@@ -5,6 +5,7 @@ Select multiple strategies, configure parameters per strategy, and run backtests
 """
 
 import sys
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -277,6 +278,35 @@ if run_btn:
         reports_dir.mkdir(exist_ok=True)
         report_path = reports_dir / f"{backtest_name}_report.html"
         report_path.write_text(report_html, encoding="utf-8")
+
+        # Auto-save CSV reports per strategy
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for strat_name, strat_results in all_results.items():
+            safe_name = strat_name.replace(" ", "_")
+
+            # Position report
+            if strat_results.get("positions_report") is not None and not strat_results["positions_report"].empty:
+                strat_results["positions_report"].to_csv(
+                    reports_dir / f"position_report_{safe_name}_{timestamp}.csv", index=False
+                )
+
+            # Order fills report
+            if strat_results.get("fills_report") is not None and not strat_results["fills_report"].empty:
+                strat_results["fills_report"].to_csv(
+                    reports_dir / f"order_fill_report_{safe_name}_{timestamp}.csv", index=False
+                )
+
+            # Account report
+            if strat_results.get("account_report") is not None and not strat_results["account_report"].empty:
+                acct_csv = strat_results["account_report"].copy()
+                for col in acct_csv.columns:
+                    if acct_csv[col].apply(lambda x: isinstance(x, (dict, list))).any():
+                        acct_csv[col] = acct_csv[col].astype(str)
+                acct_csv.to_csv(
+                    reports_dir / f"account_report_{safe_name}_{timestamp}.csv", index=False
+                )
+
+        st.success(f"CSV reports saved to `reports/` folder (timestamp: {timestamp})")
 
 # --- Display Results ---
 if "backtest_results" in st.session_state:
