@@ -174,34 +174,54 @@ def _extract_results(engine: BacktestEngine, starting_capital: float) -> dict:
     filled_orders = [o for o in orders if o.is_closed]
     total_orders = len(filled_orders)
 
-    # In NETTING mode, positions net together so we can't reliably count
-    # individual wins/losses from positions. Instead, derive from fills report.
     wins = 0
     losses = 0
     total_trades = 0
 
-    if fills_report is not None and not fills_report.empty:
-        total_trades = total_orders // 2
+    # Try counting from positions_report first (most accurate across modes)
+    if positions_report is not None and not positions_report.empty:
+        pnl_col = None
+        for col_name in ["realized_pnl", "RealizedPnl", "pnl"]:
+            if col_name in positions_report.columns:
+                pnl_col = col_name
+                break
 
-    positions = engine.kernel.cache.positions()
-    closed_positions = [p for p in positions if p.is_closed]
+        if pnl_col:
+            for _, row in positions_report.iterrows():
+                try:
+                    pnl_val = float(str(row[pnl_col]).split()[0])
+                except (ValueError, IndexError):
+                    pnl_val = 0.0
+                if pnl_val > 0:
+                    wins += 1
+                elif pnl_val < 0:
+                    losses += 1
+            total_trades = wins + losses
+        else:
+            total_trades = len(positions_report)
 
-    if len(closed_positions) > 1:
+    # Fallback to cache positions if positions_report was empty
+    if total_trades == 0:
+        positions = engine.kernel.cache.positions()
+        closed_positions = [p for p in positions if p.is_closed]
         for pos in closed_positions:
-            pnl = float(pos.realized_pnl)
+            try:
+                pnl = float(pos.realized_pnl)
+            except (TypeError, ValueError):
+                pnl = 0.0
             if pnl > 0:
                 wins += 1
             elif pnl < 0:
                 losses += 1
         total_trades = wins + losses
-    elif total_trades > 0:
+
+    # Last resort fallback from fills count
+    if total_trades == 0 and fills_report is not None and not fills_report.empty:
+        total_trades = max(total_orders // 2, 1)
         if total_pnl > 0:
             wins = 1
-            losses = 0
         elif total_pnl < 0:
-            wins = 0
             losses = 1
-        total_trades = 1
 
     win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
 

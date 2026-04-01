@@ -167,6 +167,20 @@ if run_btn:
             "strategies": strategy_configs,
         }
 
+        # Generate HTML report
+        from core.report_generator import generate_report
+
+        backtest_name = f"{selected_bar_type.split('.')[0]}_{'_'.join(selected_strategies)}"
+        report_html = generate_report(all_results, backtest_name=backtest_name)
+        st.session_state["backtest_report_html"] = report_html
+        st.session_state["backtest_report_name"] = backtest_name
+
+        # Auto-save to reports directory
+        reports_dir = Path(__file__).resolve().parent.parent / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        report_path = reports_dir / f"{backtest_name}_report.html"
+        report_path.write_text(report_html, encoding="utf-8")
+
 # --- Display Results ---
 if "backtest_results" in st.session_state:
     all_results = st.session_state["backtest_results"]
@@ -192,6 +206,16 @@ if "backtest_results" in st.session_state:
         })
 
     st.dataframe(pd.DataFrame(comparison_data), use_container_width=True, hide_index=True)
+
+    # --- HTML Report Download ---
+    if "backtest_report_html" in st.session_state:
+        report_name = st.session_state.get("backtest_report_name", "backtest")
+        st.download_button(
+            label="📄 Download HTML Report",
+            data=st.session_state["backtest_report_html"],
+            file_name=f"{report_name}_report.html",
+            mime="text/html",
+        )
 
     # --- Per-Strategy Detail ---
     for name, results in all_results.items():
@@ -222,4 +246,9 @@ if "backtest_results" in st.session_state:
             # Account report
             if results.get("account_report") is not None and not results["account_report"].empty:
                 st.markdown("**Account Report**")
-                st.dataframe(results["account_report"], use_container_width=True)
+                acct_df = results["account_report"].copy()
+                # Convert nested object columns (e.g. margins, info) to readable strings
+                for col in acct_df.columns:
+                    if acct_df[col].apply(lambda x: isinstance(x, (dict, list))).any():
+                        acct_df[col] = acct_df[col].astype(str)
+                st.dataframe(acct_df, use_container_width=True)

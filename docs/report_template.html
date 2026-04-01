@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtest Report - {{BACKTEST_NAME}}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <style>
+        :root {
+            /* Dark Theme (Default) */
+            --bg: #0b121f;
+            --bg-card: #020617;
+            --bg-soft: #0f172a;
+            --border-subtle: #1e293b;
+            --accent: #38bdf8;
+            --accent-soft: rgba(56, 189, 248, 0.12);
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --good: #22c55e;
+            --bad: #ef4444;
+            --danger: #ef4444;
+            --table-header: #1e293b;
+            --section-bg: #1e293b;
+        }
+
+        body.light-mode {
+            /* Light Theme */
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-soft: #f1f5f9;
+            --border-subtle: #e2e8f0;
+            --accent: #0ea5e9;
+            --accent-soft: rgba(14, 165, 233, 0.1);
+            --text: #0f172a;
+            --muted: #64748b;
+            --good: #16a34a;
+            --bad: #dc2626;
+            --danger: #dc2626;
+            --table-header: #e2e8f0;
+            --section-bg: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .theme-toggle {
+            background: var(--bg-soft);
+            border: 1px solid var(--border-subtle);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .page {
+            max-width: 1400px;
+            margin: 24px auto 40px auto;
+            padding: 0 16px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin: 0 0 4px 0;
+        }
+
+        .subtle {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* Portfolio Filter Section */
+        .filter-section {
+            background: var(--bg-soft);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .filter-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-row label {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--accent);
+            min-width: 120px;
+        }
+
+        /* Tag Selector Styling */
+        .tag-selector-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 300px;
+            max-width: 600px;
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            min-height: 42px;
+            cursor: text;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .tag-container:hover {
+            border-color: var(--accent);
+        }
+
+        .tag-chip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--accent-soft);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border: 1px solid var(--accent);
+            white-space: nowrap;
+        }
+
+        .tag-remove {
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--danger);
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .tag-remove:hover {
+            color: #ff0000;
+        }
+
+        .tag-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        .tag-dropdown.active {
+            display: block;
+        }
+
+        .tag-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .tag-option:hover {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .tag-input-mock {
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 0.9rem;
+            outline: none;
+            flex: 1;
+            min-width: 50px;
+            cursor: text;
+        }
+
+        .date-input {
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .light-mode .date-input::-webkit-calendar-picker-indicator {
+            filter: none;
+        }
+
+        body:not(.light-mode) .date-input::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+
+        .weekday-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .weekday-btn {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .weekday-btn:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .weekday-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        #reload-btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-left: auto;
+        }
+
+        #reload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+        }
+
+        #reload-btn:active {
+            transform: translateY(0);
+        }
+
+        #filter-status {
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-style: italic;
+            width: 100%;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .section {
+            margin-top: 16px;
+            border-radius: 18px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 14px 16px 16px 16px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .section-header h2 {
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.5);
+            font-size: 0.74rem;
+            color: var(--muted);
+        }
+
+        .grid-kpi {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 1000px) {
+            .grid-kpi {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .grid-kpi {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .kpi {
+            background: var(--bg-soft);
+            border-radius: 14px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .kpi-value {
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        .kpi-value.good {
+            color: var(--good);
+        }
+
+        .kpi-value.bad {
+            color: var(--danger);
+        }
+
+        .kpi-sub {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        .chart-card {
+            background: var(--bg-soft);
+            border-radius: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .chart-card h3 {
+            font-size: 0.9rem;
+            margin: 0 0 4px 0;
+            color: var(--muted);
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            font-size: 0.85rem;
+        }
+
+        .table thead th {
+            background: var(--table-header);
+            color: var(--text);
+            /* Light beige/orange tint like screenshot */
+            color: #475569;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px 12px;
+            border: 1px solid #fed7aa;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            font-size: 0.8rem;
+        }
+
+        .table thead th:hover {
+            background: rgba(30, 64, 175, 0.3);
+        }
+
+        .table tbody td {
+            padding: 10px 12px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            line-height: 1.4;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .table tbody tr:hover {
+            background: rgba(30, 64, 175, 0.35);
+        }
+
+        .table {
+            border: 1px solid #fed7aa;
+        }
+
+        .scroll-x {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            border-radius: 8px;
+        }
+
+        .profit {
+            color: var(--good);
+        }
+
+        .loss {
+            color: var(--bad);
+        }
+
+        /* Tabs styling */
+        .tabs-header {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 5px;
+            border-bottom: 2px solid var(--border-subtle);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover {
+            color: var(--accent);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 10px 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        /* Monthly/Weekly Table Specifics */
+        .stats-table thead th {
+            background: var(--table-header);
+            color: var(--text);
+            text-align: center;
+        }
+
+        .stats-table tbody td {
+            text-align: center;
+        }
+
+        .total-cell {
+            background: var(--bg-soft);
+            font-weight: 700;
+        }
+
+        /* Collapsible Trade History */
+        .day-header {
+            background: var(--bg-soft);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--border-subtle);
+            transition: background 0.2s;
+        }
+
+        .day-header:hover {
+            background: var(--accent-soft);
+        }
+
+        .day-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .day-title {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .day-pnl {
+            font-weight: 600;
+        }
+
+        .day-details {
+            display: none;
+            padding: 0 0 16px 0;
+        }
+
+        .day-details.active {
+            display: block;
+        }
+
+        .portfolio-group {
+            margin-top: 10px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .portfolio-header {
+            background: rgba(56, 189, 248, 0.05);
+            padding: 8px 12px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .expand-icon {
+            transition: transform 0.2s;
+        }
+
+        .day-header.active .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Zoom controls */
+        .zoom-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            justify-content: flex-end;
+        }
+
+        .zoom-btn {
+            padding: 4px 10px;
+            background: var(--bg-soft);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .zoom-btn:hover {
+            border-color: var(--accent);
+        }
+
+        /* Nav Bar CSS */
+        .top-nav {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .download-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .open-all-btn {
+            background: var(--bg-soft);
+            color: var(--text);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .open-all-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body class="light-mode">
+    <nav class="top-nav">
+        <div class="nav-links">
+            <a href="#section-input">Inputs</a>
+            <a href="#section-overview">Overview</a>
+            <a href="#section-portfolio">Portfolio</a>
+            <a href="#section-strategy">Strategy</a>
+            <a href="#section-charts">Charts</a>
+            <a href="#section-history">Trade History</a>
+        </div>
+        <div class="nav-actions">
+            <button class="download-btn" onclick="downloadReports()">⬇️ Download Reports</button>
+            <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" style="padding: 6px 12px;">
+                <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
+            </button>
+        </div>
+    </nav>
+    <div class="page" style="margin-top: 20px;">
+        <header class="header-flex">
+            <div>
+                <h1>📊 Backtest Report — {{BACKTEST_NAME}}</h1>
+                <div class="subtle" id="date-range">Loading...</div>
+            </div>
+        </header>
+
+        <!-- Section 1: Input Parameters -->
+        <section class="section" id="section-input">
+            <div class="section-header">
+                <h2>Input Parameters</h2>
+            </div>
+            <div class="filter-section">
+                <!-- Portfolio Filter Row -->
+                <div class="filter-row">
+                    <label>Portfolio Filter:</label>
+                    <div class="tag-selector-wrapper" id="tag-selector-wrapper">
+                        <div class="tag-container" id="tag-container" onclick="toggleTagDropdown(event)">
+                            <div id="selected-tags" style="display: contents;"></div>
+                            <input type="text" class="tag-input-mock" id="tag-input-mock"
+                                placeholder="Click to add portfolios..." readonly>
+                        </div>
+                        <div class="tag-dropdown" id="tag-dropdown">
+                            <!-- Options populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Range Filter Row -->
+                <div class="filter-row">
+                    <label>Date Range:</label>
+                    <input type="date" id="date-from" class="date-input" />
+                    <span style="color: var(--muted);">to</span>
+                    <input type="date" id="date-to" class="date-input" />
+                </div>
+
+                <!-- Weekday Filter Row -->
+                <div class="filter-row">
+                    <label>Weekdays:</label>
+                    <div class="weekday-buttons">
+                        <button class="weekday-btn active" data-day="1">Mon</button>
+                        <button class="weekday-btn active" data-day="2">Tue</button>
+                        <button class="weekday-btn active" data-day="3">Wed</button>
+                        <button class="weekday-btn active" data-day="4">Thu</button>
+                        <button class="weekday-btn active" data-day="5">Fri</button>
+                        <button class="weekday-btn active" data-day="6">Sat</button>
+                        <button class="weekday-btn active" data-day="0">Sun</button>
+                    </div>
+                    <button id="reload-btn">🔄 Reload Report</button>
+                </div>
+
+                <!-- Filter Status -->
+                <div id="filter-status">All data displayed</div>
+            </div>
+        </section>
+
+        <!-- Section 2: Overview -->
+        <section class="section" id="section-overview">
+            <div class="section-header">
+                <h2>Overview</h2>
+                <span class="badge">Summary Metrics</span>
+            </div>
+            <div class="grid-kpi" id="overview-grid">
+                <!-- KPIs populated dynamically -->
+            </div>
+        </section>
+
+        <!-- Section 3: Portfolio-wise Breakdown -->
+        <section class="section" id="section-portfolio">
+            <div class="section-header">
+                <h2>Portfolio-wise Breakdown</h2>
+                <span class="badge">By Portfolio</span>
+            </div>
+            <div class="scroll-x">
+                <table class="table" id="portfolio-breakdown-table">
+                    <thead>
+                        <tr>
+                            <th>Portfolio Name</th>
+                            <th>Overall Profit And Loss</th>
+                            <th>Avg Day PNL</th>
+                            <th>Max Profit</th>
+                            <th>Max Loss</th>
+                            <th>Total Days</th>
+                            <th>Win% (Days)</th>
+                            <th>Loss% (Days)</th>
+                            <th>Max Winning Streak</th>
+                            <th>Max Losing Streak</th>
+                            <th>Avg Profit On Win Days</th>
+                            <th>Avg Loss On Loss Days</th>
+                            <th>Reward To Risk Ratio</th>
+                            <th>Expectancy</th>
+                            <th>Max Drawdown (Days)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolio-breakdown-tbody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 4: Strategy-wise Breakdown -->
+        <section class="section" id="section-strategy">
+            <div class="section-header">
+                <h2>Strategy-wise Breakdown</h2>
+                <span class="badge">By Strategy</span>
+            </div>
+            <div class="scroll-x">
+                <table class="table" id="strategy-breakdown-table">
+                    <thead>
+                        <tr>
+                            <th>Strategy Name</th>
+                            <th>Portfolios</th>
+                            <th>Overall Profit And Loss</th>
+                            <th>Avg Day PNL</th>
+                            <th>Max Profit</th>
+                            <th>Max Loss</th>
+                            <th>Total Days</th>
+                            <th>Win% (Days)</th>
+                            <th>Loss% (Days)</th>
+                            <th>Max Winning Streak</th>
+                            <th>Max Losing Streak</th>
+                            <th>Avg Profit On Win Days</th>
+                            <th>Avg Loss On Loss Days</th>
+                            <th>Reward To Risk Ratio</th>
+                            <th>Expectancy</th>
+                            <th>Max Drawdown (Days)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="strategy-breakdown-tbody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 5: Performance Charts -->
+        <section class="section" id="section-charts">
+            <div class="section-header">
+                <h2>Performance Charts</h2>
+                <div class="tabs-header">
+                    <button class="tab-btn active" onclick="showTab('day-pnl-tab')">Day PNL</button>
+                    <button class="tab-btn" onclick="showTab('week-pnl-tab')">Week PNL</button>
+                    <button class="tab-btn" onclick="showTab('month-pnl-tab')">Month PNL</button>
+                    <button class="tab-btn" onclick="showTab('year-pnl-tab')">Year PNL</button>
+                    <button class="tab-btn" onclick="showTab('cumulative-pnl-tab')">Cumulative PNL</button>
+                    <button class="tab-btn" onclick="showTab('drawdown-tab')">Drawdown</button>
+                </div>
+            </div>
+
+            <div id="day-pnl-tab" class="tab-content active">
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="resetZoom('dayPnlChart')">Reset Zoom</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dayPnlChart"></canvas>
+                </div>
+            </div>
+
+            <div id="week-pnl-tab" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="weekPnlChart"></canvas>
+                </div>
+            </div>
+
+            <div id="month-pnl-tab" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="monthPnlChart"></canvas>
+                </div>
+            </div>
+
+            <div id="year-pnl-tab" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="yearPnlChart"></canvas>
+                </div>
+            </div>
+
+            <div id="cumulative-pnl-tab" class="tab-content">
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="resetZoom('cumPnlChart')">Reset Zoom</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cumPnlChart"></canvas>
+                </div>
+            </div>
+
+            <div id="drawdown-tab" class="tab-content">
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="resetZoom('drawdownChart')">Reset Zoom</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="drawdownChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        </section>
+
+        <!-- Section 8: Day-wise Trade History -->
+        <section class="section" id="section-history">
+            <div class="section-header">
+                <div>
+                    <h2 style="display: inline-block; margin-right: 12px;">Day-wise Trade History</h2>
+                    <span class="badge">Trades</span>
+                </div>
+                <button class="open-all-btn" onclick="toggleAllDays()">Open All</button>
+            </div>
+            <div id="day-wise-trades-container">
+                <!-- Collapsible content populated dynamically -->
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Helper to parse DD-MM-YYYY HH:MM:SS or DD-MM-YYYY
+        function parseDate(s) {
+            if (!s) return new Date();
+            if (s instanceof Date) return s;
+            const parts = s.split(' ')[0].split('-');
+            if (parts.length === 3) {
+                // Return YYYY, MM-1, DD
+                const timeParts = s.split(' ')[1] ? s.split(' ')[1].split(':') : [0, 0, 0];
+                return new Date(parts[2], parts[1] - 1, parts[0], timeParts[0] || 0, timeParts[1] || 0, timeParts[2] || 0);
+            }
+            return new Date(s);
+        }
+
+        // Helper to convert DD-MM-YYYY to YYYY-MM-DD for HTML5 date inputs
+        function toISODate(s) {
+            if (!s) return "";
+            const parts = s.split(' ')[0].split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+            return s;
+        }
+
+        function sortDates(dateArray, reverse = false) {
+            return dateArray.sort((a, b) => {
+                const da = parseDate(a);
+                const db = parseDate(b);
+                return reverse ? db - da : da - db;
+            });
+        }
+
+        // Embedded Data
+        const ORDERBOOK_DATA = {{ ORDERBOOK_JSON }};
+        const SUMMARY_DATA = {{ SUMMARY_JSON }};
+        const LOGS_DATA = {{ LOGS_JSON }};
+        const BACKTEST_NAME = "{{BACKTEST_NAME}}";
+
+        // State management
+        let allPortfolios = [];
+        let selectedPortfolios = [];
+        let selectedWeekdays = [0, 1, 2, 3, 4, 5, 6];
+        let dateFrom = null;
+        let dateTo = null;
+        let filteredData = [];
+        let charts = {};
+        let isDarkMode = false;
+
+        // --- Tag Selector Logic ---
+        function toggleTagDropdown(e) {
+            e.stopPropagation();
+            document.getElementById('tag-dropdown').classList.toggle('active');
+        }
+
+        function renderTagsAndDropdown() {
+            const tagContainer = document.getElementById('selected-tags');
+            const dropdown = document.getElementById('tag-dropdown');
+
+            // Render selected tags
+            tagContainer.innerHTML = selectedPortfolios.map(pf => `
+                <div class="tag-chip">
+                    <span class="tag-remove" onclick="removeTag(event, '${pf}')">&times;</span>
+                    <span>${pf}</span>
+                </div>
+            `).join('');
+
+            // Render dropdown options (unselected only)
+            const unselected = allPortfolios.filter(pf => !selectedPortfolios.includes(pf));
+            dropdown.innerHTML = unselected.map(pf => `
+                <div class="tag-option" onclick="addTag('${pf}')">${pf}</div>
+            `).join('');
+
+            if (unselected.length === 0) {
+                dropdown.innerHTML = '<div class="tag-option" style="color:var(--muted); cursor:default;">No more portfolios</div>';
+            }
+
+            // Update placeholder
+            const input = document.getElementById('tag-input-mock');
+            input.placeholder = selectedPortfolios.length === 0 ? "Click to add portfolios..." : "";
+        }
+
+        function addTag(pf) {
+            if (!selectedPortfolios.includes(pf)) {
+                selectedPortfolios.push(pf);
+                renderTagsAndDropdown();
+            }
+            document.getElementById('tag-dropdown').classList.remove('active');
+        }
+
+        function removeTag(e, pf) {
+            e.stopPropagation();
+            selectedPortfolios = selectedPortfolios.filter(p => p !== pf);
+            renderTagsAndDropdown();
+        }
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', () => {
+            document.getElementById('tag-dropdown').classList.remove('active');
+        });
+
+        // --- Theme Management ---
+        function toggleTheme() {
+            const body = document.body;
+            const btn = document.getElementById('theme-btn');
+            const icon = document.getElementById('theme-icon');
+            const text = document.getElementById('theme-text');
+
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                body.classList.remove('light-mode');
+                icon.textContent = '🌙';
+                text.textContent = 'Dark Mode';
+            } else {
+                body.classList.add('light-mode');
+                icon.textContent = '☀️';
+                text.textContent = 'Light Mode';
+            }
+            renderCharts();
+        }
+
+        // --- Tab Management ---
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+            if (btn) btn.classList.add('active');
+        }
+
+        // --- Chart Management ---
+        function resetZoom(chartId) {
+            if (charts[chartId]) charts[chartId].resetZoom();
+        }
+
+        function renderCharts() {
+            const dayPnLMap = {};
+            filteredData.forEach(row => {
+                const date = row['ENTRY TIME'].split(' ')[0];
+                dayPnLMap[date] = (dayPnLMap[date] || 0) + parseFloat(row.PNL || 0);
+            });
+            const dates = sortDates(Object.keys(dayPnLMap));
+            const pnels = dates.map(d => dayPnLMap[d]);
+
+            // Prepare Cumulative PNL & Drawdown
+            let cum = 0;
+            let peak = -Infinity;
+            const cumPnels = [];
+            const drawdowns = [];
+            pnels.forEach(pnl => {
+                cum += pnl;
+                cumPnels.push(cum);
+                if (cum > peak) peak = cum;
+                drawdowns.push(cum - peak);
+            });
+
+            // Prepare Week PNL
+            const weekNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const weekPnLMap = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            dates.forEach(d => {
+                const day = parseDate(d).getDay();
+                if (weekPnLMap[day] !== undefined) weekPnLMap[day] += dayPnLMap[d];
+            });
+            const weekVals = [0, 1, 2, 3, 4, 5, 6].map(d => weekPnLMap[d]);
+
+            // Prepare Month PNL
+            const monthPnLMap = {};
+            dates.forEach(d => {
+                const month = d.substring(3, 10); // "MM-YYYY"
+                monthPnLMap[month] = (monthPnLMap[month] || 0) + dayPnLMap[d];
+            });
+            const monthLabels = Object.keys(monthPnLMap).sort((a, b) => {
+                const [m1, y1] = a.split('-');
+                const [m2, y2] = b.split('-');
+                return y1 !== y2 ? y1.localeCompare(y2) : m1.localeCompare(m2);
+            });
+            const monthVals = monthLabels.map(m => monthPnLMap[m]);
+
+            // Prepare Year PNL
+            const yearPnLMap = {};
+            dates.forEach(d => {
+                const year = d.substring(6, 10); // "YYYY"
+                yearPnLMap[year] = (yearPnLMap[year] || 0) + dayPnLMap[d];
+            });
+            const yearLabels = Object.keys(yearPnLMap).sort();
+            const yearVals = yearLabels.map(y => yearPnLMap[y]);
+
+            // Destroy existing
+            Object.values(charts).forEach(c => c.destroy());
+
+            const textColor = isDarkMode ? '#f8fafc' : '#0f172a';
+            const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+            // 1. Day PNL Chart
+            charts.dayPnlChart = new Chart(document.getElementById('dayPnlChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Day PNL',
+                        data: pnels,
+                        backgroundColor: pnels.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                        borderColor: pnels.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } },
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor }
+                        }
+                    }
+                }
+            });
+
+            // 2. Week PNL Chart
+            charts.weekPnlChart = new Chart(document.getElementById('weekPnlChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                    datasets: [{
+                        label: 'Week PNL',
+                        data: weekVals,
+                        backgroundColor: weekVals.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: textColor } } },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            // 3. Month PNL Chart
+            charts.monthPnlChart = new Chart(document.getElementById('monthPnlChart'), {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'Month PNL',
+                        data: monthVals,
+                        backgroundColor: monthVals.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: textColor } } },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            // 4. Year PNL Chart
+            charts.yearPnlChart = new Chart(document.getElementById('yearPnlChart'), {
+                type: 'bar',
+                data: {
+                    labels: yearLabels,
+                    datasets: [{
+                        label: 'Year PNL',
+                        data: yearVals,
+                        backgroundColor: yearVals.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: textColor } } },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            // 3. Cumulative Chart
+            charts.cumPnlChart = new Chart(document.getElementById('cumPnlChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Cumulative PNL',
+                        data: cumPnels,
+                        borderColor: isDarkMode ? '#38bdf8' : '#0ea5e9',
+                        backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.1)' : 'rgba(14, 165, 233, 0.1)',
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        zoom: { zoom: { wheel: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } },
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { grid: { color: gridColor }, ticks: { color: textColor } }
+                    }
+                }
+            });
+
+            // 4. Drawdown Chart
+            charts.drawdownChart = new Chart(document.getElementById('drawdownChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Drawdown',
+                        data: drawdowns,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        zoom: { zoom: { wheel: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } },
+                        legend: { labels: { color: textColor } }
+                    },
+                    scales: {
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                        x: { grid: { color: gridColor }, ticks: { color: textColor } }
+                    }
+                }
+            });
+        }
+
+        // --- (Monthly/Weekly Tables Removed) ---
+
+        // --- Enhanced Trade History ---
+        function formatExitReason(r) {
+            if (!r) return '-';
+            const MAP = {
+                'STOPLOSS':           'Combined Loss Hit - Portfolio Level',
+                'TARGET':             'Combined Profit Hit - Portfolio Level',
+                'TARGET_TRAIL':       'Portfolio Trailing Target Hit',
+                'LEG_SL_HIT':         'Leg SL Hit',
+                'LEG_TARGET_HIT':     'Leg Target Hit',
+                'TIME_SQOFF':         'Time Square Off',
+                'END_OF_DAY':         'End of Day Exit',
+                'PARENT_EXIT':        'Parent Leg Exit (Hedge)',
+                'GLOBAL_MAX_LOSS':    'Global Max Loss Hit',
+                'GLOBAL_MAX_PROFIT':  'Global Max Profit Hit',
+                'GLOBAL_TRAIL_STOP':  'Global Trail Stop Hit',
+                'RBO_TIME_EXIT':      'RBO Time Exit'
+            };
+            return MAP[r] || r;
+        }
+
+        function renderDayWiseTrades() {
+            const container = document.getElementById('day-wise-trades-container');
+            const dates = sortDates([...new Set(filteredData.map(row => row['ENTRY TIME'].split(' ')[0]))], true);
+
+            if (dates.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">No trades found for selected filters.</div>';
+                return;
+            }
+
+            container.innerHTML = dates.map(date => {
+                const dayTrades = filteredData.filter(row => row['ENTRY TIME'].startsWith(date));
+                const dayPnL = dayTrades.reduce((sum, r) => sum + parseFloat(r.PNL || 0), 0);
+
+                // Get pre-calculated metrics if available (from Summary Data injected by Python)
+                const meta = SUMMARY_DATA[date] || {};
+                const maxP = meta.max_pnl !== undefined ? `${meta.max_pnl.toFixed(2)} (${meta.max_pnl_time.split(' ')[1]})` : '-';
+                const minP = meta.min_pnl !== undefined ? `${meta.min_pnl.toFixed(2)} (${meta.min_pnl_time.split(' ')[1]})` : '-';
+
+                // Categorize by portfolio
+                const pfNames = [...new Set(dayTrades.map(t => t['PORTFOLIO NAME']))].sort();
+                const pfSections = pfNames.map(pf => {
+                    const pfTrades = dayTrades.filter(t => t['PORTFOLIO NAME'] === pf);
+                    const pfPnL = pfTrades.reduce((sum, r) => sum + parseFloat(r.PNL || 0), 0);
+                    const pfMeta = (meta.portfolio_stats || {})[pf] || {};
+                    const pfMax = pfMeta.max_pnl !== undefined ? `${pfMeta.max_pnl.toFixed(2)}` : '';
+
+                    const rows = pfTrades.map(t => {
+                        const isProfit = parseFloat(t.PNL) >= 0;
+
+                        let legMinMaxStr = 'Min: - | Max: -';
+                        const pfStats = (meta.portfolio_stats || {})[pf] || {};
+                        const pfLegStats = pfStats.leg_stats || {};
+
+                        let execKey = null;
+                        let baseKey = null;
+                        if (t['OrderID'] && Object.keys(pfLegStats).length > 0) {
+                            const orderId = t['OrderID'];
+                            const sortedKeys = Object.keys(pfLegStats).sort((a, b) => b.length - a.length);
+                             for (const k of sortedKeys) {
+                                 // New format: portfolio_[H]execid_epoch, Old format: PORTFOLIO_LEGID_EXECID
+                                 if (orderId.endsWith('_' + k) || orderId.includes('_' + k + '_') || orderId.includes('_H' + k + '_')) {
+                                     execKey = k;
+                                     baseKey = k.replace(/\.\d+$/, '');
+                                     break;
+                                 }
+                             }
+                        }
+                        if (execKey || baseKey) {
+                            const stats = (execKey && pfLegStats[execKey]) ? pfLegStats[execKey] : (baseKey && pfLegStats[baseKey]) ? pfLegStats[baseKey] : null;
+                            if (stats && stats.min_pnl_time) {
+                                legMinMaxStr = `Min: <span class="loss">${stats.min_pnl.toFixed(2)}</span> @ ${stats.min_pnl_time.split(' ')[1] || '-'} <br> Max: <span class="profit">${stats.max_pnl.toFixed(2)}</span> @ ${stats.max_pnl_time.split(' ')[1] || '-'}`;
+                            }
+                        }
+
+                        return `
+                            <tr>
+                                <td>${t.OrderID || '-'}</td>
+                                <td>${t.SYMBOL || '-'}</td>
+                                <td>${t.TRANSACTION || '-'}</td>
+                                <td>${t['OPTION TYPE'] || '-'}</td>
+                                <td style="font-weight: 500;">${t.STRIKE || '-'}</td>
+                                <td>${t.LOTS || '-'}</td>
+                                <td>${t['ENTRY PRICE']?.toFixed(2) || '-'}</td>
+                                <td>${t['AVG EXIT PRICE']?.toFixed(2) || '-'}</td>
+                                <td class="${isProfit ? 'profit' : 'loss'}">${parseFloat(t.PNL).toFixed(2)}</td>
+                                 <td>${t['ENTRY TIME'].split(' ')[1] || '-'}</td>
+                                <td>${t['EXIT TIME'] ? t['EXIT TIME'].split(' ')[1] : '-'}</td>
+                                <td style="font-size: 0.75rem;">${formatExitReason(t['EXIT REASON'])}</td>
+                                <td style="font-size: 0.7rem; line-height: 1.2;">${legMinMaxStr}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="portfolio-group">
+                            <div class="portfolio-header">
+                                <span>📁 ${pf}</span>
+                                <span>PNL: <span class="${pfPnL >= 0 ? 'profit' : 'loss'}">${pfPnL.toFixed(2)}</span></span>
+                            </div>
+                            <table class="table">
+                                <thead style="font-size: 0.75rem;">
+                                    <tr>
+                                        <th>OrderID</th><th>Symbol</th><th>Side</th><th>Type</th><th>Strike</th><th>Lots</th>
+                                        <th>Entry</th><th>Exit</th><th>PNL</th><th>In</th><th>Out</th><th>Reason</th><th>Min/Max PNL</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    `;
+                }).join('');
+
+                const dtObj = parseDate(date);
+                const dayName = dtObj.toLocaleDateString('en-US', { weekday: 'short' });
+                const displayDate = `${date} (${dayName})`;
+
+                return `
+                    <div class="day-history-item">
+                        <div class="day-header" onclick="this.nextElementSibling.classList.toggle('active'); this.classList.toggle('active');">
+                            <div class="day-info">
+                                <span class="day-title">📅 ${displayDate}</span>
+                                <span class="day-pnl ${dayPnL >= 0 ? 'profit' : 'loss'}">Day PNL: ${dayPnL.toFixed(2)}</span>
+                                <span style="font-size:0.8rem; color:var(--muted)">Max: <span class="profit">${maxP}</span> | Min: <span class="loss">${minP}</span></span>
+                            </div>
+                            <span class="expand-icon">▼</span>
+                        </div>
+                        <div class="day-details">
+                            ${pfSections}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Filtering Logic ---
+        function initFilters() {
+            // Portfolios
+            allPortfolios = [...new Set(ORDERBOOK_DATA.map(row => row['PORTFOLIO NAME']))].sort();
+            selectedPortfolios = [...allPortfolios]; // Select all by default
+            renderTagsAndDropdown();
+
+            // Dates
+            const rawDates = [...new Set(ORDERBOOK_DATA.map(r => r['ENTRY TIME']?.split(' ')[0]).filter(d => d))];
+            if (rawDates.length > 0) {
+                const sorted = sortDates(rawDates);
+                const min = sorted[0];
+                const max = sorted[sorted.length - 1];
+                document.getElementById('date-from').value = toISODate(min);
+                document.getElementById('date-to').value = toISODate(max);
+                document.getElementById('date-range').textContent = `Date range: ${min} to ${max}`;
+            }
+
+            // Buttons
+            document.querySelectorAll('.weekday-btn').forEach(btn => {
+                btn.addEventListener('click', () => btn.classList.toggle('active'));
+            });
+            document.getElementById('reload-btn').addEventListener('click', () => {
+                applyAllFilters();
+                renderAll();
+            });
+        }
+
+        function applyAllFilters() {
+            const from = document.getElementById('date-from').value;
+            const to = document.getElementById('date-to').value;
+            const selDays = Array.from(document.querySelectorAll('.weekday-btn.active')).map(b => parseInt(b.dataset.day));
+
+            filteredData = ORDERBOOK_DATA.filter(row => {
+                const rowPf = row['PORTFOLIO NAME'];
+                const rowDateStr = row['ENTRY TIME']?.split(' ')[0];
+                if (!rowDateStr) return false;
+
+                const dt = parseDate(rowDateStr);
+                const day = dt.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+
+                // Tag-based filter
+                if (selectedPortfolios.length > 0 && !selectedPortfolios.includes(rowPf)) return false;
+                if (selectedPortfolios.length === 0) return false; // Hide all if none selected
+
+                if (from && toISODate(rowDateStr) < from) return false;
+                if (to && toISODate(rowDateStr) > to) return false;
+                if (selDays.length > 0 && !selDays.includes(day)) return false;
+                return true;
+            });
+
+            // Update status
+            const status = `| ${filteredData.length} trades | ${selectedPortfolios.length} Portfolios | ${from} to ${to}`;
+            document.getElementById('filter-status').textContent = status;
+        }
+
+        // --- Metrics (Reused from existing but simplified) ---
+        function calculateMetrics(data) {
+            const dayMap = {};
+            data.forEach(r => {
+                const d = r['ENTRY TIME'].split(' ')[0];
+                dayMap[d] = (dayMap[d] || 0) + parseFloat(r.PNL || 0);
+            });
+            const dates = sortDates(Object.keys(dayMap));
+            const pnels = dates.map(d => dayMap[d]);
+            const totalPnL = pnels.reduce((a, b) => a + b, 0);
+            const winDays = pnels.filter(v => v > 0);
+            const lossDays = pnels.filter(v => v < 0);
+
+            let maxP = { v: 0, d: '-' };
+            let maxL = { v: 0, d: '-' };
+            dates.forEach(d => {
+                const v = dayMap[d];
+                if (v > maxP.v) maxP = { v, d };
+                if (v < maxL.v) maxL = { v, d };
+            });
+
+            // Streaks
+            let wStr = 0, lStr = 0, mw = 0, ml = 0;
+            pnels.forEach(v => {
+                if (v > 0) { wStr++; lStr = 0; if (wStr > mw) mw = wStr; }
+                else if (v < 0) { lStr++; wStr = 0; if (lStr > ml) ml = lStr; }
+                else { wStr = 0; lStr = 0; }
+            });
+
+            // Drawdown
+            let c = 0, pk = 0, mdd = 0;
+            pnels.forEach(v => { c += v; if (c > pk) pk = c; const dd = pk - c; if (dd > mdd) mdd = dd; });
+
+            return {
+                totalPnL, avgDay: pnels.length ? totalPnL / pnels.length : 0,
+                maxP, maxL, totalDays: pnels.length,
+                winP: pnels.length ? (winDays.length / pnels.length * 100) : 0, winC: winDays.length,
+                lossP: pnels.length ? (lossDays.length / pnels.length * 100) : 0, lossC: lossDays.length,
+                mw, ml, avgW: winDays.length ? winDays.reduce((a, b) => a + b, 0) / winDays.length : 0,
+                avgL: lossDays.length ? lossDays.reduce((a, b) => a + b, 0) / lossDays.length : 0,
+                mdd
+            };
+        }
+
+        function renderOverview() {
+            const m = calculateMetrics(filteredData);
+            document.getElementById('overview-grid').innerHTML = `
+                <div class="kpi"><div class="kpi-label">Overall PNL</div><div class="kpi-value ${m.totalPnL >= 0 ? 'good' : 'bad'}">${m.totalPnL.toFixed(2)}</div></div>
+                <div class="kpi"><div class="kpi-label">Avg Day PNL</div><div class="kpi-value">${m.avgDay.toFixed(2)}</div></div>
+                <div class="kpi"><div class="kpi-label">Max Profit</div><div class="kpi-value good">${m.maxP.v.toFixed(2)}</div><div class="kpi-sub">${m.maxP.d}</div></div>
+                <div class="kpi"><div class="kpi-label">Max Loss</div><div class="kpi-value bad">${m.maxL.v.toFixed(2)}</div><div class="kpi-sub">${m.maxL.d}</div></div>
+                <div class="kpi"><div class="kpi-label">Total Days</div><div class="kpi-value">${m.totalDays}</div></div>
+                <div class="kpi"><div class="kpi-label">Win%</div><div class="kpi-value good">${m.winP.toFixed(1)}% (${m.winC})</div></div>
+                <div class="kpi"><div class="kpi-label">Loss%</div><div class="kpi-value bad">${m.lossP.toFixed(1)}% (${m.lossC})</div></div>
+                <div class="kpi"><div class="kpi-label">Max Win Streak</div><div class="kpi-value good">${m.mw}</div></div>
+                <div class="kpi"><div class="kpi-label">Max Loss Streak</div><div class="kpi-value bad">${m.ml}</div></div>
+                <div class="kpi"><div class="kpi-label">MDD</div><div class="kpi-value bad">${m.mdd.toFixed(2)}</div></div>
+            `;
+        }
+
+        function renderPortfolios() {
+            const pfs = [...new Set(filteredData.map(r => r['PORTFOLIO NAME']))].sort();
+            document.getElementById('portfolio-breakdown-tbody').innerHTML = pfs.map(pf => {
+                const d = calculateMetrics(filteredData.filter(r => r['PORTFOLIO NAME'] === pf));
+                const expectancy = (d.winP / 100 * d.avgW) - (d.lossP / 100 * Math.abs(d.avgL));
+                return `<tr><td>${pf}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderStrategies() {
+            const strats = [...new Set(filteredData.map(r => r['STRATEGY'] || 'DEFAULT'))].sort();
+            document.getElementById('strategy-breakdown-tbody').innerHTML = strats.map(s => {
+                const sData = filteredData.filter(r => (r['STRATEGY'] || 'DEFAULT') === s);
+                const d = calculateMetrics(sData);
+                const expectancy = (d.winP / 100 * d.avgW) - (d.lossP / 100 * Math.abs(d.avgL));
+                const pfs = [...new Set(sData.map(r => r['PORTFOLIO NAME']))].join(', ');
+                return `<tr><td style="font-weight:600">${s}</td><td style="font-size:0.7rem">${pfs}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderAll() {
+            renderOverview();
+            renderCharts();
+            renderPortfolios();
+            renderStrategies();
+            renderDayWiseTrades();
+        }
+
+        // --- UI Interactions and Downloads ---
+        function toggleAllDays() {
+            const details = document.querySelectorAll('.day-details');
+            const headers = document.querySelectorAll('.day-header');
+
+            // Checking first item to determine if we open or close all
+            const isAnyClosed = Array.from(details).some(d => !d.classList.contains('active'));
+
+            if (isAnyClosed) {
+                details.forEach(d => d.classList.add('active'));
+                headers.forEach(h => h.classList.add('active'));
+            } else {
+                details.forEach(d => d.classList.remove('active'));
+                headers.forEach(h => h.classList.remove('active'));
+            }
+        }
+
+        function downloadReports() {
+            // 1. Download HTML Report
+            const htmlContent = document.documentElement.outerHTML;
+            const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+            const htmlUrl = URL.createObjectURL(htmlBlob);
+            const htmlLink = document.createElement('a');
+            htmlLink.href = htmlUrl;
+            htmlLink.download = `${BACKTEST_NAME}_Report.html`;
+            htmlLink.click();
+
+            // Prepare CSV downloader
+            const downloadCSV = (data, filename) => {
+                if (!data || data.length === 0) return;
+                const headers = Object.keys(data[0]);
+                const csvRows = [
+                    headers.join(','),
+                    ...data.map(row => headers.map(fieldName => {
+                        let fieldVal = row[fieldName] === null || row[fieldName] === undefined ? '' : row[fieldName].toString();
+                        fieldVal = fieldVal.replace(/"/g, '""');
+                        if (fieldVal.search(/("|,|\n)/g) >= 0) {
+                            fieldVal = `"${fieldVal}"`;
+                        }
+                        return fieldVal;
+                    }).join(','))
+                ];
+                const csvBlob = new Blob([csvRows.join('\\n')], { type: 'text/csv' });
+                const csvUrl = URL.createObjectURL(csvBlob);
+                const csvLink = document.createElement('a');
+                csvLink.href = csvUrl;
+                csvLink.download = filename;
+                csvLink.click();
+            };
+
+            // 2. Download Orderbook
+            setTimeout(() => downloadCSV(ORDERBOOK_DATA, `${BACKTEST_NAME}_Orderbook.csv`), 500);
+
+            // 3. Download Logs
+            setTimeout(() => downloadCSV(LOGS_DATA, `${BACKTEST_NAME}_Logs.csv`), 1000);
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initFilters();
+            applyAllFilters();
+            renderAll();
+        });
+    </script>
+</body>
+
+</html>
