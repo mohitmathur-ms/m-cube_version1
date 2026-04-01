@@ -1,0 +1,4 @@
+,total,locked,free,currency,account_id,account_type,base_currency,margins,reported,info
+2024-02-01 00:02:00+00:00,1000000.00,0.00,1000000.00,USD,XCME-001,MARGIN,USD,[],True,{}
+2024-02-01 00:03:00+00:00,1000000.00,0.00,1000000.00,USD,XCME-001,MARGIN,USD,[],False,{}
+2024-02-01 00:03:00+00:00,1000000.00,0.00,1000000.00,USD,XCME-001,MARGIN,USD,[],False,{}
