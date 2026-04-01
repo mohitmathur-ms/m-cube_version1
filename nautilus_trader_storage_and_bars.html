@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NautilusTrader Deep Dive: Storage, Databases &amp; Tick-to-Bar Conversion</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #f778ba;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+    --red: #f85149;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent4), var(--accent5));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h2 { font-size: 1.1rem; color: var(--accent); margin-bottom: 0.8rem; }
+  .toc ol { padding-left: 1.2rem; }
+  .toc li { margin: 0.3rem 0; }
+  .toc a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+  .toc a:hover { color: var(--accent); }
+
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.5rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; color: var(--accent3); margin: 1.5rem 0 0.8rem 0; }
+  h4 { font-size: 1rem; color: var(--accent4); margin: 1.2rem 0 0.5rem 0; }
+  p { margin-bottom: 0.8rem; }
+  strong { color: #f0f6fc; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent2);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .keyword { color: var(--accent3); }
+  .function { color: var(--accent); }
+  .string { color: var(--accent2); }
+  .comment { color: var(--text-muted); }
+  .arrow { color: var(--accent4); }
+  .highlight { color: var(--accent5); }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th { background: var(--code-bg); color: var(--accent); text-align: left; padding: 0.7rem 1rem; border: 1px solid var(--border); font-weight: 600; }
+  td { padding: 0.6rem 1rem; border: 1px solid var(--border); }
+  tr:nth-child(even) td { background: var(--table-alt); }
+
+  .insight-box {
+    background: linear-gradient(135deg, #1a2332, #161b22);
+    border-left: 4px solid var(--accent2);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .insight-box strong { color: var(--accent2); }
+
+  .warning-box {
+    background: linear-gradient(135deg, #2a1a1a, #161b22);
+    border-left: 4px solid var(--red);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .warning-box strong { color: var(--red); }
+
+  .info-box {
+    background: linear-gradient(135deg, #1a1a2e, #161b22);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .info-box strong { color: var(--accent); }
+
+  .flow-diagram {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+  .flow-diagram pre { background: none; border: none; display: inline-block; text-align: left; margin: 0; padding: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-parquet { background: #1f3a2a; color: #3fb950; }
+  .badge-redis { background: #3a1f1f; color: #f85149; }
+  .badge-memory { background: #1c2d4a; color: #58a6ff; }
+  .badge-feather { background: #2d1f4a; color: #d2a8ff; }
+  .badge-optional { background: #3a2a1f; color: #f0883e; }
+
+  .file-ref { color: var(--accent4); font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85em; }
+  ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.3rem 0; }
+
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  .col-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+  }
+  .col-box h4 { margin-top: 0; }
+
+  .step-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-right: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .three-col { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.5rem; }
+    .container { padding: 1rem; }
+    section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NautilusTrader Deep Dive</h1>
+  <p>Storage, Databases &amp; Tick-to-Bar Conversion &mdash; Where data lives after ingestion, how it's persisted, and the precise mechanics of bar aggregation.</p>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#storage-overview">Where Is Data Stored? (Three Tiers)</a></li>
+    <li><a href="#parquet">Storage A: Parquet Catalog (Market Data)</a></li>
+    <li><a href="#redis">Storage B: Redis (Trading State)</a></li>
+    <li><a href="#feather">Storage C: StreamingFeatherWriter (Live)</a></li>
+    <li><a href="#merge">How Data Merges (The Write Path)</a></li>
+    <li><a href="#tick-to-bar">Tick-to-Bar Conversion (Complete Mechanism)</a></li>
+    <li><a href="#bar-builder">BarBuilder: The OHLCV Accumulator</a></li>
+    <li><a href="#time-bar">TimeBarAggregator (1-min, 5-min bars)</a></li>
+    <li><a href="#volume-bar">VolumeBarAggregator (Smart Tick Splitting)</a></li>
+    <li><a href="#other-bars">Other Bar Types (Tick, Imbalance, Runs, Renko)</a></li>
+    <li><a href="#architecture-diagram">Complete Storage Architecture Diagram</a></li>
+    <li><a href="#takeaways">Key Takeaways</a></li>
+  </ol>
+</div>
+
+<!-- Section 1: Storage Overview -->
+<section id="storage-overview">
+  <h2>Where Is Data Stored? (Three Independent Tiers)</h2>
+
+  <div class="three-col">
+    <div class="col-box">
+      <h4><span class="badge badge-memory">Tier 1</span> In-Memory Cache</h4>
+      <p><strong>Speed:</strong> Nanoseconds</p>
+      <p><strong>Capacity:</strong> Limited (10K items)</p>
+      <p><strong>File:</strong> <span class="file-ref">cache/cache.pyx</span></p>
+      <p>Latest quotes, trades, bar history deques. Fastest access, used during runtime.</p>
+    </div>
+    <div class="col-box">
+      <h4><span class="badge badge-parquet">Tier 2</span> Parquet Catalog</h4>
+      <p><strong>Speed:</strong> Milliseconds</p>
+      <p><strong>Capacity:</strong> Unlimited</p>
+      <p><strong>File:</strong> <span class="file-ref">persistence/catalog/parquet.py</span></p>
+      <p>All market data as .parquet files. Used for backtesting and analysis. Supports cloud.</p>
+    </div>
+    <div class="col-box">
+      <h4><span class="badge badge-redis">Tier 3</span> Redis <span class="badge badge-optional">Optional</span></h4>
+      <p><strong>Speed:</strong> Sub-millisecond</p>
+      <p><strong>Capacity:</strong> Medium</p>
+      <p><strong>File:</strong> <span class="file-ref">cache/database.pyx</span></p>
+      <p>Orders, positions, accounts ONLY. For crash recovery. NOT for market data.</p>
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <strong>No traditional database for market data!</strong> NautilusTrader uses Parquet files (columnar, compressed, fast reads) &mdash; not SQL, not MongoDB, not InfluxDB. Redis is only for trading state and is optional.
+  </div>
+</section>
+
+<!-- Section 2: Parquet Catalog -->
+<section id="parquet">
+  <h2>Storage A: Parquet Catalog (Market Data Persistence)</h2>
+
+  <p><strong>Purpose:</strong> Store market data (ticks, bars, order book deltas, instruments) to disk for backtesting and analysis.</p>
+  <p><strong>Format:</strong> Apache Parquet files (columnar binary format)</p>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/persistence/catalog/parquet.py</span> &mdash; <code>ParquetDataCatalog</code></p>
+
+  <h3>How write_data() works</h3>
+  <pre><code><span class="function">write_data</span>(data: list[Data])
+  <span class="arrow">&rarr;</span> Sort &amp; group data by (<span class="string">class_name</span>, <span class="string">instrument_id</span>)
+    <span class="arrow">&rarr;</span> For each group, call <span class="function">_write_chunk()</span>
+      <span class="arrow">&rarr;</span> Serialize to PyArrow Table via <span class="function">ArrowSerializer</span>
+      <span class="arrow">&rarr;</span> Write to Parquet file via <span class="function">pq.write_table()</span></code></pre>
+
+  <h3>On-disk file structure</h3>
+  <pre><code>catalog_root/
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">QuoteTick/</span>
+<span class="arrow">&#9474;</span>   <span class="arrow">&#9492;&#9472;&#9472;</span> BINANCE.ETHUSDT/
+<span class="arrow">&#9474;</span>       <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="string">1704067200000000000-1704153600000000000.parquet</span>  <span class="comment">&larr; filename = start_ns-end_ns</span>
+<span class="arrow">&#9474;</span>       <span class="arrow">&#9492;&#9472;&#9472;</span> <span class="string">1704153600000000001-1704240000000000000.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">TradeTick/</span>
+<span class="arrow">&#9474;</span>   <span class="arrow">&#9492;&#9472;&#9472;</span> BINANCE.ETHUSDT/
+<span class="arrow">&#9474;</span>       <span class="arrow">&#9492;&#9472;&#9472;</span> <span class="string">1704067200000000000-1704153600000000000.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Bar/</span>
+<span class="arrow">&#9474;</span>   <span class="arrow">&#9492;&#9472;&#9472;</span> BINANCE.ETHUSDT-1-MINUTE-LAST/
+<span class="arrow">&#9474;</span>       <span class="arrow">&#9492;&#9472;&#9472;</span> <span class="string">1704067200000000000-1704153600000000000.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">OrderBookDelta/</span>
+<span class="arrow">&#9492;&#9472;&#9472;</span> <span class="keyword">Instrument/</span></code></pre>
+
+  <h3>Key rules enforced by the catalog</h3>
+  <table>
+    <thead><tr><th>Rule</th><th>Detail</th><th>Code Line</th></tr></thead>
+    <tbody>
+      <tr><td>Disjoint intervals</td><td>Overlapping timestamp files raise <code>ValueError</code></td><td>parquet.py:348-355</td></tr>
+      <tr><td>Monotonic ordering</td><td>Data must be non-decreasing by <code>ts_init</code></td><td>parquet.py:370-378</td></tr>
+      <tr><td>Row group size</td><td>Max 5,000 rows per Parquet row group (default)</td><td>parquet.py:137</td></tr>
+      <tr><td>No overwrites</td><td>Existing files are skipped, not overwritten</td><td>parquet.py:344-346</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Supported file systems (via fsspec)</h3>
+  <table>
+    <thead><tr><th>Protocol</th><th>Storage</th><th>Example URI</th></tr></thead>
+    <tbody>
+      <tr><td><code>file://</code></td><td>Local filesystem (default)</td><td><code>/home/data/catalog</code></td></tr>
+      <tr><td><code>s3://</code></td><td>Amazon S3</td><td><code>s3://my-bucket/catalog</code></td></tr>
+      <tr><td><code>gcs://</code></td><td>Google Cloud Storage</td><td><code>gcs://my-bucket/catalog</code></td></tr>
+      <tr><td><code>az://</code></td><td>Azure Blob Storage</td><td><code>az://my-container/catalog</code></td></tr>
+      <tr><td><code>memory://</code></td><td>In-memory (testing)</td><td>&mdash;</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Section 3: Redis -->
+<section id="redis">
+  <h2>Storage B: Redis (Trading State Only) <span class="badge badge-optional">Optional</span></h2>
+
+  <p><strong>Purpose:</strong> Persist <em>trading state</em> &mdash; orders, positions, accounts &mdash; for crash recovery. <strong>NOT for market data.</strong></p>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/cache/database.pyx</span> &mdash; <code>CacheDatabaseAdapter</code></p>
+  <p><strong>Backend:</strong> <code>nautilus_pyo3.RedisCacheDatabase</code> (Rust implementation)</p>
+  <p><strong>Requires:</strong> Redis 6.2+</p>
+
+  <h3>What Redis stores</h3>
+  <pre><code>Redis Keys:
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">currencies</span>           <span class="comment">&rarr; serialized Currency objects</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">instruments</span>          <span class="comment">&rarr; serialized Instrument definitions</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">synthetics</span>           <span class="comment">&rarr; synthetic instrument definitions</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">accounts</span>             <span class="comment">&rarr; account state (balances, margins)</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">orders</span>               <span class="comment">&rarr; full order state with all events</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">positions</span>            <span class="comment">&rarr; position state</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">index:orders_open</span>    <span class="comment">&rarr; set of open order IDs</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">index:orders_closed</span>  <span class="comment">&rarr; set of closed order IDs</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">index:positions_open</span> <span class="comment">&rarr; set of open position IDs</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">snapshots:orders</span>     <span class="comment">&rarr; order snapshots</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">snapshots:positions</span>  <span class="comment">&rarr; position snapshots</span>
+<span class="arrow">&#9492;&#9472;&#9472;</span> <span class="keyword">health:heartbeat</span>     <span class="comment">&rarr; liveness check</span></code></pre>
+
+  <h3>Configuration</h3>
+  <pre><code><span class="keyword">from</span> nautilus_trader.cache.config <span class="keyword">import</span> CacheConfig
+<span class="keyword">from</span> nautilus_trader.common.config <span class="keyword">import</span> DatabaseConfig
+
+CacheConfig(
+    database=DatabaseConfig(
+        type=<span class="string">"redis"</span>,
+        host=<span class="string">"localhost"</span>,
+        port=<span class="string">6379</span>,
+    ),
+    encoding=<span class="string">"msgpack"</span>,              <span class="comment"># or "json"</span>
+    timestamps_as_iso8601=<span class="keyword">False</span>,    <span class="comment"># True = ISO strings, False = UNIX nanos</span>
+    buffer_interval_ms=<span class="string">100</span>,         <span class="comment"># batch writes every 100ms</span>
+    flush_on_start=<span class="keyword">False</span>,           <span class="comment"># wipe Redis on startup?</span>
+    tick_capacity=<span class="string">10_000</span>,           <span class="comment"># max ticks in memory deque</span>
+    bar_capacity=<span class="string">10_000</span>,            <span class="comment"># max bars in memory deque</span>
+)</code></pre>
+
+  <div class="info-box">
+    <strong>Redis is optional.</strong> If <code>database=None</code> (the default), everything runs in-memory only. No Redis needed.
+  </div>
+</section>
+
+<!-- Section 4: Feather Writer -->
+<section id="feather">
+  <h2>Storage C: StreamingFeatherWriter (Live Streaming to Disk)</h2>
+
+  <p><strong>Purpose:</strong> During live trading, continuously write market data to disk in near-real-time.</p>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/persistence/writer.py</span> &mdash; <code>StreamingFeatherWriter</code></p>
+  <p><strong>Format:</strong> Arrow IPC (Feather) &mdash; a streaming-friendly binary format</p>
+
+  <table>
+    <thead><tr><th>Feature</th><th>Options</th></tr></thead>
+    <tbody>
+      <tr><td>Rotation Modes</td><td><code>SIZE</code> (default 1GB), <code>INTERVAL</code> (default 1 day), <code>SCHEDULED_DATES</code>, <code>NO_ROTATION</code></td></tr>
+      <tr><td>Flush Interval</td><td>Configurable batching (e.g., flush every 100ms)</td></tr>
+      <tr><td>Type Filtering</td><td>Only write specific types (e.g., only QuoteTick and Bar)</td></tr>
+      <tr><td>Compression</td><td>Optional file compression</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Section 5: Data Merge Path -->
+<section id="merge">
+  <h2>How Data Merges (The Write Path)</h2>
+
+  <h3><span class="step-indicator">1</span> Ingestion &rarr; In-Memory Cache</h3>
+  <pre><code><span class="function">_handle_quote_tick</span>(tick):
+    cache.<span class="function">add_quote_tick</span>(tick)    <span class="comment">&larr; adds to in-memory deque (max 10,000 items)</span>
+    msgbus.<span class="function">publish</span>(topic, tick)   <span class="comment">&larr; routes to all subscribers</span></code></pre>
+
+  <p>The Cache holds:</p>
+  <ul>
+    <li><strong>Latest values:</strong> <code>dict[InstrumentId, QuoteTick]</code> &mdash; only the most recent</li>
+    <li><strong>History deques:</strong> <code>dict[InstrumentId, deque[QuoteTick]]</code> &mdash; last N items (configurable via <code>tick_capacity</code> / <code>bar_capacity</code>)</li>
+  </ul>
+
+  <h3><span class="step-indicator">2</span> Ingestion &rarr; Parquet Catalog (if configured)</h3>
+  <pre><code><span class="comment"># In data/engine.pyx</span>
+self.<span class="function">_update_catalog</span>(data, data_cls, identifier)
+    <span class="arrow">&rarr;</span> catalog.<span class="function">write_data</span>([data])
+        <span class="arrow">&rarr;</span> ArrowSerializer.<span class="function">serialize_batch</span>()
+        <span class="arrow">&rarr;</span> pq.<span class="function">write_table</span>() <span class="comment">&larr; new .parquet file</span></code></pre>
+
+  <p>The catalog enforces:</p>
+  <ul>
+    <li><strong>No overlapping timestamps</strong> &mdash; each file covers a unique time range</li>
+    <li><strong>Adjacent file merging</strong> &mdash; <code>extend_file_name()</code> renames files to merge adjacent time ranges without rewriting data</li>
+  </ul>
+
+  <h3><span class="step-indicator">3</span> Reading Back (for Backtesting)</h3>
+  <pre><code>catalog = ParquetDataCatalog(<span class="string">"/path/to/catalog"</span>)
+bars = catalog.<span class="function">bars</span>(
+    bar_types=[<span class="string">"ETHUSDT.BINANCE-1-MINUTE-LAST"</span>],
+    start=<span class="string">"2024-01-01"</span>,
+    end=<span class="string">"2024-02-01"</span>,
+)
+<span class="comment"># Uses pyarrow.dataset for efficient predicate pushdown</span>
+<span class="comment"># Only reads the Parquet row groups matching the time filter</span></code></pre>
+</section>
+
+<!-- Section 6: Tick-to-Bar Overview -->
+<section id="tick-to-bar">
+  <h2>Tick-to-Bar Conversion (Complete Mechanism)</h2>
+
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/data/aggregation.pyx</span></p>
+
+  <table>
+    <thead><tr><th>Class</th><th>What Triggers a New Bar?</th><th>Line</th></tr></thead>
+    <tbody>
+      <tr><td><code>BarBuilder</code></td><td>Low-level OHLCV accumulator. Tracks open/high/low/close/volume.</td><td>65</td></tr>
+      <tr><td><code>BarAggregator</code></td><td>Base class. Receives ticks, delegates to BarBuilder, emits bars via callback.</td><td>251</td></tr>
+      <tr><td><strong><code>TimeBarAggregator</code></strong></td><td>Timer fires at interval (1min, 5min, 1hr...). Builds bar from all ticks in window.</td><td>1390</td></tr>
+      <tr><td><code>TickBarAggregator</code></td><td>After every N ticks, builds and emits a bar.</td><td>400</td></tr>
+      <tr><td><strong><code>VolumeBarAggregator</code></strong></td><td>When cumulative volume hits threshold. <em>Splits excess volume into next bar.</em></td><td>577</td></tr>
+      <tr><td><code>ValueBarAggregator</code></td><td>When cumulative notional value (price &times; size) reaches threshold.</td><td>&mdash;</td></tr>
+      <tr><td><code>TickImbalanceBarAggregator</code></td><td>When |buy_ticks &minus; sell_ticks| reaches threshold.</td><td>447</td></tr>
+      <tr><td><code>TickRunsBarAggregator</code></td><td>When consecutive same-side ticks reach threshold.</td><td>509</td></tr>
+      <tr><td><code>RenkoBarAggregator</code></td><td>When price moves a fixed amount from the last bar's close.</td><td>&mdash;</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Section 7: BarBuilder -->
+<section id="bar-builder">
+  <h2>BarBuilder: The OHLCV Accumulator</h2>
+
+  <h3>Step 1: <code>BarBuilder.update()</code> &mdash; Each tick updates OHLCV</h3>
+  <pre><code><span class="keyword">cpdef void</span> <span class="function">update</span>(self, Price price, Quantity size, uint64_t ts_init):
+    <span class="keyword">if</span> self._open <span class="keyword">is None</span>:          <span class="comment"># First tick &rarr; set OPEN</span>
+        self._open = price
+        self._high = price
+        self._low = price
+    <span class="keyword">elif</span> price &gt; self._high:         <span class="comment"># Update HIGH</span>
+        self._high = price
+    <span class="keyword">elif</span> price &lt; self._low:          <span class="comment"># Update LOW</span>
+        self._low = price
+
+    self._close = price              <span class="comment"># Always update CLOSE to latest price</span>
+    self.volume += size              <span class="comment"># Accumulate VOLUME</span>
+    self.count += 1                  <span class="comment"># Count ticks in this bar</span></code></pre>
+
+  <h3>Step 2: <code>BarBuilder.build()</code> &mdash; Emit the completed bar</h3>
+  <pre><code><span class="keyword">cpdef</span> Bar <span class="function">build</span>(self, uint64_t ts_event, uint64_t ts_init):
+    <span class="comment"># Edge case: no ticks received &rarr; use last bar's close</span>
+    <span class="keyword">if</span> self._open <span class="keyword">is None</span>:
+        self._open = self._last_close
+        self._high = self._last_close
+        self._low = self._last_close
+        self._close = self._last_close
+
+    bar = <span class="function">Bar</span>(
+        bar_type=self._bar_type,
+        open=self._open,
+        high=self._high,
+        low=self._low,
+        close=self._close,
+        volume=self.volume,
+        ts_event=ts_event,
+        ts_init=ts_init,
+    )
+    self._last_close = self._close   <span class="comment"># Remember for next bar's edge case</span>
+    self.<span class="function">reset()</span>                      <span class="comment"># Clear OHLCV state for next bar</span>
+    <span class="keyword">return</span> bar</code></pre>
+</section>
+
+<!-- Section 8: TimeBarAggregator -->
+<section id="time-bar">
+  <h2>TimeBarAggregator (1-minute, 5-minute bars, etc.)</h2>
+
+  <p><strong>Line:</strong> 1390 in <span class="file-ref">aggregation.pyx</span></p>
+  <p>The most commonly used aggregator. Uses an internal <strong>Clock timer</strong> to fire at regular intervals.</p>
+
+  <h3>Configuration options</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>interval_type</code></td><td><code>"left-open"</code></td><td><code>"left-open"</code> = (start, end], <code>"right-open"</code> = [start, end)</td></tr>
+      <tr><td><code>timestamp_on_close</code></td><td><code>True</code></td><td>Bar's <code>ts_event</code> = close time (True) or open time (False)</td></tr>
+      <tr><td><code>skip_first_non_full_bar</code></td><td><code>False</code></td><td>Skip emitting a bar if aggregation starts mid-interval</td></tr>
+      <tr><td><code>build_with_no_updates</code></td><td><code>True</code></td><td>If True, emit bar even if no ticks arrived (uses last close)</td></tr>
+      <tr><td><code>time_bars_origin_offset</code></td><td><code>None</code></td><td>Offset the bar boundaries (e.g., start at :30 instead of :00)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Walkthrough: 1-minute bars</h3>
+  <pre><code><span class="highlight">1. Strategy subscribes:</span>
+   subscribe_bars(BarType(<span class="string">"ETHUSDT.BINANCE-1-MINUTE-LAST"</span>))
+
+<span class="highlight">2. DataEngine creates TimeBarAggregator:</span>
+   <span class="comment">Sets internal timer via Clock to fire every 60 seconds</span>
+   <span class="comment">interval_type="left-open" &rarr; tick AT the boundary goes to NEXT bar</span>
+
+<span class="highlight">3. Ticks arrive continuously:</span>
+   10:00:00.100  TradeTick(price=<span class="string">3500.50</span>, size=<span class="string">1.5</span>)  <span class="arrow">&rarr;</span> builder.update()
+   10:00:00.250  TradeTick(price=<span class="string">3501.00</span>, size=<span class="string">0.8</span>)  <span class="arrow">&rarr;</span> builder.update()
+   10:00:00.500  TradeTick(price=<span class="string">3499.75</span>, size=<span class="string">2.0</span>)  <span class="arrow">&rarr;</span> builder.update()
+   <span class="comment">... hundreds more ticks ...</span>
+   10:00:59.990  TradeTick(price=<span class="string">3502.25</span>, size=<span class="string">1.0</span>)  <span class="arrow">&rarr;</span> builder.update()
+
+<span class="highlight">4. Timer fires at 10:01:00.000:</span>
+   <span class="arrow">&rarr;</span> builder.<span class="function">build</span>(ts_event=10:01:00) returns:
+     <span class="keyword">Bar</span>(open=<span class="string">3500.50</span>, high=<span class="string">3505.00</span>, low=<span class="string">3498.00</span>, close=<span class="string">3502.25</span>, volume=<span class="string">1543.7</span>)
+   <span class="arrow">&rarr;</span> handler(bar) <span class="arrow">&rarr;</span> published to message bus
+   <span class="arrow">&rarr;</span> builder.<span class="function">reset()</span> <span class="arrow">&rarr;</span> ready for next minute
+
+<span class="highlight">5. If NO ticks arrive in next minute:</span>
+   <span class="comment">build_with_no_updates=True (default)</span>
+   <span class="arrow">&rarr;</span> Emits bar with open=high=low=close=<span class="string">last_close</span>, volume=<span class="string">0</span></code></pre>
+</section>
+
+<!-- Section 9: VolumeBarAggregator -->
+<section id="volume-bar">
+  <h2>VolumeBarAggregator (Smart Tick Splitting)</h2>
+
+  <p><strong>Line:</strong> 577 in <span class="file-ref">aggregation.pyx</span></p>
+  <p>The cleverest aggregator &mdash; it <strong>splits a single tick across bar boundaries</strong> when volume overflows.</p>
+
+  <h3>The algorithm</h3>
+  <pre><code><span class="keyword">cdef void</span> <span class="function">_apply_update</span>(self, Price price, Quantity size, uint64_t ts_init):
+    raw_size_update = size
+    raw_step = bar_type.spec.step  <span class="comment"># e.g., 100 units</span>
+
+    <span class="keyword">while</span> raw_size_update &gt; 0:     <span class="comment"># While there is size to apply</span>
+        <span class="keyword">if</span> builder.volume + raw_size_update &lt; raw_step:
+            <span class="comment"># Fits entirely in current bar</span>
+            builder.<span class="function">update</span>(price, raw_size_update, ts_init)
+            <span class="keyword">break</span>
+
+        <span class="comment"># Fill current bar to threshold</span>
+        raw_size_diff = raw_step - builder.volume
+        builder.<span class="function">update</span>(price, raw_size_diff, ts_init)
+        <span class="function">build_now_and_send()</span>  <span class="comment">&larr; emit completed bar</span>
+
+        <span class="comment"># Remaining size carries over to next bar</span>
+        raw_size_update -= raw_size_diff</code></pre>
+
+  <h3>Visual example: step=100, current volume=80</h3>
+  <div class="flow-diagram">
+    <pre><code>Tick arrives: price=3500, <span class="highlight">size=50</span>
+
+  Current bar volume: <span class="string">80</span> / 100
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="string">20 units</span> fill current bar to 100 <span class="arrow">&rarr;</span> <span style="color:#3fb950;font-weight:bold;">BAR EMITTED!</span>
+  <span class="arrow">&#9492;&#9472;&#9472;</span> <span class="string">30 units</span> start the <span class="keyword">next</span> bar (volume=30/100)
+
+  <span class="comment">One tick created two bar states &mdash; no data lost!</span></code></pre>
+  </div>
+
+  <div class="insight-box">
+    <strong>Why this matters:</strong> In high-volume markets, a single large trade (e.g., 500 BTC) could span multiple volume bars. The aggregator correctly splits it, ensuring each bar contains exactly the specified volume threshold.
+  </div>
+</section>
+
+<!-- Section 10: Other Bar Types -->
+<section id="other-bars">
+  <h2>Other Bar Types</h2>
+
+  <h3>TickBarAggregator (line 400)</h3>
+  <p>Simplest aggregator. Counts ticks and emits when count == step.</p>
+  <pre><code><span class="keyword">cdef void</span> <span class="function">_apply_update</span>(self, Price price, Quantity size, uint64_t ts_init):
+    self._builder.<span class="function">update</span>(price, size, ts_init)
+
+    <span class="keyword">if</span> self._builder.count == self.bar_type.spec.step:   <span class="comment"># e.g., every 100 ticks</span>
+        self.<span class="function">_build_now_and_send()</span></code></pre>
+
+  <h3>TickImbalanceBarAggregator (line 447)</h3>
+  <p>Tracks the imbalance between buy and sell ticks. Emits when |imbalance| reaches threshold.</p>
+  <pre><code><span class="keyword">cpdef void</span> <span class="function">handle_trade_tick</span>(self, TradeTick tick):
+    self.<span class="function">_apply_update</span>(tick.price, tick.size, tick.ts_init)
+
+    <span class="keyword">if</span> tick.aggressor_side == <span class="string">BUYER</span>:
+        self._imbalance += 1
+    <span class="keyword">else</span>:
+        self._imbalance -= 1
+
+    <span class="keyword">if</span> <span class="function">abs</span>(self._imbalance) &gt;= self.bar_type.spec.step:
+        self.<span class="function">_build_now_and_send()</span>
+        self._imbalance = 0  <span class="comment"># reset</span></code></pre>
+
+  <h3>TickRunsBarAggregator (line 509)</h3>
+  <p>Counts consecutive ticks on the same side. Resets run counter when aggressor side changes.</p>
+  <pre><code><span class="keyword">cpdef void</span> <span class="function">handle_trade_tick</span>(self, TradeTick tick):
+    <span class="keyword">if</span> side != self._current_run_side:
+        self._current_run_side = side
+        self._run_count = 0        <span class="comment"># new side, reset run</span>
+        self._builder.<span class="function">reset()</span>
+
+    self.<span class="function">_apply_update</span>(tick.price, tick.size, tick.ts_init)
+    self._run_count += 1
+
+    <span class="keyword">if</span> self._run_count &gt;= self.bar_type.spec.step:
+        self.<span class="function">_build_now_and_send()</span>
+        self._run_count = 0</code></pre>
+
+  <h3>RenkoBarAggregator</h3>
+  <p>Emits a bar when price moves a fixed amount (the "brick size") from the last bar's close. Useful for filtering noise and focusing on significant price movements.</p>
+</section>
+
+<!-- Section 11: Architecture Diagram -->
+<section id="architecture-diagram">
+  <h2>Complete Storage Architecture Diagram</h2>
+
+  <div class="flow-diagram">
+    <pre><code>                    <span style="color:#f0f6fc;font-weight:bold;">RAW MARKET DATA</span>
+                    (Ticks from exchange)
+                            <span class="arrow">|</span>
+                            <span class="arrow">&#9660;</span>
+                  <span style="color:#58a6ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+                  <span style="color:#58a6ff;">&#9474;</span>     <span style="color:#58a6ff;font-weight:bold;">DataEngine</span>        <span style="color:#58a6ff;">&#9474;</span>
+                  <span style="color:#58a6ff;">&#9474;</span>  _handle_*_tick()   <span style="color:#58a6ff;">&#9474;</span>
+                  <span style="color:#58a6ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                         <span class="arrow">|</span>       <span class="arrow">|</span>
+            <span class="arrow">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>       <span class="arrow">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+            <span class="arrow">&#9660;</span>                             <span class="arrow">&#9660;</span>
+  <span style="color:#58a6ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span style="color:#d2a8ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span style="color:#3fb950;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span style="color:#58a6ff;">&#9474;</span> <span style="color:#58a6ff;font-weight:bold;">IN-MEMORY</span>     <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> <span style="color:#d2a8ff;font-weight:bold;">MESSAGE</span>   <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span> <span style="color:#3fb950;font-weight:bold;">PARQUET CATALOG</span> <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span> <span style="color:#58a6ff;font-weight:bold;">CACHE</span>         <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> <span style="color:#d2a8ff;font-weight:bold;">BUS</span>       <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span> (if configured) <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span>               <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span>           <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span>                 <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span> Latest quote  <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> Pub/Sub   <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span> ArrowSerializer <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span> Latest trade  <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> to topics <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span> pq.write_table  <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span> deque[Bar]    <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span>           <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span> .parquet files  <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9474;</span> (10K max)     <span style="color:#58a6ff;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span>           <span style="color:#d2a8ff;">&#9474;</span>  <span style="color:#3fb950;">&#9474;</span>                 <span style="color:#3fb950;">&#9474;</span>
+  <span style="color:#58a6ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span style="color:#d2a8ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span style="color:#3fb950;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                         <span class="arrow">|</span>
+          <span class="arrow">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+          <span class="arrow">&#9660;</span>             <span class="arrow">&#9660;</span>             <span class="arrow">&#9660;</span>
+  <span style="color:#f0883e;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span style="color:#f778ba;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span style="color:#d2a8ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span style="color:#f0883e;">&#9474;</span> <span style="color:#f0883e;font-weight:bold;">Bar</span>        <span style="color:#f0883e;">&#9474;</span>  <span style="color:#f778ba;">&#9474;</span> <span style="color:#f778ba;font-weight:bold;">Strategy</span>  <span style="color:#f778ba;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> <span style="color:#d2a8ff;font-weight:bold;">Streaming</span> <span style="color:#d2a8ff;">&#9474;</span>
+  <span style="color:#f0883e;">&#9474;</span> Aggregator <span style="color:#f0883e;">&#9474;</span>  <span style="color:#f778ba;">&#9474;</span> on_bar()  <span style="color:#f778ba;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> Feather   <span style="color:#d2a8ff;">&#9474;</span>
+  <span style="color:#f0883e;">&#9474;</span> Ticks&#8594;Bars <span style="color:#f0883e;">&#9474;</span>  <span style="color:#f778ba;">&#9474;</span> on_tick() <span style="color:#f778ba;">&#9474;</span>  <span style="color:#d2a8ff;">&#9474;</span> Writer    <span style="color:#d2a8ff;">&#9474;</span>
+  <span style="color:#f0883e;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span style="color:#f778ba;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span style="color:#d2a8ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+       <span class="arrow">|</span>                             <span class="arrow">|</span>
+       <span class="arrow">&#9660;</span>                             <span class="arrow">&#9660;</span>
+  Back to DataEngine          .feather files
+  (new Bar published)         (live streaming)
+
+  <span style="color:#f85149;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span style="color:#f85149;">&#9474;</span>   <span style="color:#f85149;font-weight:bold;">REDIS</span> (Optional, trading state ONLY)         <span style="color:#f85149;">&#9474;</span>
+  <span style="color:#f85149;">&#9474;</span>   orders, positions, accounts, instruments     <span style="color:#f85149;">&#9474;</span>
+  <span style="color:#f85149;">&#9474;</span>   Purpose: crash recovery, NOT market data      <span style="color:#f85149;">&#9474;</span>
+  <span style="color:#f85149;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span></code></pre>
+  </div>
+</section>
+
+<!-- Section 12: Takeaways -->
+<section id="takeaways">
+  <h2>Key Takeaways</h2>
+
+  <div class="insight-box" style="margin-bottom: 1rem;">
+    <strong>1. No traditional database for market data.</strong> Parquet files (columnar, compressed, fast reads) &mdash; not SQL, MongoDB, or InfluxDB.
+  </div>
+
+  <div class="insight-box" style="margin-bottom: 1rem;">
+    <strong>2. Redis is only for trading state</strong> (orders, positions, accounts) and is <strong>optional</strong>. Without Redis config, everything runs in-memory only.
+  </div>
+
+  <div class="insight-box" style="margin-bottom: 1rem;">
+    <strong>3. Three storage tiers exist simultaneously:</strong><br>
+    &bull; <span style="color:#58a6ff;">In-memory Cache</span> &mdash; fastest, limited (deques of 10K)<br>
+    &bull; <span style="color:#3fb950;">Parquet Catalog</span> &mdash; disk, unlimited, for backtesting<br>
+    &bull; <span style="color:#f85149;">Redis</span> &mdash; optional, for crash recovery
+  </div>
+
+  <div class="insight-box" style="margin-bottom: 1rem;">
+    <strong>4. Tick-to-bar conversion</strong> happens via <code>BarAggregator</code> subclasses. The <code>BarBuilder</code> accumulates OHLCV; each aggregator decides <em>when</em> to emit (time, tick count, volume, value, imbalance, or runs).
+  </div>
+
+  <div class="insight-box">
+    <strong>5. Volume/Value bars intelligently split ticks</strong> across bar boundaries &mdash; a single large tick can complete one bar and start the next. No data is ever lost or double-counted.
+  </div>
+</section>
+
+<footer style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem; border-top:1px solid var(--border); margin-top:1rem;">
+  NautilusTrader Storage &amp; Aggregation Deep Dive &mdash; Generated March 2026
+</footer>
+
+</div>
+</body>
+</html>

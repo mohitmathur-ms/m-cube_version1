@@ -1,3 +1,5 @@
+venv/
+.claude/
 __pycache__/
 *.pyc
 *.pyo
@@ -8,3 +10,4 @@ test_catalog/
 dist/
 build/
 reports/
+.pytest_cache/

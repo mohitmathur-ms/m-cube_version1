@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NautilusTrader Data Management - Complete Workflow Guide</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h2 {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .toc ol {
+    padding-left: 1.2rem;
+  }
+  .toc li {
+    margin: 0.3rem 0;
+  }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .toc a:hover {
+    color: var(--accent);
+  }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.6rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.2rem;
+    color: var(--accent3);
+    margin: 1.5rem 0 0.8rem 0;
+  }
+  p { margin-bottom: 0.8rem; }
+  strong { color: #f0f6fc; }
+  em { color: var(--accent4); font-style: normal; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent2);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .keyword { color: var(--accent3); }
+  .function { color: var(--accent); }
+  .string { color: var(--accent2); }
+  .comment { color: var(--text-muted); }
+  .arrow { color: var(--accent4); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+  }
+  tr:nth-child(even) td {
+    background: var(--table-alt);
+  }
+  .insight-box {
+    background: linear-gradient(135deg, #1a2332, #161b22);
+    border-left: 4px solid var(--accent2);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .insight-box strong {
+    color: var(--accent2);
+  }
+  .flow-diagram {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+  .flow-diagram pre {
+    background: none;
+    border: none;
+    display: inline-block;
+    text-align: left;
+    margin: 0;
+    padding: 0;
+  }
+  .layer-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-ingestion { background: #1f3a2a; color: #3fb950; }
+  .badge-processing { background: #1c2d4a; color: #58a6ff; }
+  .badge-routing { background: #2d1f4a; color: #d2a8ff; }
+  .badge-storage { background: #3a2a1f; color: #f0883e; }
+  .badge-consumption { background: #3a1f2a; color: #f778ba; }
+  .badge-entry { background: #2a2a1f; color: #d2d050; }
+  .badge-types { background: #1f3a3a; color: #56d4dd; }
+  ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.3rem 0; }
+  .file-ref {
+    color: var(--accent4);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85em;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .col-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+  }
+  .col-box h4 {
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.6rem; }
+    .container { padding: 1rem; }
+    section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NautilusTrader Data Management</h1>
+  <p>Complete Workflow Guide &mdash; How data flows end-to-end: from raw market data arriving from exchanges, through processing and storage, to strategies consuming it.</p>
+</div>
+
+<div class="container">
+
+<!-- Table of Contents -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#architecture">High-Level Architecture</a></li>
+    <li><a href="#data-types">Part 1: Data Types (The "Nouns")</a></li>
+    <li><a href="#ingestion">Part 2: Data Ingestion (How Raw Data Enters)</a></li>
+    <li><a href="#processing">Part 3: Data Processing (The DataEngine)</a></li>
+    <li><a href="#message-bus">Part 4: Message Bus (The Nervous System)</a></li>
+    <li><a href="#cache">Part 5: Cache (In-Memory State)</a></li>
+    <li><a href="#consumption">Part 6: Data Consumption (How Strategies Get Data)</a></li>
+    <li><a href="#persistence">Part 7: Persistence (Saving Data to Disk)</a></li>
+    <li><a href="#entry-points">Part 8: System Entry Points</a></li>
+    <li><a href="#e2e-example">Part 9: Complete End-to-End Example</a></li>
+    <li><a href="#file-reference">Key Files Reference Table</a></li>
+  </ol>
+</div>
+
+<!-- Architecture Overview -->
+<section id="architecture">
+  <h2>High-Level Architecture (The Big Picture)</h2>
+  <div class="flow-diagram">
+    <pre><code><span class="comment">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+<span class="comment">&#9474;</span>                        <span style="color:#f0f6fc;font-weight:bold;">EXTERNAL WORLD</span>                               <span class="comment">&#9474;</span>
+<span class="comment">&#9474;</span>   Exchanges (Binance, Bybit, IB, Databento, etc.)                  <span class="comment">&#9474;</span>
+<span class="comment">&#9474;</span>   Files (CSV, Parquet, DBN)                                         <span class="comment">&#9474;</span>
+<span class="comment">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span><span class="arrow">&#9516;</span><span class="comment">&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                             <span class="arrow">&#9474;</span> Raw bytes / WebSocket / HTTP / Files
+                             <span class="arrow">&#9660;</span>
+<span style="color:#3fb950;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+<span style="color:#3fb950;">&#9474;</span>  <strong>LAYER 1: DATA INGESTION</strong> (Adapters &amp; Loaders)                       <span style="color:#3fb950;">&#9474;</span>
+<span style="color:#3fb950;">&#9474;</span>                                                                     <span style="color:#3fb950;">&#9474;</span>
+<span style="color:#3fb950;">&#9474;</span>  Live: Adapter DataClients  &#9474;  Backtest: Catalog / File Loaders     <span style="color:#3fb950;">&#9474;</span>
+<span style="color:#3fb950;">&#9474;</span>  (WebSocket &#8594; parse &#8594; emit) &#9474;  (Parquet/CSV &#8594; wrangler &#8594; emit)     <span style="color:#3fb950;">&#9474;</span>
+<span style="color:#3fb950;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span><span class="arrow">&#9516;</span><span style="color:#3fb950;">&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                             <span class="arrow">&#9474;</span> Nautilus Data Types (QuoteTick, Bar...)
+                             <span class="arrow">&#9660;</span>
+<span style="color:#58a6ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+<span style="color:#58a6ff;">&#9474;</span>  <strong>LAYER 2: DATA ENGINE</strong> (Central Processing Hub)                      <span style="color:#58a6ff;">&#9474;</span>
+<span style="color:#58a6ff;">&#9474;</span>                                                                     <span style="color:#58a6ff;">&#9474;</span>
+<span style="color:#58a6ff;">&#9474;</span>  [Cache Update]  [Aggregators]  [Validate]  [Publish to MsgBus]     <span style="color:#58a6ff;">&#9474;</span>
+<span style="color:#58a6ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span><span class="arrow">&#9516;</span><span style="color:#58a6ff;">&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                             <span class="arrow">&#9474;</span> Message Bus Topics
+                             <span class="arrow">&#9660;</span>
+<span style="color:#d2a8ff;">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+<span style="color:#d2a8ff;">&#9474;</span>  <strong>LAYER 3: DATA CONSUMPTION</strong> (Strategies, Indicators, Persistence)    <span style="color:#d2a8ff;">&#9474;</span>
+<span style="color:#d2a8ff;">&#9474;</span>                                                                     <span style="color:#d2a8ff;">&#9474;</span>
+<span style="color:#d2a8ff;">&#9474;</span>  [Strategies]  [Indicators]  [Order Books]  [Parquet Catalog]       <span style="color:#d2a8ff;">&#9474;</span>
+<span style="color:#d2a8ff;">&#9474;</span>  [on_bar()]    [EMA, RSI..]                  [(Persistence)]         <span style="color:#d2a8ff;">&#9474;</span>
+<span style="color:#d2a8ff;">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span></code></pre>
+  </div>
+</section>
+
+<!-- Part 1: Data Types -->
+<section id="data-types">
+  <h2>Part 1: Data Types (The "Nouns" of the System)</h2>
+  <p>All raw market data is converted into these core Nautilus types, defined in Cython for performance.</p>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/model/data.pyx</span></p>
+
+  <table>
+    <thead>
+      <tr><th>Data Type</th><th>What It Represents</th><th>Key Fields</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>QuoteTick</strong></td><td>Best bid/ask snapshot</td><td><code>bid_price, ask_price, bid_size, ask_size, instrument_id, ts_event</code></td></tr>
+      <tr><td><strong>TradeTick</strong></td><td>A single trade on the exchange</td><td><code>price, size, aggressor_side, trade_id, instrument_id, ts_event</code></td></tr>
+      <tr><td><strong>Bar</strong></td><td>OHLCV candle</td><td><code>open, high, low, close, volume, bar_type, ts_event</code></td></tr>
+      <tr><td><strong>OrderBookDelta</strong></td><td>One change to the order book</td><td><code>action (ADD/UPDATE/DELETE), order, instrument_id, ts_event</code></td></tr>
+      <tr><td><strong>OrderBookDeltas</strong></td><td>Batch of book deltas</td><td><code>list[OrderBookDelta]</code></td></tr>
+      <tr><td><strong>OrderBookDepth10</strong></td><td>Top-10 level snapshot</td><td><code>bids[10], asks[10], bid_counts, ask_counts</code></td></tr>
+      <tr><td><strong>CustomData</strong></td><td>Anything else (vendor-specific)</td><td><code>data_type, payload</code></td></tr>
+      <tr><td><strong>InstrumentStatus</strong></td><td>Is trading halted/open?</td><td><code>status, ts_event</code></td></tr>
+      <tr><td><strong>MarkPriceUpdate</strong></td><td>Mark price (derivatives)</td><td><code>mark_price, index_price</code></td></tr>
+      <tr><td><strong>FundingRateUpdate</strong></td><td>Funding rate (futures)</td><td><code>funding_rate, next_funding_time</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="insight-box">
+    <strong>Key insight:</strong> Both backtest and live use the <em>exact same types</em>. Your strategy code doesn't know if it's running on historical or live data.
+  </div>
+</section>
+
+<!-- Part 2: Data Ingestion -->
+<section id="ingestion">
+  <h2>Part 2: Data Ingestion (How Raw Data Enters)</h2>
+
+  <h3>2A. Live Data &mdash; Adapter Pattern</h3>
+  <p><strong>Directory:</strong> <span class="file-ref">nautilus_trader/adapters/</span></p>
+  <p>Each exchange has an adapter folder (binance, bybit, databento, interactive_brokers, etc.) with a consistent structure:</p>
+
+  <pre><code>adapters/binance/
+&#9500;&#9472;&#9472; config.py          <span class="comment">&larr; BinanceDataClientConfig (API keys, endpoints)</span>
+&#9500;&#9472;&#9472; data.py            <span class="comment">&larr; BinanceCommonDataClient (extends LiveMarketDataClient)</span>
+&#9500;&#9472;&#9472; factories.py       <span class="comment">&larr; BinanceLiveDataClientFactory</span>
+&#9500;&#9472;&#9472; common/
+&#9474;   &#9492;&#9472;&#9472; schemas/       <span class="comment">&larr; msgspec JSON decoders for raw API messages</span>
+&#9492;&#9472;&#9472; ...</code></pre>
+
+  <p><strong>Flow (using Binance as example):</strong></p>
+  <pre><code>Binance WebSocket sends raw JSON bytes
+  <span class="arrow">&rarr;</span> <span class="function">_handle_ws_message</span>(raw: bytes)
+    <span class="arrow">&rarr;</span> msgspec.Decoder parses JSON into schema objects
+      <span class="arrow">&rarr;</span> Route by stream name to handler:
+          <span class="function">_handle_trade()</span>       <span class="arrow">&rarr;</span> <span class="keyword">TradeTick</span>
+          <span class="function">_handle_book_ticker()</span> <span class="arrow">&rarr;</span> <span class="keyword">QuoteTick</span>
+          <span class="function">_handle_kline()</span>       <span class="arrow">&rarr;</span> <span class="keyword">Bar</span>
+          <span class="function">_handle_book_diff()</span>   <span class="arrow">&rarr;</span> <span class="keyword">OrderBookDeltas</span>
+        <span class="arrow">&rarr;</span> <span class="function">_handle_data</span>(data)
+          <span class="arrow">&rarr;</span> msgbus.send(<span class="string">"DataEngine.process"</span>, data)</code></pre>
+
+  <p><strong>Key files:</strong></p>
+  <ul>
+    <li><span class="file-ref">nautilus_trader/adapters/binance/data.py</span> &mdash; Binance data client</li>
+    <li><span class="file-ref">nautilus_trader/live/data_client.py</span> &mdash; <code>LiveMarketDataClient</code> base class (async)</li>
+    <li><span class="file-ref">nautilus_trader/data/client.pyx</span> &mdash; <code>MarketDataClient</code> base class (Cython)</li>
+  </ul>
+
+  <h3>2B. Historical Data &mdash; Loaders &amp; Catalog</h3>
+  <p><strong>For backtesting</strong>, data comes from files:</p>
+
+  <table>
+    <thead>
+      <tr><th>Source</th><th>Loader</th><th>File</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>CSV files</td><td><code>CSVTickDataLoader</code>, <code>CSVBarDataLoader</code></td><td><span class="file-ref">nautilus_trader/persistence/loaders.py</span></td></tr>
+      <tr><td>Parquet (native)</td><td><code>ParquetDataCatalog</code></td><td><span class="file-ref">nautilus_trader/persistence/catalog/parquet.py</span></td></tr>
+      <tr><td>Databento DBN</td><td><code>DatabentoDataLoader</code></td><td><span class="file-ref">nautilus_trader/adapters/databento/loaders.py</span></td></tr>
+      <tr><td>Binance CSV</td><td><code>BinanceOrderBookDeltaDataLoader</code></td><td><span class="file-ref">nautilus_trader/adapters/binance/</span></td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Wranglers</strong> convert raw file data into Nautilus types:</p>
+  <ul>
+    <li><strong>File:</strong> <span class="file-ref">nautilus_trader/persistence/wranglers_v2.py</span></li>
+    <li><code>QuoteTickDataWranglerV2</code>, <code>TradeTickDataWranglerV2</code>, <code>BarDataWranglerV2</code>, etc.</li>
+  </ul>
+</section>
+
+<!-- Part 3: Data Processing -->
+<section id="processing">
+  <h2>Part 3: Data Processing (The DataEngine)</h2>
+  <p>The <strong>DataEngine</strong> is the central hub. All data passes through it.</p>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/data/engine.pyx</span> (Cython, ~170KB)</p>
+  <p><strong>Config:</strong> <span class="file-ref">nautilus_trader/data/config.py</span> &mdash; <code>DataEngineConfig</code></p>
+
+  <h3>What the DataEngine does:</h3>
+  <ol>
+    <li><strong>Receives data</strong> via message bus endpoint <code>"DataEngine.process"</code></li>
+    <li><strong>Dispatches by type</strong> to specific handlers:</li>
+  </ol>
+
+  <pre><code><span class="function">_handle_data</span>(data)
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">QuoteTick</span>       <span class="arrow">&rarr;</span> <span class="function">_handle_quote_tick()</span>
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">TradeTick</span>       <span class="arrow">&rarr;</span> <span class="function">_handle_trade_tick()</span>
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Bar</span>             <span class="arrow">&rarr;</span> <span class="function">_handle_bar()</span>
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">OrderBookDelta</span>  <span class="arrow">&rarr;</span> <span class="function">_handle_order_book_delta()</span>
+  <span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">MarkPriceUpdate</span> <span class="arrow">&rarr;</span> <span class="function">_handle_mark_price()</span>
+  <span class="arrow">&#9492;&#9472;&#9472;</span> <span class="keyword">CustomData</span>      <span class="arrow">&rarr;</span> <span class="function">_handle_custom_data()</span></code></pre>
+
+  <ol start="3">
+    <li><strong>Each handler does 4 things:</strong>
+      <ul>
+        <li>Updates the <strong>Cache</strong> (<code>cache.add_quote_tick(tick)</code>)</li>
+        <li>Updates <strong>Synthetic Instruments</strong> (if any)</li>
+        <li><strong>Publishes to Message Bus</strong> with a topic like <code>"data.quotes.BINANCE.ETHUSDT"</code></li>
+        <li>Writes to <strong>Catalog</strong> for persistence (if configured)</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>Bar Aggregation (Ticks &rarr; Bars)</h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/data/aggregation.pyx</span></p>
+  <p>When a strategy subscribes to bars, the DataEngine creates an aggregator:</p>
+
+  <pre><code>Raw Ticks arrive
+  <span class="arrow">&rarr;</span> <span class="function">BarAggregator.handle_trade_tick()</span> / <span class="function">handle_quote_tick()</span>
+    <span class="arrow">&rarr;</span> BarBuilder updates OHLCV
+      <span class="arrow">&rarr;</span> When threshold reached (time/volume/tick count):
+        <span class="arrow">&rarr;</span> <span class="function">build()</span> creates a <span class="keyword">Bar</span> object
+          <span class="arrow">&rarr;</span> Published to message bus</code></pre>
+
+  <p><strong>Aggregator types:</strong></p>
+  <ul>
+    <li><code>TimeBarAggregator</code> &mdash; e.g., 1-minute, 5-minute bars</li>
+    <li><code>VolumeBarAggregator</code> &mdash; bar closes after X volume</li>
+    <li><code>TickBarAggregator</code> &mdash; bar closes after N ticks</li>
+    <li><code>ValueBarAggregator</code> &mdash; bar closes after X notional value</li>
+    <li><code>RenkoBarAggregator</code> &mdash; bar closes after fixed price movement</li>
+  </ul>
+
+  <h3>Order Book Delta Buffering</h3>
+  <pre><code><span class="keyword">if</span> config.buffer_deltas:
+    <span class="comment"># Collect deltas until F_LAST flag</span>
+    buffer.append(delta)
+    <span class="keyword">if</span> delta.flags &amp; RecordFlag.F_LAST:
+        publish(OrderBookDeltas(buffer))
+        buffer.clear()</code></pre>
+</section>
+
+<!-- Part 4: Message Bus -->
+<section id="message-bus">
+  <h2>Part 4: Message Bus (The Nervous System)</h2>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/common/component.pyx</span> (line 2178+)</p>
+  <p><strong>Topics:</strong> <span class="file-ref">nautilus_trader/common/data_topics.pyx</span></p>
+  <p>The MessageBus is a publish/subscribe system that routes data between components.</p>
+
+  <p><strong>Topic naming convention:</strong></p>
+  <pre><code><span class="string">data.quotes.BINANCE.ETHUSDT</span>              <span class="comment">&larr; QuoteTick for ETH/USDT on Binance</span>
+<span class="string">data.trades.BINANCE.ETHUSDT</span>              <span class="comment">&larr; TradeTick</span>
+<span class="string">data.bars.BINANCE.ETHUSDT-1-MINUTE-LAST</span>  <span class="comment">&larr; 1-min Bar</span>
+<span class="string">data.deltas.BINANCE.BTCUSDT</span>              <span class="comment">&larr; OrderBookDeltas</span>
+<span class="string">data.status.BINANCE.ETHUSDT</span>              <span class="comment">&larr; InstrumentStatus</span></code></pre>
+
+  <p><strong>How it works:</strong></p>
+  <ol>
+    <li>DataEngine <strong>publishes</strong> data to a topic</li>
+    <li>Strategies/actors that <strong>subscribed</strong> to that topic get called automatically</li>
+    <li>Wildcard subscriptions supported (<code>*</code> = any chars)</li>
+  </ol>
+</section>
+
+<!-- Part 5: Cache -->
+<section id="cache">
+  <h2>Part 5: Cache (In-Memory State)</h2>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/cache/cache.pyx</span> (~193KB)</p>
+  <p>The Cache stores the latest state of everything:</p>
+
+  <pre><code>Cache
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Instruments</span>     dict[InstrumentId, Instrument]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Latest Quotes</span>   dict[InstrumentId, QuoteTick]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Latest Trades</span>   dict[InstrumentId, TradeTick]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Bar History</span>     dict[BarType, deque[Bar]]  <span class="comment">(configurable depth)</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Order Books</span>     dict[InstrumentId, OrderBook]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Mark Prices</span>     dict[InstrumentId, MarkPriceUpdate]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Funding Rates</span>   dict[InstrumentId, FundingRateUpdate]
+<span class="arrow">&#9500;&#9472;&#9472;</span> <span class="keyword">Orders</span>          dict[ClientOrderId, Order]
+<span class="arrow">&#9492;&#9472;&#9472;</span> <span class="keyword">Positions</span>       dict[PositionId, Position]</code></pre>
+
+  <p>Strategies access cache via: <code>self.cache.quote_tick(instrument_id)</code>, <code>self.cache.bar(bar_type)</code>, etc.</p>
+</section>
+
+<!-- Part 6: Data Consumption -->
+<section id="consumption">
+  <h2>Part 6: Data Consumption (How Strategies Get Data)</h2>
+
+  <h3>Step 1: Strategy subscribes in <code>on_start()</code></h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/common/actor.pyx</span> (subscription methods)</p>
+
+  <pre><code><span class="keyword">class</span> <span class="function">MyStrategy</span>(Strategy):
+    <span class="keyword">def</span> <span class="function">on_start</span>(self):
+        self.subscribe_bars(self.bar_type)          <span class="comment"># Subscribe to bars</span>
+        self.subscribe_quote_ticks(instrument_id)    <span class="comment"># Subscribe to quotes</span>
+        self.subscribe_trade_ticks(instrument_id)    <span class="comment"># Subscribe to trades</span>
+
+        <span class="comment"># Register indicators to auto-update</span>
+        self.register_indicator_for_bars(self.bar_type, self.ema_fast)
+        self.register_indicator_for_bars(self.bar_type, self.ema_slow)</code></pre>
+
+  <h3>Step 2: Data arrives via handler chain</h3>
+  <pre><code>DataEngine publishes Bar to message bus
+  <span class="arrow">&rarr;</span> <span class="function">Actor.handle_bar</span>(bar)                    <span class="comment"># Internal handler</span>
+    <span class="arrow">&rarr;</span> Update all registered indicators       <span class="comment"># EMA, RSI, etc. auto-updated</span>
+    <span class="arrow">&rarr;</span> Call <span class="function">self.on_bar</span>(bar)                   <span class="comment"># YOUR strategy code runs</span></code></pre>
+
+  <h3>Step 3: Strategy implements <code>on_bar()</code>, <code>on_quote_tick()</code>, etc.</h3>
+  <pre><code><span class="keyword">def</span> <span class="function">on_bar</span>(self, bar: Bar):
+    <span class="keyword">if</span> self.ema_fast.value &gt; self.ema_slow.value:
+        self.buy(bar.bar_type.instrument_id, quantity)</code></pre>
+
+  <p><strong>Example strategy:</strong> <span class="file-ref">nautilus_trader/examples/strategies/ema_cross.py</span></p>
+
+  <h3>Indicators</h3>
+  <p><strong>Directory:</strong> <span class="file-ref">nautilus_trader/indicators/</span></p>
+  <ul>
+    <li><code>base.pyx</code> &mdash; Indicator base class</li>
+    <li><code>averages.pyx</code> &mdash; EMA, SMA, etc.</li>
+    <li><code>momentum.pyx</code> &mdash; RSI, MACD, etc.</li>
+    <li><code>trend.pyx</code> &mdash; ADX, Aroon, etc.</li>
+    <li><code>volatility.pyx</code> &mdash; ATR, Bollinger Bands, etc.</li>
+  </ul>
+
+  <div class="insight-box">
+    <strong>How it works:</strong> Indicators have <code>handle_bar()</code>, <code>handle_quote_tick()</code>, <code>handle_trade_tick()</code> methods. When registered via <code>register_indicator_for_bars()</code>, they update automatically <em>before</em> <code>on_bar()</code> is called.
+  </div>
+</section>
+
+<!-- Part 7: Persistence -->
+<section id="persistence">
+  <h2>Part 7: Persistence (Saving Data to Disk)</h2>
+
+  <h3>ParquetDataCatalog</h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/persistence/catalog/parquet.py</span></p>
+  <p>Stores data in columnar Parquet format:</p>
+
+  <pre><code>catalog_root/
+<span class="arrow">&#9500;&#9472;&#9472;</span> QuoteTick/BINANCE/ETHUSDT/<span class="string">data.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> TradeTick/BINANCE/ETHUSDT/<span class="string">data.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> Bar/BINANCE/ETHUSDT-1-MINUTE-LAST/<span class="string">data.parquet</span>
+<span class="arrow">&#9500;&#9472;&#9472;</span> OrderBookDelta/...
+<span class="arrow">&#9492;&#9472;&#9472;</span> Instrument/...</code></pre>
+
+  <h3>StreamingFeatherWriter</h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/persistence/writer.py</span></p>
+  <p>For live systems, writes data asynchronously in Arrow IPC (Feather) format with configurable rotation (by size, interval, or scheduled dates).</p>
+
+  <h3>Arrow Serialization</h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/serialization/arrow/serializer.py</span></p>
+  <p>Handles encoding/decoding between Nautilus types and PyArrow tables. Registry of per-type encoders/decoders.</p>
+</section>
+
+<!-- Part 8: System Entry Points -->
+<section id="entry-points">
+  <h2>Part 8: System Entry Points</h2>
+
+  <div class="two-col">
+    <div class="col-box">
+      <h4>Backtesting</h4>
+      <ul>
+        <li><span class="file-ref">backtest/node.py</span> &mdash; <code>BacktestNode</code></li>
+        <li><span class="file-ref">backtest/engine.pyx</span> &mdash; <code>BacktestEngine</code></li>
+        <li><span class="file-ref">backtest/config.py</span> &mdash; <code>BacktestRunConfig</code></li>
+      </ul>
+      <pre><code>BacktestNode
+<span class="arrow">&rarr;</span> Loads BacktestRunConfig
+  <span class="arrow">&rarr;</span> Creates BacktestEngine
+    <span class="arrow">&rarr;</span> Loads data from Catalog
+      <span class="arrow">&rarr;</span> Replays chronologically
+        <span class="arrow">&rarr;</span> Same on_bar() interface</code></pre>
+    </div>
+    <div class="col-box">
+      <h4>Live Trading</h4>
+      <ul>
+        <li><span class="file-ref">live/node.py</span> &mdash; <code>TradingNode</code></li>
+        <li><span class="file-ref">live/data_engine.py</span> &mdash; <code>LiveDataEngine</code></li>
+        <li><span class="file-ref">live/config.py</span> &mdash; configs</li>
+      </ul>
+      <pre><code>TradingNode
+<span class="arrow">&rarr;</span> Creates NautilusKernel
+  <span class="arrow">&rarr;</span> LiveDataEngine (async)
+    <span class="arrow">&rarr;</span> Adapter DataClients
+      <span class="arrow">&rarr;</span> Real-time data flows
+        <span class="arrow">&rarr;</span> Same on_bar() interface</code></pre>
+    </div>
+  </div>
+
+  <h3>The Kernel (Shared Core)</h3>
+  <p><strong>File:</strong> <span class="file-ref">nautilus_trader/system/kernel.py</span> &mdash; <code>NautilusKernel</code></p>
+  <p>Both backtest and live use the same kernel containing: DataEngine, ExecutionEngine, RiskEngine, Cache, MessageBus, Clock, and Trader.</p>
+</section>
+
+<!-- Part 9: End-to-End Example -->
+<section id="e2e-example">
+  <h2>Part 9: Complete End-to-End Example</h2>
+  <h3>Scenario: A live strategy receiving 1-minute bars from Binance</h3>
+
+  <pre><code><span style="color:#f0883e;font-weight:bold;">1. CONFIG</span>
+   TradingNodeConfig specifies BinanceDataClientConfig with API keys
+
+<span style="color:#f0883e;font-weight:bold;">2. STARTUP</span>
+   TradingNode <span class="arrow">&rarr;</span> NautilusKernel <span class="arrow">&rarr;</span> LiveDataEngine
+   BinanceLiveDataClientFactory creates BinanceCommonDataClient
+
+<span style="color:#f0883e;font-weight:bold;">3. SUBSCRIPTION</span>
+   Strategy.<span class="function">on_start()</span> calls self.subscribe_bars(BarType(<span class="string">"ETHUSDT.BINANCE-1-MINUTE-LAST"</span>))
+   <span class="arrow">&rarr;</span> Actor registers handle_bar on message bus topic
+   <span class="arrow">&rarr;</span> SubscribeBars command sent to DataEngine
+   <span class="arrow">&rarr;</span> DataEngine creates TimeBarAggregator
+   <span class="arrow">&rarr;</span> Client subscribes to Binance WebSocket kline stream
+
+<span style="color:#f0883e;font-weight:bold;">4. DATA ARRIVES</span>
+   Binance WebSocket sends kline JSON
+   <span class="arrow">&rarr;</span> BinanceCommonDataClient.<span class="function">_handle_ws_message</span>(bytes)
+   <span class="arrow">&rarr;</span> msgspec decodes <span class="arrow">&rarr;</span> <span class="function">_handle_kline()</span> <span class="arrow">&rarr;</span> creates <span class="keyword">Bar</span>
+   <span class="arrow">&rarr;</span> <span class="function">_handle_data</span>(bar) <span class="arrow">&rarr;</span> msgbus.send(<span class="string">"DataEngine.process"</span>, bar)
+
+<span style="color:#f0883e;font-weight:bold;">5. PROCESSING</span>
+   DataEngine.<span class="function">_handle_bar</span>(bar)
+   <span class="arrow">&rarr;</span> cache.add_bar(bar)
+   <span class="arrow">&rarr;</span> msgbus.publish(<span class="string">"data.bars.BINANCE.ETHUSDT-1-MINUTE-LAST"</span>, bar)
+   <span class="arrow">&rarr;</span> catalog.write_data([bar])  <span class="comment">(if persistence configured)</span>
+
+<span style="color:#f0883e;font-weight:bold;">6. CONSUMPTION</span>
+   Actor.<span class="function">handle_bar</span>(bar) triggered by message bus
+   <span class="arrow">&rarr;</span> Updates registered indicators (EMA, RSI, etc.)
+   <span class="arrow">&rarr;</span> Calls Strategy.<span class="function">on_bar</span>(bar)
+   <span class="arrow">&rarr;</span> Strategy logic runs, potentially submitting orders</code></pre>
+</section>
+
+<!-- File Reference Table -->
+<section id="file-reference">
+  <h2>Key Files Reference Table</h2>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Component</th><th>File</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="layer-badge badge-types">Types</span></td><td>Core data models</td><td><span class="file-ref">nautilus_trader/model/data.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-types">Config</span></td><td>DataEngine config</td><td><span class="file-ref">nautilus_trader/data/config.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-ingestion">Ingestion</span></td><td>Data client base</td><td><span class="file-ref">nautilus_trader/data/client.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-ingestion">Ingestion</span></td><td>Live data client</td><td><span class="file-ref">nautilus_trader/live/data_client.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-ingestion">Ingestion</span></td><td>Binance adapter</td><td><span class="file-ref">nautilus_trader/adapters/binance/data.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-ingestion">Ingestion</span></td><td>File loaders</td><td><span class="file-ref">nautilus_trader/persistence/loaders.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-ingestion">Ingestion</span></td><td>Data wranglers</td><td><span class="file-ref">nautilus_trader/persistence/wranglers_v2.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-processing">Processing</span></td><td>DataEngine</td><td><span class="file-ref">nautilus_trader/data/engine.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-processing">Processing</span></td><td>Bar aggregation</td><td><span class="file-ref">nautilus_trader/data/aggregation.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-processing">Processing</span></td><td>Data messages</td><td><span class="file-ref">nautilus_trader/data/messages.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-routing">Routing</span></td><td>Message bus</td><td><span class="file-ref">nautilus_trader/common/component.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-routing">Routing</span></td><td>Topic cache</td><td><span class="file-ref">nautilus_trader/common/data_topics.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-storage">Storage</span></td><td>In-memory cache</td><td><span class="file-ref">nautilus_trader/cache/cache.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-storage">Storage</span></td><td>Parquet catalog</td><td><span class="file-ref">nautilus_trader/persistence/catalog/parquet.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-storage">Storage</span></td><td>Arrow serializer</td><td><span class="file-ref">nautilus_trader/serialization/arrow/serializer.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-storage">Storage</span></td><td>Streaming writer</td><td><span class="file-ref">nautilus_trader/persistence/writer.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-consumption">Consumption</span></td><td>Actor (subscriptions)</td><td><span class="file-ref">nautilus_trader/common/actor.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-consumption">Consumption</span></td><td>Strategy base</td><td><span class="file-ref">nautilus_trader/trading/strategy.pyx</span></td></tr>
+      <tr><td><span class="layer-badge badge-consumption">Consumption</span></td><td>Indicators</td><td><span class="file-ref">nautilus_trader/indicators/</span></td></tr>
+      <tr><td><span class="layer-badge badge-consumption">Consumption</span></td><td>Example strategy</td><td><span class="file-ref">nautilus_trader/examples/strategies/ema_cross.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-entry">Entry</span></td><td>Backtest node</td><td><span class="file-ref">nautilus_trader/backtest/node.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-entry">Entry</span></td><td>Live node</td><td><span class="file-ref">nautilus_trader/live/node.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-entry">Entry</span></td><td>System kernel</td><td><span class="file-ref">nautilus_trader/system/kernel.py</span></td></tr>
+      <tr><td><span class="layer-badge badge-entry">Entry</span></td><td>Backtest config</td><td><span class="file-ref">nautilus_trader/backtest/config.py</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem; border-top:1px solid var(--border); margin-top:1rem;">
+  NautilusTrader Data Workflow Guide &mdash; Generated March 2026
+</footer>
+
+</div>
+</body>
+</html>
