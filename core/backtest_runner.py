@@ -117,9 +117,11 @@ def run_backtest(
 
     # Run backtest
     engine.run()
+    engine.trader.stop()
 
     # Extract results
     results = _extract_results(engine, starting_capital)
+
 
     engine.dispose()
 
@@ -167,24 +169,42 @@ def _extract_results(engine: BacktestEngine, starting_capital: float) -> dict:
     total_pnl = final_balance - starting_capital
     total_return_pct = (total_pnl / starting_capital) * 100 if starting_capital > 0 else 0
 
-    # Count trades from positions
+    # Count trades from order fills (round-trip analysis)
     orders = engine.kernel.cache.orders()
     filled_orders = [o for o in orders if o.is_closed]
     total_orders = len(filled_orders)
 
-    positions = engine.kernel.cache.positions()
+    # In NETTING mode, positions net together so we can't reliably count
+    # individual wins/losses from positions. Instead, derive from fills report.
     wins = 0
     losses = 0
-    for pos in positions:
-        if pos.is_closed:
+    total_trades = 0
+
+    if fills_report is not None and not fills_report.empty:
+        total_trades = total_orders // 2
+
+    positions = engine.kernel.cache.positions()
+    closed_positions = [p for p in positions if p.is_closed]
+
+    if len(closed_positions) > 1:
+        for pos in closed_positions:
             pnl = float(pos.realized_pnl)
             if pnl > 0:
                 wins += 1
             elif pnl < 0:
                 losses += 1
+        total_trades = wins + losses
+    elif total_trades > 0:
+        if total_pnl > 0:
+            wins = 1
+            losses = 0
+        elif total_pnl < 0:
+            wins = 0
+            losses = 1
+        total_trades = 1
 
-    total_trades = wins + losses
     win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+
 
     return {
         "starting_capital": starting_capital,
