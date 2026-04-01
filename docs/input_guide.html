@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Data App - CSV Input Guide</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d2e;
+            --surface2: #222640;
+            --border: #2d3147;
+            --text: #e0e0e0;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --accent-light: #8b83ff;
+            --green: #00c853;
+            --red: #ff5252;
+            --orange: #ff9800;
+            --yellow: #ffd740;
+            --code-bg: #141624;
+            --cyan: #4fc3f7;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem 1.5rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* ---- Header ---- */
+        header {
+            text-align: center;
+            padding: 3rem 0 2.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2.5rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #a78bfa, var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.75rem;
+        }
+
+        header .subtitle {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ---- Typography ---- */
+        h2 {
+            font-size: 1.7rem;
+            margin: 3rem 0 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent);
+            display: inline-block;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            margin: 1.75rem 0 0.75rem;
+            color: var(--accent-light);
+        }
+
+        p { margin: 0.6rem 0; }
+
+        section { margin-bottom: 2.5rem; }
+
+        a { color: var(--accent-light); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        strong { color: #fff; }
+
+        /* ---- Badges ---- */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            vertical-align: middle;
+        }
+        .badge-required { background: rgba(255, 82, 82, 0.15); color: var(--red); }
+        .badge-ok       { background: rgba(0, 200, 83, 0.15); color: var(--green); }
+        .badge-warn     { background: rgba(255, 152, 0, 0.15); color: var(--orange); }
+        .badge-error    { background: rgba(255, 82, 82, 0.15); color: var(--red); }
+
+        /* ---- Cards ---- */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .card-do {
+            border-left: 4px solid var(--green);
+        }
+        .card-dont {
+            border-left: 4px solid var(--red);
+        }
+        .card-do h3, .card-do .card-label { color: var(--green); margin-top: 0; }
+        .card-dont h3, .card-dont .card-label { color: var(--red); margin-top: 0; }
+
+        /* ---- Tables ---- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        thead th {
+            background: var(--accent);
+            color: #fff;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        thead th:first-child { border-radius: 8px 0 0 0; }
+        thead th:last-child  { border-radius: 0 8px 0 0; }
+
+        tbody td {
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr:hover { background: rgba(108, 99, 255, 0.06); }
+
+        /* ---- Code ---- */
+        code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            background: var(--code-bg);
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            font-size: 0.88rem;
+            color: #a78bfa;
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text);
+        }
+
+        .comment { color: var(--text-muted); }
+
+        /* ---- Callouts ---- */
+        .callout {
+            border-left: 4px solid;
+            border-radius: 0 10px 10px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .callout-tip     { border-color: var(--green);  background: rgba(0, 200, 83, 0.07); }
+        .callout-warning { border-color: var(--orange); background: rgba(255, 152, 0, 0.07); }
+        .callout-error   { border-color: var(--red);    background: rgba(255, 82, 82, 0.07); }
+        .callout-info    { border-color: var(--accent);  background: rgba(108, 99, 255, 0.07); }
+        .callout-label {
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .callout-tip .callout-label    { color: var(--green); }
+        .callout-warning .callout-label { color: var(--orange); }
+        .callout-error .callout-label   { color: var(--red); }
+        .callout-info .callout-label    { color: var(--accent-light); }
+
+        /* ---- CSV Visual ---- */
+        .csv-visual {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1.25rem 0;
+        }
+        .csv-visual-title {
+            background: var(--surface2);
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            font-family: 'Cascadia Code', monospace;
+        }
+        .csv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+        }
+        .csv-table th {
+            background: var(--accent);
+            color: #fff;
+            padding: 0.55rem 0.85rem;
+            text-align: left;
+            font-weight: 600;
+            border-radius: 0;
+        }
+        .csv-table td {
+            padding: 0.5rem 0.85rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .csv-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+        .csv-table .row-bad { background: rgba(255, 82, 82, 0.1); }
+        .csv-table .cell-bad { color: var(--red); font-weight: 600; }
+        .csv-table .cell-good { color: var(--green); }
+
+        /* ---- Flow / Steps ---- */
+        .steps {
+            counter-reset: step-counter;
+            list-style: none;
+            padding: 0;
+            margin: 1.25rem 0;
+        }
+        .steps li {
+            counter-increment: step-counter;
+            padding: 1rem 1.25rem 1rem 4rem;
+            position: relative;
+            border-left: 2px solid var(--border);
+            margin-left: 1rem;
+        }
+        .steps li:last-child { border-left-color: transparent; }
+        .steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: -0.85rem;
+            top: 0.85rem;
+            width: 1.7rem;
+            height: 1.7rem;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .steps li strong { color: #fff; display: block; margin-bottom: 0.2rem; }
+
+        /* ---- TOC ---- */
+        .toc {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 1.5rem 0;
+        }
+        .toc h3 { margin-top: 0; }
+        .toc ol { padding-left: 1.25rem; }
+        .toc li { margin: 0.45rem 0; }
+
+        /* ---- Jargon tooltip ---- */
+        .jargon {
+            border-bottom: 1px dashed var(--accent-light);
+            cursor: help;
+            position: relative;
+        }
+        .jargon:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface2);
+            border: 1px solid var(--accent);
+            color: var(--text);
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            white-space: normal;
+            width: 260px;
+            text-align: center;
+            z-index: 10;
+            line-height: 1.5;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        /* ---- Checklist ---- */
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 0.65rem 0;
+            border-bottom: 1px solid var(--border);
+            padding-left: 2rem;
+            position: relative;
+        }
+        .checklist li:last-child { border-bottom: none; }
+        .checklist li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.75rem;
+            width: 1.1rem;
+            height: 1.1rem;
+            border: 2px solid var(--accent);
+            border-radius: 3px;
+        }
+
+        /* ---- Edge case icons ---- */
+        .edge-list { list-style: none; padding: 0; }
+        .edge-list li {
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 0.8rem;
+            align-items: flex-start;
+        }
+        .edge-list li:last-child { border-bottom: none; }
+        .edge-icon {
+            flex-shrink: 0;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .icon-dropped  { background: rgba(255, 152, 0, 0.2); color: var(--orange); }
+        .icon-modified { background: rgba(108, 99, 255, 0.2); color: var(--accent-light); }
+        .icon-sorted   { background: rgba(79, 195, 247, 0.2); color: var(--cyan); }
+        .icon-ok       { background: rgba(0, 200, 83, 0.2); color: var(--green); }
+        .icon-warn     { background: rgba(255, 215, 64, 0.2); color: var(--yellow); }
+
+        /* ---- FAQ ---- */
+        details {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin: 0.6rem 0;
+            overflow: hidden;
+        }
+        details[open] { border-color: var(--accent); }
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: #fff;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        summary::before {
+            content: '+';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.4rem; height: 1.4rem;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        details[open] summary::before { content: '-'; }
+        summary::-webkit-details-marker { display: none; }
+        details .faq-body {
+            padding: 0 1.25rem 1.25rem 3.25rem;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* ---- Footer ---- */
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 700px) {
+            body { padding: 1rem; }
+            header h1 { font-size: 1.8rem; }
+            .card-grid { grid-template-columns: 1fr; }
+            .csv-table { font-size: 0.78rem; }
+            .csv-table th, .csv-table td { padding: 0.4rem 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ==================== HEADER ==================== -->
+        <header>
+            <h1>Crypto Data App &mdash; CSV Input Guide</h1>
+            <p class="subtitle">A beginner-friendly guide to preparing your cryptocurrency data files for the dashboard. No coding experience needed.</p>
+        </header>
+
+        <!-- ==================== WHAT IS THIS APP? ==================== -->
+        <section id="what-is-this">
+            <h2>What Does This App Do?</h2>
+            <p>This app lets you <strong>load cryptocurrency price history from CSV files</strong> (spreadsheet files) and then:</p>
+            <ul style="margin: 0.75rem 0 0.75rem 1.5rem;">
+                <li>View interactive price charts</li>
+                <li>Run trading strategy backtests (test "what if I traded like this in the past?")</li>
+                <li>Compare different coins side by side</li>
+            </ul>
+            <p>To do all of this, the app needs your data in a <strong>specific format</strong>. This guide explains exactly what that format looks like &mdash; think of it as a recipe the app expects you to follow.</p>
+        </section>
+
+        <!-- ==================== TOC ==================== -->
+        <nav class="toc">
+            <h3>What's in This Guide</h3>
+            <ol>
+                <li><a href="#what-is-this">What Does This App Do?</a></li>
+                <li><a href="#quick-start">Quick Start &mdash; Your First CSV in 3 Steps</a></li>
+                <li><a href="#file-naming">How to Name Your File</a></li>
+                <li><a href="#columns">The 6 Columns Your CSV Must Have</a></li>
+                <li><a href="#sample">Full Example CSV (Copy &amp; Modify)</a></li>
+                <li><a href="#timestamps">Timestamps &mdash; Date/Time Formats Explained</a></li>
+                <li><a href="#pipeline">What Happens After You Load a CSV</a></li>
+                <li><a href="#edge-cases">Tricky Situations &amp; What the App Does</a></li>
+                <li><a href="#common-mistakes">Common Mistakes &amp; How to Fix Them</a></li>
+                <li><a href="#errors">Error Messages Explained</a></li>
+                <li><a href="#instruments">Supported Coins &amp; Price Precision</a></li>
+                <li><a href="#checklist">Pre-Upload Checklist</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- ==================== QUICK START ==================== -->
+        <section id="quick-start">
+            <h2>Quick Start &mdash; Your First CSV in 3 Steps</h2>
+            <p>If you just want to get started fast, follow these three steps:</p>
+
+            <ol class="steps">
+                <li>
+                    <strong>Name your file correctly</strong>
+                    Use the pattern: <code>ID_SYMBOL_Name.csv</code><br>
+                    Example: <code>1_BTC_Bitcoin.csv</code>
+                </li>
+                <li>
+                    <strong>Make sure it has these 6 column headers</strong>
+                    Your first row must be: <code>ts,open,high,low,close,volume</code><br>
+                    Exactly those names, exactly that lowercase spelling.
+                </li>
+                <li>
+                    <strong>Load it in the app</strong>
+                    Open the app, go to the <em>"Load Data"</em> page, point it to your CSV folder, select your file, and click <em>"Load Selected into Catalog"</em>.
+                </li>
+            </ol>
+
+            <div class="callout callout-tip">
+                <span class="callout-label">Tip</span>
+                The app already has quick-select buttons for popular coins like BTC, ETH, SOL, XRP, DOGE, and more &mdash; so if your files are named correctly, loading is just one click!
+            </div>
+        </section>
+
+        <!-- ==================== FILE NAMING ==================== -->
+        <section id="file-naming">
+            <h2>How to Name Your File</h2>
+            <p>The app scans your folder and looks for files named in a very specific way. If the filename doesn't match, the file is <strong>invisible</strong> to the app (no error, it just won't show up).</p>
+
+            <h3>The Pattern</h3>
+            <pre><code>{number}_{SYMBOL}_{Name}.csv</code></pre>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Part</th>
+                        <th>What It Means</th>
+                        <th>Rules</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>{number}</code></td>
+                        <td>A numeric ID for the coin (from CoinMarketCap)</td>
+                        <td>Digits only (1, 42, 1027, etc.)</td>
+                        <td><code>1</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>{SYMBOL}</code></td>
+                        <td>The coin's ticker symbol</td>
+                        <td>UPPERCASE letters only &mdash; no numbers, no lowercase</td>
+                        <td><code>BTC</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>{Name}</code></td>
+                        <td>The coin's full name (human-readable)</td>
+                        <td>Any text is fine</td>
+                        <td><code>Bitcoin</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Each part is separated by an underscore <code>_</code> and the file must end with <code>.csv</code>.</p>
+
+            <div class="card-grid">
+                <div class="card card-do">
+                    <h3>Correct Names</h3>
+                    <code>1_BTC_Bitcoin.csv</code><br>
+                    <code>1027_ETH_Ethereum.csv</code><br>
+                    <code>5426_SOL_Solana.csv</code><br>
+                    <code>74_DOGE_Dogecoin.csv</code><br>
+                    <code>52_XRP_XRP.csv</code>
+                </div>
+                <div class="card card-dont">
+                    <h3>Incorrect Names &mdash; Won't Load</h3>
+                    <code>BTC_Bitcoin.csv</code> &mdash; missing the ID number<br>
+                    <code>1_btc_Bitcoin.csv</code> &mdash; "btc" must be "BTC"<br>
+                    <code>bitcoin_data.csv</code> &mdash; doesn't follow the pattern<br>
+                    <code>1_BTC_Bitcoin.xlsx</code> &mdash; must be .csv, not .xlsx<br>
+                    <code>1-BTC-Bitcoin.csv</code> &mdash; uses hyphens instead of underscores
+                </div>
+            </div>
+
+            <div class="callout callout-info">
+                <span class="callout-label">Where do I find the coin ID?</span>
+                Go to <strong>CoinMarketCap.com</strong> and look at the URL of any coin's page. For example, Bitcoin's URL is <code>coinmarketcap.com/currencies/bitcoin/</code> and its ID is <code>1</code>. You can also find it in the CoinMarketCap API. If you're unsure, just use any unique number.
+            </div>
+        </section>
+
+        <!-- ==================== COLUMNS ==================== -->
+        <section id="columns">
+            <h2>The 6 Columns Your CSV Must Have</h2>
+            <p>Think of each row in your CSV as a snapshot of a coin's price for one day (called a "<span class="jargon" data-tip="A candlestick 'bar' represents price movement over a time period &mdash; it shows the open, high, low, and close prices.">bar</span>" or "candle" in trading). Here's what each column means:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column Name</th>
+                        <th>What It Means (Plain English)</th>
+                        <th>What Kind of Data</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>ts</code> <span class="badge badge-required">required</span></td>
+                        <td>The <strong>date</strong> (or date+time) this price data is for</td>
+                        <td>A date, datetime, or number representing time</td>
+                        <td><code>2024-01-15</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>open</code> <span class="badge badge-required">required</span></td>
+                        <td>The price when trading <strong>started</strong> that day</td>
+                        <td>A number (decimals OK)</td>
+                        <td><code>42265.19</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>high</code> <span class="badge badge-required">required</span></td>
+                        <td>The <strong>highest</strong> price reached that day</td>
+                        <td>A number (decimals OK)</td>
+                        <td><code>45000.00</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>low</code> <span class="badge badge-required">required</span></td>
+                        <td>The <strong>lowest</strong> price reached that day</td>
+                        <td>A number (decimals OK)</td>
+                        <td><code>41800.50</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>close</code> <span class="badge badge-required">required</span></td>
+                        <td>The price when trading <strong>ended</strong> that day</td>
+                        <td>A number (decimals OK)</td>
+                        <td><code>44172.65</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>volume</code> <span class="badge badge-required">required</span></td>
+                        <td>How much of the coin was <strong>traded</strong> that day</td>
+                        <td>A number (can be very large)</td>
+                        <td><code>25483910000</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout callout-warning">
+                <span class="callout-label">Column Names Are Case-Sensitive!</span>
+                <code>ts</code> works. <code>Ts</code>, <code>TS</code>, <code>Timestamp</code> &mdash; none of these will work. The column names must be <strong>exactly lowercase</strong> as shown above.
+            </div>
+
+            <div class="callout callout-tip">
+                <span class="callout-label">Have extra columns?</span>
+                That's perfectly fine! If your CSV has additional columns (like <code>market_cap</code>, <code>adj_close</code>, etc.), the app will simply ignore them. Only the 6 columns above are used.
+            </div>
+        </section>
+
+        <!-- ==================== SAMPLE CSV ==================== -->
+        <section id="sample">
+            <h2>Full Example CSV (Copy &amp; Modify)</h2>
+            <p>Here's exactly what a working CSV looks like. You can copy this structure:</p>
+
+            <div class="csv-visual">
+                <div class="csv-visual-title">1_BTC_Bitcoin.csv</div>
+                <table class="csv-table">
+                    <thead>
+                        <tr>
+                            <th>ts</th>
+                            <th>open</th>
+                            <th>high</th>
+                            <th>low</th>
+                            <th>close</th>
+                            <th>volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="cell-good">2024-01-01</td>
+                            <td>42265.19</td>
+                            <td>45000.00</td>
+                            <td>41800.50</td>
+                            <td>44172.65</td>
+                            <td>25483910000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-good">2024-01-02</td>
+                            <td>44172.65</td>
+                            <td>44950.00</td>
+                            <td>43200.00</td>
+                            <td>43850.10</td>
+                            <td>19234560000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-good">2024-01-03</td>
+                            <td>43850.10</td>
+                            <td>44100.75</td>
+                            <td>42500.00</td>
+                            <td>43600.00</td>
+                            <td>17890340000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-good">2024-01-04</td>
+                            <td>43600.00</td>
+                            <td>44800.00</td>
+                            <td>43100.50</td>
+                            <td>44500.25</td>
+                            <td>21045670000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-good">2024-01-05</td>
+                            <td>44500.25</td>
+                            <td>45200.30</td>
+                            <td>44000.00</td>
+                            <td>45100.80</td>
+                            <td>23456780000</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p>As raw text, the CSV file looks like this:</p>
+            <pre><code>ts,open,high,low,close,volume
+2024-01-01,42265.19,45000.00,41800.50,44172.65,25483910000
+2024-01-02,44172.65,44950.00,43200.00,43850.10,19234560000
+2024-01-03,43850.10,44100.75,42500.00,43600.00,17890340000
+2024-01-04,43600.00,44800.00,43100.50,44500.25,21045670000
+2024-01-05,44500.25,45200.30,44000.00,45100.80,23456780000</code></pre>
+        </section>
+
+        <!-- ==================== TIMESTAMPS ==================== -->
+        <section id="timestamps">
+            <h2>Timestamps &mdash; Date/Time Formats Explained</h2>
+            <p>The <code>ts</code> column is the most flexible column. Here are all the date/time formats that will work:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Format</th>
+                        <th>Example</th>
+                        <th>Works?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Standard date (recommended)</td>
+                        <td><code>2024-01-15</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Date with time</td>
+                        <td><code>2024-01-15T00:00:00</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Date with timezone info</td>
+                        <td><code>2024-01-15T00:00:00+00:00</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Unix timestamp (seconds since 1970)</td>
+                        <td><code>1705276800</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Unix timestamp in milliseconds</td>
+                        <td><code>1705276800000</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Slash-separated (US style)</td>
+                        <td><code>01/15/2024</code></td>
+                        <td><span class="badge badge-warn">Risky</span> &mdash; month/day can be ambiguous</td>
+                    </tr>
+                    <tr>
+                        <td>Written-out date</td>
+                        <td><code>Jan 15, 2024</code></td>
+                        <td><span class="badge badge-ok">Yes</span></td>
+                    </tr>
+                    <tr>
+                        <td>Random text / empty cell</td>
+                        <td><code>hello</code> or blank</td>
+                        <td><span class="badge badge-error">Error</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout callout-info">
+                <span class="callout-label">What is UTC?</span>
+                <span class="jargon" data-tip="UTC (Coordinated Universal Time) is the world's time standard. It's basically the same as GMT (Greenwich Mean Time). Think of it as 'the universal clock' that doesn't change with daylight saving.">UTC</span> is the global standard time (like GMT). If your dates don't specify a timezone, the app assumes they're in UTC. If your data is from a source in a different timezone (say, EST), your chart might be off by a few hours &mdash; usually not a problem for daily data.
+            </div>
+        </section>
+
+        <!-- ==================== PIPELINE ==================== -->
+        <section id="pipeline">
+            <h2>What Happens After You Load a CSV</h2>
+            <p>When you click "Load", the app processes your file through 7 steps. Here's what happens behind the scenes in plain English:</p>
+
+            <ol class="steps">
+                <li>
+                    <strong>Read the file</strong>
+                    The app opens your CSV file and reads all the rows and columns.
+                </li>
+                <li>
+                    <strong>Check that all 6 columns exist</strong>
+                    It looks for <code>ts</code>, <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>, <code>volume</code>. If any are missing, it stops and shows an error message telling you which ones are missing.
+                </li>
+                <li>
+                    <strong>Parse the dates</strong>
+                    The <code>ts</code> column is converted into proper date/time values. All dates are treated as UTC time.
+                </li>
+                <li>
+                    <strong>Convert prices &amp; volume to numbers</strong>
+                    The app tries to turn every value in the price and volume columns into a number. If a value can't be converted (e.g., it's text like "N/A"), it gets marked as "missing".
+                </li>
+                <li>
+                    <strong>Remove incomplete rows</strong>
+                    Any row that has a missing value in <em>any</em> column gets removed entirely. <span style="color: var(--orange);">(This happens silently &mdash; you won't see a warning.)</span>
+                </li>
+                <li>
+                    <strong>Sort by date</strong>
+                    All rows are arranged in chronological order (oldest date first).
+                </li>
+                <li>
+                    <strong>Cap very large volume numbers</strong>
+                    If any volume value is above 16 billion, it's reduced to 16 billion. This is a safety limit to prevent crashes in the trading engine.
+                </li>
+            </ol>
+        </section>
+
+        <!-- ==================== EDGE CASES ==================== -->
+        <section id="edge-cases">
+            <h2>Tricky Situations &amp; What the App Does</h2>
+
+            <h3>Things the App Fixes Silently (No Error Shown)</h3>
+            <p>These issues won't crash the app, but your data may be quietly modified:</p>
+
+            <div class="card">
+                <ul class="edge-list">
+                    <li>
+                        <span class="edge-icon icon-dropped">&#8861;</span>
+                        <div>
+                            <strong>A cell contains text instead of a number</strong> (e.g., "N/A" in the volume column)<br>
+                            <em>What happens:</em> The entire row is removed. You won't see a warning or a count of how many rows were dropped.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-dropped">&#8861;</span>
+                        <div>
+                            <strong>A cell is empty / blank</strong><br>
+                            <em>What happens:</em> Same as above &mdash; the entire row is removed silently.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-modified">&#8644;</span>
+                        <div>
+                            <strong>Volume is larger than 16 billion</strong><br>
+                            <em>What happens:</em> The value is capped at 16,000,000,000. For example, <code>20000000000</code> becomes <code>16000000000</code>.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-sorted">&#8645;</span>
+                        <div>
+                            <strong>Rows are not in date order</strong><br>
+                            <em>What happens:</em> The app re-sorts all rows from oldest to newest automatically.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-ok">&#10003;</span>
+                        <div>
+                            <strong>CSV has extra columns</strong> (like <code>market_cap</code>, <code>adj_close</code>)<br>
+                            <em>What happens:</em> Extra columns are ignored. Only the 6 required columns are kept.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-ok">&#10003;</span>
+                        <div>
+                            <strong>Dates don't include timezone info</strong><br>
+                            <em>What happens:</em> The app assumes all dates are in UTC. No warning is shown.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <h3>Things the App Allows (But You Should Watch Out For)</h3>
+            <p>These won't cause errors, but could lead to weird results in charts and backtests:</p>
+
+            <div class="card">
+                <ul class="edge-list">
+                    <li>
+                        <span class="edge-icon icon-warn">!</span>
+                        <div>
+                            <strong>Negative prices</strong> (e.g., <code>open = -100</code>)<br>
+                            <em>Allowed but wrong:</em> Crypto prices should never be negative. The app doesn't check for this.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-warn">!</span>
+                        <div>
+                            <strong>High price is lower than Low price</strong><br>
+                            <em>Allowed but wrong:</em> Logically, <code>high</code> should always be &ge; <code>low</code>. The app doesn't validate this.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-warn">!</span>
+                        <div>
+                            <strong>Duplicate dates</strong> (two rows with the same timestamp)<br>
+                            <em>Allowed:</em> Both rows are kept. This could distort your backtest results.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-warn">!</span>
+                        <div>
+                            <strong>Completely identical rows</strong><br>
+                            <em>Allowed:</em> Not detected or removed. All copies are kept.
+                        </div>
+                    </li>
+                    <li>
+                        <span class="edge-icon icon-warn">!</span>
+                        <div>
+                            <strong>Empty file (only headers, no data rows)</strong><br>
+                            <em>Allowed:</em> Loads without error, but there will be nothing to chart or backtest.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ==================== COMMON MISTAKES ==================== -->
+        <section id="common-mistakes">
+            <h2>Common Mistakes &amp; How to Fix Them</h2>
+
+            <h3>Mistake 1: Wrong column names</h3>
+            <div class="card-grid">
+                <div class="card card-dont">
+                    <span class="card-label">Won't work</span>
+                    <div class="csv-visual" style="margin: 0.5rem 0 0;">
+                        <table class="csv-table">
+                            <thead><tr><th class="cell-bad">Timestamp</th><th class="cell-bad">Open</th><th class="cell-bad">High</th><th class="cell-bad">Low</th><th class="cell-bad">Close</th><th class="cell-bad">Volume</th></tr></thead>
+                            <tbody><tr><td>2024-01-01</td><td>42265</td><td>45000</td><td>41800</td><td>44172</td><td>25483910000</td></tr></tbody>
+                        </table>
+                    </div>
+                    <p style="margin-top:0.5rem; color: var(--red); font-size: 0.9rem;">Column names are capitalized &amp; "Timestamp" instead of "ts"</p>
+                </div>
+                <div class="card card-do">
+                    <span class="card-label">Works</span>
+                    <div class="csv-visual" style="margin: 0.5rem 0 0;">
+                        <table class="csv-table">
+                            <thead><tr><th>ts</th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr></thead>
+                            <tbody><tr><td>2024-01-01</td><td>42265</td><td>45000</td><td>41800</td><td>44172</td><td>25483910000</td></tr></tbody>
+                        </table>
+                    </div>
+                    <p style="margin-top:0.5rem; color: var(--green); font-size: 0.9rem;">All lowercase, exactly as specified</p>
+                </div>
+            </div>
+
+            <h3>Mistake 2: Non-numeric values in price columns</h3>
+            <div class="csv-visual">
+                <div class="csv-visual-title">What a problematic CSV looks like</div>
+                <table class="csv-table">
+                    <thead><tr><th>ts</th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td>2024-01-01</td><td>42265.19</td><td>45000.00</td><td>41800.50</td><td>44172.65</td><td>25483910000</td>
+                        </tr>
+                        <tr class="row-bad">
+                            <td>2024-01-02</td><td class="cell-bad">$44,172.65</td><td>44950.00</td><td>43200.00</td><td>43850.10</td><td class="cell-bad">N/A</td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-03</td><td>43850.10</td><td>44100.75</td><td>42500.00</td><td>43600.00</td><td>17890340000</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>The highlighted row has <code>$44,172.65</code> (with a dollar sign and comma) and <code>N/A</code>. This row will be <strong>silently removed</strong> because those aren't pure numbers.</p>
+
+            <div class="callout callout-warning">
+                <span class="callout-label">Rule of thumb</span>
+                Numbers must be <strong>plain numbers only</strong>. No dollar signs (<code>$</code>), no commas (<code>44,172</code>), no percentage signs (<code>%</code>), no text (<code>N/A</code>, <code>null</code>, <code>-</code>).
+            </div>
+
+            <h3>Mistake 3: Wrong filename format</h3>
+            <p>If your file doesn't appear in the app's list, double-check the filename. The most common issues:</p>
+            <ul style="margin: 0.5rem 0 0 1.5rem;">
+                <li>Using lowercase symbol: <code>1_btc_Bitcoin.csv</code> &rarr; Fix: <code>1_BTC_Bitcoin.csv</code></li>
+                <li>Missing the ID number: <code>BTC_Bitcoin.csv</code> &rarr; Fix: <code>1_BTC_Bitcoin.csv</code></li>
+                <li>Using the wrong separator: <code>1-BTC-Bitcoin.csv</code> &rarr; Fix: use underscores <code>_</code></li>
+                <li>Wrong file extension: <code>1_BTC_Bitcoin.xlsx</code> &rarr; Fix: save/export as <code>.csv</code></li>
+            </ul>
+        </section>
+
+        <!-- ==================== ERRORS ==================== -->
+        <section id="errors">
+            <h2>Error Messages Explained</h2>
+            <p>If something goes wrong, here's what the error messages mean and how to fix them:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Error Message</th>
+                        <th>What It Means</th>
+                        <th>How to Fix It</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>CSV missing required columns: ['volume']</code></td>
+                        <td>Your file doesn't have one or more of the 6 required columns. The error tells you which ones are missing.</td>
+                        <td>Add the missing column(s) to your CSV. Check spelling &mdash; it's case-sensitive.</td>
+                    </tr>
+                    <tr>
+                        <td><code>FileNotFoundError</code></td>
+                        <td>The app can't find the file at the path you provided.</td>
+                        <td>Double-check the folder path in the app. Make sure the CSV file is actually in that folder.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Unknown datetime string format</code></td>
+                        <td>The <code>ts</code> column has dates in a format the app can't understand.</td>
+                        <td>Convert your dates to a standard format like <code>2024-01-15</code> (YYYY-MM-DD).</td>
+                    </tr>
+                    <tr>
+                        <td><code>Out of bounds nanosecond timestamp</code></td>
+                        <td>A date is too far in the past or future (outside the year range ~1677 to ~2262).</td>
+                        <td>Check for obviously wrong dates, like year 0001 or 9999.</td>
+                    </tr>
+                    <tr>
+                        <td><em>"No CSV files found in {folder}"</em></td>
+                        <td>The folder exists but contains no files matching the naming pattern.</td>
+                        <td>Rename your files to match the <code>ID_SYMBOL_Name.csv</code> pattern.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ==================== INSTRUMENTS ==================== -->
+        <section id="instruments">
+            <h2>Supported Coins &amp; Price Precision</h2>
+            <p>After loading, each coin is automatically paired with USD (U.S. Dollar) as the quote currency. The app uses different levels of decimal precision depending on the coin:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Coin</th>
+                        <th>Trading Pair</th>
+                        <th>Decimal Places</th>
+                        <th>Example Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Bitcoin (BTC)</td><td>BTCUSD</td><td>2</td><td><code>$67,245.83</code></td></tr>
+                    <tr><td>Ethereum (ETH)</td><td>ETHUSD</td><td>2</td><td><code>$3,521.47</code></td></tr>
+                    <tr><td>Solana (SOL)</td><td>SOLUSD</td><td>4</td><td><code>$142.5678</code></td></tr>
+                    <tr><td>XRP</td><td>XRPUSD</td><td>4</td><td><code>$0.5234</code></td></tr>
+                    <tr><td>Cardano (ADA)</td><td>ADAUSD</td><td>4</td><td><code>$0.4521</code></td></tr>
+                    <tr><td>Dogecoin (DOGE)</td><td>DOGEUSD</td><td>6</td><td><code>$0.082345</code></td></tr>
+                    <tr><td>Polygon (MATIC)</td><td>MATICUSD</td><td>6</td><td><code>$0.712345</code></td></tr>
+                    <tr><td>Any other coin</td><td>{SYMBOL}USD</td><td>2</td><td><code>$123.45</code></td></tr>
+                </tbody>
+            </table>
+
+            <div class="callout callout-info">
+                <span class="callout-label">Why does precision matter?</span>
+                Coins like DOGE are worth fractions of a dollar, so they need more decimal places to show meaningful price differences. BTC, at tens of thousands of dollars, only needs 2 decimal places.
+            </div>
+
+            <div class="card">
+                <h3>System Limits</h3>
+                <p>These are the maximum values the trading engine can handle:</p>
+                <table>
+                    <thead>
+                        <tr><th>Limit</th><th>Value</th><th>Why It Matters</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Maximum price</td><td>$10,000,000</td><td>Prices above this aren't supported</td></tr>
+                        <tr><td>Maximum volume per row</td><td>16,000,000,000</td><td>Larger values are automatically capped</td></tr>
+                        <tr><td>Minimum trade value</td><td>$1.00</td><td>For backtesting purposes</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ==================== CHECKLIST ==================== -->
+        <section id="checklist">
+            <h2>Pre-Upload Checklist</h2>
+            <p>Go through this list before loading your CSV. If everything checks out, you're good to go!</p>
+
+            <div class="card">
+                <ul class="checklist">
+                    <li><strong>File is named correctly</strong> &mdash; follows <code>ID_SYMBOL_Name.csv</code> pattern (e.g., <code>1_BTC_Bitcoin.csv</code>)</li>
+                    <li><strong>File extension is <code>.csv</code></strong> &mdash; not .xlsx, .txt, or .json</li>
+                    <li><strong>First row has all 6 column headers</strong> &mdash; <code>ts, open, high, low, close, volume</code></li>
+                    <li><strong>Column names are exact lowercase</strong> &mdash; <code>Open</code> won't work, must be <code>open</code></li>
+                    <li><strong>Dates are in a standard format</strong> &mdash; <code>2024-01-15</code> is the safest choice</li>
+                    <li><strong>Numbers are plain numbers</strong> &mdash; no <code>$</code>, no commas, no <code>N/A</code>, no blanks</li>
+                    <li><strong>Dates are in UTC</strong> (or you're OK with the app assuming UTC)</li>
+                    <li><strong>No obviously wrong data</strong> &mdash; no negative prices, no <code>high &lt; low</code> values</li>
+                    <li><strong>No duplicate dates</strong> (unless intentional) &mdash; each row should be a unique day</li>
+                    <li><strong>Volume values are under 16 billion</strong> &mdash; larger values will be silently capped</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ==================== FAQ ==================== -->
+        <section id="faq">
+            <h2>Frequently Asked Questions</h2>
+
+            <details>
+                <summary>Can I use data exported from Excel or Google Sheets?</summary>
+                <div class="faq-body">
+                    Yes! Just make sure you export/save as <strong>CSV (Comma Separated Values)</strong>, not as .xlsx or .ods. In Excel: File &rarr; Save As &rarr; choose "CSV (Comma delimited)". In Google Sheets: File &rarr; Download &rarr; Comma Separated Values (.csv). Then rename the file to match the required pattern.
+                </div>
+            </details>
+
+            <details>
+                <summary>Where can I download crypto CSV data?</summary>
+                <div class="faq-body">
+                    Popular free sources include:
+                    <ul style="margin: 0.5rem 0 0 1.25rem;">
+                        <li><strong>CoinMarketCap</strong> &mdash; historical data section (may need free account)</li>
+                        <li><strong>Yahoo Finance</strong> &mdash; search for a crypto, click "Historical Data", then "Download"</li>
+                        <li><strong>CoinGecko</strong> &mdash; export historical data from any coin's page</li>
+                        <li><strong>Kaggle</strong> &mdash; search for "cryptocurrency historical data" datasets</li>
+                    </ul>
+                    <p style="margin-top: 0.5rem;">After downloading, you may need to <strong>rename the columns</strong> to match what this app expects (<code>ts, open, high, low, close, volume</code>) and <strong>rename the file</strong> to match the naming pattern.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>My file doesn't show up in the app. What's wrong?</summary>
+                <div class="faq-body">
+                    Three things to check:
+                    <ol style="margin: 0.5rem 0 0 1.25rem;">
+                        <li><strong>Is the file in the right folder?</strong> Check the folder path shown in the app.</li>
+                        <li><strong>Is the filename correct?</strong> It must match <code>ID_SYMBOL_Name.csv</code> exactly &mdash; uppercase symbol, underscores as separators, .csv extension.</li>
+                        <li><strong>Is it actually a .csv file?</strong> Sometimes files look like .csv in Windows but are actually .csv.txt. Enable "Show file extensions" in your file explorer to verify.</li>
+                    </ol>
+                </div>
+            </details>
+
+            <details>
+                <summary>Some of my rows disappeared after loading. Why?</summary>
+                <div class="faq-body">
+                    The app silently removes any row where <em>any</em> value is missing, blank, or can't be converted to a number. Open your CSV in a spreadsheet and look for:
+                    <ul style="margin: 0.5rem 0 0 1.25rem;">
+                        <li>Blank cells</li>
+                        <li>Text values like "N/A", "null", "-", or "#REF!"</li>
+                        <li>Numbers with formatting: "$1,234" or "1,234.56" (commas aren't allowed)</li>
+                    </ul>
+                    <p style="margin-top: 0.5rem;">Fix those cells and reload.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Does the data have to be daily? Can I use hourly or minute data?</summary>
+                <div class="faq-body">
+                    The CSV loader itself doesn't care about the time interval &mdash; it just reads rows with timestamps. However, the backtest engine processes the data as <strong>daily bars</strong>, so hourly or minute data will be treated as one bar per row regardless. For best results, use <strong>daily OHLCV data</strong> (one row per day).
+                </div>
+            </details>
+
+            <details>
+                <summary>Can I load multiple coins at once?</summary>
+                <div class="faq-body">
+                    Yes! Place all your CSV files in the same folder, and the app will detect all of them. You can then select multiple coins from the list or use the quick-select buttons. Each coin needs its own separate CSV file.
+                </div>
+            </details>
+
+            <details>
+                <summary>What does "CoinMarketCap ID" mean? Does it matter what number I use?</summary>
+                <div class="faq-body">
+                    The ID is just a unique number to identify each coin. CoinMarketCap assigns these (Bitcoin = 1, Ethereum = 1027, etc.), but <strong>any unique number will work</strong>. The app uses it mainly to sort and identify files. If you don't know the official ID, just pick any number &mdash; it won't affect your charts or backtests.
+                </div>
+            </details>
+
+            <details>
+                <summary>My data uses different column names (like "Date", "Open", "Close"). Do I have to rename them?</summary>
+                <div class="faq-body">
+                    <strong>Yes.</strong> The app requires exact column names: <code>ts</code>, <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>, <code>volume</code>. If your data has <code>Date</code>, rename it to <code>ts</code>. If it has <code>Open</code>, rename it to <code>open</code>. You can do this in Excel/Google Sheets by simply editing the first row, or in a text editor by changing the first line.
+                </div>
+            </details>
+        </section>
+
+        <!-- ==================== FOOTER ==================== -->
+        <footer>
+            <p>Crypto Data App &mdash; CSV Input Guide</p>
+            <p style="margin-top: 0.3rem;">Built for the NautilusTrader Crypto Dashboard</p>
+        </footer>
+
+    </div>
+</body>
+</html>

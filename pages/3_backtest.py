@@ -95,7 +95,13 @@ for strategy_name in selected_strategies:
         param_cols = st.columns(len(params))
         for i, (param_key, param_info) in enumerate(params.items()):
             with param_cols[i]:
-                if isinstance(param_info["default"], float):
+                if isinstance(param_info["default"], bool):
+                    strategy_params[param_key] = st.checkbox(
+                        param_info["label"],
+                        value=param_info["default"],
+                        key=f"param_{strategy_name}_{param_key}",
+                    )
+                elif isinstance(param_info["default"], float):
                     strategy_params[param_key] = st.number_input(
                         param_info["label"],
                         value=param_info["default"],
