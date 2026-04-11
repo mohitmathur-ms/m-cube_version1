@@ -16,14 +16,14 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 st.set_page_config(
-    page_title="NautilusTrader Crypto Dashboard",
+    page_title="M_Cube Crypto Dashboard",
     page_icon="⚓",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # --- Sidebar: Global Settings ---
-st.sidebar.title("NautilusTrader")
+st.sidebar.title("M_Cube")
 st.sidebar.caption("Crypto Data Dashboard")
 st.sidebar.divider()
 
@@ -54,7 +54,7 @@ st.sidebar.markdown(
 )
 
 # --- Main Page ---
-st.title("Welcome to NautilusTrader Crypto Dashboard")
+st.title("Welcome to M_Cube Crypto Dashboard")
 st.markdown("---")
 
 col1, col2, col3, col4 = st.columns(4)

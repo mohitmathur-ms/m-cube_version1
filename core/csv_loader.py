@@ -14,7 +14,7 @@ import pandas as pd
 
 
 # Default path to the user's crypto CSV data
-DEFAULT_CSV_FOLDER = r"C:\Users\HP\Desktop\MS\Dataset\id_name_all_symbols"
+DEFAULT_CSV_FOLDER = r"C:\Users\ADMIN\Desktop\id_name_all_symbols\id_name_all_symbols"
 
 # NautilusTrader QUANTITY_RAW_MAX is 18_446_744_072.999999488
 # Use a safe value well below this to avoid Rust panics

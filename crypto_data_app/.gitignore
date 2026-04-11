@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-*.pyo
-catalog/
-test_catalog/
-.env
-*.egg-info/
-dist/
-build/

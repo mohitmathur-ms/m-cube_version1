@@ -1,0 +1,2011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M_Cube Crypto Dashboard - Complete Documentation</title>
+    <style>
+        :root {
+            --bg-primary: #0e1117;
+            --bg-secondary: #1a1d23;
+            --bg-card: #21252b;
+            --bg-hover: #2a2e35;
+            --border-color: #333840;
+            --text-primary: #e6e6e6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent: #00d4aa;
+            --accent-hover: #00b894;
+            --danger: #ff4444;
+            --success: #00d4aa;
+            --warning: #ffe66d;
+            --info: #4ecdc4;
+            --radius: 8px;
+            --beginner: #a29bfe;
+            --beginner-soft: rgba(162, 155, 254, 0.12);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        /* Tab Navigation */
+        .tab-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border-color);
+            padding: 0 20px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 14px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+        .tab-content { display: none; padding: 30px 40px; max-width: 1400px; margin: 0 auto; }
+        .tab-content.active { display: block; }
+
+        /* Typography */
+        h1 { font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+        h2 { font-size: 1.5rem; font-weight: 700; margin: 32px 0 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        h3 { font-size: 1.15rem; font-weight: 600; margin: 24px 0 12px; color: var(--accent); }
+        h4 { font-size: 1rem; font-weight: 600; margin: 16px 0 8px; color: var(--text-primary); }
+        p { margin-bottom: 12px; color: var(--text-secondary); }
+        strong { color: var(--text-primary); }
+        .subtitle { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 30px; }
+
+        /* Cards */
+        .doc-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .doc-card-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        /* Boxes */
+        .highlight-box {
+            background: rgba(0, 212, 170, 0.08);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+        .warning-box {
+            background: rgba(255, 230, 109, 0.08);
+            border-left: 4px solid var(--warning);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+        .danger-box {
+            background: rgba(255, 68, 68, 0.08);
+            border-left: 4px solid var(--danger);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+        .info-box {
+            background: rgba(78, 205, 196, 0.08);
+            border-left: 4px solid var(--info);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+
+        /* Beginner-friendly callouts */
+        .analogy-box {
+            background: var(--beginner-soft);
+            border-left: 4px solid var(--beginner);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+        .analogy-box::before {
+            content: "Think of it like...";
+            display: block;
+            font-weight: 700;
+            color: var(--beginner);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .term-box {
+            background: rgba(255, 230, 109, 0.06);
+            border-left: 4px solid var(--warning);
+            padding: 16px 20px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            margin: 16px 0;
+        }
+        .term-box::before {
+            content: "New Term";
+            display: block;
+            font-weight: 700;
+            color: var(--warning);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .step-box {
+            background: rgba(0, 212, 170, 0.06);
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin: 12px 0;
+            counter-increment: step-counter;
+            position: relative;
+            padding-left: 60px;
+        }
+        .step-box::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 16px;
+            top: 18px;
+            width: 30px;
+            height: 30px;
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .step-container { counter-reset: step-counter; }
+
+        /* Code */
+        code {
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 18px;
+            overflow-x: auto;
+            margin: 12px 0 20px;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.82rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        /* Tables */
+        .doc-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin: 12px 0 20px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        td { padding: 10px 16px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        tr:hover { background: var(--bg-hover); }
+        tr:last-child td { border-bottom: none; }
+
+        /* Lists */
+        ul, ol { margin: 8px 0 16px 24px; color: var(--text-secondary); }
+        li { margin-bottom: 6px; }
+
+        /* Flow Diagrams */
+        .flow-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin: 16px 0 24px;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: var(--accent);
+            white-space: pre;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+        .badge-get { background: rgba(0, 212, 170, 0.15); color: var(--accent); }
+        .badge-post { background: rgba(78, 205, 196, 0.15); color: var(--info); }
+        .badge-file { background: rgba(162, 155, 254, 0.15); color: #a29bfe; }
+
+        /* Grid */
+        .doc-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .doc-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .doc-grid-2, .doc-grid-3 { grid-template-columns: 1fr; } }
+
+        /* Links */
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Optimization tags */
+        .opt-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-right: 6px; }
+        .opt-perf { background: rgba(255, 68, 68, 0.15); color: var(--danger); }
+        .opt-security { background: rgba(255, 230, 109, 0.15); color: var(--warning); }
+        .opt-ux { background: rgba(0, 212, 170, 0.15); color: var(--success); }
+        .opt-arch { background: rgba(78, 205, 196, 0.15); color: var(--info); }
+        .opt-maint { background: rgba(162, 155, 254, 0.15); color: #a29bfe; }
+        .severity-high { border-left: 4px solid var(--danger); }
+        .severity-medium { border-left: 4px solid var(--warning); }
+        .severity-low { border-left: 4px solid var(--info); }
+
+        /* Glossary */
+        .glossary-term {
+            display: inline-block;
+            background: rgba(162, 155, 254, 0.1);
+            border: 1px solid rgba(162, 155, 254, 0.3);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--beginner);
+            cursor: help;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tab-content { padding: 20px; }
+            .tab-btn { padding: 12px 14px; font-size: 0.8rem; }
+        }
+
+        /* Visual flow cards */
+        .vflow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+        .vflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            text-align: center;
+            min-width: 140px;
+            flex: 1;
+        }
+        .vflow-step strong { display: block; color: var(--accent); margin-bottom: 4px; font-size: 0.9rem; }
+        .vflow-step span { font-size: 0.78rem; color: var(--text-secondary); }
+        .vflow-arrow {
+            color: var(--accent);
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        /* FAQ */
+        .faq-q {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+        }
+        .faq-a {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            padding-left: 16px;
+            border-left: 2px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB BAR                                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('start')">Getting Started</button>
+    <button class="tab-btn" onclick="switchTab('glossary')">Glossary</button>
+    <button class="tab-btn" onclick="switchTab('architecture')">How It All Connects</button>
+    <button class="tab-btn" onclick="switchTab('backend')">Backend (Python)</button>
+    <button class="tab-btn" onclick="switchTab('core')">Core Modules</button>
+    <button class="tab-btn" onclick="switchTab('frontend')">Frontend (JavaScript)</button>
+    <button class="tab-btn" onclick="switchTab('dataflow')">Data Flow (Step-by-Step)</button>
+    <button class="tab-btn" onclick="switchTab('api')">API Reference</button>
+    <button class="tab-btn" onclick="switchTab('variables')">Variables & Parameters</button>
+    <button class="tab-btn" onclick="switchTab('optimization')">Optimizations</button>
+    <button class="tab-btn" onclick="switchTab('faq')">FAQ</button>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 1: GETTING STARTED                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-start">
+    <h1>M_Cube Crypto Dashboard</h1>
+    <p class="subtitle">A beginner-friendly guide to understanding the entire project, inside and out.</p>
+
+    <h2>What Does This App Do?</h2>
+    <div class="doc-card">
+        <p>In simple words, this app lets you:</p>
+        <ol>
+            <li><strong>Import</strong> historical cryptocurrency price data (like Bitcoin, Ethereum, etc.) from CSV files on your computer</li>
+            <li><strong>Explore</strong> that data with interactive charts (candlestick charts, price tables, return analysis)</li>
+            <li><strong>Test trading strategies</strong> &mdash; "what if I had followed this trading rule for the last 5 years?" (this is called <strong>backtesting</strong>)</li>
+            <li><strong>Analyze the results</strong> &mdash; see how much profit/loss each strategy would have made, visualize performance with charts</li>
+        </ol>
+    </div>
+
+    <div class="analogy-box">
+        Imagine a flight simulator for trading. Instead of risking real money, you feed the app historical price data and test your trading ideas against the past. The app shows you exactly what would have happened &mdash; how many trades you'd have made, how much you'd have won or lost, and when things went wrong.
+    </div>
+
+    <h2>How the App is Built (The Big Picture)</h2>
+    <p>The app has two main halves that talk to each other:</p>
+
+    <div class="doc-grid-2">
+        <div class="doc-card">
+            <div class="doc-card-title">Frontend (What You See)</div>
+            <p>This is the part that runs <strong>in your web browser</strong>. It's built with:</p>
+            <ul>
+                <li><strong>HTML</strong> &mdash; the structure of the pages (buttons, inputs, layout)</li>
+                <li><strong>CSS</strong> &mdash; the styling (dark theme, colors, spacing)</li>
+                <li><strong>JavaScript</strong> &mdash; the logic that makes things interactive (click a button, see a chart)</li>
+                <li><strong>Plotly.js</strong> &mdash; a library that draws the interactive charts</li>
+            </ul>
+        </div>
+        <div class="doc-card">
+            <div class="doc-card-title">Backend (What Does the Work)</div>
+            <p>This is the part that runs <strong>on your computer as a Python program</strong>. It handles:</p>
+            <ul>
+                <li><strong>Flask</strong> &mdash; a Python web framework that serves the website and handles requests</li>
+                <li><strong>NautilusTrader</strong> &mdash; a professional trading simulation engine</li>
+                <li><strong>Pandas</strong> &mdash; a Python library for processing data tables</li>
+                <li><strong>File system</strong> &mdash; reading CSVs, saving reports, managing the data catalog</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="analogy-box">
+        The frontend is like a restaurant menu &mdash; it shows you options and takes your order. The backend is like the kitchen &mdash; it does the actual cooking (loading data, running backtests) and sends the results back to your table.
+    </div>
+
+    <h2>Project File Structure</h2>
+    <div class="doc-card">
+        <p>Here's every file in the project and what it does. Don't worry about memorizing this &mdash; just use it as a reference when you need to find something:</p>
+        <pre>
+crypto_data_app_using_html/
+|
+|-- server.py                       &lt;-- THE MAIN FILE. Start here. This runs the backend.
+|
+|-- static/                         &lt;-- Everything the browser needs
+|   |-- index.html                  &lt;-- The one HTML page (the app "shell")
+|   |-- css/
+|   |   |-- style.css               &lt;-- All the visual styling (colors, layout, dark theme)
+|   |-- js/
+|       |-- app.js                  &lt;-- The "brain" - handles navigation and shared utilities
+|       |-- dashboard.js            &lt;-- Home page with welcome cards
+|       |-- load_data.js            &lt;-- Page for importing CSV data
+|       |-- view_data.js            &lt;-- Page for exploring data with charts
+|       |-- backtest.js             &lt;-- Page for running trading strategies
+|       |-- tearsheet.js            &lt;-- Page for performance analysis
+|
+|-- (parent directory) core/        &lt;-- Python modules that do the heavy lifting
+    |-- csv_loader.py               &lt;-- Reads and parses CSV files
+    |-- nautilus_loader.py          &lt;-- Converts data for NautilusTrader
+    |-- instrument_factory.py       &lt;-- Creates trading instrument definitions
+    |-- strategies.py               &lt;-- 4 built-in trading strategies
+    |-- backtest_runner.py          &lt;-- Runs the actual backtests
+    |-- report_generator.py         &lt;-- Creates HTML and CSV reports
+    |-- custom_strategy_loader.py   &lt;-- Handles user-uploaded strategies</pre>
+    </div>
+
+    <h2>How to Run the App (Step by Step)</h2>
+    <div class="step-container">
+        <div class="step-box">
+            <h4>Install Python Dependencies</h4>
+            <p>Open a terminal and run:</p>
+            <pre>pip install flask flask-cors pandas nautilus_trader</pre>
+            <p>This installs the Python libraries the backend needs.</p>
+        </div>
+        <div class="step-box">
+            <h4>Place Your CSV Data Files</h4>
+            <p>Put your crypto CSV files in a folder on your computer. The default location the app looks for is:<br>
+            <code>C:\Users\ADMIN\Desktop\id_name_all_symbols\id_name_all_symbols</code><br>
+            But you can change this in the app. CSV files should be named like: <code>1_BTC_Bitcoin.csv</code></p>
+        </div>
+        <div class="step-box">
+            <h4>Start the Server</h4>
+            <pre>python crypto_data_app_using_html/server.py</pre>
+            <p>You'll see a message saying the server is running on <code>http://localhost:5000</code></p>
+        </div>
+        <div class="step-box">
+            <h4>Open Your Browser</h4>
+            <p>Go to <strong>http://localhost:5000</strong> in Chrome, Firefox, or Edge. You'll see the dashboard!</p>
+        </div>
+        <div class="step-box">
+            <h4>Follow the 4-Step Workflow</h4>
+            <p>The app is designed to be used in order:</p>
+            <div class="vflow">
+                <div class="vflow-step"><strong>Load Data</strong><span>Import your CSV files</span></div>
+                <div class="vflow-arrow">&rarr;</div>
+                <div class="vflow-step"><strong>View Data</strong><span>Explore with charts</span></div>
+                <div class="vflow-arrow">&rarr;</div>
+                <div class="vflow-step"><strong>Backtest</strong><span>Test trading strategies</span></div>
+                <div class="vflow-arrow">&rarr;</div>
+                <div class="vflow-step"><strong>Tearsheet</strong><span>Analyze performance</span></div>
+            </div>
+        </div>
+    </div>
+
+    <h2>The 5 Pages Explained</h2>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Page</th><th>What It Does</th><th>When to Use It</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>Dashboard</strong></td>
+                    <td>Welcome screen. Shows navigation cards and whether you have data loaded.</td>
+                    <td>First thing you see. Use it to check if your data catalog has data.</td>
+                </tr>
+                <tr>
+                    <td><strong>Load Data</strong></td>
+                    <td>Scans a folder for CSV files, lets you pick which coins to import, loads them into the system.</td>
+                    <td>Do this first! Without data, nothing else works.</td>
+                </tr>
+                <tr>
+                    <td><strong>View Data</strong></td>
+                    <td>Shows candlestick charts, OHLCV tables, daily return histograms, and cumulative return charts.</td>
+                    <td>Use this to visually inspect your data before running backtests.</td>
+                </tr>
+                <tr>
+                    <td><strong>Run Backtest</strong></td>
+                    <td>Pick one or more trading strategies, configure their parameters, and run them on your data.</td>
+                    <td>The core feature. This is where you test "what if" scenarios.</td>
+                </tr>
+                <tr>
+                    <td><strong>Tearsheet</strong></td>
+                    <td>Deep analysis of backtest results: equity curves, drawdown charts, win/loss ratios, per-trade P&L.</td>
+                    <td>After running a backtest, come here to understand the results in depth.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 2: GLOSSARY                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-glossary">
+    <h1>Glossary of Terms</h1>
+    <p class="subtitle">If you see a word you don't know, look it up here. Terms are organized by category.</p>
+
+    <h2>Trading & Finance Terms</h2>
+    <div class="doc-card">
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Term</th><th>Plain English Explanation</th><th>Example</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>OHLCV</strong></td>
+                        <td>Stands for <strong>Open, High, Low, Close, Volume</strong>. These are the 5 numbers that describe a single day of trading. Open = price at start of day, High = highest price, Low = lowest, Close = price at end of day, Volume = how much was traded.</td>
+                        <td>Bitcoin on Jan 1: Open=$42,000, High=$43,500, Low=$41,800, Close=$43,100, Volume=50,000 BTC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Candlestick Chart</strong></td>
+                        <td>A chart where each "candle" shows one day's OHLCV. The body shows open-to-close, the "wicks" show high and low. Green = price went up, Red = price went down.</td>
+                        <td>A tall green candle means the price rose a lot that day</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Backtest</strong></td>
+                        <td>Testing a trading strategy on <em>historical</em> data to see how it would have performed. Like rewinding time and asking "what if?"</td>
+                        <td>"If I bought BTC every time the RSI went below 30 since 2015, how much would I have made?"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Strategy</strong></td>
+                        <td>A set of rules that decide when to buy and when to sell. No emotions, just math.</td>
+                        <td>"Buy when the 10-day average crosses above the 20-day average"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>EMA (Exponential Moving Average)</strong></td>
+                        <td>An average of recent prices that gives more weight to recent days. A "fast" EMA (short period) reacts quickly to price changes; a "slow" EMA (long period) is smoother.</td>
+                        <td>10-day EMA reacts faster than 50-day EMA</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RSI (Relative Strength Index)</strong></td>
+                        <td>A number from 0-100 that measures if something is "overbought" (too expensive, might drop) or "oversold" (too cheap, might rise). Typically: above 70 = overbought, below 30 = oversold.</td>
+                        <td>RSI at 25 suggests the asset might be a good buy</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bollinger Bands</strong></td>
+                        <td>A channel around the price made of an average line plus upper and lower bands. When price touches the lower band, it might bounce up. When it hits the upper band, it might drop.</td>
+                        <td>Price hitting the lower band = potential buy signal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>P&L (Profit & Loss)</strong></td>
+                        <td>How much money a trade or strategy made or lost. Positive = profit, negative = loss.</td>
+                        <td>P&L of +$5,000 means you made five thousand dollars</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Drawdown</strong></td>
+                        <td>The drop from a peak balance to a trough. Shows the worst "paper loss" you'd have experienced. Max drawdown is the biggest drop.</td>
+                        <td>Balance went from $110K to $95K = drawdown of -13.6%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Win Rate</strong></td>
+                        <td>What percentage of your trades made money.</td>
+                        <td>24 wins out of 42 trades = 57.1% win rate</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Equity Curve</strong></td>
+                        <td>A line chart showing how your account balance changed over time. Goes up when you profit, down when you lose.</td>
+                        <td>A steadily rising equity curve = consistently profitable strategy</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tearsheet</strong></td>
+                        <td>A one-page summary of a strategy's performance with key metrics and charts. Like a report card for your trading strategy.</td>
+                        <td>Shows return %, drawdown, win rate, and trade analysis all in one view</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trade Size</strong></td>
+                        <td>How many units (e.g., how many Bitcoin) to buy or sell per trade.</td>
+                        <td>Trade size of 1 = buy/sell 1 BTC at a time</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Starting Capital</strong></td>
+                        <td>How much fake money you start with in the simulation.</td>
+                        <td>$100,000 starting capital is the default</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2>Technical / Programming Terms</h2>
+    <div class="doc-card">
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Term</th><th>Plain English Explanation</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>API (Application Programming Interface)</strong></td>
+                        <td>A set of URLs that the frontend uses to ask the backend for data. When you click "Load Data", the browser sends a message to the backend saying "please load this CSV" &mdash; that message is an API call.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>REST API</strong></td>
+                        <td>A specific style of API that uses standard HTTP methods (GET = retrieve data, POST = send data). All our API endpoints follow this pattern.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Endpoint</strong></td>
+                        <td>A specific URL that the backend listens on. For example, <code>/api/data/bars</code> is an endpoint that returns price data.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JSON</strong></td>
+                        <td>A text format for sending structured data between frontend and backend. Looks like: <code>{"name": "Bitcoin", "price": 83000}</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flask</strong></td>
+                        <td>A lightweight Python web framework. It lets you write Python functions that respond to web requests. Think of it as the "waiter" that connects the browser to our Python code.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SPA (Single Page Application)</strong></td>
+                        <td>A website that loads one HTML page and then swaps content dynamically using JavaScript, instead of loading a new page each time you click something. Our app is an SPA.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DOM (Document Object Model)</strong></td>
+                        <td>The browser's internal representation of the HTML page. When JavaScript "updates the DOM", it's changing what you see on screen.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NautilusTrader</strong></td>
+                        <td>A professional-grade Python library for running trading simulations (backtests). It handles order execution, position tracking, and performance calculations.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Parquet Catalog</strong></td>
+                        <td>A high-performance storage format. Instead of reading CSV files every time, we convert the data once into Parquet format (stored in the <code>catalog/</code> folder) which is much faster to read later.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DataFrame</strong></td>
+                        <td>A table of data in Python (from the pandas library). Think of it like a spreadsheet in code &mdash; rows and columns you can filter, sort, and analyze.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CORS (Cross-Origin Resource Sharing)</strong></td>
+                        <td>A security feature in browsers. It controls whether a website can talk to a different server. We enable it so the frontend can talk to the Flask backend.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CSS Variables</strong></td>
+                        <td>Reusable color/size values defined once and used everywhere. For example, <code>--accent: #00d4aa</code> defines our teal accent color. Change it once, and the whole app updates.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Plotly.js</strong></td>
+                        <td>A JavaScript charting library loaded from a CDN (internet link). It draws all the interactive charts &mdash; candlesticks, histograms, pie charts, etc.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bar (in NautilusTrader)</strong></td>
+                        <td>One unit of price data. In our case, one Bar = one day of OHLCV data. The string <code>BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL</code> means "Bitcoin/USD, 1-day bars, last price, from an external source".</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 3: ARCHITECTURE                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-architecture">
+    <h1>How It All Connects</h1>
+    <p class="subtitle">A visual guide to how the frontend, backend, and data storage work together</p>
+
+    <h2>The Big Picture</h2>
+    <div class="analogy-box">
+        Imagine a restaurant: The <strong>browser</strong> is the customer reading the menu. The <strong>JavaScript</strong> is the waiter who takes orders and brings food. The <strong>Flask server</strong> is the kitchen manager who receives orders. The <strong>core modules</strong> are the chefs who actually cook. The <strong>catalog</strong> is the pantry where ingredients (data) are stored.
+    </div>
+
+    <div class="flow-diagram">
++---------------------------------------------------------------------+
+|                    YOUR WEB BROWSER                                  |
+|                                                                      |
+|   What you see:                                                      |
+|   +----------------------------------+-----------------------------+ |
+|   | Sidebar                          | Main Content Area           | |
+|   |  [Dashboard]                     |                             | |
+|   |  [Load Data]                     |  Charts, tables, forms,     | |
+|   |  [View Data]                     |  buttons, results...        | |
+|   |  [Run Backtest]                  |                             | |
+|   |  [Tearsheet]                     |  (rendered by JavaScript)   | |
+|   +----------------------------------+-----------------------------+ |
+|                                                                      |
+|   Behind the scenes (JavaScript):                                    |
+|   app.js       = controls which page is shown, shared helpers        |
+|   dashboard.js = renders the home page                               |
+|   load_data.js = handles CSV importing                               |
+|   view_data.js = handles charts and data exploration                 |
+|   backtest.js  = handles strategy config and backtest execution      |
+|   tearsheet.js = handles performance analysis charts                 |
++---------------------------------------------------------------------+
+                    |                            ^
+                    | Sends requests             | Sends responses
+                    | (e.g. "load Bitcoin data") | (e.g. {price data...})
+                    v                            |
++---------------------------------------------------------------------+
+|                    FLASK SERVER (server.py)                           |
+|                    Running at http://localhost:5000                   |
+|                                                                      |
+|   Receives requests from the browser and calls Python functions:     |
+|                                                                      |
+|   /api/csv/scan       --> "What CSV files are available?"            |
+|   /api/csv/load       --> "Please import these CSV files"            |
+|   /api/data/bars      --> "Give me the price data for Bitcoin"       |
+|   /api/strategies     --> "What trading strategies are available?"   |
+|   /api/backtest/run   --> "Run these strategies on this data"        |
++---------------------------------------------------------------------+
+                    |                            ^
+                    | Calls Python functions      | Returns results
+                    v                            |
++---------------------------------------------------------------------+
+|                    CORE MODULES (core/ folder)                        |
+|                                                                      |
+|   csv_loader.py         = reads CSV files from your hard drive       |
+|   nautilus_loader.py    = converts data for NautilusTrader           |
+|   instrument_factory.py = defines what "BTCUSD" means as a          |
+|                           tradable instrument                        |
+|   strategies.py         = 4 pre-built trading strategies             |
+|   backtest_runner.py    = configures and runs the simulation         |
+|   report_generator.py   = creates HTML/CSV reports                   |
+|   custom_strategy_loader.py = validates user-uploaded strategies     |
++---------------------------------------------------------------------+
+                    |                            ^
+                    | Reads/Writes               | Data
+                    v                            |
++---------------------------------------------------------------------+
+|                    YOUR HARD DRIVE                                    |
+|                                                                      |
+|   INPUT:  CSV files (your crypto price data)                         |
+|   STORAGE: catalog/ folder (fast-access Parquet format)              |
+|   OUTPUT:  reports/ folder (HTML reports + CSV exports)              |
+|   CUSTOM:  custom_strategies/ folder (your uploaded .py files)       |
++---------------------------------------------------------------------+</div>
+
+    <h2>What Happens When You Click Something?</h2>
+    <div class="doc-card">
+        <p>Every user action follows this sequence. Here's an example: you click <strong>"Load Data"</strong> for Bitcoin:</p>
+        <div class="step-container">
+            <div class="step-box">
+                <strong>You click the "BTC - Bitcoin" button</strong>
+                <p>This triggers a JavaScript function in <code>load_data.js</code></p>
+            </div>
+            <div class="step-box">
+                <strong>JavaScript sends a request to the backend</strong>
+                <p>Specifically, it sends a POST request to <code>/api/csv/load</code> with the Bitcoin CSV entry details</p>
+            </div>
+            <div class="step-box">
+                <strong>Flask receives the request</strong>
+                <p>The <code>csv_load()</code> function in <code>server.py</code> handles it</p>
+            </div>
+            <div class="step-box">
+                <strong>Flask calls the core modules</strong>
+                <p><code>load_csv_and_store()</code> reads the CSV, creates NautilusTrader objects, and saves to the catalog</p>
+            </div>
+            <div class="step-box">
+                <strong>Flask sends back results as JSON</strong>
+                <p>Something like: <code>{"symbol": "BTCUSD", "num_bars": 4200, "latest_close": 83000}</code></p>
+            </div>
+            <div class="step-box">
+                <strong>JavaScript updates the page</strong>
+                <p>It creates metric cards, data tables, and success messages &mdash; all without reloading the page</p>
+            </div>
+        </div>
+    </div>
+
+    <h2>How Page Navigation Works</h2>
+    <div class="doc-card">
+        <p>This is a <strong>Single Page Application (SPA)</strong>. That means:</p>
+        <ul>
+            <li>Only <strong>one HTML file</strong> (<code>index.html</code>) is ever loaded</li>
+            <li>When you click a sidebar link, JavaScript <strong>replaces the content</strong> inside the main area</li>
+            <li>The page <strong>never fully reloads</strong> &mdash; it just swaps what's visible</li>
+        </ul>
+        <p>Here's the code that makes this work (in <code>app.js</code>):</p>
+        <pre>
+// When you click a sidebar link:
+navigate(page) {
+    const main = document.getElementById("main-content");  // Find the content area
+    switch (page) {
+        case "dashboard":   Dashboard.render(main); break;  // Replace content with Dashboard
+        case "load_data":   LoadData.render(main); break;   // Replace content with Load Data
+        case "view_data":   ViewData.render(main); break;   // ...and so on
+        case "backtest":    Backtest.render(main); break;
+        case "tearsheet":   Tearsheet.render(main); break;
+    }
+}</pre>
+    </div>
+
+    <h2>How Data Persists Between Pages</h2>
+    <div class="doc-card">
+        <p>When you run a backtest and then go to the Tearsheet page, how does Tearsheet know your results?</p>
+        <p>The answer is <strong>shared state</strong> stored in <code>App.state</code>:</p>
+        <pre>
+// In backtest.js - after backtest completes:
+App.state.backtestResults = data.results;   // Save results to shared state
+App.state.backtestConfig = { bar_type, strategies };
+
+// In tearsheet.js - when the page loads:
+const results = App.state.backtestResults;  // Read from shared state</pre>
+        <div class="warning-box">
+            <strong>Important for beginners:</strong> This state only lives in your browser's memory. If you refresh the page (F5), the state is lost and you'll need to run the backtest again. It does NOT save to disk automatically.
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 4: BACKEND                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-backend">
+    <h1>Backend &mdash; server.py</h1>
+    <p class="subtitle">The Python file that runs the web server and handles all API requests</p>
+
+    <div class="analogy-box">
+        <code>server.py</code> is like a receptionist at a hotel. It doesn't clean rooms or cook food itself &mdash; but it receives every guest request and routes it to the right department (the core modules).
+    </div>
+
+    <h2>Server Setup (What Happens When You Run It)</h2>
+    <div class="doc-card">
+        <p>When you run <code>python server.py</code>, these things happen:</p>
+        <div class="step-container">
+            <div class="step-box">
+                <strong>Flask app is created</strong>
+                <p><code>app = Flask(__name__, static_folder="static")</code> &mdash; This tells Flask to serve files from the <code>static/</code> folder.</p>
+            </div>
+            <div class="step-box">
+                <strong>CORS is enabled</strong>
+                <p><code>CORS(app)</code> &mdash; This allows the browser to make requests to the server (a security thing browsers require).</p>
+            </div>
+            <div class="step-box">
+                <strong>Path constants are set</strong>
+                <p>The server figures out where the <code>catalog/</code>, <code>custom_strategies/</code>, and <code>reports/</code> folders are.</p>
+            </div>
+            <div class="step-box">
+                <strong>Server starts listening</strong>
+                <p>At <code>http://localhost:5000</code> &mdash; ready for browser requests!</p>
+            </div>
+        </div>
+    </div>
+
+    <h2>Configuration Values</h2>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Setting</th><th>Value</th><th>What It Means</th></tr></thead>
+            <tbody>
+                <tr><td><code>static_folder</code></td><td><code>"static"</code></td><td>The folder containing HTML/CSS/JS files</td></tr>
+                <tr><td><code>MAX_CONTENT_LENGTH</code></td><td>16 MB</td><td>Largest file you can upload (for custom strategies)</td></tr>
+                <tr><td><code>host</code></td><td><code>"0.0.0.0"</code></td><td>Accept connections from any device on your network</td></tr>
+                <tr><td><code>port</code></td><td><code>5000</code></td><td>The port number (part of the URL: localhost:<strong>5000</strong>)</td></tr>
+                <tr><td><code>debug</code></td><td><code>True</code></td><td>Shows detailed errors in the browser (helpful for development)</td></tr>
+                <tr><td><code>use_reloader</code></td><td><code>False</code></td><td>Disabled because NautilusTrader has issues with Flask's auto-reloader</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Important Folder Paths</h2>
+    <div class="doc-card">
+        <pre>
+PARENT_DIR            = (one folder above server.py)
+CATALOG_PATH          = PARENT_DIR / "catalog"           # Where processed data is stored
+CUSTOM_STRATEGIES_DIR = PARENT_DIR / "custom_strategies"  # Where uploaded .py files go
+REPORTS_DIR           = PARENT_DIR / "reports"            # Where CSV/HTML reports are saved</pre>
+    </div>
+
+    <h2>What the Server Imports</h2>
+    <div class="doc-card">
+        <p>The server doesn't do heavy work itself. It imports functions from the <code>core/</code> modules:</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Imported From</th><th>Functions Used</th><th>Purpose</th></tr></thead>
+                <tbody>
+                    <tr><td><code>core.csv_loader</code></td><td><code>scan_csv_folder, get_display_label</code></td><td>Finding and labeling CSV files</td></tr>
+                    <tr><td><code>core.nautilus_loader</code></td><td><code>load_csv_and_store, load_catalog</code></td><td>Loading data into the Parquet catalog</td></tr>
+                    <tr><td><code>core.backtest_runner</code></td><td><code>run_backtest</code></td><td>Actually running the backtest simulation</td></tr>
+                    <tr><td><code>core.report_generator</code></td><td><code>generate_report, build_orderbook_dataframe, build_logs_dataframe</code></td><td>Creating reports from results</td></tr>
+                    <tr><td><code>core.custom_strategy_loader</code></td><td><code>get_merged_registry, sanitize_filename, validate_and_load_strategy, get_strategy_template, get_strategy_guidelines</code></td><td>Handling custom strategies</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2>All API Endpoints (What the Server Can Do)</h2>
+    <p>Each endpoint is like a specific service the server offers. The browser calls these URLs to get things done:</p>
+
+    <h3><span class="badge badge-get">GET</span> /api/catalog/status</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Checks if the data catalog exists and what data is in it.</p>
+        <p><strong>When it's called:</strong> When Dashboard or Load Data pages load.</p>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "exists": true, "data_types": ["Bar(BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL)", ...] }</pre>
+    </div>
+
+    <h3><span class="badge badge-get">GET</span> /api/csv/scan</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Looks through a folder on your computer and finds all CSV files that contain crypto data.</p>
+        <p><strong>When it's called:</strong> When you go to Load Data page (automatically) or click "Scan Folder".</p>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "entries": [{"id": 1, "symbol": "BTC", "name": "Bitcoin", "path": "...", "label": "BTC - Bitcoin"}], "count": 42 }</pre>
+    </div>
+
+    <h3><span class="badge badge-post">POST</span> /api/csv/load</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Takes CSV entries you selected and loads them into the NautilusTrader catalog. This is the heavy lifting &mdash; it reads the CSV, creates trading instruments, and saves to Parquet format.</p>
+        <p><strong>When it's called:</strong> When you click "Load Selected into Catalog" or a quick-select button.</p>
+        <p><strong>What you send:</strong></p>
+        <pre>{ "entries": [{"id": 1, "symbol": "BTC", "name": "Bitcoin", "path": "..."}] }</pre>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "results": [{"symbol": "BTCUSD", "num_bars": 4200, "date_start": "2013-04-28", "date_end": "2026-04-06", "latest_close": 83000.50, "sample_data": [...]}], "errors": [] }</pre>
+    </div>
+
+    <h3><span class="badge badge-get">GET</span> /api/data/bar_types</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Returns a list of all instruments you've loaded (e.g., "BTCUSD", "ETHUSD").</p>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "bar_types": ["BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL", "ETHUSD.CRYPTO-1-DAY-LAST-EXTERNAL"] }</pre>
+    </div>
+
+    <h3><span class="badge badge-get">GET</span> /api/data/bars</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Returns all the OHLCV price data for a specific instrument.</p>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "data": [{"timestamp": "2013-04-28T00:00:00+00:00", "open": 135.3, "high": 135.98, "low": 132.1, "close": 134.21, "volume": 100000.0}, ...], "count": 4200 }</pre>
+    </div>
+
+    <h3><span class="badge badge-get">GET</span> /api/strategies</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Returns all available trading strategies (both built-in and any custom ones you uploaded) with their parameter definitions.</p>
+        <p><strong>What it returns:</strong></p>
+        <pre>{ "strategies": {"EMA Cross": {"description": "...", "params": {"fast_ema_period": {"label": "Fast EMA", "default": 10, "min": 2, "max": 500}}}}, "warnings": [] }</pre>
+    </div>
+
+    <h3><span class="badge badge-post">POST</span> /api/custom_strategies/upload</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> Lets you upload your own trading strategy as a Python file. It validates the file in a separate process (to avoid crashes), checks for required exports, and saves it.</p>
+        <p><strong>Safety measure:</strong> Validation runs in a <strong>subprocess</strong> &mdash; if the uploaded code has errors, it crashes the subprocess, not the main server.</p>
+    </div>
+
+    <h3><span class="badge badge-post">POST</span> /api/backtest/run</h3>
+    <div class="doc-card">
+        <p><strong>What it does:</strong> The most complex endpoint. It runs one or more trading strategies on your data and returns detailed results.</p>
+        <p><strong>What you send:</strong></p>
+        <pre>{
+    "bar_type": "BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL",
+    "starting_capital": 100000,
+    "strategies": {
+        "EMA Cross": { "params": {"fast_ema_period": 10, "slow_ema_period": 20}, "trade_size": 1 }
+    }
+}</pre>
+        <p><strong>What it does internally (step by step):</strong></p>
+        <ol>
+            <li>Merges built-in and custom strategies into one registry</li>
+            <li>For each strategy: runs the backtest simulation via NautilusTrader</li>
+            <li>Collects results: P&L, trades, fills, positions, account balance</li>
+            <li>Generates an HTML report and saves it to <code>reports/</code></li>
+            <li>Saves individual CSV reports per strategy (positions, fills, account, orders, logs)</li>
+            <li>Returns everything as JSON to the browser</li>
+        </ol>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 5: CORE MODULES                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-core">
+    <h1>Core Modules (Python)</h1>
+    <p class="subtitle">The Python files in <code>core/</code> that do the actual data processing and backtesting</p>
+
+    <div class="analogy-box">
+        If <code>server.py</code> is the receptionist, these core modules are the specialists. Each one has a specific job: one reads CSVs, one manages storage, one runs simulations, etc.
+    </div>
+
+    <h2>How the Modules Connect</h2>
+    <div class="vflow">
+        <div class="vflow-step"><strong>csv_loader.py</strong><span>Reads CSV files</span></div>
+        <div class="vflow-arrow">&rarr;</div>
+        <div class="vflow-step"><strong>nautilus_loader.py</strong><span>Converts to catalog</span></div>
+        <div class="vflow-arrow">&rarr;</div>
+        <div class="vflow-step"><strong>backtest_runner.py</strong><span>Runs simulation</span></div>
+        <div class="vflow-arrow">&rarr;</div>
+        <div class="vflow-step"><strong>report_generator.py</strong><span>Creates reports</span></div>
+    </div>
+    <p style="text-align: center; margin-top: -8px; color: var(--text-muted); font-size: 0.82rem;">
+        Also: <code>instrument_factory.py</code> (used by nautilus_loader), <code>strategies.py</code> (used by backtest_runner), <code>custom_strategy_loader.py</code> (used by server)
+    </p>
+
+    <h3>csv_loader.py &mdash; "The File Reader"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Finds and reads crypto CSV files from your computer.</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Function</th><th>What It Does (in plain English)</th></tr></thead>
+                <tbody>
+                    <tr><td><code>scan_csv_folder(folder)</code></td><td>Looks through a folder and finds all files matching the pattern <code>{id}_{SYMBOL}_{Name}.csv</code> (e.g., <code>1_BTC_Bitcoin.csv</code>). Returns a list of what it found.</td></tr>
+                    <tr><td><code>get_display_label(entry)</code></td><td>Creates a human-readable label like "BTC - Bitcoin" for the UI dropdowns.</td></tr>
+                    <tr><td><code>load_csv(entry)</code></td><td>Actually reads a CSV file and turns it into a pandas DataFrame (a data table in Python) with columns: open, high, low, close, volume.</td></tr>
+                    <tr><td><code>parse_symbol_from_entry(entry)</code></td><td>Figures out the currency pair. "BTC" becomes ("BTC", "USD") because we're pricing everything in US dollars.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="term-box">
+            <strong>DEFAULT_CSV_FOLDER:</strong> The hardcoded default path where the app looks for CSV files. Currently set to <code>C:\Users\ADMIN\Desktop\id_name_all_symbols\id_name_all_symbols</code>. You can change this in the UI.
+        </div>
+    </div>
+
+    <h3>nautilus_loader.py &mdash; "The Data Converter"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Converts CSV data into NautilusTrader format and stores it in a fast-access Parquet catalog.</p>
+        <div class="analogy-box">
+            CSV files are like raw ingredients. This module "cooks" them into a format the backtesting engine understands, then stores them in the "pantry" (catalog) for quick access later.
+        </div>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Function</th><th>What It Does</th></tr></thead>
+                <tbody>
+                    <tr><td><code>make_bar_type_str(symbol)</code></td><td>Creates the identifier string like <code>"BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL"</code> that NautilusTrader uses to identify data.</td></tr>
+                    <tr><td><code>wrangle_bars(df, instrument)</code></td><td>Converts each row of the DataFrame into a NautilusTrader <code>Bar</code> object (one bar = one day of OHLCV data).</td></tr>
+                    <tr><td><code>save_to_catalog(bars, instrument, path)</code></td><td>Writes the bars and instrument definition to Parquet files on disk.</td></tr>
+                    <tr><td><code>load_catalog(path)</code></td><td>Opens an existing catalog for reading.</td></tr>
+                    <tr><td><code>load_csv_and_store(csv_entry, catalog_path)</code></td><td>The main pipeline: reads CSV &rarr; creates instrument &rarr; wrangles bars &rarr; saves to catalog. This is the function <code>server.py</code> calls when you click "Load".</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h3>instrument_factory.py &mdash; "The Instrument Builder"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Creates the "instrument definition" &mdash; a formal description of what you're trading (e.g., BTC/USD pair, with specific price precision and fees).</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Setting</th><th>Value</th><th>What It Means</th></tr></thead>
+                <tbody>
+                    <tr><td>Venue</td><td><code>"YAHOO"</code></td><td>The simulated exchange name (doesn't affect results)</td></tr>
+                    <tr><td>Maker/Taker Fee</td><td>0.1%</td><td>Simulated trading fee (each buy/sell costs 0.1%)</td></tr>
+                    <tr><td>Size Precision</td><td>0 (whole units)</td><td>You trade in whole coins (1 BTC, 2 BTC, not 0.5 BTC)</td></tr>
+                    <tr><td>BTC Price Precision</td><td>2 decimals</td><td>BTC prices like $83,000.50 (2 decimal places)</td></tr>
+                    <tr><td>DOGE Price Precision</td><td>6 decimals</td><td>DOGE prices like $0.123456 (6 decimal places for cheap coins)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h3>strategies.py &mdash; "The Strategy Library"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Contains 4 pre-built trading strategies. Each strategy is a set of rules that tells the backtester when to buy and sell.</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Strategy</th><th>How It Works (Beginner Explanation)</th><th>Default Parameters</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>EMA Cross</strong></td>
+                        <td>Tracks two moving averages &mdash; a fast one (recent trend) and a slow one (longer trend). <strong>Buys</strong> when the fast average crosses above the slow (uptrend starting). <strong>Sells</strong> when it crosses below (downtrend starting).</td>
+                        <td>Fast: 10 days, Slow: 20 days</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RSI Mean Reversion</strong></td>
+                        <td>Uses the RSI indicator (0-100 scale). <strong>Buys</strong> when RSI drops below 30 (oversold = "too cheap"). <strong>Sells</strong> when RSI goes above 70 (overbought = "too expensive"). Bets that prices will return to normal.</td>
+                        <td>Period: 14, Overbought: 70, Oversold: 30</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bollinger Bands</strong></td>
+                        <td>Creates a channel around the price using standard deviation. <strong>Buys</strong> when price touches the lower band (price is unusually low). <strong>Sells</strong> when it touches the upper band (price is unusually high).</td>
+                        <td>Period: 20, Std Dev: 2.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4 Moving Averages</strong></td>
+                        <td>Uses 4 moving averages of different speeds. <strong>Buys</strong> when all 4 are in order (fastest on top = strong uptrend). <strong>Sells</strong> when the alignment breaks.</td>
+                        <td>Periods: 10, 20, 50, 200 (Use EMA: Yes)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p>All strategies have these in common:</p>
+        <ul>
+            <li>They use <strong>Market Orders</strong> (buy/sell at current price, no waiting)</li>
+            <li>They require a <code>trade_size</code> parameter (how many units per trade)</li>
+            <li>On stop, they cancel all open orders and close all positions</li>
+        </ul>
+    </div>
+
+    <h3>backtest_runner.py &mdash; "The Simulation Engine"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Takes a strategy, data, and settings &mdash; then runs the entire trading simulation and returns results.</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Parameter</th><th>What It Means</th><th>Default</th></tr></thead>
+                <tbody>
+                    <tr><td><code>catalog_path</code></td><td>Where the data is stored</td><td>Required</td></tr>
+                    <tr><td><code>bar_type_str</code></td><td>Which instrument to test on (e.g., "BTCUSD...")</td><td>Required</td></tr>
+                    <tr><td><code>strategy_name</code></td><td>Which strategy to use</td><td>Required</td></tr>
+                    <tr><td><code>strategy_params</code></td><td>Strategy settings (e.g., EMA periods)</td><td><code>{}</code></td></tr>
+                    <tr><td><code>trade_size</code></td><td>Units per trade</td><td>1</td></tr>
+                    <tr><td><code>starting_capital</code></td><td>Initial balance in USD</td><td>$100,000</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p><strong>What it returns:</strong> A dictionary containing final balance, P&L, win/loss counts, win rate, and full reports (fills, positions, account history).</p>
+    </div>
+
+    <h3>custom_strategy_loader.py &mdash; "The Strategy Validator"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Handles uploading, validating, and loading user-created strategy files.</p>
+        <p>When you upload a <code>.py</code> file, it checks that the file has these <strong>required exports</strong>:</p>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Required Export</th><th>Type</th><th>Why It's Needed</th></tr></thead>
+                <tbody>
+                    <tr><td><code>STRATEGY_NAME</code></td><td>String</td><td>Display name in the UI (e.g., "My Custom Strategy")</td></tr>
+                    <tr><td><code>STRATEGY_CLASS</code></td><td>Class</td><td>The actual strategy logic (must inherit from <code>Strategy</code>)</td></tr>
+                    <tr><td><code>CONFIG_CLASS</code></td><td>Class</td><td>Configuration class (must inherit from <code>StrategyConfig</code>)</td></tr>
+                    <tr><td><code>DESCRIPTION</code></td><td>String</td><td>Short description shown in the UI</td></tr>
+                    <tr><td><code>PARAMS</code></td><td>Dictionary</td><td>Defines what parameters users can configure</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h3>report_generator.py &mdash; "The Report Writer"</h3>
+    <div class="doc-card">
+        <p><strong>Job:</strong> Takes raw backtest results and generates readable reports.</p>
+        <ul>
+            <li><code>generate_report()</code> &mdash; Creates a self-contained HTML report file</li>
+            <li><code>build_orderbook_dataframe()</code> &mdash; Creates a trade-by-trade order book</li>
+            <li><code>build_logs_dataframe()</code> &mdash; Creates event-by-event trading logs</li>
+        </ul>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 6: FRONTEND                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-frontend">
+    <h1>Frontend (JavaScript)</h1>
+    <p class="subtitle">How the browser-side code is organized, what each file does, and how they work together</p>
+
+    <div class="analogy-box">
+        Each JavaScript file is like one employee at a store. <code>app.js</code> is the manager who handles common tasks. <code>dashboard.js</code> works the front desk. <code>load_data.js</code> works in receiving. And so on. They all share the same store (the <code>App</code> object).
+    </div>
+
+    <h2>app.js &mdash; The Manager (143 lines)</h2>
+    <div class="doc-card">
+        <p>This is the central controller. Every other module depends on it.</p>
+
+        <h4>What It Stores (State)</h4>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Variable</th><th>What It Holds</th><th>Used By</th></tr></thead>
+                <tbody>
+                    <tr><td><code>App.currentPage</code></td><td>Which page is currently displayed (e.g., "dashboard")</td><td>Navigation system</td></tr>
+                    <tr><td><code>App.state.backtestResults</code></td><td>Results from the last backtest (or null if none run yet)</td><td>Backtest + Tearsheet pages</td></tr>
+                    <tr><td><code>App.state.backtestConfig</code></td><td>Settings used in the last backtest (bar type, strategy names)</td><td>Tearsheet page</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4>What It Does (Methods)</h4>
+        <div class="doc-table-wrap">
+            <table>
+                <thead><tr><th>Method</th><th>What It Does</th><th>Example Usage</th></tr></thead>
+                <tbody>
+                    <tr><td><code>navigate(page)</code></td><td>Switches to a different page by calling that page's <code>render()</code> method</td><td><code>App.navigate("backtest")</code></td></tr>
+                    <tr><td><code>showLoading(text)</code></td><td>Shows a full-screen spinner with a message</td><td><code>App.showLoading("Running backtest...")</code></td></tr>
+                    <tr><td><code>hideLoading()</code></td><td>Hides the spinner</td><td><code>App.hideLoading()</code></td></tr>
+                    <tr><td><code>toast(msg, type, duration)</code></td><td>Shows a popup notification that auto-dismisses. Types: "info", "success", "error"</td><td><code>App.toast("Loaded!", "success")</code></td></tr>
+                    <tr><td><code>api(endpoint, options)</code></td><td>Makes an HTTP request to the backend and returns the JSON response. This is how <em>every</em> page talks to the server.</td><td><code>App.api("/api/data/bars?bar_type=...")</code></td></tr>
+                    <tr><td><code>currency(value)</code></td><td>Formats a number as USD currency</td><td><code>App.currency(83000.5)</code> &rarr; <code>"$83,000.50"</code></td></tr>
+                    <tr><td><code>formatNumber(value)</code></td><td>Adds thousand separators to a number</td><td><code>App.formatNumber(1000000)</code> &rarr; <code>"1,000,000"</code></td></tr>
+                    <tr><td><code>metricHTML(label, value)</code></td><td>Creates a styled metric card (the boxes that show numbers)</td><td>Used everywhere to display stats</td></tr>
+                    <tr><td><code>tableHTML(data)</code></td><td>Creates an HTML table from an array of objects</td><td>Used to display data tables on every page</td></tr>
+                    <tr><td><code>accordionHTML(id, title, content)</code></td><td>Creates a collapsible section (click to expand/collapse)</td><td>Used for detailed reports and raw data</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2>dashboard.js &mdash; Home Page (65 lines)</h2>
+    <div class="doc-card">
+        <p>The simplest module. Shows 4 navigation cards and checks if the catalog has data.</p>
+        <ul>
+            <li><code>render(container)</code> &mdash; Draws 4 clickable cards (Load Data, View Data, Backtest, Tearsheet)</li>
+            <li><code>loadCatalogStatus()</code> &mdash; Calls <code>GET /api/catalog/status</code> and shows the result</li>
+        </ul>
+    </div>
+
+    <h2>load_data.js &mdash; Data Import (200 lines)</h2>
+    <div class="doc-card">
+        <h4>What It Stores</h4>
+        <ul>
+            <li><code>entries</code> &mdash; All CSV entries found by the scan</li>
+            <li><code>selectedEntries</code> &mdash; Which ones the user picked</li>
+        </ul>
+
+        <h4>Key Features</h4>
+        <ul>
+            <li><strong>Quick-select buttons</strong> for 11 major coins (BTC, ETH, SOL, XRP, DOGE, ADA, SHIB, LTC, ATOM, HBAR, XLM)</li>
+            <li><strong>Multi-select dropdown</strong> for choosing from all available files</li>
+            <li><strong>Progress bar</strong> during loading</li>
+            <li><strong>Results display</strong> with bar count, date range, latest price, and sample data table</li>
+        </ul>
+
+        <h4>How Loading Works</h4>
+        <pre>
+// 1. User clicks a coin button or selects from dropdown
+// 2. loadSelected() or quickLoad() calls doLoad(entries)
+// 3. doLoad() sends a POST to /api/csv/load with the selected entries
+// 4. Backend reads CSV files, converts to NautilusTrader format, saves to catalog
+// 5. Response contains: symbol, bar count, date range, latest close, sample data
+// 6. JavaScript renders success messages, metrics, and a data table</pre>
+    </div>
+
+    <h2>view_data.js &mdash; Data Exploration (251 lines)</h2>
+    <div class="doc-card">
+        <h4>What It Stores</h4>
+        <ul>
+            <li><code>barData</code> &mdash; The complete dataset from the API (all bars, no filter)</li>
+            <li><code>filteredData</code> &mdash; The subset after applying date filters</li>
+        </ul>
+
+        <h4>What It Renders</h4>
+        <ol>
+            <li><strong>Bar type dropdown</strong> &mdash; Select which instrument to view</li>
+            <li><strong>Date range filter</strong> &mdash; From/To date inputs to narrow down the data</li>
+            <li><strong>Summary statistics</strong> &mdash; Total bars, min/max price, average close, total volume</li>
+            <li><strong>Candlestick chart</strong> &mdash; Interactive OHLCV chart with volume bars</li>
+            <li><strong>Data table</strong> &mdash; All OHLCV data in tabular format</li>
+            <li><strong>Return analysis</strong> &mdash; Daily return histogram + cumulative return line chart</li>
+        </ol>
+
+        <h4>How Statistics Are Calculated</h4>
+        <pre>
+// Summary stats (computed in JavaScript, not the server):
+Total Bars    = filteredData.length
+Min Price     = Math.min(...all low values)
+Max Price     = Math.max(...all high values)
+Avg Close     = sum of all closes / number of bars
+Total Volume  = sum of all volumes
+
+// Daily returns (percentage change day-to-day):
+return[i] = ((close[i] - close[i-1]) / close[i-1]) * 100
+
+// Cumulative returns (compound growth):
+cumProd *= (1 + daily_return_as_decimal)
+cumReturn = (cumProd - 1) * 100</pre>
+    </div>
+
+    <h2>backtest.js &mdash; Strategy Config & Execution (523 lines)</h2>
+    <div class="doc-card">
+        <p>The most complex module. Here's how it works in order:</p>
+
+        <h4>On Page Load</h4>
+        <ol>
+            <li>Calls 3 APIs <strong>in parallel</strong> (at the same time, for speed):
+                <ul>
+                    <li><code>/api/data/bar_types</code> &mdash; What instruments are available?</li>
+                    <li><code>/api/strategies</code> &mdash; What strategies exist?</li>
+                    <li><code>/api/custom_strategies/list</code> &mdash; What custom files are uploaded?</li>
+                </ul>
+            </li>
+            <li>Renders the config UI: dropdowns, checkboxes, parameter inputs</li>
+        </ol>
+
+        <h4>Dynamic Parameter Rendering</h4>
+        <p>The strategy parameters are NOT hardcoded in the UI. The backend tells the frontend what parameters each strategy has, and the frontend dynamically creates input fields:</p>
+        <pre>
+// For each parameter defined by the strategy:
+if (parameter type is boolean)  --> render a checkbox
+if (parameter type is float)    --> render a number input with step=0.5
+if (parameter type is integer)  --> render a number input with step=1
+// Each input gets min/max limits from the parameter definition</pre>
+
+        <h4>Running a Backtest</h4>
+        <ol>
+            <li><code>collectConfig()</code> reads all form inputs and builds a config object</li>
+            <li>Sends POST to <code>/api/backtest/run</code> with the config</li>
+            <li>Stores results in <code>App.state.backtestResults</code> (for Tearsheet)</li>
+            <li>Renders: comparison table, per-strategy accordions with metrics, download buttons, and data tables</li>
+        </ol>
+
+        <h4>Download Features</h4>
+        <p>The module can download files directly from browser memory (no server request needed):</p>
+        <ul>
+            <li><code>arrayToCSV(data)</code> &mdash; Converts an array of objects to CSV text</li>
+            <li><code>downloadFile(content, filename)</code> &mdash; Creates a download link and clicks it programmatically</li>
+        </ul>
+    </div>
+
+    <h2>tearsheet.js &mdash; Performance Analysis (299 lines)</h2>
+    <div class="doc-card">
+        <p><strong>Prerequisite:</strong> Only works after a backtest has been run (needs <code>App.state.backtestResults</code>).</p>
+
+        <h4>Color Palette (for multi-strategy charts)</h4>
+        <pre>COLORS: ["#00d4aa", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a29bfe", "#fd79a8"]
+//        teal      red       cyan      yellow    purple    pink</pre>
+
+        <h4>What It Renders</h4>
+        <ol>
+            <li><strong>Equity Comparison Chart</strong> &mdash; All strategies on one chart (multi-colored lines)</li>
+            <li><strong>Strategy Selector Dropdown</strong> &mdash; Pick one strategy for detailed analysis</li>
+            <li><strong>Performance Summary</strong> &mdash; Total return, P&L, win rate, total trades</li>
+            <li><strong>Equity & Drawdown Chart</strong> &mdash; Two-panel chart: equity curve on top, drawdown on bottom</li>
+            <li><strong>Trade Distribution</strong> &mdash; P&L per trade bar chart (green/red) + win/loss pie chart</li>
+            <li><strong>Trade Statistics</strong> &mdash; Avg win, avg loss, best trade, worst trade, max drawdown</li>
+            <li><strong>Raw Reports</strong> &mdash; Collapsible tables with positions, fills, account, orders, logs</li>
+        </ol>
+
+        <h4>How Key Metrics Are Calculated</h4>
+        <pre>
+// Equity curve: starting capital + cumulative sum of P&L per trade
+equity[0] = starting_capital + pnl[0]
+equity[1] = starting_capital + pnl[0] + pnl[1]
+... and so on
+
+// Drawdown: how far equity has fallen from its peak
+peak = highest equity seen so far
+drawdown[i] = ((equity[i] - peak) / peak) * 100
+
+// Trade statistics:
+avgWin    = total profit from winning trades / number of wins
+avgLoss   = total loss from losing trades / number of losses
+bestTrade = largest single P&L value
+worstTrade = smallest (most negative) single P&L value
+maxDrawdown = the most negative drawdown value</pre>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 7: DATA FLOW                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-dataflow">
+    <h1>Data Flow (Step-by-Step)</h1>
+    <p class="subtitle">Follow the data from your CSV files all the way to the performance charts</p>
+
+    <h2>Flow 1: Loading Data</h2>
+    <p>What happens when you import a CSV file into the system:</p>
+    <div class="flow-diagram">
+YOUR CSV FILE on disk
+  (e.g., 1_BTC_Bitcoin.csv)
+       |
+       | You click "BTC - Bitcoin" quick-select button
+       v
+[load_data.js] quickLoad(1)
+       |
+       | Finds the entry with id=1, calls doLoad([entry])
+       v
+[load_data.js] doLoad()
+       |
+       | POST /api/csv/load  { entries: [{id:1, symbol:"BTC", ...}] }
+       v
+[server.py] csv_load()
+       |
+       | For each entry, calls load_csv_and_store()
+       v
+[nautilus_loader.py] load_csv_and_store()
+       |
+       |--- [csv_loader.py] load_csv(entry)
+       |       Reads the CSV file into a pandas DataFrame
+       |       Columns: open, high, low, close, volume
+       |       Index: datetime
+       |
+       |--- [csv_loader.py] parse_symbol_from_entry(entry)
+       |       Returns ("BTC", "USD")
+       |
+       |--- [instrument_factory.py] create_instrument("BTC", "USD")
+       |       Creates a NautilusTrader CurrencyPair
+       |       (price precision: 2 decimals, fees: 0.1%)
+       |
+       |--- [nautilus_loader.py] wrangle_bars(df, instrument)
+       |       Converts each DataFrame row into a Bar object
+       |       (4200 rows = 4200 Bar objects)
+       |
+       |--- [nautilus_loader.py] save_to_catalog(bars, instrument, path)
+       |       Writes to disk as Parquet files:
+       |         catalog/data/bar/BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL/
+       |         catalog/data/currency_pair/BTCUSD.CRYPTO/
+       v
+Response sent back to browser:
+  { symbol: "BTCUSD", num_bars: 4200, date_start: "2013-04-28",
+    date_end: "2026-04-06", latest_close: 83000.50,
+    sample_data: [last 10 rows...] }
+       |
+       v
+[load_data.js] renders:
+  - "Loaded 4200 daily bars for BTCUSD" success message
+  - Metric cards: bar count, date range, latest close
+  - Sample data table (last 10 rows)
+  - Refreshes catalog contents display</div>
+
+    <h2>Flow 2: Viewing Data</h2>
+    <div class="flow-diagram">
+You navigate to "View Data" page
+       |
+       v
+[view_data.js] render() --> loadBarTypes()
+       |
+       | GET /api/data/bar_types
+       v
+[server.py] --> loads catalog --> extracts unique bar type strings
+       |
+       v
+Returns: ["BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL", "ETHUSD..."]
+       |
+       v
+[view_data.js] Populates dropdown, auto-loads first one
+       |
+       | GET /api/data/bars?bar_type=BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL
+       v
+[server.py] --> loads catalog --> converts bars to JSON
+       |
+       v
+Returns: 4200 rows of {timestamp, open, high, low, close, volume}
+       |
+       v
+[view_data.js] stores in this.barData
+       |
+       | applyFilter() - filters by date range (initially shows all)
+       v
+FOUR THINGS ARE RENDERED:
+  1. Summary stats    (total bars, min/max price, avg close, volume)
+  2. Candlestick chart (Plotly: OHLC candles + volume bars)
+  3. Data table        (formatted OHLCV with currency values)
+  4. Return analysis   (daily return histogram + cumulative return)</div>
+
+    <h2>Flow 3: Running a Backtest</h2>
+    <div class="flow-diagram">
+You configure strategies and click "Run Backtest"
+       |
+       v
+[backtest.js] runBacktest()
+       |
+       | collectConfig() reads all form inputs:
+       |   bar_type: "BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL"
+       |   starting_capital: 100000
+       |   strategies: {
+       |     "EMA Cross": { params: {fast_ema_period: 10, slow_ema_period: 20}, trade_size: 1 }
+       |   }
+       |
+       | POST /api/backtest/run
+       v
+[server.py] run_backtest_api()
+       |
+       | For EACH selected strategy:
+       |   [backtest_runner.py] run_backtest(...)
+       |       1. Load data from catalog
+       |       2. Create strategy instance with your parameters
+       |       3. Initialize BacktestEngine (simulated exchange)
+       |       4. Feed all 4200 bars through the strategy
+       |       5. Strategy makes buy/sell decisions at each bar
+       |       6. Engine tracks orders, positions, balance
+       |       7. Extract final results
+       |
+       | After all strategies complete:
+       |   [report_generator.py] generate_report() --> HTML report
+       |   Save CSV files to reports/ folder:
+       |     - position_report_EMA_Cross_07_april_2026.csv
+       |     - order_fill_report_EMA_Cross_07_april_2026.csv
+       |     - account_report_EMA_Cross_07_april_2026.csv
+       |     - order_book_EMA_Cross_07_april_2026.csv
+       |     - backtest_EMA_Cross_07_april_2026_logs.csv
+       v
+Response: { results: {...}, backtest_name: "...", report_html: "..." }
+       |
+       v
+[backtest.js]
+  1. Saves to App.state (for Tearsheet page)
+  2. Renders comparison table (all strategies side-by-side)
+  3. Renders per-strategy accordion with:
+     - 6 metric cards (capital, balance, P&L, trades, win rate, W/L)
+     - CSV download buttons
+     - Full data tables for each report type</div>
+
+    <h2>Flow 4: Analyzing Performance (Tearsheet)</h2>
+    <div class="flow-diagram">
+You navigate to "Tearsheet" page
+       |
+       v
+[tearsheet.js] render()
+       |
+       | Reads App.state.backtestResults (saved by backtest.js)
+       | If null --> shows "No results, run a backtest first"
+       | If exists --> continues
+       |
+       v
+EQUITY COMPARISON CHART (all strategies on one chart)
+  For each strategy:
+    1. Extract P&L values from positions report
+    2. Compute cumulative equity: start + sum(pnl[0..i])
+    3. Plot as a colored line
+       |
+       v
+You select a strategy from dropdown
+       |
+       v
+DETAILED TEARSHEET for that strategy:
+  - Performance Summary (return %, P&L, win rate, trades)
+  - Equity + Drawdown 2-panel chart
+  - P&L per trade bar chart (green=profit, red=loss)
+  - Win/Loss donut pie chart
+  - Trade Statistics (avg win, avg loss, best, worst, max drawdown)
+  - Raw data tables (positions, fills, account, orders, logs)</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 8: API REFERENCE                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-api">
+    <h1>API Reference</h1>
+    <p class="subtitle">Every URL the frontend can call on the backend, and what each one does</p>
+
+    <div class="term-box">
+        <strong>API</strong> = a way for the browser (frontend) to talk to the server (backend). The browser sends a request to a URL, and the server sends back data. <strong>GET</strong> = "give me data". <strong>POST</strong> = "here's data, do something with it".
+    </div>
+
+    <div class="doc-table-wrap">
+        <table>
+            <thead>
+                <tr><th>Method</th><th>URL</th><th>What It Does (Plain English)</th><th>Called By</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/</code></td>
+                    <td>Serves the main HTML page (index.html) that the browser loads first</td>
+                    <td>Browser (automatically)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/catalog/status</code></td>
+                    <td>Checks if the data catalog exists and lists what data types are stored</td>
+                    <td>Dashboard, Load Data</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/csv/scan</code></td>
+                    <td>Scans a folder on your computer for CSV files</td>
+                    <td>Load Data</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/csv/load</code></td>
+                    <td>Reads selected CSV files and imports them into the data catalog</td>
+                    <td>Load Data</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/data/bar_types</code></td>
+                    <td>Lists all instruments available in the catalog (e.g., BTCUSD, ETHUSD)</td>
+                    <td>View Data, Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/data/bars</code></td>
+                    <td>Returns all price data (OHLCV) for a specific instrument</td>
+                    <td>View Data</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/strategies</code></td>
+                    <td>Lists all trading strategies (built-in + custom) with their parameters</td>
+                    <td>Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/custom_strategies/list</code></td>
+                    <td>Lists uploaded custom strategy files</td>
+                    <td>Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/custom_strategies/upload</code></td>
+                    <td>Uploads and validates a custom strategy Python file</td>
+                    <td>Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/custom_strategies/delete</code></td>
+                    <td>Deletes an uploaded custom strategy file</td>
+                    <td>Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/custom_strategies/template</code></td>
+                    <td>Downloads a template Python file for creating custom strategies</td>
+                    <td>Backtest (download link)</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-get">GET</span></td>
+                    <td><code>/api/custom_strategies/guidelines</code></td>
+                    <td>Returns instructions for how to write custom strategies</td>
+                    <td>Backtest</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-post">POST</span></td>
+                    <td><code>/api/backtest/run</code></td>
+                    <td>Runs trading strategy backtests and returns detailed results + reports</td>
+                    <td>Backtest</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Error Handling</h2>
+    <div class="doc-card">
+        <p>When something goes wrong, the server always returns a JSON object with an <code>error</code> field:</p>
+        <pre>
+// Simple error (e.g., missing parameter):
+{ "error": "bar_type parameter required" }
+
+// Server crash (with full details for debugging):
+{ "error": "Something broke", "traceback": "File server.py, line 42, ..." }
+
+// Partial success (some strategies worked, some didn't):
+{
+    "results": { "EMA Cross": {...} },           // This one worked
+    "errors": [{ "strategy": "RSI", "error": "..." }]  // This one failed
+}</pre>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 9: VARIABLES & PARAMETERS                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-variables">
+    <h1>Variables & Parameters Reference</h1>
+    <p class="subtitle">Every configurable value in the system &mdash; what it does and where to find it</p>
+
+    <h2>Backend Configuration (Python)</h2>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Variable</th><th>Where</th><th>Default Value</th><th>What It Controls</th></tr></thead>
+            <tbody>
+                <tr><td><code>CATALOG_PATH</code></td><td>server.py</td><td><code>"./catalog"</code></td><td>Where the Parquet data catalog is stored on disk</td></tr>
+                <tr><td><code>CUSTOM_STRATEGIES_DIR</code></td><td>server.py</td><td><code>"./custom_strategies"</code></td><td>Where uploaded .py strategy files are saved</td></tr>
+                <tr><td><code>REPORTS_DIR</code></td><td>server.py</td><td><code>"./reports"</code></td><td>Where HTML/CSV reports are saved after backtests</td></tr>
+                <tr><td><code>MAX_CONTENT_LENGTH</code></td><td>server.py</td><td>16 MB</td><td>Maximum file size for custom strategy uploads</td></tr>
+                <tr><td><code>DEFAULT_CSV_FOLDER</code></td><td>csv_loader.py</td><td><code>C:\Users\ADMIN\Desktop\...</code></td><td>Default folder to scan for CSV data files</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Frontend State (JavaScript)</h2>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Variable</th><th>Where</th><th>What It Holds</th><th>Lifetime</th></tr></thead>
+            <tbody>
+                <tr><td><code>App.currentPage</code></td><td>app.js</td><td>Currently displayed page name</td><td>Until page switch</td></tr>
+                <tr><td><code>App.state.backtestResults</code></td><td>app.js</td><td>Full results from last backtest</td><td>Until browser refresh</td></tr>
+                <tr><td><code>App.state.backtestConfig</code></td><td>app.js</td><td>Bar type + strategy names from last backtest</td><td>Until browser refresh</td></tr>
+                <tr><td><code>LoadData.entries</code></td><td>load_data.js</td><td>Scanned CSV file entries</td><td>Until page re-render</td></tr>
+                <tr><td><code>ViewData.barData</code></td><td>view_data.js</td><td>All bar data from API</td><td>Until new bar type selected</td></tr>
+                <tr><td><code>ViewData.filteredData</code></td><td>view_data.js</td><td>Date-filtered subset</td><td>Until filter changes</td></tr>
+                <tr><td><code>Backtest.strategies</code></td><td>backtest.js</td><td>Strategy definitions from API</td><td>Until page re-render</td></tr>
+                <tr><td><code>Backtest.selectedStrategies</code></td><td>backtest.js</td><td>Which strategies are checked</td><td>Until checkbox changes</td></tr>
+                <tr><td><code>Backtest.lastReportHTML</code></td><td>backtest.js</td><td>Generated HTML report</td><td>Until new backtest</td></tr>
+                <tr><td><code>Tearsheet.COLORS</code></td><td>tearsheet.js</td><td>6-color palette for charts</td><td>Constant (never changes)</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Strategy Parameters</h2>
+    <p>These are the values you can tweak when configuring each trading strategy:</p>
+
+    <h3>EMA Cross</h3>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>Range</th></tr></thead>
+            <tbody>
+                <tr><td><code>fast_ema_period</code></td><td>Number of days for the fast (sensitive) moving average. Lower = reacts faster to price changes.</td><td>10</td><td>2 - 500</td></tr>
+                <tr><td><code>slow_ema_period</code></td><td>Number of days for the slow (smooth) moving average. Higher = smoother, less noise.</td><td>20</td><td>2 - 500</td></tr>
+                <tr><td><code>trade_size</code></td><td>How many units (coins) to buy/sell per trade.</td><td>1</td><td>1+</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>RSI Mean Reversion</h3>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>Range</th></tr></thead>
+            <tbody>
+                <tr><td><code>rsi_period</code></td><td>Number of days used to calculate the RSI indicator.</td><td>14</td><td>2 - 500</td></tr>
+                <tr><td><code>overbought</code></td><td>RSI level that triggers a sell (asset is "too expensive").</td><td>70</td><td>50 - 100</td></tr>
+                <tr><td><code>oversold</code></td><td>RSI level that triggers a buy (asset is "too cheap").</td><td>30</td><td>0 - 50</td></tr>
+                <tr><td><code>trade_size</code></td><td>Units per trade.</td><td>1</td><td>1+</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Bollinger Bands</h3>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>Range</th></tr></thead>
+            <tbody>
+                <tr><td><code>bb_period</code></td><td>Number of days for the moving average at the center of the bands.</td><td>20</td><td>5 - 500</td></tr>
+                <tr><td><code>bb_std</code></td><td>How many standard deviations wide the bands are. Higher = wider bands = fewer signals.</td><td>2.0</td><td>0.5 - 5.0</td></tr>
+                <tr><td><code>trade_size</code></td><td>Units per trade.</td><td>1</td><td>1+</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>4 Moving Averages</h3>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Parameter</th><th>What It Means</th><th>Default</th><th>Range</th></tr></thead>
+            <tbody>
+                <tr><td><code>use_ema</code></td><td>Use EMA (exponential, reacts faster) or SMA (simple, equal weight). Checkbox.</td><td>Yes (EMA)</td><td>Yes/No</td></tr>
+                <tr><td><code>period_1</code></td><td>Fastest moving average period (shortest lookback).</td><td>10</td><td>2 - 500</td></tr>
+                <tr><td><code>period_2</code></td><td>Second fastest.</td><td>20</td><td>2 - 500</td></tr>
+                <tr><td><code>period_3</code></td><td>Third (getting slower).</td><td>50</td><td>2 - 500</td></tr>
+                <tr><td><code>period_4</code></td><td>Slowest moving average (longest lookback).</td><td>200</td><td>2 - 500</td></tr>
+                <tr><td><code>trade_size</code></td><td>Units per trade.</td><td>1</td><td>1+</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>CSS Design Tokens (Colors & Styling)</h2>
+    <p>These CSS variables control the entire visual theme. Change these to restyle the app:</p>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>Variable</th><th>Color</th><th>What It's Used For</th></tr></thead>
+            <tbody>
+                <tr><td><code>--bg-primary</code></td><td><code>#0e1117</code> (very dark)</td><td>Main page background</td></tr>
+                <tr><td><code>--bg-secondary</code></td><td><code>#1a1d23</code> (dark)</td><td>Sidebar, table headers</td></tr>
+                <tr><td><code>--bg-card</code></td><td><code>#21252b</code> (medium dark)</td><td>Cards, metric boxes, chart backgrounds</td></tr>
+                <tr><td><code>--accent</code></td><td><code>#00d4aa</code> (teal green)</td><td>Primary action color &mdash; buttons, links, active states</td></tr>
+                <tr><td><code>--danger</code></td><td><code>#ff4444</code> (red)</td><td>Errors, negative values, losses</td></tr>
+                <tr><td><code>--success</code></td><td><code>#00d4aa</code> (teal green)</td><td>Success messages, positive values, wins</td></tr>
+                <tr><td><code>--warning</code></td><td><code>#ffe66d</code> (yellow)</td><td>Warning messages</td></tr>
+                <tr><td><code>--info</code></td><td><code>#4ecdc4</code> (cyan)</td><td>Informational messages</td></tr>
+                <tr><td><code>--text-primary</code></td><td><code>#e6e6e6</code> (light gray)</td><td>Main text color</td></tr>
+                <tr><td><code>--text-secondary</code></td><td><code>#9ca3af</code> (medium gray)</td><td>Labels, descriptions, secondary text</td></tr>
+                <tr><td><code>--sidebar-width</code></td><td><code>260px</code></td><td>Width of the sidebar navigation</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 10: OPTIMIZATIONS                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-optimization">
+    <h1>Optimization Suggestions</h1>
+    <p class="subtitle">Ways to make the app faster, safer, and better &mdash; sorted by importance</p>
+
+    <div class="info-box">
+        <strong>How to read this section:</strong><br>
+        <span class="opt-perf">PERFORMANCE</span> = Make it faster<br>
+        <span class="opt-security">SECURITY</span> = Make it safer<br>
+        <span class="opt-ux">UX</span> = Make it easier to use<br>
+        <span class="opt-arch">ARCHITECTURE</span> = Make the code better organized<br>
+        <span class="opt-maint">MAINTAINABILITY</span> = Make it easier to change in the future
+    </div>
+
+    <h2>High Priority (Fix These First)</h2>
+
+    <div class="doc-card severity-high">
+        <div class="doc-card-title"><span class="opt-perf">PERFORMANCE</span> 1. All Price Data Loaded at Once</div>
+        <p><strong>The problem:</strong> When you view data, the server sends ALL bars (potentially thousands) in one giant JSON response. For years of daily data, this can be slow.</p>
+        <p><strong>Why it matters:</strong> Users on slower connections will wait a long time. The browser might lag with huge datasets.</p>
+        <p><strong>How to fix:</strong> Add pagination (load 500 bars at a time) or server-side date filtering so the browser only gets what it needs.</p>
+    </div>
+
+    <div class="doc-card severity-high">
+        <div class="doc-card-title"><span class="opt-security">SECURITY</span> 2. Debug Mode is On</div>
+        <p><strong>The problem:</strong> <code>debug=True</code> in server.py shows detailed error pages with your code. If anyone on your network accesses the server, they can see your source code and even run Python commands.</p>
+        <p><strong>Why it matters:</strong> This is the #1 security risk in the entire app.</p>
+        <p><strong>How to fix:</strong> Change to <code>debug=False</code> for production, or use an environment variable to control it.</p>
+    </div>
+
+    <div class="doc-card severity-high">
+        <div class="doc-card-title"><span class="opt-security">SECURITY</span> 3. Server Accepts Connections from Anywhere</div>
+        <p><strong>The problem:</strong> <code>host="0.0.0.0"</code> + <code>CORS(app)</code> with no restrictions means anyone on your network can access the app and make API calls.</p>
+        <p><strong>How to fix:</strong> Change host to <code>"127.0.0.1"</code> (localhost only) and restrict CORS origins.</p>
+    </div>
+
+    <div class="doc-card severity-high">
+        <div class="doc-card-title"><span class="opt-perf">PERFORMANCE</span> 4. Backtests Block the Server</div>
+        <p><strong>The problem:</strong> When a backtest is running, the server can't handle any other requests. If you run 5 strategies, the server is completely blocked until all 5 finish.</p>
+        <p><strong>How to fix:</strong> Run backtests in a background thread/process and let the frontend poll for progress.</p>
+    </div>
+
+    <div class="doc-card severity-high">
+        <div class="doc-card-title"><span class="opt-security">SECURITY</span> 5. Custom Strategy Files Can Run Any Code</div>
+        <p><strong>The problem:</strong> When you upload a .py file, it eventually gets imported and executed. A malicious file could delete files, steal data, etc.</p>
+        <p><strong>How to fix:</strong> Add code scanning (block dangerous imports like <code>os</code>, <code>subprocess</code>), run strategies in a sandbox, or use Docker containers.</p>
+    </div>
+
+    <h2>Medium Priority (Nice to Have)</h2>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-ux">UX</span> 6. Results Lost on Page Refresh</div>
+        <p><strong>The problem:</strong> If you refresh the browser, all backtest results are gone. You have to re-run the backtest.</p>
+        <p><strong>How to fix:</strong> Save results to <code>sessionStorage</code> (browser storage) so they survive a refresh.</p>
+    </div>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-perf">PERFORMANCE</span> 7. Catalog Reloaded Every API Call</div>
+        <p><strong>The problem:</strong> Every time the server needs data, it reopens the Parquet catalog from disk. This is wasteful when the data hasn't changed.</p>
+        <p><strong>How to fix:</strong> Cache the catalog in memory and only reload when new data is loaded.</p>
+    </div>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-ux">UX</span> 8. Progress Bar Isn't Real</div>
+        <p><strong>The problem:</strong> The backtest progress bar shows 30% while waiting, then jumps to 100%. It doesn't reflect actual progress.</p>
+        <p><strong>How to fix:</strong> Run each strategy individually and update progress after each one completes.</p>
+    </div>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-arch">ARCHITECTURE</span> 9. Sidebar Catalog Path Does Nothing</div>
+        <p><strong>The problem:</strong> There's a "Catalog Storage Path" input in the sidebar, but no JavaScript code reads it. It's decorative.</p>
+        <p><strong>How to fix:</strong> Either connect it to API calls or remove it to avoid confusing users.</p>
+    </div>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-perf">PERFORMANCE</span> 10. HTML Report Sent Inside JSON</div>
+        <p><strong>The problem:</strong> The entire HTML report (can be hundreds of KB) is sent as part of the backtest response JSON, even though it's only needed when the user clicks "Download Report".</p>
+        <p><strong>How to fix:</strong> Save the report on the server and return just a download URL.</p>
+    </div>
+
+    <div class="doc-card severity-medium">
+        <div class="doc-card-title"><span class="opt-ux">UX</span> 11. No Bookmarkable URLs</div>
+        <p><strong>The problem:</strong> All pages share the same URL (<code>localhost:5000</code>). You can't bookmark the backtest page or share a link to a specific page.</p>
+        <p><strong>How to fix:</strong> Add hash-based routing (e.g., <code>localhost:5000/#/backtest</code>).</p>
+    </div>
+
+    <h2>Low Priority (Polish)</h2>
+
+    <div class="doc-card severity-low">
+        <div class="doc-card-title"><span class="opt-maint">MAINTAINABILITY</span> 12. Hardcoded CSV Path</div>
+        <p>The default CSV folder path only works on the developer's computer. Use a config file or environment variable instead.</p>
+    </div>
+
+    <div class="doc-card severity-low">
+        <div class="doc-card-title"><span class="opt-maint">MAINTAINABILITY</span> 13. Global JavaScript Objects</div>
+        <p>All JS modules are global variables. This can cause naming conflicts. Migrating to ES modules (<code>import/export</code>) would be cleaner.</p>
+    </div>
+
+    <div class="doc-card severity-low">
+        <div class="doc-card-title"><span class="opt-ux">UX</span> 14-16. Minor UX Improvements</div>
+        <ul>
+            <li>Add loading indicators when charts are re-rendering</li>
+            <li>Cache API responses to avoid redundant calls</li>
+            <li>Show error messages in chart areas when Plotly fails</li>
+        </ul>
+    </div>
+
+    <div class="doc-card severity-low">
+        <div class="doc-card-title"><span class="opt-security">SECURITY</span> 17. XSS Risk in Dynamic HTML</div>
+        <p>Strategy names and error messages are inserted with <code>innerHTML</code> without sanitization. A crafted name could inject malicious scripts. Fix by escaping HTML or using <code>textContent</code>.</p>
+    </div>
+
+    <div class="doc-card severity-low">
+        <div class="doc-card-title"><span class="opt-ux">UX</span> 18-19. Mobile & Markdown</div>
+        <ul>
+            <li>Sidebar doesn't collapse on mobile &mdash; add a hamburger menu</li>
+            <li>The markdown parser for strategy guidelines is fragile &mdash; use a proper library like marked.js</li>
+        </ul>
+    </div>
+
+    <h2>Quick Summary</h2>
+    <div class="doc-table-wrap">
+        <table>
+            <thead><tr><th>#</th><th>Type</th><th>Priority</th><th>One-Line Summary</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td><span class="opt-perf">PERF</span></td><td>High</td><td>Add pagination to bars API</td></tr>
+                <tr><td>2</td><td><span class="opt-security">SEC</span></td><td>High</td><td>Disable debug mode</td></tr>
+                <tr><td>3</td><td><span class="opt-security">SEC</span></td><td>High</td><td>Restrict network access + CORS</td></tr>
+                <tr><td>4</td><td><span class="opt-perf">PERF</span></td><td>High</td><td>Run backtests in background</td></tr>
+                <tr><td>5</td><td><span class="opt-security">SEC</span></td><td>High</td><td>Sandbox custom strategy execution</td></tr>
+                <tr><td>6</td><td><span class="opt-ux">UX</span></td><td>Medium</td><td>Persist results in sessionStorage</td></tr>
+                <tr><td>7</td><td><span class="opt-perf">PERF</span></td><td>Medium</td><td>Cache catalog in memory</td></tr>
+                <tr><td>8</td><td><span class="opt-ux">UX</span></td><td>Medium</td><td>Real progress bar</td></tr>
+                <tr><td>9</td><td><span class="opt-arch">ARCH</span></td><td>Medium</td><td>Connect or remove sidebar catalog path</td></tr>
+                <tr><td>10</td><td><span class="opt-perf">PERF</span></td><td>Medium</td><td>Serve HTML report via separate endpoint</td></tr>
+                <tr><td>11</td><td><span class="opt-ux">UX</span></td><td>Medium</td><td>Add hash-based URL routing</td></tr>
+                <tr><td>12-19</td><td>Various</td><td>Low</td><td>Config file, ES modules, mobile, XSS, etc.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB 11: FAQ                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-faq">
+    <h1>Frequently Asked Questions</h1>
+    <p class="subtitle">Common questions a new developer might have when first reading this codebase</p>
+
+    <h2>General Questions</h2>
+
+    <div class="faq-q">Q: Where do I start if I want to understand the code?</div>
+    <div class="faq-a">Start with <strong>server.py</strong>. Read the route functions top to bottom. Each <code>@app.route</code> is one thing the server can do. Then read the JavaScript file for the page you're interested in (e.g., <code>backtest.js</code> for the backtest page).</div>
+
+    <div class="faq-q">Q: What's the minimum I need to run this app?</div>
+    <div class="faq-a">Python 3.8+, the packages (flask, flask-cors, pandas, nautilus_trader), and at least one CSV data file. Run <code>python server.py</code> and open localhost:5000.</div>
+
+    <div class="faq-q">Q: Why is it called a "Single Page Application" if it has 5 pages?</div>
+    <div class="faq-a">Because the browser only loads <strong>one HTML file</strong> (index.html). The "pages" are really just different chunks of HTML that JavaScript swaps into the main content area. The URL never changes.</div>
+
+    <div class="faq-q">Q: Why does the app use NautilusTrader instead of a simpler backtesting library?</div>
+    <div class="faq-a">NautilusTrader is a professional-grade engine that handles realistic order execution, position tracking, slippage, and fees. It produces results closer to real trading than a simple spreadsheet backtest would.</div>
+
+    <h2>Data Questions</h2>
+
+    <div class="faq-q">Q: What format do the CSV files need to be in?</div>
+    <div class="faq-a">Files should be named <code>{id}_{SYMBOL}_{Name}.csv</code> (e.g., <code>1_BTC_Bitcoin.csv</code>) and contain columns for date, open, high, low, close, and volume.</div>
+
+    <div class="faq-q">Q: What is the "catalog" and why do we need it?</div>
+    <div class="faq-a">The catalog is a folder (<code>./catalog</code>) that stores your data in Parquet format. CSV files are slow to read every time, so we convert them once into Parquet (a fast binary format) during the "Load Data" step. After that, reading data for charts and backtests is much faster.</div>
+
+    <div class="faq-q">Q: Can I delete the catalog folder and recreate it?</div>
+    <div class="faq-a">Yes! The catalog is derived from your CSV files. If you delete <code>./catalog</code>, just go to "Load Data" and re-import your CSVs.</div>
+
+    <div class="faq-q">Q: What does "BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL" mean?</div>
+    <div class="faq-a">It's NautilusTrader's identifier for this data: <strong>BTCUSD</strong> (Bitcoin vs US Dollar), <strong>CRYPTO</strong> (asset class), <strong>1-DAY</strong> (daily bars), <strong>LAST</strong> (closing price type), <strong>EXTERNAL</strong> (data from an external source, not a live exchange).</div>
+
+    <h2>Backtest Questions</h2>
+
+    <div class="faq-q">Q: Do the backtest results account for trading fees?</div>
+    <div class="faq-a">Yes. The instrument factory sets maker and taker fees at 0.1% each (configured in <code>instrument_factory.py</code>). Every simulated buy/sell includes this fee.</div>
+
+    <div class="faq-q">Q: What does "trade size" mean? Should I change it?</div>
+    <div class="faq-a">Trade size is how many units of the cryptocurrency the strategy buys/sells per trade. Default is 1 (= 1 BTC, 1 ETH, etc.). For expensive coins like BTC, 1 unit = 1 full Bitcoin, which costs ~$83,000. Make sure your starting capital can cover it!</div>
+
+    <div class="faq-q">Q: Why did my backtest show 0 trades?</div>
+    <div class="faq-a">The strategy's conditions were never triggered by the data. Try adjusting parameters (e.g., widen the RSI thresholds) or try a different time period.</div>
+
+    <div class="faq-q">Q: Where are the backtest reports saved?</div>
+    <div class="faq-a">In the <code>./reports</code> folder. You'll find both CSV files (positions, fills, account, orders, logs) and an HTML report per backtest run.</div>
+
+    <h2>Custom Strategy Questions</h2>
+
+    <div class="faq-q">Q: How do I create a custom strategy?</div>
+    <div class="faq-a">
+        <ol>
+            <li>Download the strategy template from the Backtest page</li>
+            <li>Edit it to implement your trading logic</li>
+            <li>Make sure you export: <code>STRATEGY_NAME</code>, <code>STRATEGY_CLASS</code>, <code>CONFIG_CLASS</code>, <code>DESCRIPTION</code>, <code>PARAMS</code></li>
+            <li>Upload the .py file via the Backtest page</li>
+        </ol>
+    </div>
+
+    <div class="faq-q">Q: Why does the upload use a "subprocess" for validation?</div>
+    <div class="faq-a">NautilusTrader uses Rust bindings under the hood. If a bad strategy file causes a crash, it would kill the Flask server. By running validation in a subprocess, only the subprocess crashes &mdash; the server stays alive.</div>
+
+    <h2>Code Questions</h2>
+
+    <div class="faq-q">Q: How do I add a new page to the app?</div>
+    <div class="faq-a">
+        <ol>
+            <li>Create a new JS file (e.g., <code>static/js/my_page.js</code>) with a <code>MyPage</code> object that has a <code>render(container)</code> method</li>
+            <li>Add a <code>&lt;script&gt;</code> tag in <code>index.html</code></li>
+            <li>Add a nav item in <code>index.html</code>'s sidebar with <code>data-page="my_page"</code></li>
+            <li>Add the case in <code>app.js</code>'s <code>navigate()</code> switch statement</li>
+        </ol>
+    </div>
+
+    <div class="faq-q">Q: How do I add a new API endpoint?</div>
+    <div class="faq-a">
+        <ol>
+            <li>Add a new function in <code>server.py</code> with the <code>@app.route("/api/your/endpoint")</code> decorator</li>
+            <li>Implement the logic (call core modules as needed)</li>
+            <li>Return JSON with <code>jsonify()</code></li>
+            <li>Call it from JavaScript with <code>App.api("/api/your/endpoint")</code></li>
+        </ol>
+    </div>
+
+    <div class="faq-q">Q: How do I change the color theme?</div>
+    <div class="faq-a">Edit the CSS variables at the top of <code>static/css/style.css</code>. For example, changing <code>--accent: #00d4aa</code> to <code>--accent: #ff6b6b</code> would make the entire accent color red instead of teal.</div>
+
+    <div class="faq-q">Q: Why are there no frameworks (React, Vue, etc.)?</div>
+    <div class="faq-a">The app uses vanilla JavaScript intentionally. This keeps the dependency count low, makes it easier to understand for beginners, and avoids build tooling complexity. Each JS file is a plain object with methods &mdash; no JSX, no virtual DOM, no bundler needed.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB SWITCHING SCRIPT                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+function switchTab(tabId) {
+    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+    document.getElementById("tab-" + tabId).classList.add("active");
+    event.target.classList.add("active");
+    window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>

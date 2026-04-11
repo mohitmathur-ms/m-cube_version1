@@ -9,7 +9,6 @@ a self-contained HTML report file.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -50,6 +49,67 @@ def _resolve_column(df: pd.DataFrame, candidates: list[str], default=None):
     return default
 
 
+def _determine_reason(
+    order_type: str,
+    is_reduce: bool,
+    contingency_type: str = "",
+    tags: str = "",
+) -> str:
+    """Derive a human-readable entry/exit reason from NautilusTrader order fields.
+
+    Priority: tags > order type / contingency type > fallback.
+    """
+    tags = (tags or "").strip()
+    if tags:
+        return tags
+
+    order_type = (order_type or "").strip().upper()
+    contingency_type = (contingency_type or "").strip().upper()
+
+    if is_reduce:
+        if contingency_type == "ONE_CANCELS_OTHER":
+            return "OCO Exit"
+        if order_type in ("STOP_MARKET", "STOP"):
+            return "Stop Loss"
+        if order_type == "STOP_LIMIT":
+            return "Stop Limit"
+        if order_type == "LIMIT":
+            return "Take Profit"
+        if order_type == "MARKET":
+            return "Market Exit"
+        return "Strategy Signal"
+    else:
+        if order_type == "MARKET":
+            return "Market Order"
+        if order_type == "LIMIT":
+            return "Limit Order"
+        return "Strategy Signal"
+
+
+def _build_fills_lookup(fills_report) -> dict:
+    """Build a dict mapping order_id -> reason fields from a fills_report DataFrame."""
+    lookup: dict = {}
+    if fills_report is None or fills_report.empty:
+        return lookup
+
+    df = fills_report.reset_index()
+    col_order_id = _resolve_column(df, ["venue_order_id", "VenueOrderId", "client_order_id", "order_id"])
+    col_type = _resolve_column(df, ["type", "order_type", "OrderType"])
+    col_contingency = _resolve_column(df, ["contingency_type", "ContingencyType"])
+    col_tags = _resolve_column(df, ["tags", "Tags"])
+
+    for _, row in df.iterrows():
+        oid = str(row[col_order_id]) if col_order_id else ""
+        if not oid:
+            continue
+        lookup[oid] = {
+            "type": str(row[col_type]) if col_type else "",
+            "contingency_type": str(row[col_contingency]) if col_contingency else "",
+            "tags": str(row[col_tags]) if col_tags else "",
+        }
+    return lookup
+
+
 def _build_orderbook(all_results: dict) -> list[dict]:
     """Build the ORDERBOOK trade list from all strategy results.
 
@@ -61,6 +121,8 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         positions_report = results.get("positions_report")
         if positions_report is None or positions_report.empty:
             continue
+
+        fills_lookup = _build_fills_lookup(results.get("fills_report"))
 
         df = positions_report.reset_index()
 
@@ -74,6 +136,8 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         col_ts_open = _resolve_column(df, ["ts_opened", "TsOpened", "opened_time", "ts_init"])
         col_ts_close = _resolve_column(df, ["ts_closed", "TsClosed", "closed_time", "ts_last"])
         col_id = _resolve_column(df, ["id", "Id", "position_id", "index"])
+        col_opening_order = _resolve_column(df, ["opening_order_id", "OpeningOrderId"])
+        col_closing_order = _resolve_column(df, ["closing_order_id", "ClosingOrderId"])
 
         for idx, row in df.iterrows():
             raw_instrument = str(row[col_instrument]) if col_instrument else strategy_name
@@ -87,6 +151,25 @@ def _build_orderbook(all_results: dict) -> list[dict]:
             entry_time = _format_timestamp(row[col_ts_open]) if col_ts_open else ""
             exit_time = _format_timestamp(row[col_ts_close]) if col_ts_close else ""
 
+            opening_oid = str(row[col_opening_order]) if col_opening_order else ""
+            closing_oid = str(row[col_closing_order]) if col_closing_order else ""
+
+            entry_fill = fills_lookup.get(opening_oid, {})
+            exit_fill = fills_lookup.get(closing_oid, {})
+
+            entry_reason = _determine_reason(
+                order_type=entry_fill.get("type", ""),
+                is_reduce=False,
+                contingency_type=entry_fill.get("contingency_type", ""),
+                tags=entry_fill.get("tags", ""),
+            )
+            exit_reason = _determine_reason(
+                order_type=exit_fill.get("type", ""),
+                is_reduce=True,
+                contingency_type=exit_fill.get("contingency_type", ""),
+                tags=exit_fill.get("tags", ""),
+            )
+
             trade = {
                 "USERID": "UID001",
                 "SYMBOL": symbol,
@@ -98,14 +181,14 @@ def _build_orderbook(all_results: dict) -> list[dict]:
                 "OrderID": str(row[col_id]) if col_id else str(idx),
                 "ENTRY TIME": entry_time,
                 "ENTRY PRICE": _parse_nautilus_value(row[col_avg_open]) if col_avg_open else 0.0,
-                "ENTRY REASON": "Strategy Signal",
+                "ENTRY REASON": entry_reason,
                 "OPTION TYPE": "",
                 "STRIKE": "",
                 "PORTFOLIO NAME": strategy_name,
                 "STRATEGY": strategy_name,
                 "EXIT TIME": exit_time,
                 "AVG EXIT PRICE": _parse_nautilus_value(row[col_avg_close]) if col_avg_close else 0.0,
-                "EXIT REASON": "Strategy Signal",
+                "EXIT REASON": exit_reason,
                 "PNL": pnl,
                 "_IS_HEDGE": False,
                 "_PARENT_ID": "",
@@ -191,6 +274,9 @@ def build_logs_dataframe(
         col_reduce = _resolve_column(df, ["is_reduce_only", "IsReduceOnly"])
         col_order_id = _resolve_column(df, ["venue_order_id", "VenueOrderId", "order_id"])
         col_position_id = _resolve_column(df, ["position_id", "PositionId"])
+        col_type = _resolve_column(df, ["type", "order_type", "OrderType"])
+        col_contingency = _resolve_column(df, ["contingency_type", "ContingencyType"])
+        col_tags = _resolve_column(df, ["tags", "Tags"])
 
         for _, row in df.iterrows():
             raw_instrument = str(row[col_instrument]) if col_instrument else ""
@@ -205,20 +291,19 @@ def build_logs_dataframe(
             order_id = str(row[col_order_id]) if col_order_id else ""
             position_id = str(row[col_position_id]) if col_position_id else ""
 
-            if is_reduce:
-                log_type = "TRADING"
-                action = "EXIT"
-                msg = (
-                    f"{action} | {side} {qty} {symbol} @ {price:.2f}"
-                    f" | OrderID={order_id} | PositionID={position_id}"
-                )
-            else:
-                log_type = "TRADING"
-                action = "ENTRY"
-                msg = (
-                    f"{action} | {side} {qty} {symbol} @ {price:.2f}"
-                    f" | OrderID={order_id} | PositionID={position_id}"
-                )
+            reason = _determine_reason(
+                order_type=str(row[col_type]) if col_type else "",
+                is_reduce=is_reduce,
+                contingency_type=str(row[col_contingency]) if col_contingency else "",
+                tags=str(row[col_tags]) if col_tags else "",
+            )
+
+            action = "EXIT" if is_reduce else "ENTRY"
+            log_type = "TRADING"
+            msg = (
+                f"{action} | {reason} | {side} {qty} {symbol} @ {price:.2f}"
+                f" | OrderID={order_id} | PositionID={position_id}"
+            )
 
             logs.append({
                 "Timestamp": run_timestamp,
