@@ -6,6 +6,7 @@ This module bridges local CSV data → NautilusTrader native types → Parquet c
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -25,7 +26,7 @@ from core.instrument_factory import create_instrument
 DEFAULT_CATALOG_PATH = "./catalog"
 
 
-def make_bar_type_str(instrument: CurrencyPair, timeframe: str = "1-DAY") -> str:
+def make_bar_type_str(instrument: CurrencyPair, timeframe: str = "1-DAY", price_type: str = "LAST") -> str:
     """
     Build a BarType string like "BTCUSD.CRYPTO-1-DAY-LAST-EXTERNAL".
 
@@ -35,18 +36,21 @@ def make_bar_type_str(instrument: CurrencyPair, timeframe: str = "1-DAY") -> str
         The instrument.
     timeframe : str, default "1-DAY"
         Timeframe string like "1-DAY", "1-MINUTE", "1-HOUR".
+    price_type : str, default "LAST"
+        Price type like "LAST", "BID", "ASK".
 
     Returns
     -------
     str
     """
-    return f"{instrument.id}-{timeframe}-LAST-EXTERNAL"
+    return f"{instrument.id}-{timeframe}-{price_type}-EXTERNAL"
 
 
 def wrangle_bars(
     df: pd.DataFrame,
     instrument: CurrencyPair,
     timeframe: str = "1-DAY",
+    price_type: str = "LAST",
 ) -> list[Bar]:
     """
     Convert an OHLCV DataFrame into a list of NautilusTrader Bar objects.
@@ -61,12 +65,14 @@ def wrangle_bars(
         The instrument definition.
     timeframe : str, default "1-DAY"
         Timeframe string.
+    price_type : str, default "LAST"
+        Price type like "LAST", "BID", "ASK".
 
     Returns
     -------
     list[Bar]
     """
-    bar_type_str = make_bar_type_str(instrument, timeframe)
+    bar_type_str = make_bar_type_str(instrument, timeframe, price_type=price_type)
     bar_type = BarType.from_str(bar_type_str)
 
     # Ensure volume is capped (safety check)
@@ -115,7 +121,8 @@ def load_catalog(catalog_path: str = DEFAULT_CATALOG_PATH) -> ParquetDataCatalog
 def load_csv_and_store(
     csv_entry: dict,
     catalog_path: str = DEFAULT_CATALOG_PATH,
-    venue: str = "CRYPTO",
+    venue: str = "BINANCE",
+    data_format: dict | None = None,
 ) -> dict:
     """
     Full pipeline: load local CSV → wrangle → store in catalog.
@@ -128,26 +135,58 @@ def load_csv_and_store(
         Path to store the parquet catalog.
     venue : str
         Venue name for instrument creation.
+    data_format : dict | None
+        Data format config from data_formats/<asset_class>.json.
+        Contains csv, instrument, and trading sections.
 
     Returns
     -------
     dict
         Summary with keys: symbol, name, instrument, bar_type, num_bars, catalog_path, dataframe.
     """
-    # Step 1: Load CSV
-    df = load_csv(csv_entry["path"])
+    csv_config = (data_format or {}).get("csv", {})
+    inst_config = (data_format or {}).get("instrument", {})
+
+    # Step 1: Load CSV with configurable timestamp column and delimiter
+    ts_col = csv_config.get("timestamp_column") or "ts"
+    req_cols = csv_config.get("required_columns") or None
+    delimiter = csv_config.get("delimiter") or ","
+    df = load_csv(csv_entry["path"], timestamp_column=ts_col,
+                  required_columns=req_cols, delimiter=delimiter)
 
     # Step 2: Create instrument
-    base, quote = parse_symbol_from_entry(csv_entry)
-    instrument = create_instrument(base, quote, venue)
+    quote = inst_config.get("quote_currency") or "USD"
+    base = csv_entry["symbol"]
+
+    # For forex: split combined pair symbol (e.g., "EURUSD" → base="EUR", quote="USD")
+    base_len = inst_config.get("base_currency_length")
+    if base_len and len(base) > base_len:
+        quote = base[base_len:]
+        base = base[:base_len]
+
+    instrument = create_instrument(
+        base, quote, venue,
+        price_precision=inst_config.get("price_precision"),
+        size_precision=inst_config.get("size_precision"),
+    )
 
     # Step 3: Wrangle into Nautilus Bar objects
-    bars = wrangle_bars(df, instrument)
+    timeframe = inst_config.get("timeframe") or "1-DAY"
+
+    # Extract price type (BID/ASK) from filename if configured
+    price_type = "LAST"
+    if inst_config.get("price_type_from_filename"):
+        filename = csv_entry.get("filename", "")
+        pt_match = re.search(r"_(BID|ASK)_", filename)
+        if pt_match:
+            price_type = pt_match.group(1)
+
+    bars = wrangle_bars(df, instrument, timeframe=timeframe, price_type=price_type)
 
     # Step 4: Save to catalog
     save_to_catalog(bars, instrument, catalog_path)
 
-    bar_type_str = make_bar_type_str(instrument)
+    bar_type_str = make_bar_type_str(instrument, timeframe=timeframe, price_type=price_type)
 
     return {
         "symbol": csv_entry["symbol"],
