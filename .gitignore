@@ -8,3 +8,11 @@ test_catalog/
 dist/
 build/
 .pytest_cache/
+
+# Benchmark scratch catalogs (created by scripts/ingest_fx_bulk.py runs)
+catalog_bench_*/
+catalog_fx5/
+catalog_fx5_full/
+
+# Benchmark sample output (large JSON from scripts/benchmark_portfolio.py)
+reports/benchmark_*.json
