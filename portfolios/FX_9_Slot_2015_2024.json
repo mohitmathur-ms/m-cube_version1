@@ -1,0 +1,267 @@
+{
+  "name": "FX_9_Slot_2015_2024",
+  "description": "Multi-year stress test: EMA/RSI/Bollinger x EURUSD/GBPUSD/USDJPY on 1-minute BID bars, 2015-2024.",
+  "created_at": "2026-04-22T00:00:00+00:00",
+  "updated_at": "2026-04-22T00:00:00+00:00",
+  "starting_capital": 100000,
+  "max_loss": null,
+  "max_profit": null,
+  "allocation_mode": "equal",
+  "slots": [
+    {
+      "slot_id": "fx_eur_ema",
+      "strategy_name": "EMA Cross",
+      "strategy_params": {
+        "fast_ema_period": 10,
+        "slow_ema_period": 30
+      },
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_eur_rsi",
+      "strategy_name": "RSI Mean Reversion",
+      "strategy_params": {
+        "rsi_period": 14,
+        "overbought": 70,
+        "oversold": 30
+      },
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_eur_bb",
+      "strategy_name": "Bollinger Bands",
+      "strategy_params": {
+        "bb_period": 20,
+        "bb_std": 2
+      },
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_gbp_ema",
+      "strategy_name": "EMA Cross",
+      "strategy_params": {
+        "fast_ema_period": 10,
+        "slow_ema_period": 30
+      },
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_gbp_rsi",
+      "strategy_name": "RSI Mean Reversion",
+      "strategy_params": {
+        "rsi_period": 14,
+        "overbought": 70,
+        "oversold": 30
+      },
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_gbp_bb",
+      "strategy_name": "Bollinger Bands",
+      "strategy_params": {
+        "bb_period": 20,
+        "bb_std": 2
+      },
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_jpy_ema",
+      "strategy_name": "EMA Cross",
+      "strategy_params": {
+        "fast_ema_period": 10,
+        "slow_ema_period": 30
+      },
+      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_jpy_rsi",
+      "strategy_name": "RSI Mean Reversion",
+      "strategy_params": {
+        "rsi_period": 14,
+        "overbought": 70,
+        "oversold": 30
+      },
+      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "slot_id": "fx_jpy_bb",
+      "strategy_name": "Bollinger Bands",
+      "strategy_params": {
+        "bb_period": 20,
+        "bb_std": 2
+      },
+      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "trade_size": 1000,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.5,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "percentage",
+        "target_value": 1.0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0
+      },
+      "enabled": true,
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    }
+  ]
+}
