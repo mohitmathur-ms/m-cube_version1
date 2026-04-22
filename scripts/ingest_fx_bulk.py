@@ -63,6 +63,7 @@ def ingest_one(
     price_precision: int | None = None,
     month_from: int | None = None,
     month_to: int | None = None,
+    read_workers: int = 1,
 ) -> dict:
     """Ingest one (instrument, side) pair from nested year/month/day CSVs."""
     metrics = {"instrument": out_symbol, "side": side}
@@ -94,10 +95,14 @@ def ingest_one(
     rss_before = rss_mb()
 
     t_read = time.time()
-    dfs = []
-    for f in files:
-        dfs.append(_read_ohlcv_csv(str(f)))
+    if read_workers <= 1:
+        dfs = [_read_ohlcv_csv(str(f)) for f in files]
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=read_workers) as ex:
+            dfs = list(ex.map(lambda f: _read_ohlcv_csv(str(f)), files))
     metrics["read_seconds"] = round(time.time() - t_read, 2)
+    metrics["read_workers"] = read_workers
     metrics["rss_after_read_mb"] = round(rss_mb(), 1)
 
     t_concat = time.time()
@@ -154,39 +159,76 @@ def main():
     ap.add_argument("--sides", nargs="+", default=["BID", "ASK"])
     ap.add_argument("--price-precision", type=int, default=None,
                     help="Override price precision (FX typical: 5; USDJPY: 3)")
+    ap.add_argument("--read-workers", type=int, default=1,
+                    help="Parallel CSV readers per (instrument, side) (threads). Default 1 (sequential).")
+    ap.add_argument("--pair-workers", type=int, default=0,
+                    help="Parallel (instrument, side) pairs (processes). 0 = min(pair_count, cpu_count, 8). 1 = sequential.")
     args = ap.parse_args()
+
+    read_workers = args.read_workers if args.read_workers > 0 else 1
+    if args.pair_workers <= 0:
+        # Auto: cap at pair count (estimated as instruments * sides), cpu_count, and 8.
+        n_pairs_est = len(args.instruments) * len(args.sides)
+        args.pair_workers = min(n_pairs_est, os.cpu_count() or 2, 8)
 
     print("=" * 70)
     print(f"FX Bulk Ingest  |  years {args.year_from}-{args.year_to}  |  catalog: {args.catalog}")
-    print(f"RSS at start: {rss_mb():.1f} MB")
+    print(f"RSS at start: {rss_mb():.1f} MB  |  read_workers: {read_workers}  |  pair_workers: {args.pair_workers}")
     print("=" * 70)
 
-    t_run = time.time()
-    all_metrics = []
+    # Build task list: (src_folder, out_symbol, side) for every enabled pair.
+    tasks = []
     for src_folder_name, out_symbol in parse_instruments(args.instruments):
         src = Path(args.root) / src_folder_name
         if not src.exists():
             print(f"[skip] {src} does not exist")
             continue
         for side in args.sides:
+            tasks.append((src, out_symbol, side))
+
+    if not tasks:
+        print("No tasks.")
+        return
+
+    t_run = time.time()
+    all_metrics = []
+
+    if args.pair_workers <= 1:
+        # Sequential path (baseline / debugging).
+        for src, out_symbol, side in tasks:
             print(f"\n>>> {out_symbol} {side}")
-            m = ingest_one(
-                src_folder=src,
-                out_symbol=out_symbol,
-                side=side,
-                year_from=args.year_from,
-                year_to=args.year_to,
-                catalog_path=args.catalog,
-                venue=args.venue,
-                price_precision=args.price_precision,
-                month_from=args.month_from,
-                month_to=args.month_to,
-            )
+            m = ingest_one(src, out_symbol, side,
+                           args.year_from, args.year_to, args.catalog, args.venue,
+                           args.price_precision, args.month_from, args.month_to,
+                           read_workers)
             all_metrics.append(m)
             print(f"    files={m.get('file_count', 0)}  bars={m.get('bar_count', 0):,}  "
                   f"read={m.get('read_seconds', 0)}s  concat={m.get('concat_seconds', 0)}s  "
                   f"wrangle={m.get('wrangle_seconds', 0)}s  write={m.get('write_seconds', 0)}s  "
                   f"total={m.get('total_seconds', 0)}s  peak_rss={m.get('rss_peak_mb', 0)}MB")
+    else:
+        # Parallel path: each (instrument, side) pair in its own worker process.
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        max_workers = min(len(tasks), args.pair_workers)
+        print(f"Running {len(tasks)} (instrument, side) pairs across {max_workers} workers...")
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            futures = {}
+            for src, out_symbol, side in tasks:
+                fut = ex.submit(ingest_one, src, out_symbol, side,
+                                args.year_from, args.year_to, args.catalog, args.venue,
+                                args.price_precision, args.month_from, args.month_to,
+                                read_workers)
+                futures[fut] = (out_symbol, side)
+            for fut in as_completed(futures):
+                label = futures[fut]
+                try:
+                    m = fut.result()
+                    all_metrics.append(m)
+                    print(f"  [done] {label[0]} {label[1]}  bars={m.get('bar_count', 0):,}  "
+                          f"read={m.get('read_seconds', 0)}s  wrangle={m.get('wrangle_seconds', 0)}s  "
+                          f"write={m.get('write_seconds', 0)}s  total={m.get('total_seconds', 0)}s")
+                except Exception as e:
+                    print(f"  [ERROR] {label}: {e}")
 
     total = time.time() - t_run
     print("\n" + "=" * 70)
