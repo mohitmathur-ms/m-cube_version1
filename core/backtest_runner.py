@@ -29,6 +29,24 @@ from core.strategies import STRATEGY_REGISTRY
 from core.models import PortfolioConfig, StrategySlotConfig
 from core.managed_strategy import ManagedExitStrategy, config_from_exit
 
+import functools
+
+
+@functools.lru_cache(maxsize=32)
+def _cached_catalog_bars(catalog_path: str, bt_str: str, start_iso: str | None, end_iso: str | None):
+    """Worker-local bar cache.
+
+    Multiple slots sharing the same (bar_type, date range) within the same
+    worker process hit this cache and skip the parquet read. Cache lives for
+    the worker's lifetime (ProcessPoolExecutor keeps workers alive between tasks).
+    """
+    catalog = ParquetDataCatalog(catalog_path)
+    start_arg = pd.Timestamp(start_iso, tz="UTC") if start_iso else None
+    end_arg = (
+        pd.Timestamp(end_iso, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
+    ) if end_iso else None
+    return catalog.bars(bar_types=[bt_str], start=start_arg, end=end_arg)
+
 
 def _auto_pair_bid_ask(bar_type_strs: list[str], catalog_path: str) -> list[str]:
     """Auto-detect BID/ASK bar types and include matching pair if it exists in catalog.
@@ -135,10 +153,13 @@ def run_backtest(
     if instrument is None:
         raise ValueError(f"No instrument found for {instrument_id} in catalog")
 
-    # Create engine
+    # Create engine with the same perf-tuning as _run_single_slot
+    from nautilus_trader.config import RiskEngineConfig
     engine_config = BacktestEngineConfig(
         trader_id=TraderId("BACKTESTER-001"),
-        logging=LoggingConfig(log_level="WARNING"),
+        logging=LoggingConfig(bypass_logging=True),
+        risk_engine=RiskEngineConfig(bypass=True),
+        run_analysis=False,
     )
     engine = BacktestEngine(config=engine_config)
 
@@ -256,21 +277,19 @@ def _run_single_slot(
 
     catalog = ParquetDataCatalog(catalog_path)
 
-    # Push date filter into the catalog query so parquet only returns in-range bars.
-    # end is inclusive-of-day: bump to just before midnight of the next day.
-    start_arg = pd.Timestamp(slot.start_date, tz="UTC") if slot.start_date else None
-    end_arg = (pd.Timestamp(slot.end_date, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)) if slot.end_date else None
-
-    # Load bars and instruments
+    # Load bars and instruments. Bars are served from the worker-local LRU cache
+    # so a second slot on the same worker with same (bar_type, start, end) skips
+    # the parquet read entirely.
     all_bars = []
     instrument = None
     for bt_str in all_bt_strs:
-        bars = catalog.bars(bar_types=[bt_str], start=start_arg, end=end_arg)
-        if not bars:
+        cached_bars = _cached_catalog_bars(catalog_path, bt_str, slot.start_date, slot.end_date)
+        if not cached_bars:
             raise ValueError(
                 f"No bars in date range {slot.start_date or 'start'}..{slot.end_date or 'end'} for {bt_str}"
             )
-        all_bars.extend(bars)
+        # Shallow-copy so each engine receives its own list (Nautilus may mutate).
+        all_bars.extend(cached_bars)
 
         bt = BarType.from_str(bt_str)
         if instrument is None:
@@ -286,10 +305,16 @@ def _run_single_slot(
     instrument_id = primary_bt.instrument_id
     extra_bar_types = [BarType.from_str(s) for s in all_bt_strs if s != slot.bar_type_str] or None
 
-    # Create engine
+    # Create engine with aggressive per-run performance tuning:
+    #   - bypass_logging: skip all kernel/strategy log emission
+    #   - RiskEngineConfig(bypass=True): skip per-order risk checks (OK for controlled backtests)
+    #   - run_analysis=False: skip built-in post-run analytics; we compute our own metrics
+    from nautilus_trader.config import RiskEngineConfig
     engine = BacktestEngine(config=BacktestEngineConfig(
         trader_id=TraderId(f"SLOT-{slot_index:03d}"),
-        logging=LoggingConfig(log_level="ERROR"),
+        logging=LoggingConfig(bypass_logging=True),
+        risk_engine=RiskEngineConfig(bypass=True),
+        run_analysis=False,
     ))
 
     venue = instrument_id.venue
@@ -303,6 +328,8 @@ def _run_single_slot(
     )
     engine.add_instrument(instrument)
     engine.add_data(all_bars)
+    # Free the bar list reference; Nautilus has copied into its internal cache.
+    del all_bars
 
     # Create strategy
     reg = registry
@@ -397,10 +424,24 @@ def run_portfolio_backtest(
     slot_results = {}
     errors = []
 
-    max_workers = min(n, (os.cpu_count() or 2), 8)
+    # Raise cap from 8 → 32 so 16-core boxes actually utilize their cores.
+    max_workers = min(n, (os.cpu_count() or 2), 32)
+
+    # LPT scheduling: submit longest-expected slots first so shorter ones
+    # can tail-fill behind them, minimizing max-worker-runtime imbalance.
+    def _duration_estimate(slot):
+        span = 1
+        if slot.start_date and slot.end_date:
+            span = max(1, (pd.Timestamp(slot.end_date) - pd.Timestamp(slot.start_date)).days)
+        # Bollinger Bands empirically ran 15-20% slower than EMA/RSI in benchmarks.
+        mult = 1.2 if "bollinger" in slot.strategy_name.lower() else 1.0
+        return span * mult
+
+    sorted_slots = sorted(enabled_slots, key=_duration_estimate, reverse=True)
+
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {}
-        for i, slot in enumerate(enabled_slots):
+        for i, slot in enumerate(sorted_slots):
             future = executor.submit(
                 _run_single_slot,
                 catalog_path=catalog_path,
