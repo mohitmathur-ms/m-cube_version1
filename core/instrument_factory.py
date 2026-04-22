@@ -18,7 +18,7 @@ from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 
 
-VENUE = Venue("YAHOO")
+VENUE = Venue("BINANCE")
 
 # Price precision defaults per quote currency
 PRICE_PRECISION = {
@@ -62,10 +62,12 @@ def _get_currency(code: str) -> Currency:
 def create_instrument(
     base: str,
     quote: str,
-    venue: str = "YAHOO",
+    venue: str = "BINANCE",
+    price_precision: int | None = None,
+    size_precision: int | None = None,
 ) -> CurrencyPair:
     """
-    Create a CurrencyPair instrument for a crypto pair.
+    Create a CurrencyPair instrument for a crypto or FX pair.
 
     Parameters
     ----------
@@ -73,8 +75,13 @@ def create_instrument(
         Base currency code, e.g. "BTC".
     quote : str
         Quote currency code, e.g. "USD".
-    venue : str, default "YAHOO"
+    venue : str, default "BINANCE"
         Venue name.
+    price_precision : int, optional
+        Override price precision. If None, looks up from BASE_PRICE_PRECISION /
+        PRICE_PRECISION tables (default precision=2 for unknown pairs).
+    size_precision : int, optional
+        Override size precision. Defaults to 0 for safety against QUANTITY_MAX overflow.
 
     Returns
     -------
@@ -88,11 +95,14 @@ def create_instrument(
     base_currency = _get_currency(base)
     quote_currency = _get_currency(quote)
 
-    # Determine price precision
-    price_prec = BASE_PRICE_PRECISION.get(base, PRICE_PRECISION.get(quote, 2))
+    # Determine price precision: explicit override wins, otherwise use table defaults
+    if price_precision is not None:
+        price_prec = price_precision
+    else:
+        price_prec = BASE_PRICE_PRECISION.get(base, PRICE_PRECISION.get(quote, 2))
     # Size precision must be low enough that daily volume fits within QUANTITY_MAX (~18.4B).
     # Yahoo Finance volumes for BTC can be 20B+, so we use precision=0 for safety.
-    size_prec = 0
+    size_prec = size_precision if size_precision is not None else 0
 
     return CurrencyPair(
         instrument_id=InstrumentId(
@@ -122,7 +132,7 @@ def create_instrument(
     )
 
 
-def create_instrument_from_symbol(symbol: str, venue: str = "YAHOO") -> CurrencyPair:
+def create_instrument_from_symbol(symbol: str, venue: str = "CRYPTO") -> CurrencyPair:
     """
     Create a CurrencyPair from a symbol string like "BTC/USD".
 
@@ -130,7 +140,7 @@ def create_instrument_from_symbol(symbol: str, venue: str = "YAHOO") -> Currency
     ----------
     symbol : str
         Symbol string, e.g. "BTC/USD".
-    venue : str, default "YAHOO"
+    venue : str, default "BINANCE"
         Venue name.
 
     Returns
