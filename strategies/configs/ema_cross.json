@@ -1,0 +1,20 @@
+{
+  "strategy_name": "EMA Cross",
+  "description": "Buy when fast EMA crosses above slow EMA, sell on cross below.",
+  "params": {
+    "fast_ema_period": {
+      "label": "Fast EMA Period",
+      "type": "int",
+      "min": 2,
+      "max": 100,
+      "default": 10
+    },
+    "slow_ema_period": {
+      "label": "Slow EMA Period",
+      "type": "int",
+      "min": 5,
+      "max": 200,
+      "default": 20
+    }
+  }
+}

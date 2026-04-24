@@ -1,0 +1,32 @@
+{
+  "label": "Cryptocurrency",
+  "csv": {
+    "filename_pattern": "^\\d+_[A-Z]+_.+\\.csv$",
+    "filename_description": "id_SYMBOL_Name.csv (e.g., 1_BTC_Bitcoin.csv)",
+    "required_columns": [
+      "ts",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "timestamp_column": "ts",
+    "timestamp_format": "auto",
+    "delimiter": ","
+  },
+  "instrument": {
+    "type": "CurrencyPair",
+    "quote_currency": "USD",
+    "price_precision": 2,
+    "size_precision": 8,
+    "currency_type": 2,
+    "timeframe": "1-DAY"
+  },
+  "trading": {
+    "maker_fee": "0.001",
+    "taker_fee": "0.001",
+    "margin_init": "1.0",
+    "margin_maint": "0.35"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "strategy_name": "RSI Mean Reversion",
+  "description": "Buy when RSI is oversold, sell when overbought.",
+  "params": {
+    "rsi_period": {
+      "label": "RSI Period",
+      "type": "int",
+      "min": 2,
+      "max": 50,
+      "default": 14
+    },
+    "overbought": {
+      "label": "Overbought Level",
+      "type": "float",
+      "min": 50.0,
+      "max": 95.0,
+      "default": 70.0
+    },
+    "oversold": {
+      "label": "Oversold Level",
+      "type": "float",
+      "min": 5.0,
+      "max": 50.0,
+      "default": 30.0
+    }
+  }
+}

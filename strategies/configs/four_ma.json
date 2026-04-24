@@ -1,0 +1,39 @@
+{
+  "strategy_name": "4 Moving Averages",
+  "description": "Buy when 4 MAs align bullish (MA1>MA2>MA3>MA4), sell on bearish alignment. Toggle SMA/EMA.",
+  "params": {
+    "use_ema": {
+      "label": "Use EMA",
+      "type": "bool",
+      "default": false
+    },
+    "ma1_period": {
+      "label": "MA1 Period",
+      "type": "int",
+      "min": 2,
+      "max": 200,
+      "default": 5
+    },
+    "ma2_period": {
+      "label": "MA2 Period",
+      "type": "int",
+      "min": 2,
+      "max": 200,
+      "default": 10
+    },
+    "ma3_period": {
+      "label": "MA3 Period",
+      "type": "int",
+      "min": 2,
+      "max": 200,
+      "default": 20
+    },
+    "ma4_period": {
+      "label": "MA4 Period",
+      "type": "int",
+      "min": 2,
+      "max": 500,
+      "default": 50
+    }
+  }
+}

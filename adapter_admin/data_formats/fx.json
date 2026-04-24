@@ -1,0 +1,27 @@
+{
+  "label": "FX",
+  "csv": {
+    "filename_pattern": "^[A-Z]+_[A-Z]+_\\d{2}[A-Z]{3}\\d{4}_\\d{2}[A-Z]{3}\\d{4}_(ASK|BID)_OHLCV\\.csv$",
+    "filename_description": "PAIR_PAIR_DDMMMYYYY_DDMMMYYYY_ASK/BID_OHLCV.csv (e.g., EURUSD_EURUSD_01JAN2015_27JUN2025_ASK_OHLCV.csv)",
+    "required_columns": ["timestamp", "open", "high", "low", "close", "volume"],
+    "timestamp_column": "timestamp",
+    "timestamp_format": "auto",
+    "delimiter": ","
+  },
+  "instrument": {
+    "type": "CurrencyPair",
+    "quote_currency": "USD",
+    "base_currency_length": 3,
+    "price_type_from_filename": true,
+    "price_precision": 5,
+    "size_precision": 0,
+    "currency_type": 0,
+    "timeframe": "1-MINUTE"
+  },
+  "trading": {
+    "maker_fee": null,
+    "taker_fee": null,
+    "margin_init": null,
+    "margin_maint": null
+  }
+}

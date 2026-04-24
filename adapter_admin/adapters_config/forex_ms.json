@@ -1,0 +1,46 @@
+{
+  "id": "forex_ms",
+  "name": "forex_ms",
+  "venue": "FOREX_MS",
+  "exchange_type": "InteractiveBrokers",
+  "asset_class": "fx",
+  "is_custom": false,
+  "custom_adapter_file": null,
+  "testnet": false,
+  "data_config": {
+    "account_id": "",
+    "connection_timeout": 300,
+    "fetch_all_open_orders": false,
+    "ibg_client_id": 1,
+    "ibg_host": "127.0.0.1",
+    "ibg_port": null,
+    "ignore_quote_tick_size_updates": false,
+    "market_data_type": "1",
+    "request_timeout_secs": 60,
+    "track_option_exercise_from_position_update": false,
+    "use_regular_trading_hours": true
+  },
+  "exec_config": {
+    "account_id": "",
+    "connection_timeout": 300,
+    "fetch_all_open_orders": false,
+    "ibg_client_id": 1,
+    "ibg_host": "127.0.0.1",
+    "ibg_port": null,
+    "ignore_quote_tick_size_updates": false,
+    "market_data_type": "1",
+    "request_timeout_secs": 60,
+    "track_option_exercise_from_position_update": false,
+    "use_regular_trading_hours": true
+  },
+  "account_base_currency": "USD",
+  "fx_conversion": {
+    "JPY": {
+      "catalog_pair": "USDJPY.FOREX_MS",
+      "fallback_rate": 0.0063,
+      "source": "catalog"
+    }
+  },
+  "created_at": "2026-04-18T12:54:01.021914",
+  "updated_at": "2026-04-23T18:38:35.289990"
+}

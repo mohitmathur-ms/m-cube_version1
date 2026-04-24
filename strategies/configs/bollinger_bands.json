@@ -1,0 +1,20 @@
+{
+  "strategy_name": "Bollinger Bands",
+  "description": "Buy at lower band, sell at upper band.",
+  "params": {
+    "bb_period": {
+      "label": "BB Period",
+      "type": "int",
+      "min": 5,
+      "max": 100,
+      "default": 20
+    },
+    "bb_std": {
+      "label": "Std Deviations",
+      "type": "float",
+      "min": 0.5,
+      "max": 4.0,
+      "default": 2.0
+    }
+  }
+}

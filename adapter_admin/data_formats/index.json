@@ -1,0 +1,25 @@
+{
+  "label": "Index",
+  "csv": {
+    "filename_pattern": null,
+    "filename_description": null,
+    "required_columns": null,
+    "timestamp_column": null,
+    "timestamp_format": null,
+    "delimiter": ","
+  },
+  "instrument": {
+    "type": null,
+    "quote_currency": null,
+    "price_precision": null,
+    "size_precision": null,
+    "currency_type": null,
+    "timeframe": null
+  },
+  "trading": {
+    "maker_fee": null,
+    "taker_fee": null,
+    "margin_init": null,
+    "margin_maint": null
+  }
+}
