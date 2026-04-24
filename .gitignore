@@ -16,3 +16,45 @@ catalog_fx5_full/
 
 # Benchmark sample output (large JSON from scripts/benchmark_portfolio.py)
 reports/benchmark_*.json
+
+# Local runtime state
+.runtime_history.json
+
+# One-off test/stress scripts (April 2026 session)
+run_test_april23.py
+run_stress_test_april23.py
+
+# FX ingest catalog + scratch backups
+catalog/
+catalog_backup_fx_precision/
+catalog_fx5_decade/
+
+# Generated / scratch output
+reports/
+perf_screens/
+fake_exchange/
+test_cases/
+
+# In-progress portfolios (not yet productionized)
+portfolios/Aggressive Multi-Asset.json
+portfolios/Stress-Test-2-EURUSD.json
+portfolios/Test_April23.json
+portfolios/test-001.json
+
+# Scratch docs (session notes, guide drafts, knowledge-graph scratch)
+docs/IMPROVEMENT_PLAN.md
+docs/M_Cube_Documentation.html
+docs/custom_adapter_guide.html
+docs/data_loading_guide.html
+docs/forex_data_handling_guide.html
+docs/project_architecture.html
+docs/nautilus_bar_handling_guide.ipynb
+docs/session_qa_18_april_2026.md
+docs/session_qa_18_april_2026.html
+docs/session_summary_18_april_2026.md
+docs/session_summary_18_april_2026.html
+docs/knowledge_graph/
+docs/knowledge_graph_mcube.zip
+
+# Knowledge-graph scratch scripts (not ready)
+scripts/knowledge_graph/
