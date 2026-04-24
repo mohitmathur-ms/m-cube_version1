@@ -3,7 +3,17 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(wc -l \"C:/Users/HP/Downloads/Fx/Fx/\"*.csv)",
+      "PowerShell(Stop-Process -Id 6968 -Force -ErrorAction SilentlyContinue; Stop-Process -Id 5368,6156,13208,14236,14244,17016 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, @{N=\"WS_MB\";E={[math]::Round\\($_.WorkingSet64/1MB,1\\)}} | Format-Table -AutoSize)",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, @{N=\"CPU_sec\";E={[math]::Round\\($_.CPU,0\\)}}, @{N=\"WS_MB\";E={[math]::Round\\($_.WorkingSet64/1MB,0\\)}}, StartTime | Sort-Object StartTime -Descending | Format-Table -AutoSize)",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.StartTime -gt \\(Get-Date\\).AddMinutes\\(-30\\) } | Select-Object Id, @{N=\"CPU_sec\";E={[math]::Round\\($_.CPU,0\\)}}, @{N=\"WS_MB\";E={[math]::Round\\($_.WorkingSet64/1MB,0\\)}}, StartTime | Sort-Object StartTime -Descending | Format-Table -AutoSize; $parent = Get-Process -Id 13352 -ErrorAction SilentlyContinue; if \\($parent\\) { \"Parent 13352 still alive: CPU=$\\([math]::Round\\($parent.CPU,0\\)\\)s WS=$\\([math]::Round\\($parent.WorkingSet64/1MB,0\\)\\)MB\" } else { \"Parent 13352 gone\" })",
+      "Bash(git ls-remote *)",
+      "Bash(xargs grep *)",
+      "Bash(grep -E \"\\\\.\\(pyx|py\\)$\")",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, @{Name='RSS_MB';Expression={[math]::Round\\($_.WorkingSet64/1MB, 1\\)}}, StartTime | Format-Table -AutoSize)",
+      "Bash(PYTHONIOENCODING=utf-8 python)",
+      "Bash(gh repo *)"
     ]
   }
 }

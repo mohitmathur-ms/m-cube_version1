@@ -47,6 +47,40 @@ CATALOG_PATH = str(PROJECT_DIR / "catalog")
 CUSTOM_STRATEGIES_DIR = PROJECT_DIR / "custom_strategies"
 REPORTS_DIR = PROJECT_DIR / "reports"
 
+# {absolute_filename: (mtime, strategy_name_or_None)} — avoids re-reading every
+# custom strategy file on each upload. Invalidates by mtime, so external edits
+# still get picked up.
+_STRATEGY_NAME_CACHE: dict[str, tuple[float, str | None]] = {}
+
+
+def _read_strategy_name(py_path: Path) -> str | None:
+    """Return the STRATEGY_NAME declared in a custom strategy file, or None.
+
+    Reads the file lazily and caches by mtime so repeated duplicate-name
+    checks across uploads don't re-parse unchanged files.
+    """
+    key = str(py_path)
+    try:
+        mtime = py_path.stat().st_mtime
+    except OSError:
+        return None
+    cached = _STRATEGY_NAME_CACHE.get(key)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    name: str | None = None
+    try:
+        content = py_path.read_text(encoding="utf-8")
+    except Exception:
+        _STRATEGY_NAME_CACHE[key] = (mtime, None)
+        return None
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("STRATEGY_NAME") and "=" in line:
+            name = line.split("=", 1)[1].strip().strip("\"'")
+            break
+    _STRATEGY_NAME_CACHE[key] = (mtime, name)
+    return name
+
 
 # ─── Static files ───────────────────────────────────────────────────────────
 
@@ -148,12 +182,14 @@ def csv_load():
     results = []
     errors = []
 
+    DOJI_WARN_THRESHOLD = 0.30  # above this, the precision is almost certainly wrong
+
     for entry in entries:
         try:
             result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
                                         venue=venue, data_format=data_format)
             df = result["dataframe"]
-            results.append({
+            row = {
                 "symbol": result["symbol"],
                 "name": result["name"],
                 "num_bars": result["num_bars"],
@@ -161,7 +197,21 @@ def csv_load():
                 "date_end": str(df.index[-1].date()),
                 "latest_close": float(df["close"].iloc[-1]),
                 "sample_data": df.tail(10).reset_index().to_dict(orient="records"),
-            })
+                "doji_rate": round(result.get("doji_rate", 0.0), 4),
+                "price_precision": result.get("price_precision"),
+            }
+            # Sanity-flag suspicious precision. Stored here so the UI can
+            # surface it inline with the ingest result — we don't want this
+            # silently ok'd the way the precision-2 FX ingest was.
+            if row["doji_rate"] > DOJI_WARN_THRESHOLD:
+                row["warning"] = (
+                    f"{row['doji_rate']*100:.1f}% of ingested bars have open==close. "
+                    f"The configured price_precision ({row['price_precision']}) is likely "
+                    f"too low for this data source — stored bars lose tick-level detail. "
+                    f"Check adapter_admin/data_formats/{asset_class}.json and confirm "
+                    f"price_precision matches the decimals in the source CSV."
+                )
+            results.append(row)
         except Exception as e:
             errors.append({"symbol": entry.get("symbol", "?"), "error": str(e)})
 
@@ -170,37 +220,84 @@ def csv_load():
 
 # ─── Data View API ───────────────────────────────────────────────────────────
 
+_PARQUET_NAME_RE = __import__("re").compile(
+    r"^(\d{4}-\d{2}-\d{2})T\d{2}-\d{2}-\d{2}-\d{9}Z_"
+    r"(\d{4}-\d{2}-\d{2})T\d{2}-\d{2}-\d{2}-\d{9}Z\.parquet$"
+)
+
+
+def _bar_type_range_from_files(bar_dir) -> dict | None:
+    """Return {'start_date','end_date'} parsed from parquet filenames.
+
+    ParquetDataCatalog stores bars in files named
+    ``<start_iso>_<end_iso>.parquet`` — so a directory listing alone tells us
+    the date range without opening a single row. This is 100-1000x faster
+    than `catalog.bars()` + in-memory min/max scan on multi-million-row FX
+    datasets. Returns None if no parseable filenames are found (caller
+    should fall back to the slow path).
+    """
+    min_start = None
+    max_end = None
+    for f in bar_dir.glob("*.parquet"):
+        m = _PARQUET_NAME_RE.match(f.name)
+        if not m:
+            continue
+        s, e = m.group(1), m.group(2)
+        if min_start is None or s < min_start:
+            min_start = s
+        if max_end is None or e > max_end:
+            max_end = e
+    if min_start is None:
+        return None
+    return {"start_date": min_start, "end_date": max_end}
+
+
 @app.route("/api/data/bar_types")
 def get_bar_types():
-    """Get available bar types from catalog, with date ranges."""
+    """Get available bar types from catalog, with date ranges.
+
+    Fast-path: parse parquet filenames under catalog/data/bar/<bar_type>/
+    instead of loading every bar. On the FX catalog (~24M bars) this is
+    sub-second vs. ~3 minutes for the old scan path. Falls back to the
+    bar-level scan only for directories with non-standard filenames.
+    """
     catalog_path = request.args.get("path", CATALOG_PATH)
     try:
-        catalog = load_catalog(catalog_path)
-        all_bars = catalog.bars()
-        if not all_bars:
+        bar_root = Path(catalog_path) / "data" / "bar"
+        if not bar_root.exists():
             return jsonify({"bar_types": [], "bar_type_details": {}})
 
-        # Group bars by bar_type to find min/max dates
-        by_type = {}
-        for bar in all_bars:
-            bt = str(bar.bar_type)
-            if bt not in by_type:
-                by_type[bt] = {"min_ts": bar.ts_event, "max_ts": bar.ts_event}
-            else:
-                if bar.ts_event < by_type[bt]["min_ts"]:
-                    by_type[bt]["min_ts"] = bar.ts_event
-                if bar.ts_event > by_type[bt]["max_ts"]:
-                    by_type[bt]["max_ts"] = bar.ts_event
-
-        bar_types = sorted(by_type.keys())
         bar_type_details = {}
-        for bt in bar_types:
-            info = by_type[bt]
-            bar_type_details[bt] = {
-                "start_date": str(pd.Timestamp(info["min_ts"], unit="ns", tz="UTC").date()),
-                "end_date": str(pd.Timestamp(info["max_ts"], unit="ns", tz="UTC").date()),
-            }
+        fallback_needed = []
+        for bt_dir in sorted(bar_root.iterdir()):
+            if not bt_dir.is_dir():
+                continue
+            info = _bar_type_range_from_files(bt_dir)
+            if info:
+                bar_type_details[bt_dir.name] = info
+            else:
+                fallback_needed.append(bt_dir.name)
 
+        # Only fall back to bar-level scanning for the subset of bar types
+        # whose filenames didn't parse — keeps the common case fast while
+        # preserving correctness for any weird legacy layouts.
+        if fallback_needed:
+            catalog = load_catalog(catalog_path)
+            for bt in fallback_needed:
+                try:
+                    bars = catalog.bars(bar_types=[bt])
+                except Exception:
+                    bars = []
+                if not bars:
+                    continue
+                mn = min(b.ts_event for b in bars)
+                mx = max(b.ts_event for b in bars)
+                bar_type_details[bt] = {
+                    "start_date": str(pd.Timestamp(mn, unit="ns", tz="UTC").date()),
+                    "end_date":   str(pd.Timestamp(mx, unit="ns", tz="UTC").date()),
+                }
+
+        bar_types = sorted(bar_type_details.keys())
         return jsonify({"bar_types": bar_types, "bar_type_details": bar_type_details})
     except Exception as e:
         return jsonify({"bar_types": [], "bar_type_details": {}, "error": str(e)})
@@ -208,33 +305,80 @@ def get_bar_types():
 
 @app.route("/api/data/bars")
 def get_bars():
-    """Get bar data for a specific bar type."""
+    """Get bar data for a specific bar type.
+
+    Query params
+    ------------
+    bar_type : required
+    start, end : ISO dates (YYYY-MM-DD). Pushed down to the parquet query
+        so only the matching rows are read — critical for multi-million-bar
+        FX streams where returning the full range would send 500 MB of JSON.
+    limit : int, default 5000. When the filtered range exceeds this, the
+        server downsamples by time-bucket (open of bucket, max high, min
+        low, close of bucket, sum volume) so chart rendering stays fast
+        while preserving OHLC shape. Response carries `downsampled: true`
+        and `raw_count` so the UI can display "X raw bars → Y points".
+    """
     catalog_path = request.args.get("path", CATALOG_PATH)
     bar_type_str = request.args.get("bar_type", "")
+    start_str = request.args.get("start", "")
+    end_str = request.args.get("end", "")
+    try:
+        limit = int(request.args.get("limit", 5000))
+    except ValueError:
+        limit = 5000
+    limit = max(100, min(limit, 100_000))
 
     if not bar_type_str:
         return jsonify({"error": "bar_type parameter required"}), 400
 
     try:
         catalog = load_catalog(catalog_path)
-        bars = catalog.bars(bar_types=[bar_type_str])
+        start_arg = pd.Timestamp(start_str, tz="UTC") if start_str else None
+        end_arg = (pd.Timestamp(end_str, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)) if end_str else None
+        bars = catalog.bars(bar_types=[bar_type_str], start=start_arg, end=end_arg)
 
         if not bars:
-            return jsonify({"data": [], "count": 0})
+            return jsonify({"data": [], "count": 0, "raw_count": 0, "downsampled": False})
 
-        data = []
-        for bar in bars:
-            data.append({
-                "timestamp": pd.Timestamp(bar.ts_event, unit="ns", tz="UTC").isoformat(),
-                "open": float(bar.open),
-                "high": float(bar.high),
-                "low": float(bar.low),
-                "close": float(bar.close),
-                "volume": float(bar.volume),
+        raw_count = len(bars)
+        # Bars come sorted from the parquet reader; preserve order.
+        if raw_count <= limit:
+            data = [{
+                "timestamp": pd.Timestamp(b.ts_event, unit="ns", tz="UTC").isoformat(),
+                "open": float(b.open), "high": float(b.high),
+                "low": float(b.low), "close": float(b.close),
+                "volume": float(b.volume),
+            } for b in bars]
+            return jsonify({
+                "data": data, "count": len(data),
+                "raw_count": raw_count, "downsampled": False,
             })
 
-        data.sort(key=lambda x: x["timestamp"])
-        return jsonify({"data": data, "count": len(data)})
+        # Downsample: chunk into ceil(raw_count / limit)-sized buckets and
+        # emit one OHLC per bucket. Preserves visible volatility far better
+        # than plain stride-sampling which drops wicks.
+        stride = (raw_count + limit - 1) // limit
+        out = []
+        for i in range(0, raw_count, stride):
+            chunk = bars[i:i + stride]
+            first, last = chunk[0], chunk[-1]
+            hi = max(float(b.high) for b in chunk)
+            lo = min(float(b.low)  for b in chunk)
+            vol = sum(float(b.volume) for b in chunk)
+            out.append({
+                "timestamp": pd.Timestamp(first.ts_event, unit="ns", tz="UTC").isoformat(),
+                "open":  float(first.open),
+                "high":  hi,
+                "low":   lo,
+                "close": float(last.close),
+                "volume": vol,
+            })
+        return jsonify({
+            "data": out, "count": len(out),
+            "raw_count": raw_count, "downsampled": True,
+            "bucket_size": stride,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -336,24 +480,15 @@ def upload_custom_strategy():
 
         strat_name = vresult["strategy_name"]
 
-        # Check for duplicate names among other custom files
+        # Check for duplicate names among other custom files. _read_strategy_name
+        # caches per-file by mtime so this loop avoids re-reading unchanged files
+        # on subsequent uploads.
         for other_file in CUSTOM_STRATEGIES_DIR.glob("*.py"):
             if other_file.name == safe_name or other_file.name.startswith("__"):
                 continue
-            # Quick check: read file and look for STRATEGY_NAME
-            try:
-                content = other_file.read_text(encoding="utf-8")
-                for line in content.splitlines():
-                    line = line.strip()
-                    if line.startswith("STRATEGY_NAME") and "=" in line:
-                        # Extract string value
-                        val = line.split("=", 1)[1].strip().strip("\"'")
-                        if val == strat_name:
-                            dest_path.unlink()
-                            return jsonify({"error": f"A custom strategy named '{strat_name}' already exists."}), 400
-                        break
-            except Exception:
-                continue
+            if _read_strategy_name(other_file) == strat_name:
+                dest_path.unlink()
+                return jsonify({"error": f"A custom strategy named '{strat_name}' already exists."}), 400
 
         msg = f"Replaced existing file: {safe_name}" if file_existed else f"Strategy '{strat_name}' loaded successfully!"
         return jsonify({"success": True, "message": msg, "strategy_name": strat_name, "filename": safe_name})
@@ -412,17 +547,19 @@ def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
         "equity_curve_ts": results.get("equity_curve_ts", []),
     }
 
-    # Convert reports to lists of dicts
+    # Convert reports to lists of dicts. Skip the full DataFrame copy + per-column
+    # apply — instead, convert to records first and stringify non-primitive values
+    # per cell (same net effect, one pass, no column-wise Series allocation).
+    _primitive = (int, float, str, bool, type(None))
     for report_key in ["fills_report", "positions_report", "account_report"]:
         report = results.get(report_key)
         if report is not None and not report.empty:
-            report_copy = report.copy()
-            for col in report_copy.columns:
-                report_copy[col] = report_copy[col].apply(
-                    lambda x: str(x) if not isinstance(x, (int, float, str, bool, type(None))) else x
-                )
-            report_copy = report_copy.fillna("").reset_index()
-            serializable[report_key] = report_copy.to_dict(orient="records")
+            records = report.reset_index().fillna("").to_dict(orient="records")
+            for rec in records:
+                for k, v in rec.items():
+                    if not isinstance(v, _primitive):
+                        rec[k] = str(v)
+            serializable[report_key] = records
         else:
             serializable[report_key] = []
 
@@ -488,31 +625,65 @@ def run_backtest_stream():
         errors = []
         custom_dir_str = str(CUSTOM_STRATEGIES_DIR)
 
-        # Cap worker count — each backtest is CPU-bound; too many hurts memory
-        max_workers = min(total_runs, (os.cpu_count() or 2), 8)
+        # Match the portfolio path's worker cap (was 8; 16-core boxes only used
+        # half their cores). CPU-bound per task but the OS schedules fine.
+        max_workers = min(total_runs, (os.cpu_count() or 2), 32)
+
+        # LPT scheduling: submit the longest-expected tasks first so shorter
+        # ones tail-fill behind them. History-aware — if we've seen this
+        # (bar_type, strategy) before, use the observed per-day runtime
+        # instead of the span heuristic. Closes the same-span-different-work
+        # gap that made USDJPY the tail on Forex runs.
+        from core import runtime_history
+        history = runtime_history.load()
+
+        def _span_days(meta):
+            if meta["start_date"] and meta["end_date"]:
+                try:
+                    return max(1, (pd.Timestamp(meta["end_date"]) - pd.Timestamp(meta["start_date"])).days)
+                except Exception:
+                    return 1
+            return 1
+
+        def _duration_estimate(inst_idx, strategy_name):
+            meta = inst_meta[inst_idx]
+            span = _span_days(meta)
+            hist = runtime_history.estimate(history, meta["primary_bt"], strategy_name, span)
+            if hist is not None:
+                return hist
+            mult = 1.2 if "bollinger" in strategy_name.lower() else 1.0
+            return span * mult
+
+        submit_order = [
+            (inst_idx, strategy_name)
+            for inst_idx in range(len(inst_meta))
+            for strategy_name in strategies_config.keys()
+        ]
+        submit_order.sort(key=lambda x: _duration_estimate(*x), reverse=True)
 
         t_start = _time.time()
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {}
-            for inst_idx, meta in enumerate(inst_meta):
-                for strategy_name, cfg in strategies_config.items():
-                    future = executor.submit(
-                        _run_single_backtest_task,
-                        catalog_path=catalog_path,
-                        bar_type_str=meta["bar_type_str"],
-                        strategy_name=strategy_name,
-                        strategy_params=cfg.get("params", {}),
-                        trade_size=cfg.get("trade_size", 1),
-                        starting_capital=starting_capital,
-                        start_date=meta["start_date"],
-                        end_date=meta["end_date"],
-                        custom_strategies_dir=custom_dir_str,
-                    )
-                    futures[future] = (inst_idx, strategy_name)
-                    yield json.dumps({"event": "progress", "status": "running",
-                                      "completed": completed_runs, "total": total_runs,
-                                      "current_instrument": meta["primary_bt"],
-                                      "current_strategy": strategy_name}) + "\n"
+            for inst_idx, strategy_name in submit_order:
+                meta = inst_meta[inst_idx]
+                cfg = strategies_config[strategy_name]
+                future = executor.submit(
+                    _run_single_backtest_task,
+                    catalog_path=catalog_path,
+                    bar_type_str=meta["bar_type_str"],
+                    strategy_name=strategy_name,
+                    strategy_params=cfg.get("params", {}),
+                    trade_size=cfg.get("trade_size", 1),
+                    starting_capital=starting_capital,
+                    start_date=meta["start_date"],
+                    end_date=meta["end_date"],
+                    custom_strategies_dir=custom_dir_str,
+                )
+                futures[future] = (inst_idx, strategy_name)
+                yield json.dumps({"event": "progress", "status": "running",
+                                  "completed": completed_runs, "total": total_runs,
+                                  "current_instrument": meta["primary_bt"],
+                                  "current_strategy": strategy_name}) + "\n"
 
             print(f"[Backtest] Submitted {total_runs} backtests to {max_workers} workers.")
 
@@ -525,13 +696,20 @@ def run_backtest_stream():
                     meta["strategies_raw"][strategy_name] = results
                     meta["strategies_serialized"][strategy_name] = _serialize_backtest_result(
                         results, strategy_name)
+                    elapsed_sec = results.get("elapsed_seconds") if isinstance(results, dict) else None
+                    if elapsed_sec is not None:
+                        runtime_history.record(
+                            history, primary_bt, strategy_name,
+                            float(elapsed_sec), _span_days(meta),
+                        )
                     completed_runs += 1
                     print(f"[Backtest] Completed {strategy_name} on {primary_bt} "
-                          f"({completed_runs}/{total_runs})")
+                          f"({completed_runs}/{total_runs}, {elapsed_sec}s)")
                     yield json.dumps({"event": "progress", "status": "complete",
                                       "completed": completed_runs, "total": total_runs,
                                       "current_instrument": primary_bt,
-                                      "current_strategy": strategy_name}) + "\n"
+                                      "current_strategy": strategy_name,
+                                      "elapsed_seconds": elapsed_sec}) + "\n"
                 except Exception as e:
                     completed_runs += 1
                     print(f"[Backtest] ERROR {strategy_name} on {primary_bt}: {e}")
@@ -589,6 +767,12 @@ def run_backtest_stream():
                     }
 
         elapsed_total = _time.time() - t_start
+        # Persist runtime history so the next LPT pass can use observed per-day
+        # runtimes instead of the span heuristic. One JSON write per run.
+        try:
+            runtime_history.save(history)
+        except Exception:
+            pass
         # Final complete event (use default=str to handle Timestamp and other non-serializable types)
         yield json.dumps({"event": "complete",
                           "instrument_results": instrument_results,

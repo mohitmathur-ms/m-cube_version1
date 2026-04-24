@@ -90,6 +90,8 @@ class PortfolioConfig:
     max_loss: Optional[float] = None
     max_profit: Optional[float] = None
     allocation_mode: str = "equal"  # "equal" or "percentage"
+    start_date: Optional[str] = None  # ISO date applied to all slots unless a slot overrides it
+    end_date: Optional[str] = None
     slots: list[StrategySlotConfig] = field(default_factory=list)
 
     def add_slot(self, slot: StrategySlotConfig) -> None:

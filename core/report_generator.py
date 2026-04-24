@@ -21,12 +21,12 @@ def _parse_nautilus_value(value) -> float:
     """
     if value is None:
         return 0.0
-    s = str(value).strip()
-    # Strip currency suffix (e.g. "150.00 USD" -> "150.00")
-    parts = s.split()
+    # partition() is one-pass and avoids allocating a list for the common
+    # "<amount> <ccy>" case. Empty values fall through to ValueError.
+    amount_str, _, _ = str(value).strip().partition(" ")
     try:
-        return float(parts[0])
-    except (ValueError, IndexError):
+        return float(amount_str)
+    except ValueError:
         return 0.0
 
 
@@ -39,6 +39,28 @@ def _format_timestamp(ts) -> str:
         return dt.strftime("%d-%m-%Y %H:%M:%S")
     except Exception:
         return str(ts)
+
+
+def _format_timestamp_series(series: pd.Series) -> list[str]:
+    """Vectorized equivalent of applying _format_timestamp to every cell.
+
+    Falls back to per-cell _format_timestamp for entries that vectorized
+    parsing can't handle, so string-like fallbacks ("str(ts)" for unparseable
+    values) are preserved exactly.
+    """
+    parsed = pd.to_datetime(series, utc=True, errors="coerce")
+    formatted = parsed.dt.strftime("%d-%m-%Y %H:%M:%S")
+    # NaN entries in formatted line up with NaT in parsed; fill them from the
+    # original slow path so we keep the "return str(ts)" fallback verbatim.
+    nat_mask = parsed.isna()
+    if nat_mask.any():
+        raw_values = series.tolist()
+        result = formatted.tolist()
+        for i, is_bad in enumerate(nat_mask.tolist()):
+            if is_bad:
+                result[i] = _format_timestamp(raw_values[i])
+        return result
+    return formatted.tolist()
 
 
 def _resolve_column(df: pd.DataFrame, candidates: list[str], default=None):
@@ -139,6 +161,11 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         col_opening_order = _resolve_column(df, ["opening_order_id", "OpeningOrderId"])
         col_closing_order = _resolve_column(df, ["closing_order_id", "ClosingOrderId"])
 
+        # Pre-format timestamp columns once per strategy (vectorized) instead
+        # of calling pd.to_datetime per row inside the iterrows loop.
+        entry_times = _format_timestamp_series(df[col_ts_open]) if col_ts_open else None
+        exit_times = _format_timestamp_series(df[col_ts_close]) if col_ts_close else None
+
         for idx, row in df.iterrows():
             raw_instrument = str(row[col_instrument]) if col_instrument else strategy_name
             # Clean up instrument id (e.g. "BTCUSD.CRYPTO" -> symbol="BTCUSD", exchange="CRYPTO")
@@ -148,8 +175,8 @@ def _build_orderbook(all_results: dict) -> list[dict]:
 
             pnl = _parse_nautilus_value(row[col_pnl]) if col_pnl else 0.0
             qty = _parse_nautilus_value(row[col_qty]) if col_qty else 1.0
-            entry_time = _format_timestamp(row[col_ts_open]) if col_ts_open else ""
-            exit_time = _format_timestamp(row[col_ts_close]) if col_ts_close else ""
+            entry_time = entry_times[idx] if entry_times is not None else ""
+            exit_time = exit_times[idx] if exit_times is not None else ""
 
             opening_oid = str(row[col_opening_order]) if col_opening_order else ""
             closing_oid = str(row[col_closing_order]) if col_closing_order else ""
@@ -278,12 +305,15 @@ def build_logs_dataframe(
         col_contingency = _resolve_column(df, ["contingency_type", "ContingencyType"])
         col_tags = _resolve_column(df, ["tags", "Tags"])
 
-        for _, row in df.iterrows():
+        # Pre-format timestamp column once per strategy (vectorized).
+        bt_times = _format_timestamp_series(df[col_ts]) if col_ts else None
+
+        for idx, row in df.iterrows():
             raw_instrument = str(row[col_instrument]) if col_instrument else ""
             parts = raw_instrument.split(".")
             symbol = parts[0] if parts else ""
 
-            bt_time = _format_timestamp(row[col_ts]) if col_ts else ""
+            bt_time = bt_times[idx] if bt_times is not None else ""
             side = str(row[col_side]) if col_side else ""
             price = _parse_nautilus_value(row[col_price]) if col_price else 0.0
             qty = _parse_nautilus_value(row[col_qty]) if col_qty else 0.0

@@ -147,12 +147,31 @@ def load_csv_and_store(
     csv_config = (data_format or {}).get("csv", {})
     inst_config = (data_format or {}).get("instrument", {})
 
-    # Step 1: Load CSV with configurable timestamp column and delimiter
+    # Step 1: Load CSV(s). Entries from the daily-FX aggregator carry a
+    # `files` list; we concat them in timestamp order and drop duplicates
+    # (overlapping day files occasionally cross midnight).
     ts_col = csv_config.get("timestamp_column") or "ts"
     req_cols = csv_config.get("required_columns") or None
     delimiter = csv_config.get("delimiter") or ","
-    df = load_csv(csv_entry["path"], timestamp_column=ts_col,
-                  required_columns=req_cols, delimiter=delimiter)
+
+    file_list = csv_entry.get("files")
+    if file_list:
+        parts = []
+        for p in file_list:
+            try:
+                parts.append(load_csv(p, timestamp_column=ts_col,
+                                      required_columns=req_cols, delimiter=delimiter))
+            except Exception as e:
+                # Best-effort: skip individual bad files but keep going so a
+                # transient parse error on one day doesn't lose a full year.
+                print(f"[csv_load] skip {Path(p).name}: {e}")
+        if not parts:
+            raise ValueError(f"No loadable CSVs in aggregated entry for {csv_entry.get('symbol')}")
+        df = pd.concat(parts).sort_index()
+        df = df[~df.index.duplicated(keep="first")]
+    else:
+        df = load_csv(csv_entry["path"], timestamp_column=ts_col,
+                      required_columns=req_cols, delimiter=delimiter)
 
     # Step 2: Create instrument
     quote = inst_config.get("quote_currency") or "USD"
@@ -188,6 +207,21 @@ def load_csv_and_store(
 
     bar_type_str = make_bar_type_str(instrument, timeframe=timeframe, price_type=price_type)
 
+    # Post-ingest sanity: if > 30% of a sample of bars have open == close,
+    # the instrument precision is almost certainly too low for this data
+    # source and every bar has been rounded into a doji. Callers surface
+    # this as a user-visible warning so the issue gets caught at ingest
+    # time rather than at backtest time.
+    doji_rate = 0.0
+    if bars:
+        sample_size = min(1000, len(bars))
+        # Stride-sample across the full bar list so we catch early/mid/late
+        # discrepancies, not just the first 1000 (which may be pre-market quiet).
+        stride = max(1, len(bars) // sample_size)
+        sample = bars[::stride][:sample_size]
+        doji = sum(1 for b in sample if float(b.open) == float(b.close))
+        doji_rate = doji / len(sample)
+
     return {
         "symbol": csv_entry["symbol"],
         "name": csv_entry["name"],
@@ -196,4 +230,6 @@ def load_csv_and_store(
         "num_bars": len(bars),
         "catalog_path": catalog_path,
         "dataframe": df,
+        "doji_rate": doji_rate,
+        "price_precision": instrument.price_precision,
     }

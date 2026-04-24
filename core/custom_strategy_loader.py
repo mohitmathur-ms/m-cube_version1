@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_EXPORTS = ["STRATEGY_NAME", "STRATEGY_CLASS", "CONFIG_CLASS", "DESCRIPTION", "PARAMS"]
 REQUIRED_CONFIG_FIELDS = {"instrument_id", "bar_type", "trade_size"}
+OPTIONAL_CONFIG_FIELDS = {"extra_bar_types"}
 REQUIRED_STRATEGY_METHODS = {"on_start", "on_bar", "on_stop"}
 MAX_STRATEGY_NAME_LENGTH = 100
 
@@ -325,6 +326,7 @@ class MyStrategyConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
+    extra_bar_types: list[BarType] | None = None  # Optional: additional bar types (e.g., BID + ASK)
 
     # --- Your custom parameters below ---
     ema_period: PositiveInt = 20
@@ -364,6 +366,11 @@ class MyStrategy(Strategy):
 
         # Subscribe to bar data
         self.subscribe_bars(self.config.bar_type)
+
+        # Subscribe to extra bar types if provided (e.g., BID + ASK for forex)
+        if self.config.extra_bar_types:
+            for bt in self.config.extra_bar_types:
+                self.subscribe_bars(bt)
 
     def on_bar(self, bar: Bar) -> None:
         """Called on each new bar. Implement your trading logic here."""
@@ -470,7 +477,20 @@ class MyConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId    # Auto-set from selected instrument
     bar_type: BarType              # Auto-set from selected bar type
     trade_size: Decimal = Decimal("1")  # Configurable in UI
+    extra_bar_types: list[BarType] | None = None  # Optional: auto-set when multiple bar types selected
     # ... your custom parameters below
+```
+
+### Multi-Bar Support (e.g., BID + ASK for Forex)
+
+If you select multiple bar types for the same instrument (e.g., BID and ASK), the first becomes `bar_type` and the rest are passed as `extra_bar_types`. In `on_bar()`, use `bar.bar_type` to distinguish:
+
+```python
+def on_bar(self, bar: Bar) -> None:
+    if "BID" in str(bar.bar_type):
+        self.bid_close = float(bar.close)
+    elif "ASK" in str(bar.bar_type):
+        self.ask_close = float(bar.close)
 ```
 
 ---

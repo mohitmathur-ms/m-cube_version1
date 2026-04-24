@@ -1,39 +1,33 @@
-# NautilusTrader Crypto Data Dashboard
+# M_Cube Crypto Dashboard
 
-A simple web UI for downloading crypto data, viewing charts, running backtests,
-and analyzing performance — all without writing any code.
+A web-based crypto data dashboard for loading data, viewing charts, running backtests,
+and analyzing performance — built with Flask + HTML/CSS/JS.
 
 ## Quick Start
 
 ### 1. Install Dependencies
 
 ```bash
-# From the project root (d:\nautilus_trader)
-pip install -r crypto_data_app/requirements.txt
-
-# Make sure NautilusTrader is installed
-pip install -e nautilus_trader/
+pip install -r requirements.txt
 ```
 
 ### 2. Run the App
 
 ```bash
-cd crypto_data_app
-streamlit run app.py
+python server.py
 ```
 
-The app will open in your browser at `http://localhost:8501`.
+The app will open in your browser at `http://localhost:5000`.
 
 ## How to Use
 
-### Step 1: Download Data
-- Click any preset button (BTC/USD, ETH/USD, etc.) or type a custom symbol
-- Choose a date range
-- Click "Download Data"
-- Data is saved as Parquet files in the catalog folder
+### Step 1: Load Data
+- Enter the path to your CSV folder
+- Use preset buttons (BTC, ETH, SOL, etc.) or select symbols manually
+- Click "Load Selected" to import into the NautilusTrader catalog
 
 ### Step 2: View Data
-- Select a downloaded symbol from the dropdown
+- Select a loaded symbol from the dropdown
 - See candlestick charts and OHLCV data tables
 - View daily return distribution and cumulative returns
 
@@ -42,7 +36,8 @@ The app will open in your browser at `http://localhost:8501`.
   - **EMA Cross**: Fast/slow moving average crossover
   - **RSI Mean Reversion**: Buy oversold, sell overbought
   - **Bollinger Bands**: Trade at band boundaries
-- Adjust strategy parameters using sliders
+  - Or upload a **custom strategy** (.py file)
+- Adjust strategy parameters
 - Click "Run Backtest" to see results
 
 ### Step 4: Performance Tearsheet
@@ -50,65 +45,44 @@ The app will open in your browser at `http://localhost:8501`.
 - See win/loss distribution
 - Analyze trade-by-trade P&L
 
-## How It Works (Under the Hood)
-
-```
-Yahoo Finance API
-    |
-    v
-[yfinance download] --> pandas DataFrame (OHLCV)
-    |
-    v
-[instrument_factory] --> CurrencyPair instrument (NautilusTrader type)
-    |
-    v
-[BarDataWrangler] --> list[Bar] (NautilusTrader native Bar objects)
-    |
-    v
-[ParquetDataCatalog] --> Parquet files on disk
-    |
-    v
-[BacktestEngine] --> Runs strategy, generates trades
-    |
-    v
-[Results] --> P&L, equity curve, trade stats
-```
-
 ## File Structure
 
 ```
-crypto_data_app/
-├── app.py                     # Main entry point
-├── pages/
-│   ├── 1_download.py          # Download crypto data
-│   ├── 2_view_data.py         # View charts & tables
-│   ├── 3_backtest.py          # Run backtests
-│   └── 4_tearsheet.py         # Performance analytics
-├── core/
-│   ├── data_fetcher.py        # Yahoo Finance downloader
-│   ├── instrument_factory.py  # Create NautilusTrader instruments
-│   ├── nautilus_loader.py     # Data wrangling & catalog storage
-│   ├── backtest_runner.py     # BacktestEngine wrapper
-│   └── strategies.py          # Trading strategy registry
+mcube_html_11_April_2026/
+├── server.py                  # Flask backend (REST API)
+├── static/                    # Frontend (HTML/CSS/JS SPA)
+│   ├── index.html
+│   ├── css/style.css
+│   └── js/
+│       ├── app.js             # Router & utilities
+│       ├── dashboard.js       # Home page
+│       ├── load_data.js       # CSV loading UI
+│       ├── view_data.js       # Chart viewing
+│       ├── backtest.js        # Backtest runner UI
+│       └── tearsheet.js       # Results tearsheet
+├── core/                      # Business logic (shared)
+│   ├── csv_loader.py
+│   ├── nautilus_loader.py
+│   ├── instrument_factory.py
+│   ├── backtest_runner.py
+│   ├── strategies.py
+│   ├── custom_strategy_loader.py
+│   └── report_generator.py
+├── custom_strategies/         # User-uploaded strategies
+├── catalog/                   # NautilusTrader data catalog
+├── reports/                   # Auto-saved backtest reports
 ├── requirements.txt
 └── README_APP.md
 ```
 
-## Supported Symbols
-
-Any crypto pair available on Yahoo Finance, including:
-- BTC/USD, ETH/USD, SOL/USD, XRP/USD
-- DOGE/USD, ADA/USD, AVAX/USD, LINK/USD
-- Or type any custom pair
-
 ## Data Storage
 
-Downloaded data is stored in the **catalog** folder (configurable in the sidebar):
+Data is stored in the **catalog** folder using NautilusTrader's native ParquetDataCatalog format:
 ```
 catalog/
-├── CurrencyPair/...          # Instrument definitions
-└── Bar/YAHOO/BTCUSD-1-DAY-LAST-EXTERNAL/data.parquet  # OHLCV bars
+├── data/
+│   ├── bar/                   # OHLCV bar data (Parquet)
+│   └── currency_pair/         # Instrument definitions
 ```
 
-This is NautilusTrader's native ParquetDataCatalog format and can be
-used directly by any NautilusTrader backtest script.
+This catalog can be used directly by any NautilusTrader backtest script.
