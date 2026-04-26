@@ -32,11 +32,14 @@ their actual prevailing rates, not a single snapshot rate.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -178,9 +181,7 @@ class FxRateResolver:
         """Return a UTC-indexed Series of close prices for `catalog_pair`.
 
         Loads from the ParquetDataCatalog on first access and caches thereafter.
-        The LAST-EXTERNAL bar type is preferred; if the pair only has BID/ASK
-        series (common for FX), the BID is used (consistent with how Nautilus
-        picks up quote-currency PnL on sells).
+        Prefers MID (FX) then LAST (non-FX); other bar types are a last resort.
         """
         if self._catalog_path is None:
             return None
@@ -192,8 +193,8 @@ class FxRateResolver:
             self._series_cache[catalog_pair] = None  # type: ignore[assignment]
             return None
 
-        # Prefer daily LAST bars (cheap to read, enough granularity for PnL
-        # conversion); fall back to any daily bar type, then to any bar type.
+        # Prefer daily bars (cheap to read, enough granularity for PnL
+        # conversion); MID is the canonical FX series, LAST for everything else.
         candidates = sorted(bar_root.glob(f"{catalog_pair}-*"))
         if not candidates:
             self._series_cache[catalog_pair] = None  # type: ignore[assignment]
@@ -201,14 +202,13 @@ class FxRateResolver:
 
         def _priority(path: Path) -> tuple[int, str]:
             name = path.name
-            # Daily LAST is cheapest; daily BID next; everything else last.
-            if "-1-DAY-LAST-" in name:
+            if "-1-DAY-MID-" in name:
                 return (0, name)
-            if "-1-DAY-BID-" in name:
+            if "-1-DAY-LAST-" in name:
                 return (1, name)
-            if "-LAST-" in name:
+            if "-MID-" in name:
                 return (2, name)
-            if "-BID-" in name:
+            if "-LAST-" in name:
                 return (3, name)
             return (4, name)
 
@@ -226,19 +226,33 @@ class FxRateResolver:
             if not tables:
                 self._series_cache[catalog_pair] = None  # type: ignore[assignment]
                 return None
-            # Concatenate at the Arrow layer — one materialization to pandas
-            # instead of N per-file ones followed by pd.concat.
-            df = pa.concat_tables(tables).to_pandas()
-            close = _decode_nautilus_price_column(df["close"])
+            # Concatenate at the Arrow layer and decode each column directly
+            # from its arrow buffers — skipping `.to_pandas()` saves a full
+            # column-wide bytes-object materialisation on FixedSizeBinary
+            # close columns (multi-hundred-MB on decade-long FX series).
+            table = pa.concat_tables(tables)
+            close = _decode_nautilus_price_column(table["close"])
             if close is None:
                 self._series_cache[catalog_pair] = None  # type: ignore[assignment]
                 return None
-            ts = pd.to_datetime(df["ts_event"], unit="ns", utc=True)
+            ts = pd.to_datetime(
+                table["ts_event"].to_numpy(zero_copy_only=False),
+                unit="ns", utc=True,
+            )
             series = pd.Series(close, index=ts).sort_index()
             series = series[~series.index.duplicated(keep="last")]
             self._series_cache[catalog_pair] = series
             return series
-        except Exception:
+        except (OSError, pa.ArrowInvalid, KeyError, ValueError) as exc:
+            # Disk / corrupt parquet / schema mismatch are the legitimate
+            # failure modes for this read. A bug in price decoding (e.g.
+            # AttributeError) used to be swallowed silently with the same
+            # behaviour as a missing file — the warning here makes that
+            # difference visible without breaking the resolver fallback.
+            logger.warning(
+                "FX series load failed for %s: %s: %s",
+                catalog_pair, type(exc).__name__, exc,
+            )
             self._series_cache[catalog_pair] = None  # type: ignore[assignment]
             return None
 
@@ -265,7 +279,7 @@ class FxRateResolver:
             if pd.isna(val):
                 return float(series.iloc[0])
             return float(val)
-        except Exception:
+        except (KeyError, IndexError, TypeError, ValueError):
             return None
 
 
@@ -274,20 +288,54 @@ def _decode_nautilus_price_column(col):
     a float64 numpy array.
 
     Nautilus stores prices as fixed-precision int64 scaled by 1e9 (so a
-    USDJPY price of 119.817 is the int 119_817_000_000). Pyarrow materializes
-    the column as one of:
+    USDJPY price of 119.817 is the int 119_817_000_000). The column shape
+    depends on the writer:
       * float64      — already decoded by some paths
       * int64/uint64 — legacy/newer numeric writers
-      * object dtype of 8-byte `bytes` blobs — raw fixed-precision int64 LE
-        packed as FixedSizeBinary(8). This is what the FX ingest path emits.
+      * FixedSizeBinary(8) — raw fixed-precision int64 LE; what FX ingest emits
+
+    Accepts either a pyarrow ``Array``/``ChunkedArray`` (preferred — the
+    FixedSizeBinary path then decodes by reinterpreting each chunk's values
+    buffer in place, no Python-level bytes join) OR a pandas Series (legacy
+    callers; the FixedSizeBinary case here still needs a one-shot bytes join).
 
     Returns a numpy float64 array (positional, not index-aligned), or None if
     the column shape isn't recognized.
     """
     import numpy as np
+    import pyarrow as pa
 
     scale = 1e9  # Nautilus FIXED_PRECISION = 9
 
+    # ─── pyarrow Array / ChunkedArray path (zero-copy for FixedSizeBinary) ──
+    if isinstance(col, (pa.Array, pa.ChunkedArray)):
+        if pa.types.is_floating(col.type):
+            return np.asarray(col.to_numpy(zero_copy_only=False), dtype=np.float64)
+        if pa.types.is_integer(col.type):
+            return np.asarray(col.to_numpy(zero_copy_only=False),
+                              dtype=np.float64) / scale
+        if pa.types.is_fixed_size_binary(col.type) and col.type.byte_width == 8:
+            chunks = col.chunks if isinstance(col, pa.ChunkedArray) else [col]
+            n = len(col)
+            if n == 0:
+                return None
+            out = np.empty(n, dtype="<i8")
+            cursor = 0
+            for chunk in chunks:
+                k = len(chunk)
+                if k == 0:
+                    continue
+                values_buf = chunk.buffers()[1]
+                if values_buf is None:
+                    return None
+                arr = np.frombuffer(values_buf, dtype="<i8",
+                                    count=k, offset=chunk.offset * 8)
+                out[cursor:cursor + k] = arr
+                cursor += k
+            return out.astype(np.float64) / scale
+        return None
+
+    # ─── pandas Series path (legacy) ────────────────────────────────────────
     if col.dtype.kind == "f":
         return col.values.astype(np.float64)
     if col.dtype.kind in ("i", "u"):
@@ -300,7 +348,8 @@ def _decode_nautilus_price_column(col):
         if isinstance(sample, (bytes, bytearray)) and len(sample) == 8:
             # Reinterpret the whole column as a contiguous buffer of LE int64.
             # Much faster than a per-row int.from_bytes loop on multi-million
-            # row FX series.
+            # row FX series; for very large series the pyarrow path above
+            # avoids this 8N-byte temporary entirely.
             buf = b"".join(col.tolist())
             arr = np.frombuffer(buf, dtype="<i8")
             return arr.astype(np.float64) / scale

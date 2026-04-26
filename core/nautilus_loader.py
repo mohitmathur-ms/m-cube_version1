@@ -6,7 +6,6 @@ This module bridges local CSV data → NautilusTrader native types → Parquet c
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +17,9 @@ from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
 from nautilus_trader.persistence.wranglers import BarDataWrangler
 
 from core.csv_loader import QUANTITY_MAX
+from core.csv_loader import concat_side
 from core.csv_loader import load_csv
+from core.csv_loader import load_pair_mid
 from core.csv_loader import parse_symbol_from_entry
 from core.instrument_factory import create_instrument
 
@@ -108,7 +109,16 @@ def save_to_catalog(
     """
     Path(catalog_path).mkdir(parents=True, exist_ok=True)
     catalog = ParquetDataCatalog(catalog_path)
-    catalog.write_data([instrument])
+    # An instrument is the same definition no matter which side's bars we're
+    # writing — re-writing it makes Nautilus log "File ... already exists,
+    # skipping write" once per (pair, side) call. Check first; only write if
+    # the catalog hasn't seen this instrument yet.
+    try:
+        existing_ids = {inst.id for inst in catalog.instruments()}
+    except Exception:
+        existing_ids = set()
+    if instrument.id not in existing_ids:
+        catalog.write_data([instrument])
     catalog.write_data(bars)
     return catalog
 
@@ -147,31 +157,41 @@ def load_csv_and_store(
     csv_config = (data_format or {}).get("csv", {})
     inst_config = (data_format or {}).get("instrument", {})
 
-    # Step 1: Load CSV(s). Entries from the daily-FX aggregator carry a
-    # `files` list; we concat them in timestamp order and drop duplicates
-    # (overlapping day files occasionally cross midnight).
+    # Step 1: Load CSV(s). The FX scanner emits three entries per pair
+    # (ASK / BID / MID) carrying both sides' file lists; the `side` key
+    # selects which slice to load (MID is synthesized from ASK+BID).
+    # Other asset classes either ship a `files` list (daily aggregator)
+    # or a single `path`.
     ts_col = csv_config.get("timestamp_column") or "ts"
     req_cols = csv_config.get("required_columns") or None
     delimiter = csv_config.get("delimiter") or ","
 
-    file_list = csv_entry.get("files")
-    if file_list:
-        parts = []
-        for p in file_list:
-            try:
-                parts.append(load_csv(p, timestamp_column=ts_col,
-                                      required_columns=req_cols, delimiter=delimiter))
-            except Exception as e:
-                # Best-effort: skip individual bad files but keep going so a
-                # transient parse error on one day doesn't lose a full year.
-                print(f"[csv_load] skip {Path(p).name}: {e}")
-        if not parts:
-            raise ValueError(f"No loadable CSVs in aggregated entry for {csv_entry.get('symbol')}")
-        df = pd.concat(parts).sort_index()
-        df = df[~df.index.duplicated(keep="first")]
+    side = csv_entry.get("side")
+    ask_files = csv_entry.get("ask_files") or []
+    bid_files = csv_entry.get("bid_files") or []
+
+    if side == "MID" and ask_files and bid_files:
+        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
+                           required_columns=req_cols, delimiter=delimiter)
+    elif side == "ASK" and ask_files:
+        df = concat_side(ask_files, timestamp_column=ts_col,
+                         required_columns=req_cols, delimiter=delimiter)
+    elif side == "BID" and bid_files:
+        df = concat_side(bid_files, timestamp_column=ts_col,
+                         required_columns=req_cols, delimiter=delimiter)
+    elif inst_config.get("merge_ask_bid_to_mid") and ask_files and bid_files:
+        # Legacy: an aggregated FX entry without an explicit `side` key.
+        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
+                           required_columns=req_cols, delimiter=delimiter)
+        side = "MID"
     else:
-        df = load_csv(csv_entry["path"], timestamp_column=ts_col,
-                      required_columns=req_cols, delimiter=delimiter)
+        file_list = csv_entry.get("files")
+        if file_list:
+            df = concat_side(file_list, timestamp_column=ts_col,
+                             required_columns=req_cols, delimiter=delimiter)
+        else:
+            df = load_csv(csv_entry["path"], timestamp_column=ts_col,
+                          required_columns=req_cols, delimiter=delimiter)
 
     # Step 2: Create instrument
     quote = inst_config.get("quote_currency") or "USD"
@@ -192,13 +212,15 @@ def load_csv_and_store(
     # Step 3: Wrangle into Nautilus Bar objects
     timeframe = inst_config.get("timeframe") or "1-DAY"
 
-    # Extract price type (BID/ASK) from filename if configured
-    price_type = "LAST"
-    if inst_config.get("price_type_from_filename"):
-        filename = csv_entry.get("filename", "")
-        pt_match = re.search(r"_(BID|ASK)_", filename)
-        if pt_match:
-            price_type = pt_match.group(1)
+    # FX entries carry an explicit side ("ASK" | "BID" | "MID"); fall back
+    # to the legacy MID path for entries without a side, and LAST for
+    # everything else.
+    if side in ("ASK", "BID", "MID"):
+        price_type = side
+    elif inst_config.get("merge_ask_bid_to_mid"):
+        price_type = "MID"
+    else:
+        price_type = "LAST"
 
     bars = wrangle_bars(df, instrument, timeframe=timeframe, price_type=price_type)
 

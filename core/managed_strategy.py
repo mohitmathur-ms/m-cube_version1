@@ -6,7 +6,9 @@ Used by the portfolio system to add exit management to any strategy from the sig
 
 from __future__ import annotations
 
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.indicators import ExponentialMovingAverage, SimpleMovingAverage
@@ -18,6 +20,24 @@ from nautilus_trader.trading.strategy import Strategy
 
 from core.models import ExitConfig
 from core.signals import SIGNAL_REGISTRY
+
+
+# -1 = squareoff disabled. Storing the parsed minute-of-day (0..1439) avoids
+# re-parsing the HH:MM string on every bar.
+_SQUAREOFF_DISABLED = -1
+
+
+def _parse_squareoff_minute(squareoff_time: str | None) -> int:
+    """Convert "HH:MM" → minute-of-day, or -1 when disabled.
+
+    Tolerates ``None`` and an empty string. Raises ``ValueError`` for malformed
+    inputs so a typo in a portfolio JSON fails loudly at engine build instead
+    of silently disabling the squareoff.
+    """
+    if not squareoff_time:
+        return _SQUAREOFF_DISABLED
+    h, _, m = squareoff_time.partition(":")
+    return int(h) * 60 + int(m)
 
 
 class ManagedExitConfig(StrategyConfig, frozen=True):
@@ -43,6 +63,12 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     on_target_action: str = "close"
     max_re_executions: int = 0
 
+    # Square-off (resolved by core.models.resolve_squareoff before engine build).
+    # squareoff_minute = -1 → disabled. Otherwise daily force-close at this
+    # local-time minute-of-day, no re-entry until next session.
+    squareoff_minute: int = _SQUAREOFF_DISABLED
+    squareoff_tz: str = "UTC"
+
 
 class ManagedExitStrategy(Strategy):
     """On each bar: check exits first (SL, TP, trailing, target lock, SL wait), then entries."""
@@ -58,6 +84,23 @@ class ManagedExitStrategy(Strategy):
         self.sl_wait_count = 0
         self.re_execution_count = 0
         self.position_side = None  # "LONG" or "SHORT" or None
+        self._expecting_close_fill = False  # next on_order_filled is a close, not an open
+
+        # Squareoff state. Resolve the tz once at init — ZoneInfo lookups are
+        # cached but the conversion still costs a hash; storing the object lets
+        # on_bar do a single astimezone() call. Bars are UTC-stamped, so we keep
+        # a UTC tzinfo too rather than rebuilding it per bar.
+        self._squareoff_min: int = int(config.squareoff_minute)
+        self._utc_tz = timezone.utc
+        try:
+            self._squareoff_tz = ZoneInfo(config.squareoff_tz) if self._squareoff_min >= 0 else self._utc_tz
+        except ZoneInfoNotFoundError:
+            # Fall back to UTC rather than crash the run; will be visible in
+            # any squareoff log because times won't shift for DST.
+            self._squareoff_tz = self._utc_tz
+        # Date (in squareoff_tz) on which we've already squared off. Blocks
+        # re-entries until the calendar flips. None until first squareoff fires.
+        self._squareoff_done_date: date | None = None
 
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
@@ -100,14 +143,52 @@ class ManagedExitStrategy(Strategy):
             return
 
         close = float(bar.close)
-        is_flat = self.portfolio.is_flat(self.config.instrument_id)
-        is_long = self.portfolio.is_net_long(self.config.instrument_id)
-        is_short = self.portfolio.is_net_short(self.config.instrument_id)
+        # Use this strategy's OWN state rather than ``self.portfolio.is_flat(...)``,
+        # which aggregates across every strategy trading the same (venue, instrument).
+        # Aggregation is wrong when multiple strategies share an engine (Direction B
+        # shared-engine grouping) — Strategy A's position would make Strategy B's
+        # view non-flat, blocking B's entries. In single-strategy engines these are
+        # equivalent (the strategy's tracked state mirrors the portfolio's net).
+        is_flat = self.position_side is None
+        is_long = self.position_side == "LONG"
+        is_short = self.position_side == "SHORT"
+
+        # Squareoff check runs FIRST so a bar at-or-past the configured local
+        # time always exits, even when SL/TP would fire on the same bar. This
+        # makes squareoff the deterministic outer envelope.
+        if self._squareoff_min >= 0:
+            local_dt = datetime.fromtimestamp(bar.ts_event / 1e9, tz=self._utc_tz).astimezone(self._squareoff_tz)
+            local_min = local_dt.hour * 60 + local_dt.minute
+            local_date = local_dt.date()
+
+            # New session ⇒ release the re-entry lock so the next signal can fire.
+            if self._squareoff_done_date is not None and local_date != self._squareoff_done_date:
+                self._squareoff_done_date = None
+
+            if local_min >= self._squareoff_min and self._squareoff_done_date != local_date:
+                if not is_flat:
+                    # Plain close — bypass on_sl/on_target action wiring so
+                    # squareoff doesn't accidentally re_execute or reverse.
+                    self._force_squareoff()
+                self._squareoff_done_date = local_date
+                return  # No entries on the squareoff bar itself.
+
+            # Already squared off today — skip both exit and entry logic.
+            if self._squareoff_done_date == local_date:
+                return
 
         if not is_flat:
             self._check_exits(close, is_long, is_short)
         else:
             self._check_entries(close, is_flat, is_long, is_short)
+
+    def _force_squareoff(self) -> None:
+        """Squareoff exit: close position without triggering re_execute/reverse."""
+        # Same close-fill flag as _handle_exit; without it on_order_filled would
+        # mis-classify the closing fill as a new entry.
+        self._expecting_close_fill = True
+        self.close_all_positions(self.config.instrument_id)
+        self._reset_exit_state()
 
     def _check_exits(self, close: float, is_long: bool, is_short: bool) -> None:
         if self.entry_price == 0:
@@ -176,6 +257,10 @@ class ManagedExitStrategy(Strategy):
     def _handle_exit(self, exit_type: str, was_long: bool) -> None:
         action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
 
+        # Flag the upcoming fill as a close — otherwise on_order_filled would
+        # set position_side to the opposite side (SELL closing a LONG would
+        # incorrectly mark us as SHORT) and get us stuck in an impossible state.
+        self._expecting_close_fill = True
         self.close_all_positions(self.config.instrument_id)
         self._reset_exit_state()
 
@@ -210,7 +295,16 @@ class ManagedExitStrategy(Strategy):
         pass
 
     def on_order_filled(self, event) -> None:
-        """Set exit levels when an order fills."""
+        """Set exit levels when an order fills.
+
+        If this fill is the CLOSE of an existing position (flagged by
+        ``_expecting_close_fill`` in ``_handle_exit``), do not treat it as
+        an entry — skip state updates so the position stays flat.
+        """
+        if self._expecting_close_fill:
+            self._expecting_close_fill = False
+            return
+
         self.entry_price = float(event.last_px)
         self.highest_profit = 0.0
         self.sl_wait_count = 0
@@ -272,9 +366,23 @@ class ManagedExitStrategy(Strategy):
 
 
 def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: dict,
-                     instrument_id, bar_type, trade_size) -> ManagedExitConfig:
-    """Build a ManagedExitConfig from an ExitConfig dataclass."""
-    return ManagedExitConfig(
+                     instrument_id, bar_type, trade_size,
+                     order_id_tag: str | None = None,
+                     squareoff_time: str | None = None,
+                     squareoff_tz: str | None = None) -> ManagedExitConfig:
+    """Build a ManagedExitConfig from an ExitConfig dataclass.
+
+    ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
+    multiple strategy instances of the same class coexist in a single engine
+    (Direction B shared-engine grouping) it must be unique per instance so
+    Nautilus assigns each its own ``strategy_id``.
+
+    ``squareoff_time`` / ``squareoff_tz`` carry the *already-resolved*
+    portfolio→slot→leg priority result (see core.models.resolve_squareoff).
+    Resolution stays out of this function so the runner can audit/log the
+    effective value before engine build.
+    """
+    kwargs = dict(
         instrument_id=instrument_id,
         bar_type=bar_type,
         trade_size=Decimal(str(trade_size)),
@@ -292,4 +400,9 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         on_sl_action=exit_config.on_sl_action,
         on_target_action=exit_config.on_target_action,
         max_re_executions=exit_config.max_re_executions,
+        squareoff_minute=_parse_squareoff_minute(squareoff_time),
+        squareoff_tz=squareoff_tz or "UTC",
     )
+    if order_id_tag is not None:
+        kwargs["order_id_tag"] = order_id_tag
+    return ManagedExitConfig(**kwargs)

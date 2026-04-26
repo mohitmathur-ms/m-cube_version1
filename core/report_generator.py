@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from core._pandas_utils import iter_columns
+
 
 def _parse_nautilus_value(value) -> float:
     """Parse a NautilusTrader Money/Quantity value to float.
@@ -120,14 +122,18 @@ def _build_fills_lookup(fills_report) -> dict:
     col_contingency = _resolve_column(df, ["contingency_type", "ContingencyType"])
     col_tags = _resolve_column(df, ["tags", "Tags"])
 
-    for _, row in df.iterrows():
-        oid = str(row[col_order_id]) if col_order_id else ""
+    if col_order_id is None:
+        return lookup
+
+    for raw_oid, t, c, tg in iter_columns(df, col_order_id, col_type,
+                                          col_contingency, col_tags):
+        oid = str(raw_oid)
         if not oid:
             continue
         lookup[oid] = {
-            "type": str(row[col_type]) if col_type else "",
-            "contingency_type": str(row[col_contingency]) if col_contingency else "",
-            "tags": str(row[col_tags]) if col_tags else "",
+            "type": str(t) if t is not None else "",
+            "contingency_type": str(c) if c is not None else "",
+            "tags": str(tg) if tg is not None else "",
         }
     return lookup
 
@@ -166,20 +172,29 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         entry_times = _format_timestamp_series(df[col_ts_open]) if col_ts_open else None
         exit_times = _format_timestamp_series(df[col_ts_close]) if col_ts_close else None
 
-        for idx, row in df.iterrows():
-            raw_instrument = str(row[col_instrument]) if col_instrument else strategy_name
+        # iter_columns walks all columns positionally as a single zip — ~5×
+        # faster than iterrows' Series-per-row allocation. Missing columns
+        # yield None for the corresponding tuple slot; the `if col_X` guards
+        # still substitute the right defaults.
+        rows = iter_columns(df, col_instrument, col_side, col_qty,
+                            col_avg_open, col_avg_close, col_pnl,
+                            col_id, col_opening_order, col_closing_order)
+
+        for i, (instr_v, side_v, qty_v, avg_open_v, avg_close_v,
+                pnl_v, id_v, opening_oid_v, closing_oid_v) in enumerate(rows):
+            raw_instrument = str(instr_v) if col_instrument else strategy_name
             # Clean up instrument id (e.g. "BTCUSD.CRYPTO" -> symbol="BTCUSD", exchange="CRYPTO")
             parts = raw_instrument.split(".")
             symbol = parts[0] if parts else strategy_name
             exchange = parts[1] if len(parts) > 1 else ""
 
-            pnl = _parse_nautilus_value(row[col_pnl]) if col_pnl else 0.0
-            qty = _parse_nautilus_value(row[col_qty]) if col_qty else 1.0
-            entry_time = entry_times[idx] if entry_times is not None else ""
-            exit_time = exit_times[idx] if exit_times is not None else ""
+            pnl = _parse_nautilus_value(pnl_v) if col_pnl else 0.0
+            qty = _parse_nautilus_value(qty_v) if col_qty else 1.0
+            entry_time = entry_times[i] if entry_times is not None else ""
+            exit_time = exit_times[i] if exit_times is not None else ""
 
-            opening_oid = str(row[col_opening_order]) if col_opening_order else ""
-            closing_oid = str(row[col_closing_order]) if col_closing_order else ""
+            opening_oid = str(opening_oid_v) if col_opening_order else ""
+            closing_oid = str(closing_oid_v) if col_closing_order else ""
 
             entry_fill = fills_lookup.get(opening_oid, {})
             exit_fill = fills_lookup.get(closing_oid, {})
@@ -201,20 +216,20 @@ def _build_orderbook(all_results: dict) -> list[dict]:
                 "USERID": "UID001",
                 "SYMBOL": symbol,
                 "EXCHANGE": exchange,
-                "TRANSACTION": str(row[col_side]) if col_side else "BUY",
+                "TRANSACTION": str(side_v) if col_side else "BUY",
                 "LOTS": qty,
                 "MULTIPLIER": 1.0,
                 "QUANTITY": qty * 1.0,
-                "OrderID": str(row[col_id]) if col_id else str(idx),
+                "OrderID": str(id_v) if col_id else str(i),
                 "ENTRY TIME": entry_time,
-                "ENTRY PRICE": _parse_nautilus_value(row[col_avg_open]) if col_avg_open else 0.0,
+                "ENTRY PRICE": _parse_nautilus_value(avg_open_v) if col_avg_open else 0.0,
                 "ENTRY REASON": entry_reason,
                 "OPTION TYPE": "",
                 "STRIKE": "",
                 "PORTFOLIO NAME": strategy_name,
                 "STRATEGY": strategy_name,
                 "EXIT TIME": exit_time,
-                "AVG EXIT PRICE": _parse_nautilus_value(row[col_avg_close]) if col_avg_close else 0.0,
+                "AVG EXIT PRICE": _parse_nautilus_value(avg_close_v) if col_avg_close else 0.0,
                 "EXIT REASON": exit_reason,
                 "PNL": pnl,
                 "_IS_HEDGE": False,
@@ -308,24 +323,34 @@ def build_logs_dataframe(
         # Pre-format timestamp column once per strategy (vectorized).
         bt_times = _format_timestamp_series(df[col_ts]) if col_ts else None
 
-        for idx, row in df.iterrows():
-            raw_instrument = str(row[col_instrument]) if col_instrument else ""
+        # iter_columns walks all columns positionally as a single zip — ~3-5×
+        # faster than iterrows' Series-per-row allocation. Missing columns
+        # yield None for the corresponding tuple slot; the `if col_X` guards
+        # still substitute the right defaults.
+        rows = iter_columns(df, col_instrument, col_side, col_qty, col_price,
+                            col_reduce, col_order_id, col_position_id,
+                            col_type, col_contingency, col_tags)
+
+        for i, (instr_v, side_v, qty_v, price_v, reduce_v,
+                order_id_v, position_id_v, type_v, contingency_v,
+                tags_v) in enumerate(rows):
+            raw_instrument = str(instr_v) if col_instrument else ""
             parts = raw_instrument.split(".")
             symbol = parts[0] if parts else ""
 
-            bt_time = bt_times[idx] if bt_times is not None else ""
-            side = str(row[col_side]) if col_side else ""
-            price = _parse_nautilus_value(row[col_price]) if col_price else 0.0
-            qty = _parse_nautilus_value(row[col_qty]) if col_qty else 0.0
-            is_reduce = bool(row[col_reduce]) if col_reduce else False
-            order_id = str(row[col_order_id]) if col_order_id else ""
-            position_id = str(row[col_position_id]) if col_position_id else ""
+            bt_time = bt_times[i] if bt_times is not None else ""
+            side = str(side_v) if col_side else ""
+            price = _parse_nautilus_value(price_v) if col_price else 0.0
+            qty = _parse_nautilus_value(qty_v) if col_qty else 0.0
+            is_reduce = bool(reduce_v) if col_reduce else False
+            order_id = str(order_id_v) if col_order_id else ""
+            position_id = str(position_id_v) if col_position_id else ""
 
             reason = _determine_reason(
-                order_type=str(row[col_type]) if col_type else "",
+                order_type=str(type_v) if col_type else "",
                 is_reduce=is_reduce,
-                contingency_type=str(row[col_contingency]) if col_contingency else "",
-                tags=str(row[col_tags]) if col_tags else "",
+                contingency_type=str(contingency_v) if col_contingency else "",
+                tags=str(tags_v) if col_tags else "",
             )
 
             action = "EXIT" if is_reduce else "ENTRY"

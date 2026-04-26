@@ -1,20 +1,56 @@
 """
-Load crypto OHLCV data from local CSV files.
+Load OHLCV data from local CSV files.
 
-Scans a folder of CSV files (format: {id}_{SYMBOL}_{Name}.csv) and loads them
-into clean pandas DataFrames ready for NautilusTrader wrangling.
+Scans a folder of CSV files and loads them into clean pandas DataFrames ready
+for NautilusTrader wrangling. Two layouts are supported:
+
+* Flat crypto layout: `{id}_{SYMBOL}_{Name}.csv` directly under the folder.
+* FX daily layout: `<root>/<PAIR>/YYYY/MM/DD/DD.MM.YYYY_(BID|ASK)_OHLCV.csv`.
+  For the FX layout the scanner emits **three entries per pair** — one each
+  for ASK, BID and MID — so each side becomes its own selectable instrument
+  in the UI and its own BarType key in the parquet catalog. MID is
+  synthesized from ASK+BID at load time.
 """
 
 from __future__ import annotations
 
+import logging
 import re
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pandas as pd
 
+logger = logging.getLogger(__name__)
+
+# Worker pool size for parallel daily-file reads in :func:`concat_side`.
+# 16 is a good default for SSDs/NVMe (pandas releases the GIL inside the
+# C parser, so threads overlap cleanly). Lower it for HDDs; raise for
+# arrays. Tunable per-call via the ``max_workers`` kwarg.
+_CONCAT_SIDE_MAX_WORKERS = 16
+
+# Module-level cache for :func:`_scan_fx_daily_layout`. ``rglob`` over the
+# FX tree (thousands of daily files under <PAIR>/YYYY/MM/DD/) takes
+# 2–5s; the same scan is hit on every UI page load and view-data refresh.
+# Cache key: str(root). Value: (cached_at, root_mtime, entries).
+#
+# The fast-path key is the **root directory mtime**: any new pair dir or
+# rename under the root bumps it (Windows + Linux both expose this). When
+# mtime is unchanged the cache is reused regardless of how long ago the
+# scan ran — that eliminates the periodic 2-5s UI hangs the previous 60s
+# TTL caused on big trees. The longer TTL below is only a safety net for
+# new daily files dropped into existing YYYY/MM/DD dirs, where the root
+# mtime stays constant; users who need an immediate refresh can call
+# :func:`clear_fx_scan_cache`.
+_FX_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
+_FX_SCAN_CACHE_TTL_SECONDS = 600.0
+_FX_SCAN_CACHE_LOCK = threading.Lock()
+
 
 # Default path to the user's crypto CSV data
-DEFAULT_CSV_FOLDER = r"C:\Users\HP\Desktop\MS\Dataset\id_name_all_symbols"
+DEFAULT_CSV_FOLDER = r"D:\Data_all\Fx"
 
 # NautilusTrader QUANTITY_RAW_MAX is 18_446_744_072.999999488
 # Use a safe value well below this to avoid Rust panics
@@ -34,15 +70,33 @@ _DAILY_FX_PATTERN = re.compile(
 
 def _scan_fx_daily_layout(root: Path) -> list[dict]:
     """Aggregate daily FX CSVs (<root>/<PAIR>/YYYY/MM/DD/DD.MM.YYYY_(BID|ASK)_OHLCV.csv)
-    into one virtual entry per (pair, side).
+    into three entries per pair: ASK, BID and MID.
 
-    Each entry carries a `files` list consumed by load_csv_and_store. The
-    synthetic `filename` is shaped to match fx.json's single-file
-    filename_pattern so the UI filter accepts it without special casing.
+    Each entry carries both sides' file lists so the downstream loader can
+    either concatenate one side directly (ASK or BID) or synthesize MID
+    from ASK+BID via :func:`_merge_ask_bid_to_mid`. Pairs missing either
+    side are skipped so the downstream merge always has something to join.
+
+    Result is cached under :data:`_FX_SCAN_CACHE` with a TTL — repeated UI
+    refreshes hit the cache instead of re-walking thousands of daily files.
     """
+    key = str(root)
+    try:
+        root_mtime = root.stat().st_mtime
+    except OSError:
+        return []
+
+    now = time.monotonic()
+    cached = _FX_SCAN_CACHE.get(key)
+    if (cached is not None
+            and cached[1] == root_mtime
+            and now - cached[0] < _FX_SCAN_CACHE_TTL_SECONDS):
+        return list(cached[2])
+
     aggregated: dict[tuple[str, str], list[str]] = {}
     for csv_file in root.rglob("*.csv"):
-        if not _DAILY_FX_PATTERN.match(csv_file.name):
+        match = _DAILY_FX_PATTERN.match(csv_file.name)
+        if not match:
             continue
         try:
             rel_parts = csv_file.relative_to(root).parts
@@ -53,28 +107,56 @@ def _scan_fx_daily_layout(root: Path) -> list[dict]:
             continue
         pair_dir = rel_parts[0].upper()
         symbol = _SYMBOL_NORMALIZE.get(pair_dir, pair_dir)
-        side = _DAILY_FX_PATTERN.match(csv_file.name).group(4).upper()
+        side = match.group(4).upper()
         aggregated.setdefault((symbol, side), []).append(str(csv_file))
 
-    entries = []
+    # Reshape into per-pair maps with both sides.
+    pairs: dict[str, dict[str, list[str]]] = {}
+    for (symbol, side), files in aggregated.items():
+        pairs.setdefault(symbol, {})[side] = sorted(files)
+
+    entries: list[dict] = []
     auto_id = 0
-    for (symbol, side), files in sorted(aggregated.items()):
-        files.sort()
-        auto_id -= 1
-        # Synthetic filename shaped like the consolidated format
-        # (e.g. "EURUSD_EURUSD_01JAN2015_27JUN2025_ASK_OHLCV.csv") so the
-        # fx.json filename_pattern accepts it without configuration changes.
-        synth_filename = f"{symbol}_{symbol}_01JAN2015_31DEC2025_{side}_OHLCV.csv"
-        entries.append({
-            "path": files[0],  # nominal — loader uses the full list from `files`
-            "filename": synth_filename,
-            "id": auto_id,
-            "symbol": symbol,
-            "name": f"{symbol} {side} ({len(files):,} daily files)",
-            "files": files,
-            "aggregated": True,
-        })
+    for symbol in sorted(pairs):
+        sides = pairs[symbol]
+        ask_files = sides.get("ASK", [])
+        bid_files = sides.get("BID", [])
+        if not ask_files or not bid_files:
+            missing = "ASK" if not ask_files else "BID"
+            logger.warning("fx_scan skip %s: missing %s side", symbol, missing)
+            continue
+        total_files = len(ask_files) + len(bid_files)
+        for entry_side in ("ASK", "BID", "MID"):
+            auto_id -= 1
+            # Synthetic filename shaped like the consolidated format so the
+            # fx.json filename_pattern still accepts it for UI filtering.
+            synth_filename = (
+                f"{symbol}_{symbol}_01JAN2015_31DEC2025_{entry_side}_OHLCV.csv"
+            )
+            nominal_path = (bid_files if entry_side == "BID" else ask_files)[0]
+            entries.append({
+                "path": nominal_path,  # nominal — loader uses ask_files / bid_files
+                "filename": synth_filename,
+                "id": auto_id,
+                "symbol": symbol,
+                "side": entry_side,
+                "name": f"{symbol} {entry_side} ({total_files:,} daily files)",
+                "ask_files": ask_files,
+                "bid_files": bid_files,
+                "aggregated": True,
+            })
+
+    with _FX_SCAN_CACHE_LOCK:
+        _FX_SCAN_CACHE[key] = (now, root_mtime, list(entries))
     return entries
+
+
+def clear_fx_scan_cache() -> None:
+    """Drop the FX-tree scan cache. Call after manually adding new pair
+    directories if you want the next ``scan_csv_folder`` to see them
+    immediately rather than waiting for the TTL to expire."""
+    with _FX_SCAN_CACHE_LOCK:
+        _FX_SCAN_CACHE.clear()
 
 
 def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
@@ -88,14 +170,15 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
 
     When the folder contains no direct CSV files but does contain the
     FX daily-file layout (<PAIR>/YYYY/MM/DD/*.csv), files are aggregated
-    by (pair, side) and returned as one entry per group so the UI can
-    ingest the whole tree in one click.
+    by pair and returned as **three entries per pair** (ASK, BID, MID)
+    so each side is independently selectable in the UI.
 
     Returns
     -------
     list[dict]
         Each dict has keys: path, filename, id, symbol, name.
-        Aggregated entries also carry: files (list), aggregated (True).
+        Aggregated FX entries also carry: side ("ASK"|"BID"|"MID"),
+        ask_files (list), bid_files (list), aggregated (True).
     """
     folder_path = Path(folder)
     if not folder_path.exists():
@@ -159,15 +242,21 @@ def get_display_label(entry: dict) -> str:
 
 def _parse_timestamps(series: pd.Series) -> pd.Series:
     """Parse a timestamp column to UTC datetime, handling various formats."""
-    sample = str(series.iloc[0])
+    non_null = series.dropna()
+    if non_null.empty:
+        return pd.to_datetime(series, utc=True)
+    sample = str(non_null.iloc[0])
 
-    # Detect "DD.MM.YYYY ... GMT+XXXX" format (e.g., FX data)
+    # Detect "DD.MM.YYYY ... GMT+XXXX" format (e.g., FX daily files).
     if "GMT" in sample and "." in sample.split(" ")[0]:
         cleaned = series.str.replace("GMT", "", regex=False)
         return pd.to_datetime(cleaned, format="%d.%m.%Y %H:%M:%S.%f %z", utc=True)
 
-    # Default: let pandas auto-parse with UTC
+    # Default: let pandas auto-parse with UTC.
     return pd.to_datetime(series, utc=True)
+
+
+_OHLCV_LOWER = ("open", "high", "low", "close", "volume")
 
 
 def load_csv(csv_path: str, timestamp_column: str = "ts",
@@ -193,46 +282,50 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
         Columns: open, high, low, close, volume
         Index: timestamp (UTC datetime)
     """
-    df = pd.read_csv(csv_path, delimiter=delimiter)
+    ts_col_lc = (timestamp_column or "ts").lower()
 
-    # Case-insensitive column matching. Some FX daily-file batches mix
-    # title-case ("Open") with lowercase ("open") across pairs — this
-    # normalizes once up front so every downstream reader can rely on
-    # lowercase OHLCV names.
-    lower_map = {c: c.lower() for c in df.columns}
-    df = df.rename(columns=lower_map)
-    timestamp_column = timestamp_column.lower() if timestamp_column else timestamp_column
+    # Read header only (cheap) to discover the source case-mixed names, then
+    # re-read with usecols + dtype so the C parser only materializes the
+    # columns we need with the right types — skips ~10 extra columns the
+    # FX daily files ship with and removes the post-hoc to_numeric pass.
+    header_df = pd.read_csv(csv_path, delimiter=delimiter, nrows=0)
+    case_map = {c.lower(): c for c in header_df.columns}
 
-    # Validate required columns
-    if required_columns is None:
-        required_columns = [timestamp_column, "open", "high", "low", "close", "volume"]
-    else:
-        required_columns = [c.lower() for c in required_columns]
-    missing = [c for c in required_columns if c not in df.columns]
+    needed_lc = [c.lower() for c in (required_columns or [ts_col_lc, *_OHLCV_LOWER])]
+    missing = [c for c in needed_lc if c not in case_map]
     if missing:
-        raise ValueError(f"CSV missing required columns: {missing}. Found: {list(df.columns)}")
+        raise ValueError(
+            f"CSV missing required columns: {missing}. Found: {list(header_df.columns)}"
+        )
 
-    # Select OHLCV + timestamp columns
-    ohlcv_cols = [timestamp_column, "open", "high", "low", "close", "volume"]
-    result = df[ohlcv_cols].copy()
-    result[timestamp_column] = _parse_timestamps(result[timestamp_column])
-    result = result.rename(columns={timestamp_column: "timestamp"})
-    result = result.set_index("timestamp")
+    src_ts = case_map[ts_col_lc]
+    src_ohlcv = [case_map[c] for c in _OHLCV_LOWER]
+    use_cols = [src_ts, *src_ohlcv]
+    dtypes = {c: "float64" for c in src_ohlcv}
 
-    # Convert to numeric
-    for col in ["open", "high", "low", "close", "volume"]:
-        result[col] = pd.to_numeric(result[col], errors="coerce")
+    df = pd.read_csv(
+        csv_path,
+        delimiter=delimiter,
+        usecols=use_cols,
+        dtype=dtypes,
+    )
+    rename_map = {src_ts: "timestamp"}
+    rename_map.update({src: lc for src, lc in zip(src_ohlcv, _OHLCV_LOWER)})
+    df = df.rename(columns=rename_map)
 
-    # Drop NaN rows
-    result = result.dropna()
+    df["timestamp"] = _parse_timestamps(df["timestamp"])
+    df = df.dropna(subset=["timestamp"]).set_index("timestamp")
+    df = df.dropna()
 
-    # Sort by timestamp
-    result = result.sort_index()
+    # Each daily file is already monotonic — only sort if a concatenation
+    # upstream broke that invariant.
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
 
-    # Cap volume to QUANTITY_MAX to avoid NautilusTrader overflow
-    result["volume"] = result["volume"].clip(upper=QUANTITY_MAX)
+    # Cap volume to QUANTITY_MAX to avoid NautilusTrader overflow.
+    df["volume"] = df["volume"].clip(upper=QUANTITY_MAX)
 
-    return result
+    return df
 
 
 def parse_symbol_from_entry(entry: dict) -> tuple[str, str]:
@@ -242,3 +335,91 @@ def parse_symbol_from_entry(entry: dict) -> tuple[str, str]:
     Since these CSVs are priced in USD, we always use USD as quote.
     """
     return entry["symbol"], "USD"
+
+
+def concat_side(files: list[str], timestamp_column: str = "ts",
+                required_columns: list[str] | None = None,
+                delimiter: str = ",",
+                max_workers: int | None = None) -> pd.DataFrame:
+    """Concatenate daily CSVs for one side (ASK or BID) in timestamp order,
+    dropping overlapping-midnight duplicates.
+
+    Files are loaded in parallel through a thread pool — pandas releases
+    the GIL inside the C parser, so I/O on N files overlaps cleanly.
+    ``ThreadPoolExecutor.map`` preserves input order, so the chronological
+    ordering from the scanner flows through to the concat and the global
+    sort is usually a no-op (only kicks in if concatenation broke
+    monotonicity, e.g. overlapping ranges across files).
+
+    Parameters
+    ----------
+    max_workers : int | None
+        Override the pool size (default: capped at the module constant
+        :data:`_CONCAT_SIDE_MAX_WORKERS`). Pass ``1`` to force serial
+        loading — useful for benchmarks and disk-bound HDD setups.
+    """
+    if not files:
+        raise ValueError("No loadable CSVs for side")
+
+    def _safe_load(path: str) -> pd.DataFrame | None:
+        try:
+            return load_csv(path, timestamp_column=timestamp_column,
+                            required_columns=required_columns,
+                            delimiter=delimiter)
+        except Exception as e:
+            logger.warning("csv_load skip %s: %s", Path(path).name, e)
+            return None
+
+    workers = (max_workers if max_workers is not None
+               else min(_CONCAT_SIDE_MAX_WORKERS, len(files)))
+
+    if workers <= 1 or len(files) == 1:
+        loaded: list[pd.DataFrame | None] = [_safe_load(p) for p in files]
+    else:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="csv_load") as ex:
+            loaded = list(ex.map(_safe_load, files))
+
+    parts = [df for df in loaded if df is not None]
+    if not parts:
+        raise ValueError("No loadable CSVs for side")
+    df = pd.concat(parts, copy=False)
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
+    df = df[~df.index.duplicated(keep="first")]
+    return df
+
+
+# Back-compat alias for the previous private name; remove once external
+# imports have moved to ``concat_side``.
+_concat_side = concat_side
+
+
+def _merge_ask_bid_to_mid(ask_df: pd.DataFrame, bid_df: pd.DataFrame) -> pd.DataFrame:
+    """Row-wise MID from ASK + BID OHLCV frames.
+
+    O/H/L/C = (ask + bid) / 2, volume = ask + bid. Inner-join on the
+    timestamp index, so rows present on only one side are dropped.
+    """
+    common_idx = ask_df.index.intersection(bid_df.index)
+    ask_aligned = ask_df.loc[common_idx]
+    bid_aligned = bid_df.loc[common_idx]
+    ohlc = ["open", "high", "low", "close"]
+    mid = (ask_aligned[ohlc] + bid_aligned[ohlc]) * 0.5
+    mid["volume"] = (ask_aligned["volume"] + bid_aligned["volume"]).clip(upper=QUANTITY_MAX)
+    return mid
+
+
+def load_pair_mid(entry: dict, timestamp_column: str = "ts",
+                  required_columns: list[str] | None = None,
+                  delimiter: str = ",") -> pd.DataFrame:
+    """Load one pair's ASK and BID file lists and return a merged MID OHLCV frame."""
+    ask_files = entry.get("ask_files") or []
+    bid_files = entry.get("bid_files") or []
+    if not ask_files or not bid_files:
+        raise ValueError(
+            f"load_pair_mid requires both ask_files and bid_files in the entry "
+            f"(got ask={len(ask_files)}, bid={len(bid_files)})"
+        )
+    ask_df = concat_side(ask_files, timestamp_column, required_columns, delimiter)
+    bid_df = concat_side(bid_files, timestamp_column, required_columns, delimiter)
+    return _merge_ask_bid_to_mid(ask_df, bid_df)

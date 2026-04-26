@@ -41,8 +41,18 @@ class ExitConfig:
     on_target_action: str = "close"  # "close", "re_execute", "reverse"
     max_re_executions: int = 0
 
+    # Leg-level square-off (most specific). HH:MM, e.g. "17:00".
+    # When set, every day at this local time the position is force-closed and
+    # no new entries are allowed until the next session.
+    squareoff_time: Optional[str] = None
+    squareoff_tz: Optional[str] = None  # IANA name, e.g. "America/New_York"
+
     def has_exit_management(self) -> bool:
-        return self.stop_loss_type != "none" or self.target_type != "none"
+        return (
+            self.stop_loss_type != "none"
+            or self.target_type != "none"
+            or self.squareoff_time is not None
+        )
 
 
 @dataclass
@@ -59,6 +69,10 @@ class StrategySlotConfig:
     enabled: bool = True
     start_date: Optional[str] = None  # ISO date like "2024-01-01"
     end_date: Optional[str] = None    # ISO date like "2024-12-31"
+    # Slot/strategy-level square-off override. Falls back to portfolio-level
+    # if None. Leg-level (ExitConfig.squareoff_time) wins over both.
+    squareoff_time: Optional[str] = None
+    squareoff_tz: Optional[str] = None
 
     @property
     def display_name(self) -> str:
@@ -92,6 +106,9 @@ class PortfolioConfig:
     allocation_mode: str = "equal"  # "equal" or "percentage"
     start_date: Optional[str] = None  # ISO date applied to all slots unless a slot overrides it
     end_date: Optional[str] = None
+    # Portfolio-level default square-off time. Slot or leg level can override.
+    squareoff_time: Optional[str] = None  # "HH:MM"
+    squareoff_tz: Optional[str] = None    # IANA name, e.g. "America/New_York"
     slots: list[StrategySlotConfig] = field(default_factory=list)
 
     def add_slot(self, slot: StrategySlotConfig) -> None:
@@ -105,6 +122,23 @@ class PortfolioConfig:
     @property
     def enabled_slots(self) -> list[StrategySlotConfig]:
         return [s for s in self.slots if s.enabled]
+
+
+def resolve_squareoff(
+    portfolio: "PortfolioConfig", slot: "StrategySlotConfig"
+) -> tuple[Optional[str], Optional[str]]:
+    """Resolve effective (squareoff_time, squareoff_tz) for a slot.
+
+    Priority: leg (ExitConfig) > slot > portfolio. Each level is taken
+    independently — e.g. a slot may set only the time and inherit the tz
+    from the portfolio. Returns (None, None) if disabled at every level.
+    """
+    levels = (slot.exit_config, slot, portfolio)
+    time = next((getattr(lvl, "squareoff_time", None) for lvl in levels
+                 if getattr(lvl, "squareoff_time", None)), None)
+    tz = next((getattr(lvl, "squareoff_tz", None) for lvl in levels
+               if getattr(lvl, "squareoff_tz", None)), None)
+    return time, tz
 
 
 def portfolio_to_dict(config: PortfolioConfig) -> dict:

@@ -16,6 +16,7 @@ import inspect
 import logging
 import re
 import sys
+import threading
 from pathlib import Path
 
 from nautilus_trader.config import StrategyConfig
@@ -24,6 +25,14 @@ from nautilus_trader.trading.strategy import Strategy
 from core.strategies import STRATEGY_REGISTRY
 
 logger = logging.getLogger(__name__)
+
+# Module-level cache for get_merged_registry. Validating a custom strategy
+# imports the module and runs introspection — cheap per file but adds up
+# across many endpoints that all call get_merged_registry on every request.
+# Cache key: str(custom_dir). Value: ((filename, mtime) tuple, merged_dict,
+# warnings_list). On any change to the *.py mtime signature, recompute.
+_REGISTRY_CACHE: dict[str, tuple[tuple[tuple[str, float], ...], dict, list[str]]] = {}
+_REGISTRY_CACHE_LOCK = threading.Lock()
 
 REQUIRED_EXPORTS = ["STRATEGY_NAME", "STRATEGY_CLASS", "CONFIG_CLASS", "DESCRIPTION", "PARAMS"]
 REQUIRED_CONFIG_FIELDS = {"instrument_id", "bar_type", "trade_size"}
@@ -251,27 +260,71 @@ def load_all_custom_strategies(directory: Path) -> tuple[dict[str, dict], list[s
     return strategies, warnings
 
 
+def _custom_dir_signature(custom_dir: Path) -> tuple[tuple[str, float], ...]:
+    """Return a (filename, mtime) signature tuple for cache invalidation.
+
+    Mirrors the file selection rules used in :func:`load_all_custom_strategies`
+    so the cache picks up adds, removes and edits via stat() alone — no
+    module imports or introspection on the hot path.
+    """
+    if not custom_dir.exists():
+        return ()
+    try:
+        files = [p for p in custom_dir.glob("*.py") if not p.name.startswith("__")]
+        return tuple(sorted((p.name, p.stat().st_mtime) for p in files))
+    except OSError:
+        return ()
+
+
 def get_merged_registry(custom_dir: Path) -> tuple[dict, list[str]]:
     """
     Merge built-in STRATEGY_REGISTRY with custom strategies.
 
     Returns (merged_registry, warnings_list).
+
+    Result is cached and keyed by the (filename, mtime) signature of every
+    ``*.py`` in ``custom_dir`` — adding, removing or editing a strategy
+    file invalidates the cache automatically. Returned values are fresh
+    shallow copies so callers can't mutate cache state.
     """
-    merged = dict(STRATEGY_REGISTRY)
-    custom_strategies, warnings = load_all_custom_strategies(custom_dir)
+    custom_dir = Path(custom_dir)
+    key = str(custom_dir)
+    sig = _custom_dir_signature(custom_dir)
 
-    for name, entry in custom_strategies.items():
-        if name in merged:
-            # Name collision with built-in: prefix with "(Custom) "
-            prefixed = f"(Custom) {name}"
-            warnings.append(
-                f"Strategy name '{name}' conflicts with built-in. Renamed to '{prefixed}'."
-            )
-            merged[prefixed] = entry
-        else:
-            merged[name] = entry
+    cached = _REGISTRY_CACHE.get(key)
+    if cached is not None and cached[0] == sig:
+        return dict(cached[1]), list(cached[2])
 
-    return merged, warnings
+    # Cache miss — recompute under lock so concurrent first-callers don't
+    # all stampede into validate_and_load_strategy.
+    with _REGISTRY_CACHE_LOCK:
+        cached = _REGISTRY_CACHE.get(key)
+        if cached is not None and cached[0] == sig:
+            return dict(cached[1]), list(cached[2])
+
+        merged = dict(STRATEGY_REGISTRY)
+        custom_strategies, warnings = load_all_custom_strategies(custom_dir)
+
+        for name, entry in custom_strategies.items():
+            if name in merged:
+                prefixed = f"(Custom) {name}"
+                warnings.append(
+                    f"Strategy name '{name}' conflicts with built-in. Renamed to '{prefixed}'."
+                )
+                merged[prefixed] = entry
+            else:
+                merged[name] = entry
+
+        _REGISTRY_CACHE[key] = (sig, merged, list(warnings))
+
+    return dict(merged), list(warnings)
+
+
+def clear_registry_cache() -> None:
+    """Drop all cached registry entries. Useful for tests and for any
+    explicit "reload custom strategies" UX action."""
+    with _REGISTRY_CACHE_LOCK:
+        _REGISTRY_CACHE.clear()
 
 
 def get_strategy_template() -> str:
@@ -326,7 +379,7 @@ class MyStrategyConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
-    extra_bar_types: list[BarType] | None = None  # Optional: additional bar types (e.g., BID + ASK)
+    extra_bar_types: list[BarType] | None = None  # Optional: additional bar types (e.g., higher timeframes)
 
     # --- Your custom parameters below ---
     ema_period: PositiveInt = 20
@@ -367,7 +420,7 @@ class MyStrategy(Strategy):
         # Subscribe to bar data
         self.subscribe_bars(self.config.bar_type)
 
-        # Subscribe to extra bar types if provided (e.g., BID + ASK for forex)
+        # Subscribe to extra bar types if provided (e.g., a higher-timeframe bar for context)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
                 self.subscribe_bars(bt)
@@ -481,16 +534,17 @@ class MyConfig(StrategyConfig, frozen=True):
     # ... your custom parameters below
 ```
 
-### Multi-Bar Support (e.g., BID + ASK for Forex)
+### Multi-Bar Support (e.g., higher-timeframe context)
 
-If you select multiple bar types for the same instrument (e.g., BID and ASK), the first becomes `bar_type` and the rest are passed as `extra_bar_types`. In `on_bar()`, use `bar.bar_type` to distinguish:
+If you select multiple bar types for the same instrument (e.g., a 1-minute primary plus a 1-hour context bar), the first becomes `bar_type` and the rest are passed as `extra_bar_types`. In `on_bar()`, use `bar.bar_type` to route — trade only on the primary, feed extras to state/indicators only:
 
 ```python
 def on_bar(self, bar: Bar) -> None:
-    if "BID" in str(bar.bar_type):
-        self.bid_close = float(bar.close)
-    elif "ASK" in str(bar.bar_type):
-        self.ask_close = float(bar.close)
+    if bar.bar_type != self.config.bar_type:
+        # Extra (e.g. higher-TF) bar — update context, do not trade
+        self.context_close = float(bar.close)
+        return
+    # Primary bar — run signal logic here
 ```
 
 ---

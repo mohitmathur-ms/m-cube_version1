@@ -6,7 +6,7 @@ At backtest time we need to know:
   * which currency the account reports PnL in (account_base_currency)
   * how to convert non-base-currency PnL back to the base (fx_conversion)
 
-A backtest receives a bar_type_str like "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL".
+A backtest receives a bar_type_str like "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL".
 We parse the venue ("FOREX_MS") from the InstrumentId, scan the configs dir for
 the matching venue, and return that config dict. Returns None when no matching
 adapter is configured — callers treat that as "use built-in USD defaults".
@@ -25,7 +25,7 @@ _ADAPTERS_CONFIG_DIR = _PROJECT_ROOT / "adapter_admin" / "adapters_config"
 def venue_from_bar_type(bar_type_str: str) -> str | None:
     """Extract the venue from a bar type string.
 
-    "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL" -> "FOREX_MS".
+    "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL" -> "FOREX_MS".
     "BTCUSD.BINANCE-1-DAY-LAST-EXTERNAL"    -> "BINANCE".
     """
     if not bar_type_str:
