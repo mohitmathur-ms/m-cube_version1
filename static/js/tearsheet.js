@@ -24,7 +24,7 @@ const Tearsheet = {
 
         // Build instrument options
         const instOptions = instruments.map(bt => {
-            const label = bt.split("-")[0];
+            const label = App.barTypeLabel(bt);
             return `<option value="${bt}">${label}</option>`;
         }).join("");
 
@@ -69,7 +69,7 @@ const Tearsheet = {
         const stratSelect = document.getElementById("ts-strategy-select");
         stratSelect.innerHTML = stratNames.map(n => `<option value="${n}">${n}</option>`).join("");
 
-        const label = barType.split("-")[0];
+        const label = App.barTypeLabel(barType);
         const titleEl = document.getElementById("ts-equity-title");
         if (titleEl) titleEl.textContent = `Equity Comparison | ${label}`;
 
@@ -175,7 +175,7 @@ const Tearsheet = {
             return;
         }
 
-        const label = barType.split("-")[0];
+        const label = App.barTypeLabel(barType);
 
         // Summary
         let html = `

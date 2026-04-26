@@ -80,11 +80,13 @@ const App = {
         }, duration);
     },
 
-    /** Make API call. Auto-aborts on navigate unless options.keepalive=true. */
+    /** Make API call. Auto-aborts on navigate unless options.keepalive=true.
+     *  Pass timeoutMs: 0 to disable the client-side timeout for long,
+     *  user-initiated jobs (e.g. catalog ingest of multi-million-row datasets). */
     async api(endpoint, options = {}) {
         const { keepalive, timeoutMs = 60000, ...rest } = options;
         const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), timeoutMs);
+        const timer = timeoutMs > 0 ? setTimeout(() => ac.abort(), timeoutMs) : null;
         if (!keepalive) this._pendingAborters.add(ac);
         try {
             const response = await fetch(endpoint, {
@@ -98,13 +100,22 @@ const App = {
             }
             return response.json();
         } finally {
-            clearTimeout(timer);
+            if (timer) clearTimeout(timer);
             this._pendingAborters.delete(ac);
         }
     },
 
     /** Pending request aborters, cancelled on navigation. */
     _pendingAborters: new Set(),
+
+    barTypeLabel(bt) {
+        if (!bt) return "";
+        const parts = String(bt).split("-");
+        const inst = parts[0] || "";
+        const pt = parts[3] || "";
+        if (!pt || !inst.includes(".")) return inst;
+        return inst.replace(".", `(${pt}).`);
+    },
 
     /** Debounce helper — returns a function that fires after `wait` ms of quiet. */
     debounce(fn, wait = 150) {

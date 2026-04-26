@@ -325,69 +325,190 @@ const LoadData = {
             const data = await App.api("/api/csv/load", {
                 method: "POST",
                 body: JSON.stringify({ entries, venue, asset_class: assetClass }),
+                // FX 1-minute ingest of multi-year ASK/BID merges can take many
+                // minutes; the default 60s client timeout was aborting the
+                // fetch ("signal is aborted without reason") before the server
+                // finished. Disable client-side timeout for catalog ingest.
+                timeoutMs: 0,
             });
 
-            // Update progress to 100%
-            const bar = document.getElementById("load-progress-bar");
-            if (bar) bar.style.width = "100%";
-
-            // Show results
+            // Render inline (ASK / BID) results and errors immediately.
             let html = "";
             let warnCount = 0;
             for (const result of data.results) {
-                html += `
-                    <div class="alert alert-success">
-                        Loaded <strong>${result.num_bars}</strong> daily bars for
-                        <strong>${result.symbol}</strong> (${result.name})
-                    </div>`;
-
-                // Precision sanity warning from server. Surface inline so
-                // the user sees it alongside the success banner for the
-                // same symbol — easy to miss if tucked into a tooltip.
-                if (result.warning) {
-                    warnCount++;
-                    html += `
-                        <div class="alert alert-warning" style="margin-top: -8px;">
-                            <strong>&#9888; Ingest sanity warning for ${result.symbol}:</strong>
-                            <div style="margin-top: 4px; font-size: 0.9em;">${result.warning}</div>
-                        </div>`;
-                }
-
-                html += App.accordionHTML(
-                    `load-${result.symbol}`,
-                    `${result.symbol} - ${result.name} (${result.num_bars} bars)`,
-                    `
-                    <div class="grid-3">
-                        ${App.metricHTML("Bars", result.num_bars)}
-                        ${App.metricHTML("Date Range", `${result.date_start} &rarr; ${result.date_end}`)}
-                        ${App.metricHTML("Latest Close", App.currency(result.latest_close))}
-                    </div>
-                    <div style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);">
-                        Stored precision: ${result.price_precision ?? "?"} decimals &middot;
-                        Doji rate (open==close): ${(result.doji_rate * 100 || 0).toFixed(1)}%
-                    </div>
-                    <div style="margin-top: 16px;">
-                        ${App.tableHTML(result.sample_data)}
-                    </div>`
-                );
+                html += this._renderLoadRow(result);
+                if (result.warning) warnCount++;
             }
-
             for (const error of data.errors) {
-                html += `<div class="alert alert-danger">Failed to load ${error.symbol}: ${error.error}</div>`;
+                const sideTag = error.side ? ` [${error.side}]` : "";
+                html += `<div class="alert alert-danger">Failed to load ${error.symbol}${sideTag}: ${error.error}</div>`;
             }
-
+            // Append a placeholder card for each MID job still running on the
+            // server; _pollPendingJob swaps it out when the worker reports
+            // success or error.
+            const pendingJobs = data.pending_jobs || [];
+            for (const job of pendingJobs) {
+                html += this._renderPendingJob(job);
+            }
             resultsDiv.innerHTML = html;
-            progressDiv.innerHTML = '<div class="progress-text" style="color: var(--success);">Loading complete!</div>';
 
-            App.toast(`Loaded ${data.results.length} symbol(s) successfully.`, "success");
+            const inlineDone = data.results.length + data.errors.length;
+            // Track totals on the instance so _onPendingJobFinished can keep
+            // the progress bar honest as background jobs complete.
+            this._totalLoadJobs = entries.length;
+            this._inlineDoneCount = inlineDone;
+            this._updateLoadProgress();
+
+            if (data.results.length > 0) {
+                const tail = pendingJobs.length > 0
+                    ? ` ${pendingJobs.length} ingest job(s) running in background.`
+                    : "";
+                App.toast(
+                    `Loaded ${data.results.length} symbol(s) successfully.${tail}`,
+                    "success"
+                );
+            } else if (pendingJobs.length > 0) {
+                App.toast(`${pendingJobs.length} ingest job(s) running in background — cards will fill in as each finishes.`, "success");
+            }
             if (warnCount > 0) {
                 App.toast(`${warnCount} symbol(s) have precision warnings — check the results panel.`, "error", 8000);
             }
-            this.loadCatalogContents();
+
+            if (pendingJobs.length === 0) {
+                this.loadCatalogContents();
+            } else {
+                for (const job of pendingJobs) {
+                    this._pollPendingJob(job);
+                }
+            }
 
         } catch (e) {
             progressDiv.innerHTML = "";
             resultsDiv.innerHTML = `<div class="alert alert-danger">Load failed: ${e.message}</div>`;
+        }
+    },
+
+    _renderLoadRow(result) {
+        const sideTag = result.side ? ` [${result.side}]` : "";
+        let html = `
+            <div class="alert alert-success">
+                Loaded <strong>${result.num_bars}</strong> daily bars for
+                <strong>${result.symbol}${sideTag}</strong> (${result.name})
+            </div>`;
+        // Precision sanity warning from server. Surface inline so the user
+        // sees it alongside the success banner for the same symbol.
+        if (result.warning) {
+            html += `
+                <div class="alert alert-warning" style="margin-top: -8px;">
+                    <strong>&#9888; Ingest sanity warning for ${result.symbol}${sideTag}:</strong>
+                    <div style="margin-top: 4px; font-size: 0.9em;">${result.warning}</div>
+                </div>`;
+        }
+        html += App.accordionHTML(
+            `load-${result.symbol}-${result.side || "default"}`,
+            `${result.symbol}${sideTag} - ${result.name} (${result.num_bars} bars)`,
+            `
+            <div class="grid-3">
+                ${App.metricHTML("Bars", result.num_bars)}
+                ${App.metricHTML("Date Range", `${result.date_start} &rarr; ${result.date_end}`)}
+                ${App.metricHTML("Latest Close", App.currency(result.latest_close))}
+            </div>
+            <div style="margin-top: 8px; font-size: 0.85em; color: var(--text-secondary);">
+                Stored precision: ${result.price_precision ?? "?"} decimals &middot;
+                Doji rate (open==close): ${(result.doji_rate * 100 || 0).toFixed(1)}%
+            </div>
+            <div style="margin-top: 16px;">
+                ${App.tableHTML(result.sample_data)}
+            </div>`
+        );
+        return html;
+    },
+
+    _renderPendingJob(job) {
+        // Each background ingest job lives in a placeholder card;
+        // _pollPendingJob replaces it via outerHTML when the worker thread
+        // finishes. Verb depends on side: MID is synthesized from ASK+BID
+        // in-process, ASK/BID are read directly from the daily files.
+        const verb = job.side === "MID" ? "Synthesizing" : "Loading";
+        const sideTag = job.side ? ` ${job.side}` : "";
+        return `
+            <div class="alert alert-info" id="pending-job-${job.job_id}">
+                ${verb} <strong>${job.symbol}${sideTag}</strong> in background...
+                Catalog write will appear here when complete.
+            </div>`;
+    },
+
+    _pollPendingJob(job) {
+        const intervalMs = 3000;
+        const handle = setInterval(async () => {
+            let status;
+            try {
+                status = await App.api(`/api/csv/jobs/${encodeURIComponent(job.job_id)}`);
+            } catch (e) {
+                clearInterval(handle);
+                this._replacePendingCard(job,
+                    `<div class="alert alert-danger">Lost contact with MID job for ${job.symbol}: ${e.message}</div>`);
+                this._onPendingJobFinished();
+                return;
+            }
+            if (status.status === "success") {
+                clearInterval(handle);
+                this._replacePendingCard(job, this._renderLoadRow(status.result));
+                this._onPendingJobFinished();
+            } else if (status.status === "error") {
+                clearInterval(handle);
+                this._replacePendingCard(job,
+                    `<div class="alert alert-danger">Failed to load ${job.symbol} [${job.side}]: ${status.error || "unknown error"}</div>`);
+                this._onPendingJobFinished();
+            }
+            // status === "pending" | "running": keep polling.
+        }, intervalMs);
+    },
+
+    _replacePendingCard(job, html) {
+        const placeholder = document.getElementById(`pending-job-${job.job_id}`);
+        if (placeholder) placeholder.outerHTML = html;
+    },
+
+    _onPendingJobFinished() {
+        // Update the progress bar incrementally each time a background job
+        // resolves, then refresh the catalog list once they're all done.
+        this._updateLoadProgress();
+        const remaining = document.querySelectorAll(
+            '#load-results [id^="pending-job-"]'
+        ).length;
+        if (remaining === 0) {
+            this.loadCatalogContents();
+        }
+    },
+
+    _updateLoadProgress() {
+        const bar = document.getElementById("load-progress-bar");
+        const text = document.querySelector("#load-progress .progress-text");
+        const total = this._totalLoadJobs || 0;
+        const inlineDone = this._inlineDoneCount || 0;
+        const pendingRemaining = document.querySelectorAll(
+            '#load-results [id^="pending-job-"]'
+        ).length;
+        const done = total - pendingRemaining;
+
+        if (total === 0 || pendingRemaining === 0) {
+            if (bar) bar.style.width = "100%";
+            if (text) {
+                text.textContent = "Loading complete!";
+                text.style.color = "var(--success)";
+            }
+            return;
+        }
+
+        const pct = Math.round((done / total) * 100);
+        if (bar) bar.style.width = `${pct}%`;
+        if (text) {
+            const inlineNote = inlineDone > 0
+                ? `${inlineDone} done inline; `
+                : "";
+            text.textContent =
+                `${inlineNote}${pendingRemaining} of ${total} still running in background...`;
         }
     },
 

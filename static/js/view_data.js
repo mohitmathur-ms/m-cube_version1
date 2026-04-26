@@ -60,8 +60,12 @@ const ViewData = {
             }
 
             this.barTypeDetails = data.bar_type_details || {};
+            // Render the same compact label that the Portfolio editor uses
+            // (e.g. "EURUSD(ASK).FOREX_MS") instead of the raw BarType
+            // string. The full bar-type stays as the option's value so
+            // every downstream call is unchanged.
             select.innerHTML = data.bar_types.map(bt =>
-                `<option value="${bt}">${bt}</option>`
+                `<option value="${bt}">${App.barTypeLabel(bt)}</option>`
             ).join("");
 
             this.onBarTypeChange();

@@ -68,6 +68,8 @@ const Portfolio = {
             max_profit: null,
             start_date: null,
             end_date: null,
+            squareoff_time: null,
+            squareoff_tz: null,
             slots: [],
         };
     },
@@ -91,6 +93,35 @@ const Portfolio = {
             sl.start_date = null;
             sl.end_date = null;
         }
+    },
+
+    /** Curated timezone list. Empty value = "inherit from outer level"
+     *  (or UTC at the portfolio level). The runner falls back to UTC when
+     *  null reaches it, but the inherit semantics let users set the tz once
+     *  at the portfolio and override only when needed. */
+    _SQUAREOFF_TZS: [
+        "UTC",
+        "America/New_York",
+        "America/Chicago",
+        "America/Los_Angeles",
+        "Europe/London",
+        "Europe/Berlin",
+        "Asia/Tokyo",
+        "Asia/Singapore",
+        "Asia/Kolkata",
+    ],
+
+    /** Render a tz <select>. ``inheritLabel`` when truthy adds a leading
+     *  "(inherit)" option that maps to null — used for slot/leg overrides. */
+    _renderTzSelect(currentTz, onchangeJs, inheritLabel) {
+        const opts = [];
+        if (inheritLabel) {
+            opts.push(`<option value="" ${!currentTz ? "selected" : ""}>${inheritLabel}</option>`);
+        }
+        for (const tz of this._SQUAREOFF_TZS) {
+            opts.push(`<option value="${tz}" ${currentTz === tz ? "selected" : ""}>${tz}</option>`);
+        }
+        return `<select class="form-control" onchange="${onchangeJs}">${opts.join("")}</select>`;
     },
 
     renderApp() {
@@ -156,6 +187,17 @@ const Portfolio = {
                                    onchange="Portfolio.updateField('end_date', this.value || null)">
                         </div>
                     </div>
+                    <div style="display: flex; gap: 6px; margin-bottom: 8px;" title="Force-close all open slot positions every day at this local time. Leave blank to disable.">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="form-label">Squareoff Time</label>
+                            <input type="time" class="form-control" value="${p.squareoff_time || ''}"
+                                   onchange="Portfolio.updateField('squareoff_time', this.value || null)">
+                        </div>
+                        <div class="form-group" style="flex: 1.3; margin-bottom: 0;">
+                            <label class="form-label">Squareoff TZ</label>
+                            ${this._renderTzSelect(p.squareoff_tz, "Portfolio.updateField('squareoff_tz', this.value || null)", "(UTC)")}
+                        </div>
+                    </div>
                     <div class="form-group" style="margin-bottom: 8px;">
                         <label class="form-label">Capital Allocation</label>
                         <select class="form-control" id="pf-allocation-mode"
@@ -210,7 +252,7 @@ const Portfolio = {
         ).join("");
 
         const barOpts = this.barTypes.map(bt =>
-            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${bt.split("-")[0]}</option>`
+            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${App.barTypeLabel(bt)}</option>`
         ).join("");
 
         // Strategy params — tagged so updateSlotStrategy() can swap them in
@@ -281,7 +323,7 @@ const Portfolio = {
         return `
             <div class="slot-card ${slot.enabled === false ? 'disabled' : ''}" id="slot-${index}">
                 <div class="slot-card-header">
-                    <span class="slot-card-title">#${index + 1} ${slot.strategy_name} on ${(slot.bar_type_str || "").split("-")[0] || "N/A"}</span>
+                    <span class="slot-card-title">#${index + 1} ${slot.strategy_name} on ${App.barTypeLabel(slot.bar_type_str) || "N/A"}</span>
                     <div class="slot-card-actions">
                         <button class="btn btn-xs" onclick="Portfolio.toggleSlot(${index})" title="${slot.enabled !== false ? 'Disable' : 'Enable'}">
                             ${slot.enabled !== false ? "Disable" : "Enable"}
@@ -359,6 +401,24 @@ const Portfolio = {
                         <input type="number" class="form-control" value="${ec.max_re_executions || 0}" step="1" min="0"
                                onchange="Portfolio.updateExitField(${index}, 'max_re_executions', parseInt(this.value))">
                     </div>
+                    <div class="form-group" style="max-width: 100px;" title="Slot-level squareoff override. Blank inherits from portfolio.">
+                        <label class="form-label">Slot SqOff</label>
+                        <input type="time" class="form-control" value="${slot.squareoff_time || ''}"
+                               onchange="Portfolio.updateSlotField(${index}, 'squareoff_time', this.value || null)">
+                    </div>
+                    <div class="form-group" style="max-width: 130px;">
+                        <label class="form-label">Slot SqOff TZ</label>
+                        ${this._renderTzSelect(slot.squareoff_tz, `Portfolio.updateSlotField(${index}, 'squareoff_tz', this.value || null)`, "(inherit)")}
+                    </div>
+                    <div class="form-group" style="max-width: 100px;" title="Leg-level squareoff override. Highest priority — beats slot and portfolio.">
+                        <label class="form-label">Leg SqOff</label>
+                        <input type="time" class="form-control" value="${ec.squareoff_time || ''}"
+                               onchange="Portfolio.updateExitField(${index}, 'squareoff_time', this.value || null)">
+                    </div>
+                    <div class="form-group" style="max-width: 130px;">
+                        <label class="form-label">Leg SqOff TZ</label>
+                        ${this._renderTzSelect(ec.squareoff_tz, `Portfolio.updateExitField(${index}, 'squareoff_tz', this.value || null)`, "(inherit)")}
+                    </div>
                 </div>
             </div>
         `;
@@ -433,7 +493,7 @@ const Portfolio = {
         const titleEl = card.querySelector(".slot-card-title");
         if (!titleEl) return;
         const slot = this.portfolio.slots[index];
-        const inst = (slot.bar_type_str || "").split("-")[0] || "N/A";
+        const inst = App.barTypeLabel(slot.bar_type_str) || "N/A";
         titleEl.textContent = `#${index + 1} ${slot.strategy_name} on ${inst}`;
     },
 
@@ -542,8 +602,11 @@ const Portfolio = {
                 target_lock_trigger: null, target_lock_minimum: null,
                 sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
                 max_re_executions: 0,
+                squareoff_time: null, squareoff_tz: null,
             },
             enabled: true,
+            squareoff_time: null,
+            squareoff_tz: null,
         });
         this.renderApp();
     },

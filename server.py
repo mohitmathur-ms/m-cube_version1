@@ -9,7 +9,9 @@ Run with: python server.py
 
 import json
 import sys
+import threading
 import traceback
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -163,9 +165,79 @@ def csv_scan():
     return jsonify({"entries": entries, "count": len(entries), "folder": folder})
 
 
+# ─── CSV ingest background-job state ────────────────────────────────────────
+#
+# MID synthesis re-reads thousands of daily files; doing it inline blocks
+# the HTTP response for tens of seconds per pair. Instead, ASK and BID
+# entries are processed inline (fast — a single side concat) and any
+# entry with side == "MID" is dispatched to a worker thread. The client
+# polls /api/csv/jobs/<job_id> for completion. State is in-memory, single
+# Flask process — fine for the current single-user setup; restart wipes
+# pending jobs (the user just re-submits).
+
+DOJI_WARN_THRESHOLD = 0.30  # above this, the precision is almost certainly wrong
+
+_csv_jobs: dict[str, dict] = {}
+_csv_jobs_lock = threading.Lock()
+
+
+def _build_load_row(entry: dict, result: dict, asset_class: str) -> dict:
+    """Shape the load_csv_and_store result into the row format the UI expects."""
+    df = result["dataframe"]
+    row = {
+        "symbol": result["symbol"],
+        "name": result["name"],
+        "num_bars": result["num_bars"],
+        "date_start": str(df.index[0].date()),
+        "date_end": str(df.index[-1].date()),
+        "latest_close": float(df["close"].iloc[-1]),
+        "sample_data": df.tail(10).reset_index().to_dict(orient="records"),
+        "doji_rate": round(result.get("doji_rate", 0.0), 4),
+        "price_precision": result.get("price_precision"),
+        "side": entry.get("side"),
+    }
+    if row["doji_rate"] > DOJI_WARN_THRESHOLD:
+        row["warning"] = (
+            f"{row['doji_rate']*100:.1f}% of ingested bars have open==close. "
+            f"The configured price_precision ({row['price_precision']}) is likely "
+            f"too low for this data source — stored bars lose tick-level detail. "
+            f"Check adapter_admin/data_formats/{asset_class}.json and confirm "
+            f"price_precision matches the decimals in the source CSV."
+        )
+    return row
+
+
+def _run_csv_load_job(job_id: str, entry: dict, catalog_path: str,
+                      venue: str, data_format: dict | None,
+                      asset_class: str) -> None:
+    """Worker target for background MID ingest. Always lands the job in a
+    terminal state (success or error) so the polling client can stop."""
+    with _csv_jobs_lock:
+        _csv_jobs[job_id]["status"] = "running"
+        _csv_jobs[job_id]["started_at"] = _time.time()
+    try:
+        result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
+                                    venue=venue, data_format=data_format)
+        row = _build_load_row(entry, result, asset_class)
+        with _csv_jobs_lock:
+            _csv_jobs[job_id]["status"] = "success"
+            _csv_jobs[job_id]["result"] = row
+            _csv_jobs[job_id]["finished_at"] = _time.time()
+    except Exception as e:
+        with _csv_jobs_lock:
+            _csv_jobs[job_id]["status"] = "error"
+            _csv_jobs[job_id]["error"] = str(e)
+            _csv_jobs[job_id]["finished_at"] = _time.time()
+
+
 @app.route("/api/csv/load", methods=["POST"])
 def csv_load():
-    """Load selected CSV entries into the catalog."""
+    """Load selected CSV entries into the catalog.
+
+    Entries with ``side == "MID"`` are dispatched to background threads and
+    returned as ``pending_jobs``; the rest are processed inline. Clients
+    poll ``/api/csv/jobs/<job_id>`` for the pending entries.
+    """
     data = request.json
     entries = data.get("entries", [])
     catalog_path = data.get("catalog_path", CATALOG_PATH)
@@ -179,43 +251,69 @@ def csv_load():
         if fmt_file.exists():
             data_format = json.loads(fmt_file.read_text(encoding="utf-8"))
 
-    results = []
-    errors = []
+    results: list[dict] = []
+    errors: list[dict] = []
+    pending_jobs: list[dict] = []
 
-    DOJI_WARN_THRESHOLD = 0.30  # above this, the precision is almost certainly wrong
+    # Any entry that triggers a bulk daily-file ingest (FX ASK/BID/MID, or any
+    # other aggregated layout) goes to a background thread so the HTTP
+    # response returns immediately. Single-file entries (legacy crypto)
+    # stay inline because they finish in <100ms.
+    def _is_bulk(e: dict) -> bool:
+        return bool(e.get("aggregated") or e.get("ask_files")
+                    or e.get("bid_files") or e.get("files"))
 
-    for entry in entries:
+    inline_entries = [e for e in entries if not _is_bulk(e)]
+    background_entries = [e for e in entries if _is_bulk(e)]
+
+    for entry in inline_entries:
         try:
             result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
                                         venue=venue, data_format=data_format)
-            df = result["dataframe"]
-            row = {
-                "symbol": result["symbol"],
-                "name": result["name"],
-                "num_bars": result["num_bars"],
-                "date_start": str(df.index[0].date()),
-                "date_end": str(df.index[-1].date()),
-                "latest_close": float(df["close"].iloc[-1]),
-                "sample_data": df.tail(10).reset_index().to_dict(orient="records"),
-                "doji_rate": round(result.get("doji_rate", 0.0), 4),
-                "price_precision": result.get("price_precision"),
-            }
-            # Sanity-flag suspicious precision. Stored here so the UI can
-            # surface it inline with the ingest result — we don't want this
-            # silently ok'd the way the precision-2 FX ingest was.
-            if row["doji_rate"] > DOJI_WARN_THRESHOLD:
-                row["warning"] = (
-                    f"{row['doji_rate']*100:.1f}% of ingested bars have open==close. "
-                    f"The configured price_precision ({row['price_precision']}) is likely "
-                    f"too low for this data source — stored bars lose tick-level detail. "
-                    f"Check adapter_admin/data_formats/{asset_class}.json and confirm "
-                    f"price_precision matches the decimals in the source CSV."
-                )
-            results.append(row)
+            results.append(_build_load_row(entry, result, asset_class))
         except Exception as e:
-            errors.append({"symbol": entry.get("symbol", "?"), "error": str(e)})
+            errors.append({"symbol": entry.get("symbol", "?"),
+                           "side": entry.get("side"), "error": str(e)})
 
-    return jsonify({"results": results, "errors": errors})
+    for entry in background_entries:
+        job_id = uuid.uuid4().hex
+        with _csv_jobs_lock:
+            _csv_jobs[job_id] = {
+                "status": "pending",
+                "symbol": entry.get("symbol", "?"),
+                "name": entry.get("name", ""),
+                "side": entry.get("side"),
+                "filename": entry.get("filename"),
+                "queued_at": _time.time(),
+            }
+        thread = threading.Thread(
+            target=_run_csv_load_job,
+            args=(job_id, entry, catalog_path, venue, data_format, asset_class),
+            daemon=True,
+        )
+        thread.start()
+        pending_jobs.append({
+            "job_id": job_id,
+            "symbol": entry.get("symbol", "?"),
+            "name": entry.get("name", ""),
+            "side": entry.get("side"),
+            "filename": entry.get("filename"),
+        })
+
+    return jsonify({"results": results, "errors": errors,
+                    "pending_jobs": pending_jobs})
+
+
+@app.route("/api/csv/jobs/<job_id>", methods=["GET"])
+def csv_job_status(job_id: str):
+    """Poll the status of a background CSV-ingest job."""
+    with _csv_jobs_lock:
+        job = _csv_jobs.get(job_id)
+        if job is None:
+            return jsonify({"error": "unknown job_id"}), 404
+        # Snapshot — we don't hold the lock across the JSON serialization.
+        snapshot = dict(job)
+    return jsonify(snapshot)
 
 
 # ─── Data View API ───────────────────────────────────────────────────────────

@@ -255,7 +255,7 @@ const PortfolioTearsheet = {
 
             return `<tr>
                 <td>${sr.display_name}</td>
-                <td>${sr.bar_type ? sr.bar_type.split("-")[0] : "N/A"}</td>
+                <td>${App.barTypeLabel(sr.bar_type) || "N/A"}</td>
                 <td class="${pnlCls}">${App.currency(sr.pnl)}</td>
                 <td>${sr.trades}</td>
                 <td>${sr.win_rate.toFixed(1)}%</td>

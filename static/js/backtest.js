@@ -237,7 +237,7 @@ const Backtest = {
         }
 
         // Group by instrument_id: if multiple bar types share the same instrument,
-        // send them as bar_types array (e.g., BID + ASK for same forex pair)
+        // send them as bar_types array (e.g., primary + higher-TF context bar)
         const groups = {};
         for (const item of checked) {
             const key = item.instrument_id;
@@ -690,7 +690,7 @@ const Backtest = {
 
     /** Get short instrument label from bar type string */
     instLabel(barType) {
-        return barType.split("-")[0];  // e.g. "BTCUSD.BINANCE" from "BTCUSD.BINANCE-1-DAY-LAST-EXTERNAL"
+        return App.barTypeLabel(barType);
     },
 
     /**
