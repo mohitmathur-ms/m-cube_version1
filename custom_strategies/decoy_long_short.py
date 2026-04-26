@@ -76,13 +76,9 @@ class DecoyStrategy(Strategy):
                 self.subscribe_bars(bt)
 
     def on_bar(self, bar: Bar) -> None:
-        # Extra bar types (the auto-paired ASK stream for Forex) are
-        # subscribed only so the FX matching engine fills at the right side.
-        # Do NOT use them for signal generation: same-minute BID/ASK bars
-        # share a timestamp, and naive structural checks
-        # (cur_high > prev_high) end up comparing ASK to BID of the same
-        # minute, which trivially passes because spread > 0. Filter to the
-        # primary stream so prev_bar only advances on real minute boundaries.
+        # Only trade on the primary bar; extra_bar_types (e.g. higher TFs)
+        # feed state but must not drive signal generation — prev_bar should
+        # only advance on real primary-bar minute boundaries.
         if bar.bar_type != self.config.bar_type:
             return
 

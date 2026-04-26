@@ -43,9 +43,8 @@ class BollingerBandsStrategy(Strategy):
                 self.subscribe_bars(bt)
 
     def on_bar(self, bar: Bar) -> None:
-        # Auto-paired ASK stream is for the FX matching engine to fill at
-        # the right side; signals are computed on the primary (BID) stream
-        # only to avoid duplicate trading-logic evaluation per minute.
+        # Only trade on the primary bar; extra_bar_types (e.g. higher TFs)
+        # feed indicators but must not drive order submission.
         if bar.bar_type != self.config.bar_type:
             return
         if not self.indicators_initialized():
