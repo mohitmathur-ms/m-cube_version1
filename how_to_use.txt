@@ -1,0 +1,129 @@
+============================================================
+how_to_use.txt — runtime env-var flags for server.py
+============================================================
+
+There are two ways to start the server. Both run the same Flask
+app; the difference is which portfolio-backtest path is active.
+
+------------------------------------------------------------
+1. Run the server (default, safer path)
+------------------------------------------------------------
+
+    python server.py
+
+Each portfolio slot runs in its own BacktestEngine inside its own
+worker process. Catalog, instruments and bars are loaded once per
+slot. This is the older, fully-trusted path — use it when you are
+not sure whether grouping has been parity-validated for the
+portfolio you are about to run.
+
+------------------------------------------------------------
+2. Run the server (faster portfolio backtests, opt-in)
+------------------------------------------------------------
+
+PowerShell:
+
+    $env:_USE_GROUPING="1"; python server.py
+
+bash / zsh:
+
+    _USE_GROUPING=1 python server.py
+
+Slots that share the same (bar_type, start_date, end_date,
+custom_strategies_dir) are batched into a single shared engine.
+Bars load ONCE per group instead of once per slot. Multiple
+strategies attach to the same engine with distinct order_id_tag
+values; per-slot P&L is recovered post-run by filtering the
+positions report on strategy_id.
+
+Effect scales with how many slots share an instrument:
+  - 9-slot portfolio, all 9 share EURUSD MID  ->  9x bars-load
+                                                  becomes 1x
+  - 9-slot portfolio, 9 different bar_types  ->  no benefit (each
+                                                  group is size 1
+                                                  and falls back
+                                                  to the per-slot
+                                                  path anyway)
+
+Single-slot groups still route through the per-slot engine, so
+turning the flag on never makes a single-slot portfolio worse.
+
+------------------------------------------------------------
+3. Why two paths exist
+------------------------------------------------------------
+
+It is a feature flag for safe rollout. The grouped path is newer;
+the per-slot path is the proven baseline. The flag lets us run
+both side-by-side to confirm the grouped path produces identical
+results before making it the default.
+
+The flag is gated in:
+
+    core/backtest_runner.py:947
+        use_grouping = os.environ.get("_USE_GROUPING", "0") == "1"
+
+------------------------------------------------------------
+4. Verify parity before trusting grouping for a portfolio
+------------------------------------------------------------
+
+There is a harness that runs the same portfolio twice in one
+process — once with the flag off, once with it on — and asserts
+per-slot P&L, drawdown and trade counts match within epsilon:
+
+    python scripts/verify_grouping_parity.py \
+        --portfolio portfolios/<your_portfolio>.json
+
+Exit codes:
+    0   PARITY OK   -> safe to run that portfolio with the flag on
+    1   MISMATCH    -> stick with the default path; share the diff
+
+Optional tolerance overrides:
+
+    --abs-tol-pnl 1e-6   --abs-tol-dd 1e-4
+
+------------------------------------------------------------
+5. Phase profiling (advanced)
+------------------------------------------------------------
+
+When tuning performance you can enable per-phase timing inside
+both the per-slot and the grouped run helpers:
+
+PowerShell:
+
+    $env:_PROFILE_PHASES="1"; python server.py
+
+bash / zsh:
+
+    _PROFILE_PHASES=1 python server.py
+
+Wraps each phase (registry_load, catalog_init, instruments_scan,
+bars_load, engine_run, results_extract, etc.) in a context-manager
+timer. Output goes to the standard backtest log channel. Cost is
+zero when the flag is off, so it is safe to leave the gate in
+production code.
+
+Gated in:
+
+    core/backtest_runner.py:351   (_run_single_slot)
+    core/backtest_runner.py:673   (_run_slot_group)
+
+------------------------------------------------------------
+6. Quick reference
+------------------------------------------------------------
+
+    FLAG               WHAT IT DOES                            DEFAULT
+    -----------------  --------------------------------------  --------
+    _USE_GROUPING      Group portfolio slots that share a      0  (off)
+                       (bar_type, dates) into one engine,
+                       loading bars once per group.
+
+    _PROFILE_PHASES    Emit per-phase timings inside the       0  (off)
+                       slot / group run helpers.
+
+Both flags are read once per call to run_portfolio_backtest from
+os.environ, so changing them does NOT require restarting the
+server unless the value was already cached by a long-running
+process. Setting them in the shell BEFORE starting server.py is
+the simplest pattern.
+
+============================================================
