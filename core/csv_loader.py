@@ -67,6 +67,58 @@ _DAILY_FX_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Consolidated-FX naming: "{PAIR}_{PAIR}_DDMMMYYYY_DDMMMYYYY_{ASK|BID|MID}_OHLCV.csv"
+# (matches the pattern documented in adapter_admin/data_formats/fx.json). One file
+# per pair per side, replacing the thousands-of-daily-files layout. Captured groups
+# are (pair, side).
+_FLAT_FX_FILE_PATTERN = re.compile(
+    r"^([A-Z]+)_\1_\d{2}[A-Z]{3}\d{4}_\d{2}[A-Z]{3}\d{4}_(ASK|BID|MID)_OHLCV\.csv$"
+)
+
+
+def _scan_fx_consolidated_files(root: Path) -> list[dict]:
+    """Discover one-file-per-side consolidated FX CSVs.
+
+    Each match produces a single entry that flows through the inline
+    single-file path in :func:`core.nautilus_loader.load_csv_and_store`
+    (no ``aggregated`` flag, no ``ask_files`` / ``bid_files`` lists), so
+    ingest stays in-process and skips the background-job machinery
+    entirely. The downstream loader picks ``price_type`` straight from
+    ``entry["side"]``.
+
+    Searched scope is intentionally shallow — the root and one level
+    below — so we don't traverse a daily-layout tree (thousands of
+    nested files) hunting for files that only ever live near the top.
+    """
+    seen: set[Path] = set()
+    candidates: list[Path] = []
+    for path in root.glob("*.csv"):
+        if path.is_file():
+            candidates.append(path)
+            seen.add(path)
+    for path in root.glob("*/*.csv"):
+        if path.is_file() and path not in seen:
+            candidates.append(path)
+
+    entries: list[dict] = []
+    auto_id = 0
+    for path in sorted(candidates):
+        match = _FLAT_FX_FILE_PATTERN.match(path.name)
+        if not match:
+            continue
+        symbol_raw, side = match.group(1), match.group(2)
+        symbol = _SYMBOL_NORMALIZE.get(symbol_raw, symbol_raw)
+        auto_id -= 1
+        entries.append({
+            "path": str(path),
+            "filename": path.name,
+            "id": auto_id,
+            "symbol": symbol,
+            "side": side,
+            "name": f"{symbol} {side} (consolidated)",
+        })
+    return entries
+
 
 def _scan_fx_daily_layout(root: Path) -> list[dict]:
     """Aggregate daily FX CSVs (<root>/<PAIR>/YYYY/MM/DD/DD.MM.YYYY_(BID|ASK)_OHLCV.csv)
@@ -184,6 +236,15 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
     if not folder_path.exists():
         return []
 
+    # Try the consolidated FX layout first — one CSV per pair per side at
+    # or near the root. Inline ingest, no background jobs. If anything
+    # matches, return immediately so this layout never gets shadowed by
+    # the legacy crypto-flat heuristic for filenames like
+    # "EURUSD_EURUSD_..._ASK_OHLCV.csv".
+    fx_consolidated = _scan_fx_consolidated_files(folder_path)
+    if fx_consolidated:
+        return fx_consolidated
+
     results = []
     crypto_pattern = re.compile(r"^(\d+)_([A-Z]+)_(.+)\.csv$")
     auto_id = 0
@@ -216,23 +277,6 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
         results = _scan_fx_daily_layout(folder_path)
 
     return results
-
-
-def get_unique_symbols(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
-    """
-    Get unique legitimate crypto symbols from the folder.
-
-    When multiple files share the same ticker (e.g. many PEPE tokens),
-    returns all of them so the user can pick the right one.
-    Groups by symbol for display.
-
-    Returns
-    -------
-    list[dict]
-        Sorted by symbol, then by id (lower id = more established coin).
-    """
-    all_files = scan_csv_folder(folder)
-    return sorted(all_files, key=lambda x: (x["symbol"], x["id"]))
 
 
 def get_display_label(entry: dict) -> str:
@@ -328,15 +372,6 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
     return df
 
 
-def parse_symbol_from_entry(entry: dict) -> tuple[str, str]:
-    """
-    Parse a CSV entry into (base_currency, quote_currency).
-
-    Since these CSVs are priced in USD, we always use USD as quote.
-    """
-    return entry["symbol"], "USD"
-
-
 def concat_side(files: list[str], timestamp_column: str = "ts",
                 required_columns: list[str] | None = None,
                 delimiter: str = ",",
@@ -387,11 +422,6 @@ def concat_side(files: list[str], timestamp_column: str = "ts",
         df = df.sort_index()
     df = df[~df.index.duplicated(keep="first")]
     return df
-
-
-# Back-compat alias for the previous private name; remove once external
-# imports have moved to ``concat_side``.
-_concat_side = concat_side
 
 
 def _merge_ask_bid_to_mid(ask_df: pd.DataFrame, bid_df: pd.DataFrame) -> pd.DataFrame:

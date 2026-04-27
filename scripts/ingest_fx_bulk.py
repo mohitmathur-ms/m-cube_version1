@@ -25,27 +25,16 @@ import psutil
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.csv_loader import QUANTITY_MAX, _parse_timestamps
+from core.csv_loader import load_csv
 from core.instrument_factory import create_instrument
 from core.nautilus_loader import save_to_catalog, wrangle_bars
 
 
-def _read_ohlcv_csv(path: str) -> pd.DataFrame:
-    """Read an OHLCV CSV with case-insensitive column handling."""
-    df = pd.read_csv(path)
-    df.columns = [c.strip().lower() for c in df.columns]
-    required = ["timestamp", "open", "high", "low", "close", "volume"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"{path}: missing columns {missing}. Found {list(df.columns)}")
-    df = df[required].copy()
-    df["timestamp"] = _parse_timestamps(df["timestamp"])
-    df = df.set_index("timestamp")
-    for col in ["open", "high", "low", "close", "volume"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.dropna()
-    df["volume"] = df["volume"].clip(upper=QUANTITY_MAX)
-    return df
+_OHLCV_COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
+
+
+def _read_one(path: str) -> pd.DataFrame:
+    return load_csv(path, timestamp_column="timestamp", required_columns=_OHLCV_COLUMNS)
 
 
 def rss_mb(pid: int | None = None) -> float:
@@ -96,11 +85,11 @@ def ingest_one(
 
     t_read = time.time()
     if read_workers <= 1:
-        dfs = [_read_ohlcv_csv(str(f)) for f in files]
+        dfs = [_read_one(str(f)) for f in files]
     else:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=read_workers) as ex:
-            dfs = list(ex.map(lambda f: _read_ohlcv_csv(str(f)), files))
+            dfs = list(ex.map(lambda f: _read_one(str(f)), files))
     metrics["read_seconds"] = round(time.time() - t_read, 2)
     metrics["read_workers"] = read_workers
     metrics["rss_after_read_mb"] = round(rss_mb(), 1)

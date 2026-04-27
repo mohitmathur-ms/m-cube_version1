@@ -12,7 +12,6 @@
     "type": "CurrencyPair",
     "quote_currency": "USD",
     "base_currency_length": 3,
-    "merge_ask_bid_to_mid": true,
     "expose_sides": ["ASK", "BID", "MID"],
     "price_precision": 5,
     "size_precision": 0,

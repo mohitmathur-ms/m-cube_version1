@@ -20,7 +20,6 @@ from core.csv_loader import QUANTITY_MAX
 from core.csv_loader import concat_side
 from core.csv_loader import load_csv
 from core.csv_loader import load_pair_mid
-from core.csv_loader import parse_symbol_from_entry
 from core.instrument_factory import create_instrument
 
 
@@ -179,11 +178,6 @@ def load_csv_and_store(
     elif side == "BID" and bid_files:
         df = concat_side(bid_files, timestamp_column=ts_col,
                          required_columns=req_cols, delimiter=delimiter)
-    elif inst_config.get("merge_ask_bid_to_mid") and ask_files and bid_files:
-        # Legacy: an aggregated FX entry without an explicit `side` key.
-        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
-                           required_columns=req_cols, delimiter=delimiter)
-        side = "MID"
     else:
         file_list = csv_entry.get("files")
         if file_list:
@@ -212,15 +206,9 @@ def load_csv_and_store(
     # Step 3: Wrangle into Nautilus Bar objects
     timeframe = inst_config.get("timeframe") or "1-DAY"
 
-    # FX entries carry an explicit side ("ASK" | "BID" | "MID"); fall back
-    # to the legacy MID path for entries without a side, and LAST for
-    # everything else.
-    if side in ("ASK", "BID", "MID"):
-        price_type = side
-    elif inst_config.get("merge_ask_bid_to_mid"):
-        price_type = "MID"
-    else:
-        price_type = "LAST"
+    # FX entries carry an explicit side ("ASK" | "BID" | "MID");
+    # everything else (e.g. crypto) defaults to LAST.
+    price_type = side if side in ("ASK", "BID", "MID") else "LAST"
 
     bars = wrangle_bars(df, instrument, timeframe=timeframe, price_type=price_type)
 

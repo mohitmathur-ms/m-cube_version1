@@ -140,24 +140,3 @@ def create_instrument(
         ts_event=0,
         ts_init=0,
     )
-
-
-def create_instrument_from_symbol(symbol: str, venue: str = "CRYPTO") -> CurrencyPair:
-    """
-    Create a CurrencyPair from a symbol string like "BTC/USD".
-
-    Parameters
-    ----------
-    symbol : str
-        Symbol string, e.g. "BTC/USD".
-    venue : str, default "BINANCE"
-        Venue name.
-
-    Returns
-    -------
-    CurrencyPair
-    """
-    parts = symbol.strip().upper().replace("-", "/").split("/")
-    if len(parts) != 2:
-        raise ValueError(f"Invalid symbol format: '{symbol}'. Expected 'BTC/USD'.")
-    return create_instrument(parts[0], parts[1], venue)
