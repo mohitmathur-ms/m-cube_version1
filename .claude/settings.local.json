@@ -13,7 +13,20 @@
       "Bash(grep -E \"\\\\.\\(pyx|py\\)$\")",
       "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, @{Name='RSS_MB';Expression={[math]::Round\\($_.WorkingSet64/1MB, 1\\)}}, StartTime | Format-Table -AutoSize)",
       "Bash(PYTHONIOENCODING=utf-8 python)",
-      "Bash(gh repo *)"
+      "Bash(gh repo *)",
+      "Bash(grep -E \"\\\\.py$|^[a-z_]+$\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Read(//d/Data_all/Fx/GPBUSD/2015/01/02/**)",
+      "Bash(awk -F/ '{print $\\(NF-3\\)}')",
+      "Read(//d/Data_all/Fx/USDJPY/**)",
+      "Read(//d/mcube_manshit_21April/mcube_html_11_April_2026/**)",
+      "Bash(mkdir -p d:/mcube_manshit_21April/mcube_html_11_April_2026/scratch/logs)",
+      "Bash(venv/Scripts/python.exe perf_screens/reingest_fx.py)",
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, WorkingSet64, StartTime | Format-Table -AutoSize\")",
+      "Bash(venv/Scripts/python.exe scripts/aggregate_phase_profiles.py)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ADMIN\\.claude\\plans"
     ]
   }
 }
