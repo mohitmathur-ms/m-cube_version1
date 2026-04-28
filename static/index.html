@@ -10,64 +10,60 @@
     <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" defer></script>
 </head>
 <body>
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h1 class="sidebar-title">M_Cube</h1>
-            <p class="sidebar-caption">Crypto Data Dashboard</p>
-        </div>
-        <div class="sidebar-divider"></div>
-
-        <nav class="sidebar-nav">
-            <a href="#" class="nav-item active" data-page="dashboard">
-                <span class="nav-icon">&#9875;</span> Dashboard
-            </a>
-            <a href="#" class="nav-item" data-page="load_data">
-                <span class="nav-icon">&#128194;</span> Load Data
-            </a>
-            <a href="#" class="nav-item" data-page="view_data">
-                <span class="nav-icon">&#128202;</span> View Data
-            </a>
-            <a href="#" class="nav-item" data-page="backtest">
-                <span class="nav-icon">&#129514;</span> Run Backtest
-            </a>
-            <a href="#" class="nav-item" data-page="tearsheet">
-                <span class="nav-icon">&#128200;</span> Tearsheet
-            </a>
-            <a href="#" class="nav-item" data-page="portfolio">
-                <span class="nav-icon">&#128188;</span> Portfolio
-            </a>
-            <a href="#" class="nav-item" data-page="portfolio_tearsheet">
-                <span class="nav-icon">&#128201;</span> Portfolio Tearsheet
-            </a>
-        </nav>
-
-        <div class="sidebar-divider"></div>
-
-        <div class="sidebar-settings">
-            <label for="catalog-path">Catalog Storage Path</label>
+    <!-- Top Header Bar -->
+    <header class="top-header">
+        <div class="header-brand">M_Cube</div>
+        <div class="header-settings">
+            <label for="catalog-path">Catalog Path:</label>
             <input type="text" id="catalog-path" value="./catalog" placeholder="Catalog path">
         </div>
+    </header>
 
-        <div class="sidebar-divider"></div>
-
-        <div class="sidebar-info">
-            <p><strong>How it works:</strong></p>
-            <ol>
-                <li><strong>Load</strong> - Import crypto CSV data</li>
-                <li><strong>View</strong> - Explore data & charts</li>
-                <li><strong>Backtest</strong> - Run trading strategies</li>
-                <li><strong>Tearsheet</strong> - Analyze performance</li>
-                <li><strong>Portfolio</strong> - Multi-strategy management</li>
-                <li><strong>Ptf Tearsheet</strong> - Portfolio analytics</li>
-            </ol>
-        </div>
-    </aside>
+    <!-- Top Tab Navigation -->
+    <nav class="top-tabs" id="sidebar">
+        <a href="#" class="nav-item active" data-page="dashboard">Dashboard</a>
+        <a href="#" class="nav-item" data-page="load_data">Load Data</a>
+        <a href="#" class="nav-item" data-page="view_data">View Data</a>
+        <a href="#" class="nav-item" data-page="backtest">Run Backtest</a>
+        <a href="#" class="nav-item" data-page="tearsheet">Tearsheet</a>
+        <a href="#" class="nav-item" data-page="portfolio">Multileg</a>
+        <a href="#" class="nav-item" data-page="portfolio_tearsheet">Portfolio Tearsheet</a>
+    </nav>
 
     <!-- Main Content -->
     <main class="main-content" id="main-content">
         <!-- Pages are rendered here dynamically -->
     </main>
+
+    <!-- Action / Control Bar -->
+    <div class="action-bar" id="action-bar">
+        <div class="action-bar-left" id="action-bar-buttons">
+            <!-- Page-specific buttons injected here by each page -->
+        </div>
+        <div class="action-bar-right">
+            <button class="btn btn-sm" onclick="App.toggleLog()" id="log-toggle-btn">
+                Log <span id="log-count-badge" class="btn-badge" style="display:none;">0</span>
+            </button>
+            <button class="btn btn-sm" onclick="App.clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <!-- Persistent Activity Log Panel -->
+    <div class="log-panel" id="log-panel">
+        <table id="log-table">
+            <thead>
+                <tr>
+                    <th style="width: 150px;">Timestamp</th>
+                    <th style="width: 90px;">Log Type</th>
+                    <th>Message</th>
+                    <th style="width: 90px;">Source</th>
+                    <th style="width: 120px;">Strategy Tag</th>
+                </tr>
+            </thead>
+            <tbody id="log-tbody">
+            </tbody>
+        </table>
+    </div>
 
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loading-overlay" style="display: none;">

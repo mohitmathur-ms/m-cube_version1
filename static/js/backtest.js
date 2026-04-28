@@ -25,6 +25,12 @@ const Backtest = {
 
         await this.loadConfig();
         this.showPreviousResults();
+
+        // Set action bar buttons
+        App.setActionBar(`
+            <button class="btn btn-sm btn-primary" onclick="Backtest.runBacktest()" id="action-run-bt">Run Backtest</button>
+            <button class="btn btn-sm" onclick="App.navigate('tearsheet')">View Tearsheet</button>
+        `);
     },
 
     async loadConfig() {
@@ -541,6 +547,7 @@ const Backtest = {
         const btn = document.getElementById("run-backtest-btn");
         btn.disabled = true;
         btn.textContent = "Running...";
+        App.log(`Backtest started: ${instruments.length} instrument(s), ${this.selectedStrategies.length} strategy(ies)`, "MESSAGE", "Backtest");
 
         const progressDiv = document.getElementById("backtest-progress");
         progressDiv.innerHTML = `
@@ -640,6 +647,7 @@ const Backtest = {
                 );
                 if (hasResults) {
                     App.toast("Backtests completed! CSV reports saved to reports/ folder.", "success");
+                    App.log("All backtests completed successfully", "SUCCESS", "Backtest");
                     this.renderResults(finalResults);
                 }
             } else {
@@ -648,6 +656,7 @@ const Backtest = {
 
         } catch (e) {
             progressDiv.innerHTML = `<div class="alert alert-danger">Backtest failed: ${e.message || e}</div>`;
+            App.log(`Backtest failed: ${e.message || e}`, "ERROR", "Backtest");
             btn.disabled = false;
             btn.textContent = "\u{1F680} Run Backtest";
         }

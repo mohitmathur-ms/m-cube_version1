@@ -1190,6 +1190,16 @@ def _merge_portfolio_results(
             if len(sids) > 0:
                 slot_to_strategy_id[slot.slot_id] = str(sids[0])
 
+    # Build slot_to_trader_id mapping — trader_id is unique per slot even when
+    # multiple slots share the same strategy_id (e.g. grouped ManagedExitStrategy).
+    slot_to_trader_id = {}
+    for slot in portfolio.enabled_slots:
+        r = slot_results.get(slot.slot_id)
+        if r and r.get("positions_report") is not None and not r["positions_report"].empty:
+            tids = r["positions_report"]["trader_id"].unique()
+            if len(tids) > 0:
+                slot_to_trader_id[slot.slot_id] = str(tids[0])
+
     return {
         "starting_capital": portfolio.starting_capital,
         "final_balance": final_balance,
@@ -1211,6 +1221,7 @@ def _merge_portfolio_results(
         "positions_report": merged_positions,
         "account_report": None,
         "slot_to_strategy_id": slot_to_strategy_id,
+        "slot_to_trader_id": slot_to_trader_id,
         "errors": errors,
     }
 

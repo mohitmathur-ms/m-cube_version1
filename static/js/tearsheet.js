@@ -160,10 +160,10 @@ const Tearsheet = {
 
         const darkLayout = {
             template: "plotly_dark",
-            paper_bgcolor: "#21252b",
-            plot_bgcolor: "#21252b",
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
             height: 500,
-            font: { color: "#e6e6e6" },
+            font: { color: "#1a1a1a" },
             margin: { l: 60, r: 30, t: 30, b: 50 },
             yaxis: { title: "Balance ($)" },
             xaxis: { title: hasTimestamps ? "Date" : "Trade #", type: hasTimestamps ? "date" : "linear" },
@@ -328,9 +328,9 @@ const Tearsheet = {
     renderEquityDrawdown(equity, drawdown, timestamps) {
         const darkLayout = {
             template: "plotly_dark",
-            paper_bgcolor: "#21252b",
-            plot_bgcolor: "#21252b",
-            font: { color: "#e6e6e6" },
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
+            font: { color: "#1a1a1a" },
             margin: { l: 60, r: 30, t: 30, b: 30 },
         };
 
@@ -381,10 +381,10 @@ const Tearsheet = {
     renderTradeDistribution(pnlValues, wins, losses) {
         const darkLayout = {
             template: "plotly_dark",
-            paper_bgcolor: "#21252b",
-            plot_bgcolor: "#21252b",
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
             height: 400,
-            font: { color: "#e6e6e6" },
+            font: { color: "#1a1a1a" },
             margin: { l: 50, r: 30, t: 50, b: 50 },
         };
 

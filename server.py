@@ -91,6 +91,13 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+@app.route("/api/reports/<path:filename>")
+def download_report(filename):
+    """Serve a generated report file from the reports directory."""
+    safe_name = Path(filename).name  # prevent directory traversal
+    return send_from_directory(str(REPORTS_DIR), safe_name, as_attachment=True)
+
+
 # ─── Catalog API ─────────────────────────────────────────────────────────────
 
 @app.route("/api/catalog/status")
@@ -1208,15 +1215,24 @@ def api_portfolio_backtest():
             per_strat = results.get("per_strategy", {})
             pos_report = results.get("positions_report")
             fills_rep = results.get("fills_report")
+            slot_to_tid = results.get("slot_to_trader_id", {})
             slot_to_sid = results.get("slot_to_strategy_id", {})
 
             all_results_for_reports = {}
             for slot_id, sr in per_strat.items():
                 strat_label = sanitize_filename(sr["display_name"])
+                # Prefer trader_id for filtering — it is unique per slot even
+                # when multiple slots share the same strategy_id.
+                actual_tid = slot_to_tid.get(slot_id, "")
                 actual_sid = slot_to_sid.get(slot_id, "")
                 slot_pos = pd.DataFrame()
                 slot_fills = pd.DataFrame()
-                if actual_sid:
+                if actual_tid:
+                    if pos_report is not None and not pos_report.empty and "trader_id" in pos_report.columns:
+                        slot_pos = pos_report[pos_report["trader_id"] == actual_tid]
+                    if fills_rep is not None and not fills_rep.empty and "trader_id" in fills_rep.columns:
+                        slot_fills = fills_rep[fills_rep["trader_id"] == actual_tid]
+                elif actual_sid:
                     if pos_report is not None and not pos_report.empty and "strategy_id" in pos_report.columns:
                         slot_pos = pos_report[pos_report["strategy_id"] == actual_sid]
                     if fills_rep is not None and not fills_rep.empty and "strategy_id" in fills_rep.columns:
@@ -1238,6 +1254,7 @@ def api_portfolio_backtest():
             if not logs_df.empty:
                 logs_df.to_csv(REPORTS_DIR / f"backtest_{prefix}_logs.csv", index=False)
 
+            report_html = ""
             try:
                 report_html = generate_report(all_results_for_reports,
                                               backtest_name=f"Portfolio: {config.name}")
@@ -1246,9 +1263,12 @@ def api_portfolio_backtest():
             except Exception as e:
                 print(f"[Portfolio] HTML report generation failed: {e}")
 
+            results["report_file"] = f"{prefix}_report.html"
+            results["report_name"] = prefix
+
             # Clean up non-serializable data
             for key in ["fills_report", "positions_report", "account_report",
-                         "slot_to_strategy_id", "errors"]:
+                         "slot_to_strategy_id", "slot_to_trader_id", "errors"]:
                 results.pop(key, None)
             results["equity_curve"] = [float(v) for v in results["equity_curve"]]
             for pt in results.get("equity_curve_ts", []):

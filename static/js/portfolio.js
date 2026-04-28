@@ -1,30 +1,29 @@
 /**
- * Portfolio Page - Multi-strategy portfolio management with exit management.
- * Single-page layout: left sidebar for portfolio settings, right panel for slots + results.
+ * Multileg Page - Manage multiple portfolios. Each portfolio row in the table
+ * represents a complete portfolio (like the reference Multileg tab).
+ * Click "Add Portfolio" to create, "Edit" to modify in a popup.
  */
 
 const Portfolio = {
     strategies: {},
     barTypes: [],
     barTypeDetails: {},
-    portfolio: null,  // current PortfolioConfig dict
+    portfolios: [],       // array of all portfolio objects shown in the table
+    activeIndex: null,     // index of portfolio selected for backtest
     results: null,
     templates: {},
     slotCounter: 0,
+    _editingSlotIndex: null,
 
     async render(container) {
         container.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <div>
-                    <h1 class="page-title" style="margin-bottom: 2px;">Portfolio Manager</h1>
-                    <p class="page-subtitle" style="margin-bottom: 0;">Create multi-strategy portfolios with exit management.</p>
-                </div>
-            </div>
             <div id="portfolio-loading" class="alert alert-info">Loading configuration...</div>
             <div id="portfolio-app" style="display: none;"></div>
         `;
-
         await this.loadConfig();
+        App.setActionBar(`
+            <button class="btn btn-sm" onclick="App.navigate('portfolio_tearsheet')">View Tearsheet</button>
+        `);
     },
 
     async loadConfig() {
@@ -34,7 +33,6 @@ const Portfolio = {
                 App.api("/api/strategies"),
                 App.api("/api/portfolios/templates"),
             ]);
-
             this.barTypes = barData.bar_types || [];
             this.barTypeDetails = barData.bar_type_details || {};
             this.strategies = stratData.strategies || {};
@@ -46,8 +44,9 @@ const Portfolio = {
                 return;
             }
 
-            if (!this.portfolio) {
-                this.portfolio = this._newPortfolio();
+            // Load all saved portfolios into the table on first visit
+            if (this.portfolios.length === 0) {
+                await this._loadAllSaved();
             }
 
             document.getElementById("portfolio-loading").style.display = "none";
@@ -59,9 +58,29 @@ const Portfolio = {
         }
     },
 
-    _newPortfolio() {
+    async _loadAllSaved() {
+        try {
+            const data = await App.api("/api/portfolios/list");
+            const names = data.portfolios || [];
+            const loaded = [];
+            for (const name of names) {
+                try {
+                    const d = await App.api(`/api/portfolios/load?name=${encodeURIComponent(name)}`);
+                    if (d.portfolio) {
+                        this._liftUniformSlotDates(d.portfolio);
+                        loaded.push(d.portfolio);
+                    }
+                } catch {}
+            }
+            this.portfolios = loaded;
+        } catch {
+            this.portfolios = [];
+        }
+    },
+
+    _newPortfolio(name) {
         return {
-            name: "New Portfolio",
+            name: name || "New Portfolio",
             description: "",
             starting_capital: 100000,
             max_loss: null,
@@ -74,10 +93,6 @@ const Portfolio = {
         };
     },
 
-    /** If portfolio-level dates are empty but every enabled slot shares the same
-     *  non-empty range, lift them to the portfolio level and drop the per-slot
-     *  copies. Makes imported JSONs (where every slot repeats the same range)
-     *  editable from one pair of date inputs. */
     _liftUniformSlotDates(portfolio) {
         if (!portfolio || !portfolio.slots || portfolio.slots.length === 0) return;
         if (portfolio.start_date || portfolio.end_date) return;
@@ -89,634 +104,253 @@ const Portfolio = {
         if (!allSame) return;
         portfolio.start_date = s || null;
         portfolio.end_date = e || null;
-        for (const sl of portfolio.slots) {
-            sl.start_date = null;
-            sl.end_date = null;
-        }
+        for (const sl of portfolio.slots) { sl.start_date = null; sl.end_date = null; }
     },
 
-    /** Curated timezone list. Empty value = "inherit from outer level"
-     *  (or UTC at the portfolio level). The runner falls back to UTC when
-     *  null reaches it, but the inherit semantics let users set the tz once
-     *  at the portfolio and override only when needed. */
     _SQUAREOFF_TZS: [
-        "UTC",
-        "America/New_York",
-        "America/Chicago",
-        "America/Los_Angeles",
-        "Europe/London",
-        "Europe/Berlin",
-        "Asia/Tokyo",
-        "Asia/Singapore",
-        "Asia/Kolkata",
+        "UTC", "America/New_York", "America/Chicago", "America/Los_Angeles",
+        "Europe/London", "Europe/Berlin", "Asia/Tokyo", "Asia/Singapore", "Asia/Kolkata",
     ],
 
-    /** Render a tz <select>. ``inheritLabel`` when truthy adds a leading
-     *  "(inherit)" option that maps to null — used for slot/leg overrides. */
-    _renderTzSelect(currentTz, onchangeJs, inheritLabel) {
+    _renderTzSelect(currentTz, id, inheritLabel) {
         const opts = [];
-        if (inheritLabel) {
-            opts.push(`<option value="" ${!currentTz ? "selected" : ""}>${inheritLabel}</option>`);
-        }
+        if (inheritLabel) opts.push(`<option value="" ${!currentTz ? "selected" : ""}>${inheritLabel}</option>`);
         for (const tz of this._SQUAREOFF_TZS) {
             opts.push(`<option value="${tz}" ${currentTz === tz ? "selected" : ""}>${tz}</option>`);
         }
-        return `<select class="form-control" onchange="${onchangeJs}">${opts.join("")}</select>`;
+        return `<select class="form-control" id="${id}">${opts.join("")}</select>`;
     },
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       MAIN TABLE — one row per portfolio (like reference Multileg tab)
+       ═══════════════════════════════════════════════════════════════════════ */
 
     renderApp() {
-        const p = this.portfolio;
-
-        // Template buttons
-        const tmplBtns = Object.entries(this.templates).map(([name, desc]) =>
-            `<button class="btn btn-sm" style="font-size: 0.75rem;" onclick="Portfolio.loadTemplate('${name}')" title="${desc}">${name}</button>`
-        ).join(" ");
-
-        // Saved portfolios
-        let savedSection = `<button class="btn btn-sm btn-block" onclick="Portfolio.loadSavedList()">Load Saved</button>
-            <div id="saved-list" style="margin-top: 6px;"></div>`;
-
-        // Slots HTML
-        let slotsHTML = "";
-        if (p.slots.length === 0) {
-            slotsHTML = '<div class="alert alert-info" style="margin: 0;">No strategy slots. Click "Add Slot" to add one.</div>';
+        const colCount = 13;
+        let rows = "";
+        if (this.portfolios.length === 0) {
+            rows = `<tr><td colspan="${colCount}" style="text-align:center; padding: 40px; color: var(--text-muted);">
+                No portfolios yet. Click "+ Add Portfolio" to create one.
+            </td></tr>`;
         } else {
-            slotsHTML = p.slots.map((slot, i) => this._renderSlot(slot, i)).join("");
+            rows = this.portfolios.map((pf, i) => {
+                const enabled = pf._enabled !== false;
+                const statusColor = enabled ? "var(--success)" : "var(--text-muted)";
+                const status = enabled ? "Enabled" : "Disabled";
+                const instruments = (pf.slots || []).map(s => App.barTypeLabel(s.bar_type_str)).filter(Boolean);
+                const instSummary = instruments.length > 0
+                    ? [...new Set(instruments)].slice(0, 3).join(", ") + (instruments.length > 3 ? "..." : "")
+                    : "—";
+                const stratTags = [...new Set((pf.slots || []).map(s => s.strategy_name))];
+                const stratSummary = stratTags.length > 0
+                    ? stratTags.slice(0, 2).join(", ") + (stratTags.length > 2 ? "..." : "")
+                    : "—";
+                const sqOff = pf.squareoff_time || "—";
+                const slotCount = (pf.slots || []).length;
+                const isActive = this.activeIndex === i;
+                const activeCls = isActive ? ' style="background: var(--accent-light);"' : '';
+
+                return `<tr${activeCls}>
+                    <td style="text-align:center;">
+                        ${i + 1}
+                        <input type="checkbox" ${enabled ? "checked" : ""}
+                               onchange="Portfolio.togglePortfolio(${i})" style="margin-left:3px;">
+                    </td>
+                    <td style="color:${statusColor}; font-size:0.78rem;">${status}</td>
+                    <td><strong style="cursor:pointer; color:var(--accent);" onclick="Portfolio.selectPortfolio(${i})">${pf.name}</strong></td>
+                    <td style="font-size:0.8rem;">${instSummary}</td>
+                    <td><button class="btn btn-xs" onclick="Portfolio.openEditPortfolio(${i})">Edit</button></td>
+                    <td><button class="btn btn-xs" onclick="Portfolio.duplicatePortfolio(${i})">Copy</button></td>
+                    <td><button class="btn btn-xs" style="color:var(--danger);" onclick="Portfolio.deletePortfolio(${i})">X</button></td>
+                    <td>${stratSummary}</td>
+                    <td style="text-align:center;">${slotCount}</td>
+                    <td>$${App.formatNumber(pf.starting_capital || 100000)}</td>
+                    <td>${sqOff}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-xs btn-primary" onclick="Portfolio.runBacktestFor(${i})">Run</button>
+                    </td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${pf.description || ""}</td>
+                </tr>`;
+            }).join("");
         }
 
-        // Results preview
         let resultsHTML = "";
-        if (this.results) {
-            resultsHTML = this._renderResults();
-        }
+        if (this.results) resultsHTML = this._renderResults();
 
         document.getElementById("portfolio-app").innerHTML = `
-            <div class="portfolio-layout">
-                <!-- Left sidebar -->
-                <div class="portfolio-sidebar">
-                    <div style="font-weight: 600; font-size: 0.95rem; color: var(--accent);">Portfolio Settings</div>
-
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label class="form-label">Name</label>
-                        <input type="text" class="form-control" id="pf-name" value="${p.name}" onchange="Portfolio.updateField('name', this.value)">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label class="form-label">Starting Capital ($)</label>
-                        <input type="number" class="form-control" id="pf-capital" value="${p.starting_capital}" min="1000"
-                               onchange="Portfolio.updateField('starting_capital', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label class="form-label">Max Loss ($, optional)</label>
-                        <input type="number" class="form-control" id="pf-maxloss" value="${p.max_loss || ''}" min="0"
-                               onchange="Portfolio.updateField('max_loss', this.value ? parseFloat(this.value) : null)">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label class="form-label">Max Profit ($, optional)</label>
-                        <input type="number" class="form-control" id="pf-maxprofit" value="${p.max_profit || ''}" min="0"
-                               onchange="Portfolio.updateField('max_profit', this.value ? parseFloat(this.value) : null)">
-                    </div>
-                    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="pf-start-date" value="${p.start_date || ''}"
-                                   onchange="Portfolio.updateField('start_date', this.value || null)">
-                        </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="pf-end-date" value="${p.end_date || ''}"
-                                   onchange="Portfolio.updateField('end_date', this.value || null)">
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 6px; margin-bottom: 8px;" title="Force-close all open slot positions every day at this local time. Leave blank to disable.">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label class="form-label">Squareoff Time</label>
-                            <input type="time" class="form-control" value="${p.squareoff_time || ''}"
-                                   onchange="Portfolio.updateField('squareoff_time', this.value || null)">
-                        </div>
-                        <div class="form-group" style="flex: 1.3; margin-bottom: 0;">
-                            <label class="form-label">Squareoff TZ</label>
-                            ${this._renderTzSelect(p.squareoff_tz, "Portfolio.updateField('squareoff_tz', this.value || null)", "(UTC)")}
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label class="form-label">Capital Allocation</label>
-                        <select class="form-control" id="pf-allocation-mode"
-                                onchange="Portfolio.updateField('allocation_mode', this.value)">
-                            <option value="equal" ${(p.allocation_mode || 'equal') === 'equal' ? 'selected' : ''}>Divide Equally</option>
-                            <option value="percentage" ${p.allocation_mode === 'percentage' ? 'selected' : ''}>Percentage per Slot</option>
-                        </select>
-                    </div>
-
-                    <div style="font-weight: 500; font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">Templates</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">${tmplBtns}</div>
-
-                    <div style="font-weight: 500; font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">Saved</div>
-                    ${savedSection}
-
-                    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px;">
-                        <button class="btn btn-primary btn-block btn-sm" onclick="Portfolio.savePortfolio()">Save Portfolio</button>
-                        <button class="btn btn-block btn-sm" onclick="Portfolio.exportJSON()">Export JSON</button>
-                        <label class="btn btn-block btn-sm" style="text-align: center; cursor: pointer;">
-                            Import JSON <input type="file" accept=".json" style="display: none;" onchange="Portfolio.importJSON(event)">
-                        </label>
-                    </div>
+            <div style="border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table style="margin:0;">
+                        <thead><tr>
+                            <th style="width:50px; text-align:center;">Enabled</th>
+                            <th>Status</th>
+                            <th>Portfolio Name</th>
+                            <th>Instruments</th>
+                            <th>Edit</th>
+                            <th>Copy</th>
+                            <th>Delete</th>
+                            <th>Strategy Tag</th>
+                            <th style="text-align:center;">Slots</th>
+                            <th>Capital</th>
+                            <th>Sq-off Time</th>
+                            <th>Backtest</th>
+                            <th>Remarks</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
                 </div>
-
-                <!-- Right panel -->
-                <div class="portfolio-main">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="font-weight: 600; font-size: 0.95rem;">Strategy Slots (${p.slots.length})</div>
-                        <button class="btn btn-primary btn-sm" onclick="Portfolio.addSlot()">+ Add Slot</button>
-                    </div>
-
-                    <div id="slots-container">${slotsHTML}</div>
-
-                    <button class="btn btn-primary btn-block" onclick="Portfolio.runBacktest()" id="pf-run-btn">
-                        Run Portfolio Backtest
-                    </button>
-                    <div id="pf-progress"></div>
-
-                    <div id="pf-results">${resultsHTML}</div>
-                </div>
+                <div style="min-height: 100px; background: var(--bg-secondary); border-top: 1px solid var(--border-light);"></div>
             </div>
-        `;
 
-        // Apply allocation mode visibility after each full render.
-        this._applyAllocationMode();
-    },
+            <div style="border-top: 2px solid var(--border-color);"></div>
 
-    _renderSlot(slot, index) {
-        const stratNames = Object.keys(this.strategies);
-        const stratOpts = stratNames.map(n =>
-            `<option value="${n}" ${n === slot.strategy_name ? "selected" : ""}>${n}</option>`
-        ).join("");
-
-        const barOpts = this.barTypes.map(bt =>
-            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${App.barTypeLabel(bt)}</option>`
-        ).join("");
-
-        // Strategy params — tagged so updateSlotStrategy() can swap them in
-        // place without rebuilding the whole slot card. Leg-indexed params
-        // (keys like legN_*) also get data-leg-num so _applyLegVisibility()
-        // can hide them when the slot's num_legs is reduced.
-        const strat = this.strategies[slot.strategy_name] || {};
-        const params = strat.params || {};
-        const curNumLegs = parseInt(
-            slot.strategy_params?.num_legs ?? params.num_legs?.default ?? 99, 10
-        ) || 99;
-        let paramsHTML = "";
-        for (const [key, info] of Object.entries(params)) {
-            const val = slot.strategy_params[key] !== undefined ? slot.strategy_params[key] : info.default;
-            const legMatch = key.match(/^leg(\d+)_/);
-            const legNum = legMatch ? parseInt(legMatch[1], 10) : null;
-            const legAttr = legNum !== null ? ` data-leg-num="${legNum}"` : "";
-            const hideStyle = legNum !== null && legNum > curNumLegs ? ' style="display: none"' : "";
-            if (info.type === "time") {
-                // HHMM int <-> "HH:MM" string. 930 -> "09:30".
-                // Fields with inherit_zero treat 0 as "inherit" (empty picker);
-                // non-inherit fields keep the legacy behaviour where 0 shows as 00:00.
-                const vNum = parseInt(val ?? 0, 10) || 0;
-                const inheritZero = info.inherit_zero === true;
-                const hhmm = (inheritZero && vNum === 0)
-                    ? ""
-                    : `${String(Math.floor(vNum / 100)).padStart(2, "0")}:${String(vNum % 100).padStart(2, "0")}`;
-                const placeholder = info.placeholder ? ` placeholder="${info.placeholder}"` : "";
-                const onchange = inheritZero
-                    ? `Portfolio.updateSlotParam(${index}, '${key}', this.value === '' ? 0 : parseInt(this.value.replace(':',''), 10))`
-                    : `Portfolio.updateSlotParam(${index}, '${key}', parseInt(this.value.replace(':',''), 10))`;
-                paramsHTML += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="time" class="form-control" value="${hhmm}"${placeholder}
-                               onchange="${onchange}">
-                    </div>`;
-            } else if (typeof info.default === "boolean") {
-                paramsHTML += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="checkbox" ${val ? "checked" : ""}
-                               onchange="Portfolio.updateSlotParam(${index}, '${key}', this.checked)">
-                    </div>`;
-            } else {
-                paramsHTML += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="number" class="form-control" value="${val}"
-                               ${info.min !== undefined ? `min="${info.min}"` : ""} ${info.max !== undefined ? `max="${info.max}"` : ""}
-                               step="${typeof info.default === 'number' && !Number.isInteger(info.default) ? '0.5' : '1'}"
-                               onchange="Portfolio.updateSlotParam(${index}, '${key}', ${typeof info.default === 'number' && !Number.isInteger(info.default) ? 'parseFloat(this.value)' : 'parseInt(this.value)'})">
-                    </div>`;
-            }
-        }
-
-        // Exit config
-        const ec = slot.exit_config || {};
-        const slTypes = ["none", "percentage", "points", "trailing"];
-        const tpTypes = ["none", "percentage", "points"];
-        const actions = ["close", "re_execute", "reverse"];
-
-        const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t}</option>`).join("");
-        const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type || "none") === t ? "selected" : ""}>${t}</option>`).join("");
-        const slActionOpts = actions.map(a => `<option value="${a}" ${(ec.on_sl_action || "close") === a ? "selected" : ""}>${a}</option>`).join("");
-        const tpActionOpts = actions.map(a => `<option value="${a}" ${(ec.on_target_action || "close") === a ? "selected" : ""}>${a}</option>`).join("");
-
-        return `
-            <div class="slot-card ${slot.enabled === false ? 'disabled' : ''}" id="slot-${index}">
-                <div class="slot-card-header">
-                    <span class="slot-card-title">#${index + 1} ${slot.strategy_name} on ${App.barTypeLabel(slot.bar_type_str) || "N/A"}</span>
-                    <div class="slot-card-actions">
-                        <button class="btn btn-xs" onclick="Portfolio.toggleSlot(${index})" title="${slot.enabled !== false ? 'Disable' : 'Enable'}">
-                            ${slot.enabled !== false ? "Disable" : "Enable"}
-                        </button>
-                        <button class="btn btn-xs btn-danger" onclick="Portfolio.removeSlot(${index})">Remove</button>
-                    </div>
-                </div>
-
-                <div class="slot-params-row">
-                    <div class="form-group">
-                        <label class="form-label">Strategy</label>
-                        <select class="form-control" onchange="Portfolio.updateSlotStrategy(${index}, this.value)">${stratOpts}</select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Instrument</label>
-                        <select class="form-control" onchange="Portfolio.updateSlotField(${index}, 'bar_type_str', this.value)">${barOpts}</select>
-                    </div>
-                    <div class="form-group" style="max-width: 90px;">
-                        <label class="form-label">Trade Size</label>
-                        <input type="number" class="form-control" value="${slot.trade_size || 1}" min="1"
-                               onchange="Portfolio.updateSlotField(${index}, 'trade_size', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group alloc-pct-field" style="max-width: 90px;">
-                        <label class="form-label">Alloc %</label>
-                        <input type="number" class="form-control" value="${slot.allocation_pct || 0}" min="0" max="100" step="0.5"
-                               onchange="Portfolio.updateSlotField(${index}, 'allocation_pct', parseFloat(this.value))">
-                    </div>
-                    ${paramsHTML}
-                </div>
-
-                <div class="exit-config-row">
-                    <div class="form-group">
-                        <label class="form-label">SL Type</label>
-                        <select class="form-control" onchange="Portfolio.updateExitField(${index}, 'stop_loss_type', this.value)">${slTypeOpts}</select>
-                    </div>
-                    <div class="form-group" style="max-width: 80px;">
-                        <label class="form-label">SL Value</label>
-                        <input type="number" class="form-control" value="${ec.stop_loss_value || 0}" step="0.5" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'stop_loss_value', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group" style="max-width: 80px;">
-                        <label class="form-label">Trail Step</label>
-                        <input type="number" class="form-control" value="${ec.trailing_sl_step || 0}" step="0.5" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'trailing_sl_step', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group" style="max-width: 80px;">
-                        <label class="form-label">Trail Offset</label>
-                        <input type="number" class="form-control" value="${ec.trailing_sl_offset || 0}" step="0.5" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'trailing_sl_offset', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">TP Type</label>
-                        <select class="form-control" onchange="Portfolio.updateExitField(${index}, 'target_type', this.value)">${tpTypeOpts}</select>
-                    </div>
-                    <div class="form-group" style="max-width: 80px;">
-                        <label class="form-label">TP Value</label>
-                        <input type="number" class="form-control" value="${ec.target_value || 0}" step="0.5" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'target_value', parseFloat(this.value))">
-                    </div>
-                    <div class="form-group" style="max-width: 80px;">
-                        <label class="form-label">SL Wait</label>
-                        <input type="number" class="form-control" value="${ec.sl_wait_bars || 0}" step="1" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'sl_wait_bars', parseInt(this.value))">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">On SL</label>
-                        <select class="form-control" onchange="Portfolio.updateExitField(${index}, 'on_sl_action', this.value)">${slActionOpts}</select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">On TP</label>
-                        <select class="form-control" onchange="Portfolio.updateExitField(${index}, 'on_target_action', this.value)">${tpActionOpts}</select>
-                    </div>
-                    <div class="form-group" style="max-width: 70px;">
-                        <label class="form-label">Max Re-ex</label>
-                        <input type="number" class="form-control" value="${ec.max_re_executions || 0}" step="1" min="0"
-                               onchange="Portfolio.updateExitField(${index}, 'max_re_executions', parseInt(this.value))">
-                    </div>
-                    <div class="form-group" style="max-width: 100px;" title="Slot-level squareoff override. Blank inherits from portfolio.">
-                        <label class="form-label">Slot SqOff</label>
-                        <input type="time" class="form-control" value="${slot.squareoff_time || ''}"
-                               onchange="Portfolio.updateSlotField(${index}, 'squareoff_time', this.value || null)">
-                    </div>
-                    <div class="form-group" style="max-width: 130px;">
-                        <label class="form-label">Slot SqOff TZ</label>
-                        ${this._renderTzSelect(slot.squareoff_tz, `Portfolio.updateSlotField(${index}, 'squareoff_tz', this.value || null)`, "(inherit)")}
-                    </div>
-                    <div class="form-group" style="max-width: 100px;" title="Leg-level squareoff override. Highest priority — beats slot and portfolio.">
-                        <label class="form-label">Leg SqOff</label>
-                        <input type="time" class="form-control" value="${ec.squareoff_time || ''}"
-                               onchange="Portfolio.updateExitField(${index}, 'squareoff_time', this.value || null)">
-                    </div>
-                    <div class="form-group" style="max-width: 130px;">
-                        <label class="form-label">Leg SqOff TZ</label>
-                        ${this._renderTzSelect(ec.squareoff_tz, `Portfolio.updateExitField(${index}, 'squareoff_tz', this.value || null)`, "(inherit)")}
-                    </div>
-                </div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 16px; padding: 10px 0;">
+                <button class="btn" onclick="Portfolio.openAddPortfolio()" style="padding: 6px 20px;">+ Add Portfolio</button>
+                <button class="btn" onclick="Portfolio.openOptionsMenu(event)" style="padding: 6px 20px;">Options &#9660;</button>
             </div>
+
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 0 10px 0;">
+                <span style="font-size: 0.84rem; color: var(--text-secondary);">From:</span>
+                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;" id="pf-global-start" value="">
+                <span style="font-size: 0.84rem; color: var(--text-secondary);">To:</span>
+                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;" id="pf-global-end" value="">
+                <button class="btn btn-primary btn-sm" onclick="Portfolio.runSelectedBacktest()" style="padding: 5px 16px;">
+                    &#9654; Start Testing
+                </button>
+                <button class="btn btn-sm" onclick="Portfolio.openGlobalSettings()" style="padding: 5px 14px;">Settings</button>
+            </div>
+
+            <div id="pf-progress"></div>
+            <div id="pf-results">${resultsHTML}</div>
         `;
     },
 
-    updateField(field, value) {
-        this.portfolio[field] = value;
-        // Allocation mode is the only top-level field whose UI visibility
-        // changes with its value. Toggle a body-level class so the CSS rule
-        // below can show/hide the per-slot "Alloc %" inputs without a
-        // full re-render (the main reason typing in this page felt laggy).
-        if (field === "allocation_mode") {
-            this._applyAllocationMode();
-        }
+    /* ═══════════════════════════════════════════════════════════════════════
+       PORTFOLIO-LEVEL OPERATIONS (table rows)
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    selectPortfolio(index) {
+        this.activeIndex = index;
+        this.results = null;
+        this.renderApp();
+        App.log(`Selected portfolio: ${this.portfolios[index].name}`, "MESSAGE", "Multileg");
     },
 
-    /** Show/hide the per-slot "Alloc %" inputs based on allocation_mode.
-     *  Called from updateField and after renderApp. */
-    _applyAllocationMode() {
-        const app = document.getElementById("portfolio-app");
-        if (!app) return;
-        app.classList.toggle("alloc-percentage", this.portfolio.allocation_mode === "percentage");
-    },
-
-    /** Targeted update for a slot field — avoids a full portfolio re-render.
-     *  Previously we called renderApp() on every keystroke which destroyed
-     *  focus, rebuilt 200-option <select>s for every slot, and felt jittery. */
-    updateSlotField(index, field, value) {
-        this.portfolio.slots[index][field] = value;
-        // Only the title bar depends on bar_type_str; update just that.
-        if (field === "bar_type_str") {
-            this._updateSlotTitle(index);
-        }
-    },
-
-    updateSlotParam(index, key, value) {
-        if (!this.portfolio.slots[index].strategy_params) {
-            this.portfolio.slots[index].strategy_params = {};
-        }
-        this.portfolio.slots[index].strategy_params[key] = value;
-        if (key === "num_legs") {
-            this._applyLegVisibility(index);
-        }
-    },
-
-    /** Re-render only the params inputs for one slot when strategy changes. */
-    updateSlotStrategy(index, stratName) {
-        const slot = this.portfolio.slots[index];
-        slot.strategy_name = stratName;
-        const strat = this.strategies[stratName];
-        slot.strategy_params = {};
-        if (strat && strat.params) {
-            for (const [key, info] of Object.entries(strat.params)) {
-                slot.strategy_params[key] = info.default;
-            }
-        }
-        this._updateSlotTitle(index);
-        this._rerenderSlotParams(index);
-    },
-
-    updateExitField(index, field, value) {
-        if (!this.portfolio.slots[index].exit_config) {
-            this.portfolio.slots[index].exit_config = {};
-        }
-        this.portfolio.slots[index].exit_config[field] = value;
-    },
-
-    /** Update just the title line of a slot card (strategy + instrument label). */
-    _updateSlotTitle(index) {
-        const card = document.getElementById(`slot-${index}`);
-        if (!card) return;
-        const titleEl = card.querySelector(".slot-card-title");
-        if (!titleEl) return;
-        const slot = this.portfolio.slots[index];
-        const inst = App.barTypeLabel(slot.bar_type_str) || "N/A";
-        titleEl.textContent = `#${index + 1} ${slot.strategy_name} on ${inst}`;
-    },
-
-    /** Re-render just the strategy-param form-groups inside one slot —
-     *  appended after the fixed fields (strategy, instrument, trade size, alloc). */
-    _rerenderSlotParams(index) {
-        const card = document.getElementById(`slot-${index}`);
-        if (!card) return;
-        const row = card.querySelector(".slot-params-row");
-        if (!row) return;
-        const slot = this.portfolio.slots[index];
-        const strat = this.strategies[slot.strategy_name] || {};
-        const params = strat.params || {};
-        const curNumLegs = parseInt(
-            slot.strategy_params?.num_legs ?? params.num_legs?.default ?? 99, 10
-        ) || 99;
-        // Remove existing dynamic params (everything tagged as strat-param)
-        row.querySelectorAll('[data-strat-param="1"]').forEach(n => n.remove());
-        // Re-append fresh
-        const tmp = document.createElement("div");
-        let html = "";
-        for (const [key, info] of Object.entries(params)) {
-            const val = slot.strategy_params[key] !== undefined ? slot.strategy_params[key] : info.default;
-            const legMatch = key.match(/^leg(\d+)_/);
-            const legNum = legMatch ? parseInt(legMatch[1], 10) : null;
-            const legAttr = legNum !== null ? ` data-leg-num="${legNum}"` : "";
-            const hideStyle = legNum !== null && legNum > curNumLegs ? ' style="display: none"' : "";
-            if (info.type === "time") {
-                const vNum = parseInt(val ?? 0, 10) || 0;
-                const inheritZero = info.inherit_zero === true;
-                const hhmm = (inheritZero && vNum === 0)
-                    ? ""
-                    : `${String(Math.floor(vNum / 100)).padStart(2, "0")}:${String(vNum % 100).padStart(2, "0")}`;
-                const placeholder = info.placeholder ? ` placeholder="${info.placeholder}"` : "";
-                const onchange = inheritZero
-                    ? `Portfolio.updateSlotParam(${index}, '${key}', this.value === '' ? 0 : parseInt(this.value.replace(':',''), 10))`
-                    : `Portfolio.updateSlotParam(${index}, '${key}', parseInt(this.value.replace(':',''), 10))`;
-                html += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="time" class="form-control" value="${hhmm}"${placeholder}
-                               onchange="${onchange}">
-                    </div>`;
-            } else if (typeof info.default === "boolean") {
-                html += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="checkbox" ${val ? "checked" : ""}
-                               onchange="Portfolio.updateSlotParam(${index}, '${key}', this.checked)">
-                    </div>`;
-            } else {
-                const parser = typeof info.default === "number" && !Number.isInteger(info.default)
-                    ? "parseFloat(this.value)" : "parseInt(this.value)";
-                html += `
-                    <div class="form-group" data-strat-param="1"${legAttr}${hideStyle}>
-                        <label class="form-label">${info.label}</label>
-                        <input type="number" class="form-control" value="${val}"
-                               ${info.min !== undefined ? `min="${info.min}"` : ""} ${info.max !== undefined ? `max="${info.max}"` : ""}
-                               step="${typeof info.default === 'number' && !Number.isInteger(info.default) ? '0.5' : '1'}"
-                               onchange="Portfolio.updateSlotParam(${index}, '${key}', ${parser})">
-                    </div>`;
-            }
-        }
-        tmp.innerHTML = html;
-        while (tmp.firstChild) row.appendChild(tmp.firstChild);
-    },
-
-    /** Hide form-groups whose data-leg-num exceeds the slot's current num_legs.
-     *  Called from updateSlotParam when num_legs changes, so the leg inputs
-     *  collapse without rebuilding the slot card. */
-    _applyLegVisibility(index) {
-        const card = document.getElementById(`slot-${index}`);
-        if (!card) return;
-        const slot = this.portfolio.slots[index];
-        const strat = this.strategies[slot.strategy_name] || {};
-        const fallback = strat.params?.num_legs?.default ?? 99;
-        const num = parseInt(slot.strategy_params?.num_legs ?? fallback, 10) || fallback;
-        card.querySelectorAll("[data-leg-num]").forEach(el => {
-            const n = parseInt(el.getAttribute("data-leg-num"), 10);
-            el.style.display = n > num ? "none" : "";
-        });
-    },
-
-    addSlot() {
-        const firstStrat = Object.keys(this.strategies)[0] || "EMA Cross";
-        const strat = this.strategies[firstStrat] || {};
-        const defaultParams = {};
-        if (strat.params) {
-            for (const [key, info] of Object.entries(strat.params)) {
-                defaultParams[key] = info.default;
-            }
-        }
-
-        this.slotCounter++;
-        this.portfolio.slots.push({
-            slot_id: "s" + Date.now().toString(36) + this.slotCounter,
-            strategy_name: firstStrat,
-            strategy_params: defaultParams,
-            bar_type_str: this.barTypes[0] || "",
-            trade_size: 1,
-            allocation_pct: 0,
-            exit_config: {
-                stop_loss_type: "none", stop_loss_value: 0,
-                trailing_sl_step: 0, trailing_sl_offset: 0,
-                target_type: "none", target_value: 0,
-                target_lock_trigger: null, target_lock_minimum: null,
-                sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
-                max_re_executions: 0,
-                squareoff_time: null, squareoff_tz: null,
-            },
-            enabled: true,
-            squareoff_time: null,
-            squareoff_tz: null,
-        });
+    togglePortfolio(index) {
+        this.portfolios[index]._enabled = !this.portfolios[index]._enabled;
+        if (this.portfolios[index]._enabled === undefined) this.portfolios[index]._enabled = false;
         this.renderApp();
     },
 
-    removeSlot(index) {
-        this.portfolio.slots.splice(index, 1);
+    duplicatePortfolio(index) {
+        const copy = JSON.parse(JSON.stringify(this.portfolios[index]));
+        copy.name = copy.name + " (Copy)";
+        this.portfolios.splice(index + 1, 0, copy);
         this.renderApp();
+        App.log(`Portfolio "${this.portfolios[index].name}" copied`, "MESSAGE", "Multileg");
     },
 
-    toggleSlot(index) {
-        const slot = this.portfolio.slots[index];
-        slot.enabled = !slot.enabled;
-        // Just toggle the dimmed class + update the button label in place —
-        // no need to blow away the whole page for a visual nit.
-        const card = document.getElementById(`slot-${index}`);
-        if (card) {
-            card.classList.toggle("disabled", slot.enabled === false);
-            const btn = card.querySelector(".slot-card-actions .btn-xs:not(.btn-danger)");
-            if (btn) {
-                btn.textContent = slot.enabled !== false ? "Disable" : "Enable";
-                btn.title = slot.enabled !== false ? "Disable" : "Enable";
-            }
-        }
-    },
-
-    async savePortfolio() {
-        const name = document.getElementById("pf-name").value.trim();
-        if (!name) { App.toast("Enter a portfolio name.", "error"); return; }
-        this.portfolio.name = name;
-        try {
-            const data = await App.api("/api/portfolios/save", {
-                method: "POST",
-                body: JSON.stringify(this.portfolio),
-            });
-            App.toast(data.message, "success");
-        } catch (e) {
-            App.toast("Save failed: " + e.message, "error");
-        }
-    },
-
-    async loadSavedList() {
-        const listDiv = document.getElementById("saved-list");
-        try {
-            const data = await App.api("/api/portfolios/list");
-            if (data.portfolios.length === 0) {
-                listDiv.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">No saved portfolios.</span>';
-                return;
-            }
-            listDiv.innerHTML = data.portfolios.map(name => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border-color);">
-                    <span style="font-size: 0.8rem; cursor: pointer; color: var(--accent);" onclick="Portfolio.loadSaved('${name}')">${name}</span>
-                    <button class="btn btn-xs btn-danger" onclick="Portfolio.deleteSaved('${name}')">Del</button>
-                </div>
-            `).join("");
-        } catch (e) {
-            listDiv.innerHTML = `<span style="font-size: 0.8rem; color: var(--danger);">${e.message}</span>`;
-        }
-    },
-
-    async loadSaved(name) {
-        try {
-            const data = await App.api(`/api/portfolios/load?name=${encodeURIComponent(name)}`);
-            this.portfolio = data.portfolio;
-            this._liftUniformSlotDates(this.portfolio);
-            this.results = null;
-            this.renderApp();
-            App.toast(`Loaded "${name}"`, "success");
-        } catch (e) {
-            App.toast("Load failed: " + e.message, "error");
-        }
-    },
-
-    async deleteSaved(name) {
+    deletePortfolio(index) {
+        const name = this.portfolios[index].name;
         if (!confirm(`Delete portfolio "${name}"?`)) return;
-        try {
-            await App.api("/api/portfolios/delete", {
-                method: "POST", body: JSON.stringify({ name }),
-            });
-            App.toast(`Deleted "${name}"`, "success");
-            this.loadSavedList();
-        } catch (e) {
-            App.toast("Delete failed: " + e.message, "error");
+        this.portfolios.splice(index, 1);
+        if (this.activeIndex === index) this.activeIndex = null;
+        else if (this.activeIndex > index) this.activeIndex--;
+        this.renderApp();
+        // Also delete from server
+        App.api("/api/portfolios/delete", {
+            method: "POST", body: JSON.stringify({ name }),
+        }).catch(() => {});
+        App.log(`Portfolio "${name}" deleted`, "MESSAGE", "Multileg");
+    },
+
+    runBacktestFor(index) {
+        this.activeIndex = index;
+        this._currentPortfolio = this.portfolios[index];
+        this.runBacktest();
+    },
+
+    runSelectedBacktest() {
+        if (this.activeIndex === null || !this.portfolios[this.activeIndex]) {
+            App.toast("Click a portfolio name to select it first, or click 'Run' on a row.", "error");
+            return;
+        }
+        this._currentPortfolio = this.portfolios[this.activeIndex];
+        // Apply global date overrides if set
+        const gStart = document.getElementById("pf-global-start")?.value;
+        const gEnd = document.getElementById("pf-global-end")?.value;
+        if (gStart) this._currentPortfolio.start_date = gStart;
+        if (gEnd) this._currentPortfolio.end_date = gEnd;
+        this.runBacktest();
+    },
+
+    openGlobalSettings() {
+        // Just a shortcut — if a portfolio is selected, open its settings
+        if (this.activeIndex !== null && this.portfolios[this.activeIndex]) {
+            this.openEditPortfolio(this.activeIndex);
+        } else {
+            App.toast("Select a portfolio first.", "info");
         }
     },
 
-    async loadTemplate(templateName) {
-        try {
-            const data = await App.api("/api/portfolios/from-template", {
-                method: "POST",
-                body: JSON.stringify({ template: templateName, bar_types: this.barTypes }),
-            });
-            this.portfolio = data.portfolio;
-            this._liftUniformSlotDates(this.portfolio);
-            this.results = null;
-            this.renderApp();
-            App.toast(`Template "${templateName}" loaded.`, "success");
-        } catch (e) {
-            App.toast("Template load failed: " + e.message, "error");
-        }
+    openOptionsMenu(event) {
+        const existing = document.getElementById("pf-options-menu");
+        if (existing) { existing.remove(); return; }
+
+        const menu = document.createElement("div");
+        menu.id = "pf-options-menu";
+        menu.style.cssText = "position:fixed; background:#fff; border:1px solid var(--border-color); border-radius:4px; box-shadow:0 4px 16px rgba(0,0,0,0.15); z-index:500; padding:4px 0; min-width:180px;";
+        const rect = event.target.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 4) + "px";
+        menu.style.left = rect.left + "px";
+
+        const items = [
+            { label: "Save All to Server", action: "Portfolio.saveAllPortfolios()" },
+            { label: "Reload from Server", action: "Portfolio.reloadAll()" },
+            { label: "Import Portfolio JSON", action: "document.getElementById('pf-import-input').click()" },
+            { label: "Export Selected JSON", action: "Portfolio.exportSelectedJSON()" },
+        ];
+        menu.innerHTML = items.map(it =>
+            `<div style="padding:7px 14px; font-size:0.84rem; cursor:pointer;"
+                 onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"
+                 onclick="document.getElementById('pf-options-menu').remove(); ${it.action}">${it.label}</div>`
+        ).join("") + '<input type="file" id="pf-import-input" accept=".json" style="display:none;" onchange="Portfolio.importJSON(event)">';
+        document.body.appendChild(menu);
+        const close = (e) => { if (!menu.contains(e.target) && e.target !== event.target) { menu.remove(); document.removeEventListener("click", close); } };
+        setTimeout(() => document.addEventListener("click", close), 0);
     },
 
-    exportJSON() {
-        const name = this.portfolio.name || "portfolio";
-        const json = JSON.stringify(this.portfolio, null, 2);
+    async saveAllPortfolios() {
+        let saved = 0;
+        for (const pf of this.portfolios) {
+            try {
+                const clean = JSON.parse(JSON.stringify(pf));
+                delete clean._enabled;
+                await App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(clean) });
+                saved++;
+            } catch {}
+        }
+        App.toast(`Saved ${saved} portfolio(s) to server.`, "success");
+        App.log(`Saved ${saved} portfolio(s)`, "SUCCESS", "Multileg");
+    },
+
+    async reloadAll() {
+        this.portfolios = [];
+        this.activeIndex = null;
+        this.results = null;
+        await this._loadAllSaved();
+        this.renderApp();
+        App.toast(`Loaded ${this.portfolios.length} portfolio(s) from server.`, "success");
+    },
+
+    exportSelectedJSON() {
+        if (this.activeIndex === null) { App.toast("Select a portfolio first.", "info"); return; }
+        const pf = this.portfolios[this.activeIndex];
+        const json = JSON.stringify(pf, null, 2);
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = `${name}.json`;
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
+        const a = document.createElement("a"); a.href = url; a.download = `${pf.name}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     },
 
     importJSON(event) {
@@ -725,225 +359,593 @@ const Portfolio = {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                this.portfolio = JSON.parse(e.target.result);
-                this._liftUniformSlotDates(this.portfolio);
-                this.results = null;
+                const pf = JSON.parse(e.target.result);
+                this._liftUniformSlotDates(pf);
+                this.portfolios.push(pf);
                 this.renderApp();
-                App.toast("Portfolio imported.", "success");
-            } catch (err) {
-                App.toast("Invalid JSON: " + err.message, "error");
-            }
+                App.toast(`Imported "${pf.name}"`, "success");
+                App.log(`Portfolio "${pf.name}" imported`, "MESSAGE", "Multileg");
+            } catch (err) { App.toast("Invalid JSON: " + err.message, "error"); }
         };
         reader.readAsText(file);
     },
 
-    async runBacktest() {
-        const enabledSlots = this.portfolio.slots.filter(s => s.enabled !== false);
-        if (enabledSlots.length === 0) {
-            App.toast("Add at least one enabled slot.", "error");
-            return;
+    /* ═══════════════════════════════════════════════════════════════════════
+       ADD / EDIT PORTFOLIO MODAL (like reference "Create / Edit Portfolio")
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    openAddPortfolio() {
+        const pf = this._newPortfolio("Portfolio " + (this.portfolios.length + 1));
+        this.portfolios.push(pf);
+        const idx = this.portfolios.length - 1;
+        this._openPortfolioModal(idx, true);
+    },
+
+    openEditPortfolio(index) {
+        this._openPortfolioModal(index, false);
+    },
+
+    _openPortfolioModal(pfIndex, isNew) {
+        this._editingPfIndex = pfIndex;
+        this._editingIsNew = isNew;
+        const pf = this.portfolios[pfIndex];
+        const title = isNew ? "Create Portfolio" : `Edit Portfolio — ${pf.name}`;
+
+        // Build slots table for the legs inside this portfolio
+        let slotsRows = "";
+        if ((pf.slots || []).length === 0) {
+            slotsRows = `<tr><td colspan="8" style="text-align:center; padding:16px; color:var(--text-muted);">No slots. Click "+ Add Leg" to add.</td></tr>`;
+        } else {
+            slotsRows = pf.slots.map((slot, i) => {
+                const ec = slot.exit_config || {};
+                const sl = (ec.stop_loss_type || "none") !== "none" ? `${ec.stop_loss_type} ${ec.stop_loss_value || 0}` : "—";
+                const tp = (ec.target_type || "none") !== "none" ? `${ec.target_type} ${ec.target_value || 0}` : "—";
+                return `<tr>
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td>${slot.strategy_name}</td>
+                    <td>${App.barTypeLabel(slot.bar_type_str) || "—"}</td>
+                    <td>${slot.trade_size || 1}</td>
+                    <td>${sl}</td>
+                    <td>${tp}</td>
+                    <td>
+                        <button class="btn btn-xs" onclick="Portfolio._editLeg(${i})">Edit</button>
+                        <button class="btn btn-xs" style="color:var(--danger);" onclick="Portfolio._deleteLeg(${i})">X</button>
+                    </td>
+                </tr>`;
+            }).join("");
         }
 
-        // Sync name/capital/allocation from inputs
-        this.portfolio.name = document.getElementById("pf-name").value.trim() || "Unnamed";
-        this.portfolio.starting_capital = parseFloat(document.getElementById("pf-capital").value) || 100000;
-        this.portfolio.allocation_mode = this.portfolio.allocation_mode || "equal";
-
-        // Validate percentage allocation
-        if (this.portfolio.allocation_mode === "percentage") {
-            const totalPct = enabledSlots.reduce((sum, s) => sum + (s.allocation_pct || 0), 0);
-            if (totalPct <= 0 || totalPct > 100) {
-                App.toast(`Allocation percentages must sum to 1-100%. Current: ${totalPct.toFixed(1)}%`, "error");
-                return;
-            }
-        }
-
-        const btn = document.getElementById("pf-run-btn");
-        btn.disabled = true;
-        btn.textContent = "Running...";
-
-        const progressDiv = document.getElementById("pf-progress");
-        progressDiv.innerHTML = `
-            <div class="card" style="padding: 16px;">
-                <div class="progress-text" id="pf-progress-text">Initializing portfolio backtest...</div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="pf-progress-bar" style="width: 0%; transition: width 0.3s ease;"></div>
+        const body = `
+            <!-- Top: Portfolio-level settings (like reference EXCHG/SYMBOL row) -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:#f8f9fa; border:1px solid var(--border-color); border-radius:4px;">
+                <div style="flex:2; min-width:140px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">PORTFOLIO NAME</div>
+                    <input type="text" class="form-control" id="pf-m-name" value="${pf.name}" style="font-size:0.82rem; padding:5px 8px;">
                 </div>
-                <div id="pf-progress-details" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);"></div>
-                <div id="pf-progress-slots" style="margin-top: 12px;"></div>
+                <div style="flex:1; min-width:100px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">CAPITAL</div>
+                    <input type="number" class="form-control" id="pf-m-capital" value="${pf.starting_capital || 100000}" min="1000" style="font-size:0.82rem; padding:5px 8px;">
+                </div>
+                <div style="flex:1; min-width:100px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">ALLOCATION</div>
+                    <select class="form-control" id="pf-m-alloc" style="font-size:0.82rem; padding:5px 8px;">
+                        <option value="equal" ${(pf.allocation_mode || 'equal') === 'equal' ? 'selected' : ''}>Equal</option>
+                        <option value="percentage" ${pf.allocation_mode === 'percentage' ? 'selected' : ''}>Percentage</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- + Add Leg button -->
+            <div style="margin-bottom:8px;">
+                <button class="btn btn-sm btn-primary" onclick="Portfolio._addLeg()">+ Add Leg</button>
+            </div>
+
+            <!-- Legs/Slots table (like reference legs table at top of modal) -->
+            <div style="border:1px solid var(--border-color); border-radius:4px; overflow:auto; max-height:180px; margin-bottom:10px;">
+                <table style="margin:0; font-size:0.82rem;">
+                    <thead><tr>
+                        <th style="width:30px;">#</th>
+                        <th>Strategy</th>
+                        <th>Instrument</th>
+                        <th>Size</th>
+                        <th>Stop Loss</th>
+                        <th>Target</th>
+                        <th>Actions</th>
+                    </tr></thead>
+                    <tbody id="pf-m-legs-body">${slotsRows}</tbody>
+                </table>
+            </div>
+
+            <!-- Sub-tabs (like reference: Execution Parameters, Target, Stoploss, etc.) -->
+            <div style="display:flex; gap:0; border-bottom:2px solid var(--border-color); margin-bottom:10px;">
+                <button class="slot-tab-btn active" data-tab="pf-settings" onclick="Portfolio._switchPfTab('pf-settings')">Settings</button>
+                <button class="slot-tab-btn" data-tab="pf-timing" onclick="Portfolio._switchPfTab('pf-timing')">Timing</button>
+                <button class="slot-tab-btn" data-tab="pf-limits" onclick="Portfolio._switchPfTab('pf-limits')">Limits</button>
+            </div>
+
+            <div class="pf-tab-content" id="pf-tab-pf-settings">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:120px;">
+                        <label class="form-label">Description / Remarks</label>
+                        <input type="text" class="form-control" id="pf-m-desc" value="${pf.description || ''}" placeholder="Optional remarks">
+                    </div>
+                </div>
+            </div>
+
+            <div class="pf-tab-content" id="pf-tab-pf-timing" style="display:none;">
+                <fieldset style="border:1px solid var(--border-color); border-radius:4px; padding:12px;">
+                    <legend style="font-weight:600; font-size:0.85rem; padding:0 6px;">Timing</legend>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:110px;">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="pf-m-start" value="${pf.start_date || ''}">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:110px;">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="pf-m-end" value="${pf.end_date || ''}">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:100px;">
+                            <label class="form-label">Squareoff Time</label>
+                            <input type="time" class="form-control" id="pf-m-sqoff" value="${pf.squareoff_time || ''}">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:120px;">
+                            <label class="form-label">Squareoff TZ</label>
+                            ${this._renderTzSelect(pf.squareoff_tz, "pf-m-sqofftz", "(UTC)")}
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+
+            <div class="pf-tab-content" id="pf-tab-pf-limits" style="display:none;">
+                <fieldset style="border:1px solid var(--border-color); border-radius:4px; padding:12px;">
+                    <legend style="font-weight:600; font-size:0.85rem; padding:0 6px;">Risk Limits</legend>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:120px;">
+                            <label class="form-label">Max Loss ($)</label>
+                            <input type="number" class="form-control" id="pf-m-maxloss" value="${pf.max_loss || ''}" min="0">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:120px;">
+                            <label class="form-label">Max Profit ($)</label>
+                            <input type="number" class="form-control" id="pf-m-maxprofit" value="${pf.max_profit || ''}" min="0">
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+
+            <!-- Footer: Portfolio Name + SAVE PORTFOLIO button (like reference) -->
+            <div style="display:flex; align-items:center; gap:12px; margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                <span style="font-size:0.82rem; color:var(--text-secondary);">Portfolio Name</span>
+                <input type="text" class="form-control" id="pf-m-name-footer" value="${pf.name}" style="width:200px; font-size:0.82rem; padding:4px 8px;">
+                <span style="font-size:0.82rem; color:var(--text-secondary);">Remarks</span>
+                <input type="text" class="form-control" id="pf-m-remarks-footer" value="${pf.description || ''}" style="flex:1; font-size:0.82rem; padding:4px 8px;">
+                <button class="btn btn-sm" onclick="Portfolio._cancelPortfolioModal(${isNew ? 1 : 0})">Cancel</button>
+                <button class="btn btn-sm btn-primary" style="min-width:140px; font-weight:600;" onclick="Portfolio._savePortfolioModal()">SAVE PORTFOLIO</button>
             </div>
         `;
+        this._openModal(title, body, 780);
+    },
+
+    _switchPfTab(tabName) {
+        document.querySelectorAll(".pf-tab-content").forEach(el => el.style.display = "none");
+        document.querySelectorAll(".slot-tab-btn").forEach(el => el.classList.remove("active"));
+        const content = document.getElementById(`pf-tab-${tabName}`);
+        if (content) content.style.display = "";
+        const btn = document.querySelector(`.slot-tab-btn[data-tab="${tabName}"]`);
+        if (btn) btn.classList.add("active");
+    },
+
+    _savePortfolioModal() {
+        const idx = this._editingPfIndex;
+        if (idx === null || idx === undefined) return;
+        const pf = this.portfolios[idx];
+
+        // Read values from modal
+        pf.name = document.getElementById("pf-m-name-footer")?.value || document.getElementById("pf-m-name")?.value || "Unnamed";
+        pf.starting_capital = parseFloat(document.getElementById("pf-m-capital")?.value) || 100000;
+        pf.allocation_mode = document.getElementById("pf-m-alloc")?.value || "equal";
+        pf.description = document.getElementById("pf-m-remarks-footer")?.value || document.getElementById("pf-m-desc")?.value || "";
+        pf.start_date = document.getElementById("pf-m-start")?.value || null;
+        pf.end_date = document.getElementById("pf-m-end")?.value || null;
+        pf.squareoff_time = document.getElementById("pf-m-sqoff")?.value || null;
+        pf.squareoff_tz = document.getElementById("pf-m-sqofftz")?.value || null;
+        pf.max_loss = parseFloat(document.getElementById("pf-m-maxloss")?.value) || null;
+        pf.max_profit = parseFloat(document.getElementById("pf-m-maxprofit")?.value) || null;
+
+        // Auto-save to server (strip UI-only fields)
+        const cleanPf = JSON.parse(JSON.stringify(pf));
+        delete cleanPf._enabled;
+        App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
+            .then(() => App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name))
+            .catch(() => {});
+
+        this._closeModal();
+        this.renderApp();
+        App.toast(`Portfolio "${pf.name}" saved.`, "success");
+    },
+
+    _cancelPortfolioModal(isNew) {
+        if (isNew) this.portfolios.pop();
+        this._closeModal();
+        this.renderApp();
+    },
+
+    /* ─── Leg (slot) operations inside the portfolio modal ────────────── */
+
+    _addLeg() {
+        const idx = this._editingPfIndex;
+        if (idx === null) return;
+        const pf = this.portfolios[idx];
+        const firstStrat = Object.keys(this.strategies)[0] || "EMA Cross";
+        const strat = this.strategies[firstStrat] || {};
+        const defaultParams = {};
+        if (strat.params) { for (const [k, info] of Object.entries(strat.params)) defaultParams[k] = info.default; }
+        this.slotCounter++;
+        pf.slots = pf.slots || [];
+        pf.slots.push({
+            slot_id: "s" + Date.now().toString(36) + this.slotCounter,
+            strategy_name: firstStrat, strategy_params: defaultParams,
+            bar_type_str: this.barTypes[0] || "", trade_size: 1, allocation_pct: 0,
+            exit_config: { stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
+                target_type: "none", target_value: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
+                max_re_executions: 0, squareoff_time: null, squareoff_tz: null },
+            enabled: true, squareoff_time: null, squareoff_tz: null,
+        });
+        const legIdx = pf.slots.length - 1;
+        // Open leg editor immediately
+        this._openLegModal(legIdx, true);
+    },
+
+    _editLeg(legIndex) {
+        this._openLegModal(legIndex, false);
+    },
+
+    _deleteLeg(legIndex) {
+        const idx = this._editingPfIndex;
+        if (idx === null) return;
+        this.portfolios[idx].slots.splice(legIndex, 1);
+        // Refresh the portfolio modal
+        this._closeModal();
+        this._openPortfolioModal(idx, false);
+    },
+
+    _openLegModal(legIndex, isNew) {
+        this._editingSlotIndex = legIndex;
+        this._editingLegIsNew = isNew;
+        const pf = this.portfolios[this._editingPfIndex];
+        const slot = pf.slots[legIndex];
+        const title = isNew ? `Add Leg #${legIndex + 1}` : `Edit Leg #${legIndex + 1} — ${slot.strategy_name}`;
+
+        const stratOpts = Object.keys(this.strategies).map(n =>
+            `<option value="${n}" ${n === slot.strategy_name ? "selected" : ""}>${n}</option>`).join("");
+        const barOpts = this.barTypes.map(bt =>
+            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${App.barTypeLabel(bt)}</option>`).join("");
+        const paramsHTML = this._buildParamsHTML(pf, legIndex);
+        const ec = slot.exit_config || {};
+        const slTypes = ["none", "percentage", "points", "trailing"];
+        const tpTypes = ["none", "percentage", "points"];
+        const actions = ["close", "re_execute", "reverse"];
+
+        const body = `
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:#f8f9fa; border:1px solid var(--border-color); border-radius:4px;">
+                <div style="flex:2; min-width:140px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">STRATEGY</div>
+                    <select class="form-control" id="leg-m-strategy" onchange="Portfolio._onLegStratChange()" style="font-size:0.82rem; padding:5px 8px;">${stratOpts}</select>
+                </div>
+                <div style="flex:2; min-width:140px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT</div>
+                    <select class="form-control" id="leg-m-instrument" style="font-size:0.82rem; padding:5px 8px;">${barOpts}</select>
+                </div>
+                <div style="flex:0.7; min-width:70px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">SIZE</div>
+                    <input type="number" class="form-control" id="leg-m-size" value="${slot.trade_size || 1}" min="1" style="font-size:0.82rem; padding:5px 8px;">
+                </div>
+                <div style="flex:0.7; min-width:70px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">ALLOC %</div>
+                    <input type="number" class="form-control" id="leg-m-alloc" value="${slot.allocation_pct || 0}" min="0" max="100" step="0.5" style="font-size:0.82rem; padding:5px 8px;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0; border-bottom:2px solid var(--border-color); margin-bottom:10px;">
+                <button class="slot-tab-btn active" data-tab="leg-params" onclick="Portfolio._switchLegTab('leg-params')">Parameters</button>
+                <button class="slot-tab-btn" data-tab="leg-stoploss" onclick="Portfolio._switchLegTab('leg-stoploss')">Stoploss</button>
+                <button class="slot-tab-btn" data-tab="leg-target" onclick="Portfolio._switchLegTab('leg-target')">Target</button>
+                <button class="slot-tab-btn" data-tab="leg-timing" onclick="Portfolio._switchLegTab('leg-timing')">Timing</button>
+            </div>
+
+            <div class="leg-tab-content" id="leg-tab-leg-params">
+                <div id="leg-m-params" style="display:flex; flex-wrap:wrap; gap:10px;">${paramsHTML}</div>
+            </div>
+            <div class="leg-tab-content" id="leg-tab-leg-stoploss" style="display:none;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">SL Type</label>
+                        <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t}</option>`).join("")}</select></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Value</label>
+                        <input type="number" class="form-control" id="leg-m-slval" value="${ec.stop_loss_value||0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Step</label>
+                        <input type="number" class="form-control" id="leg-m-trailstep" value="${ec.trailing_sl_step||0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Offset</label>
+                        <input type="number" class="form-control" id="leg-m-trailoff" value="${ec.trailing_sl_offset||0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Wait</label>
+                        <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_bars||0}" step="1" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On SL</label>
+                        <select class="form-control" id="leg-m-slaction">${actions.map(a => `<option value="${a}" ${(ec.on_sl_action||"close")===a?"selected":""}>${a}</option>`).join("")}</select></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Max Re-ex</label>
+                        <input type="number" class="form-control" id="leg-m-maxreex" value="${ec.max_re_executions||0}" step="1" min="0"></div>
+                </div>
+            </div>
+            <div class="leg-tab-content" id="leg-tab-leg-target" style="display:none;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">TP Type</label>
+                        <select class="form-control" id="leg-m-tptype">${tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t}</option>`).join("")}</select></div>
+                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">TP Value</label>
+                        <input type="number" class="form-control" id="leg-m-tpval" value="${ec.target_value||0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On TP</label>
+                        <select class="form-control" id="leg-m-tpaction">${actions.map(a => `<option value="${a}" ${(ec.on_target_action||"close")===a?"selected":""}>${a}</option>`).join("")}</select></div>
+                </div>
+            </div>
+            <div class="leg-tab-content" id="leg-tab-leg-timing" style="display:none;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Slot SqOff</label>
+                        <input type="time" class="form-control" id="leg-m-sqoff" value="${slot.squareoff_time||''}"></div>
+                    <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Slot SqOff TZ</label>
+                        ${this._renderTzSelect(slot.squareoff_tz, "leg-m-sqofftz", "(inherit)")}</div>
+                    <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Leg SqOff</label>
+                        <input type="time" class="form-control" id="leg-m-legsqoff" value="${ec.squareoff_time||''}"></div>
+                    <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Leg SqOff TZ</label>
+                        ${this._renderTzSelect(ec.squareoff_tz, "leg-m-legsqofftz", "(inherit)")}</div>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+                <button class="btn btn-sm" onclick="Portfolio._cancelLegModal()">Cancel</button>
+                <button class="btn btn-sm btn-primary" onclick="Portfolio._saveLegModal()">Save Leg</button>
+            </div>
+        `;
+        // Close the portfolio modal and open leg modal
+        this._closeModal();
+        this._openModal(title, body, 700);
+    },
+
+    _switchLegTab(tabName) {
+        document.querySelectorAll(".leg-tab-content").forEach(el => el.style.display = "none");
+        // Only toggle leg tab buttons (not pf tab buttons)
+        document.querySelectorAll(`.slot-tab-btn[data-tab^="leg-"]`).forEach(el => el.classList.remove("active"));
+        const content = document.getElementById(`leg-tab-${tabName}`);
+        if (content) content.style.display = "";
+        const btn = document.querySelector(`.slot-tab-btn[data-tab="${tabName}"]`);
+        if (btn) btn.classList.add("active");
+    },
+
+    _onLegStratChange() {
+        const pfIdx = this._editingPfIndex;
+        const legIdx = this._editingSlotIndex;
+        if (pfIdx === null || legIdx === null) return;
+        const stratName = document.getElementById("leg-m-strategy").value;
+        const pf = this.portfolios[pfIdx];
+        const slot = pf.slots[legIdx];
+        slot.strategy_name = stratName;
+        const strat = this.strategies[stratName] || {};
+        slot.strategy_params = {};
+        if (strat.params) { for (const [k, info] of Object.entries(strat.params)) slot.strategy_params[k] = info.default; }
+        document.getElementById("leg-m-params").innerHTML = this._buildParamsHTML(pf, legIdx);
+    },
+
+    _saveLegModal() {
+        const pfIdx = this._editingPfIndex;
+        const legIdx = this._editingSlotIndex;
+        if (pfIdx === null || legIdx === null) return;
+        const slot = this.portfolios[pfIdx].slots[legIdx];
+
+        slot.strategy_name = document.getElementById("leg-m-strategy").value;
+        slot.bar_type_str = document.getElementById("leg-m-instrument").value;
+        slot.trade_size = parseFloat(document.getElementById("leg-m-size").value) || 1;
+        slot.allocation_pct = parseFloat(document.getElementById("leg-m-alloc").value) || 0;
+
+        // Read params
+        slot.strategy_params = {};
+        document.querySelectorAll("#leg-m-params [data-param-key]").forEach(el => {
+            const key = el.getAttribute("data-param-key");
+            const ptype = el.getAttribute("data-param-type");
+            if (ptype === "bool") slot.strategy_params[key] = el.checked;
+            else if (ptype === "time") {
+                const iz = el.getAttribute("data-inherit-zero") === "1";
+                slot.strategy_params[key] = (iz && el.value === "") ? 0 : parseInt((el.value||"00:00").replace(":",""),10);
+            } else if (ptype === "float") slot.strategy_params[key] = parseFloat(el.value);
+            else slot.strategy_params[key] = parseInt(el.value);
+        });
+
+        // Exit config
+        const ec = slot.exit_config = slot.exit_config || {};
+        ec.stop_loss_type = document.getElementById("leg-m-sltype").value;
+        ec.stop_loss_value = parseFloat(document.getElementById("leg-m-slval").value) || 0;
+        ec.trailing_sl_step = parseFloat(document.getElementById("leg-m-trailstep").value) || 0;
+        ec.trailing_sl_offset = parseFloat(document.getElementById("leg-m-trailoff").value) || 0;
+        ec.sl_wait_bars = parseInt(document.getElementById("leg-m-slwait").value) || 0;
+        ec.on_sl_action = document.getElementById("leg-m-slaction").value;
+        ec.max_re_executions = parseInt(document.getElementById("leg-m-maxreex").value) || 0;
+        ec.target_type = document.getElementById("leg-m-tptype").value;
+        ec.target_value = parseFloat(document.getElementById("leg-m-tpval").value) || 0;
+        ec.on_target_action = document.getElementById("leg-m-tpaction").value;
+        ec.squareoff_time = document.getElementById("leg-m-legsqoff").value || null;
+        ec.squareoff_tz = document.getElementById("leg-m-legsqofftz").value || null;
+        slot.squareoff_time = document.getElementById("leg-m-sqoff").value || null;
+        slot.squareoff_tz = document.getElementById("leg-m-sqofftz").value || null;
+
+        // Go back to portfolio modal
+        this._closeModal();
+        this._openPortfolioModal(pfIdx, false);
+    },
+
+    _cancelLegModal() {
+        if (this._editingLegIsNew) {
+            const pfIdx = this._editingPfIndex;
+            if (pfIdx !== null) this.portfolios[pfIdx].slots.pop();
+        }
+        this._closeModal();
+        this._openPortfolioModal(this._editingPfIndex, false);
+    },
+
+    _buildParamsHTML(pf, legIndex) {
+        const slot = pf.slots[legIndex];
+        const strat = this.strategies[slot.strategy_name] || {};
+        const params = strat.params || {};
+        let html = "";
+        for (const [key, info] of Object.entries(params)) {
+            const val = slot.strategy_params[key] !== undefined ? slot.strategy_params[key] : info.default;
+            if (info.type === "time") {
+                const vNum = parseInt(val??0,10)||0;
+                const iz = info.inherit_zero === true;
+                const hhmm = (iz && vNum === 0) ? "" : `${String(Math.floor(vNum/100)).padStart(2,"0")}:${String(vNum%100).padStart(2,"0")}`;
+                html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
+                    <input type="time" class="form-control" data-param-key="${key}" data-param-type="time" value="${hhmm}" ${iz?'data-inherit-zero="1"':''}></div>`;
+            } else if (typeof info.default === "boolean") {
+                html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
+                    <input type="checkbox" data-param-key="${key}" data-param-type="bool" ${val?"checked":""}></div>`;
+            } else {
+                const step = typeof info.default === "number" && !Number.isInteger(info.default) ? "0.5" : "1";
+                html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
+                    <input type="number" class="form-control" data-param-key="${key}" data-param-type="${Number.isInteger(info.default)?'int':'float'}" value="${val}"
+                        ${info.min!==undefined?`min="${info.min}"`:""} ${info.max!==undefined?`max="${info.max}"`:""} step="${step}"></div>`;
+            }
+        }
+        return html || '<p class="section-caption">No configurable parameters.</p>';
+    },
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       MODAL HELPERS
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    _openModal(title, bodyHTML, width) {
+        this._closeModal();
+        const backdrop = document.createElement("div");
+        backdrop.className = "modal-backdrop";
+        backdrop.id = "pf-modal-backdrop";
+        backdrop.innerHTML = `
+            <div class="modal-dialog" style="width:${width||640}px;">
+                <div class="modal-header">
+                    <span class="modal-header-title">${title}</span>
+                    <button class="modal-close-btn" onclick="Portfolio._closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">${bodyHTML}</div>
+            </div>`;
+        document.body.appendChild(backdrop);
+    },
+    _closeModal() { const el = document.getElementById("pf-modal-backdrop"); if (el) el.remove(); },
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       BACKTEST (unchanged logic — runs one portfolio)
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    async runBacktest() {
+        const pf = this._currentPortfolio;
+        if (!pf) { App.toast("No portfolio selected.", "error"); return; }
+        const enabledSlots = (pf.slots||[]).filter(s => s.enabled !== false);
+        if (enabledSlots.length === 0) { App.toast("Portfolio has no enabled slots.", "error"); return; }
+
+        pf.allocation_mode = pf.allocation_mode || "equal";
+        if (pf.allocation_mode === "percentage") {
+            const totalPct = enabledSlots.reduce((sum, s) => sum + (s.allocation_pct || 0), 0);
+            if (totalPct <= 0 || totalPct > 100) { App.toast(`Alloc % must sum to 1-100%. Current: ${totalPct.toFixed(1)}%`, "error"); return; }
+        }
+
+        // Strip UI-only fields (like _enabled) before sending to server
+        const cleanPf = JSON.parse(JSON.stringify(pf));
+        delete cleanPf._enabled;
+
+        App.log(`Backtest started: "${pf.name}" with ${enabledSlots.length} slot(s)`, "MESSAGE", "Multileg", pf.name);
+        const progressDiv = document.getElementById("pf-progress");
+        progressDiv.innerHTML = `<div class="card" style="padding:16px;">
+            <div class="progress-text" id="pf-progress-text">Initializing backtest for "${pf.name}"...</div>
+            <div class="progress-bar-container"><div class="progress-bar-fill" id="pf-progress-bar" style="width:0%;"></div></div>
+            <div id="pf-progress-details" style="margin-top:8px; font-size:0.85rem; color:var(--text-secondary);"></div>
+            <div id="pf-progress-slots" style="margin-top:12px;"></div>
+        </div>`;
 
         try {
             const response = await fetch("/api/portfolios/backtest", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ portfolio: this.portfolio }),
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ portfolio: cleanPf }),
             });
-
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let buffer = "";
-            let slotInfo = [];
-
+            let buffer = "", slotInfo = [];
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop(); // keep incomplete line in buffer
-
+                const lines = buffer.split("\n"); buffer = lines.pop();
                 for (const line of lines) {
                     if (!line.trim()) continue;
-                    let evt;
-                    try { evt = JSON.parse(line); } catch { continue; }
-
+                    let evt; try { evt = JSON.parse(line); } catch { continue; }
                     const bar = document.getElementById("pf-progress-bar");
                     const text = document.getElementById("pf-progress-text");
                     const details = document.getElementById("pf-progress-details");
                     const slotsDiv = document.getElementById("pf-progress-slots");
-
                     if (evt.event === "start") {
                         slotInfo = evt.slots || [];
-                        // Render slot checklist
-                        if (slotsDiv && slotInfo.length > 0) {
-                            slotsDiv.innerHTML = slotInfo.map(s =>
-                                `<div id="pf-slot-${s.slot_id}" style="padding: 4px 0; font-size: 0.85rem; color: var(--text-secondary);">
-                                    <span class="slot-icon" style="margin-right: 6px;">&#9723;</span>${s.display_name}
-                                </div>`
-                            ).join("");
-                        }
-
+                        if (slotsDiv) slotsDiv.innerHTML = slotInfo.map(s => `<div id="pf-slot-${s.slot_id}" style="padding:4px 0; font-size:0.85rem; color:var(--text-secondary);"><span class="slot-icon" style="margin-right:6px;">&#9723;</span>${s.display_name}</div>`).join("");
                     } else if (evt.event === "progress") {
                         const pct = evt.total > 0 ? Math.round((evt.completed / evt.total) * 100) : 0;
                         if (bar) bar.style.width = pct + "%";
                         if (text) text.textContent = evt.message || "Processing...";
-
                         if (evt.phase === "engine") {
-                            // Mark all as running initially
-                            for (const s of slotInfo) {
-                                const el = document.getElementById(`pf-slot-${s.slot_id}`);
-                                if (el && !el.dataset.done) {
-                                    const icon = el.querySelector(".slot-icon");
-                                    if (icon) icon.innerHTML = "&#9881;";
-                                    el.style.color = "var(--accent)";
-                                }
-                            }
-                            // Mark completed slot with green checkmark
-                            if (evt.completed_slot_id) {
-                                const el = document.getElementById(`pf-slot-${evt.completed_slot_id}`);
-                                if (el) {
-                                    const icon = el.querySelector(".slot-icon");
-                                    if (icon) icon.innerHTML = "&#9989;";
-                                    el.style.color = "var(--text-primary)";
-                                    el.dataset.done = "1";
-                                }
-                            }
-                            if (details) details.textContent = `${evt.slots_completed || 0}/${slotInfo.length} strategies completed`;
-                        } else if (evt.phase === "reports") {
-                            for (const s of slotInfo) {
-                                const el = document.getElementById(`pf-slot-${s.slot_id}`);
-                                if (el) {
-                                    const icon = el.querySelector(".slot-icon");
-                                    if (icon) icon.innerHTML = "&#9989;";
-                                    el.style.color = "var(--text-primary)";
-                                }
-                            }
-                            if (details) details.textContent = evt.message;
-                        }
-
+                            for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el && !el.dataset.done) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9881;"; el.style.color = "var(--accent)"; } }
+                            if (evt.completed_slot_id) { const el = document.getElementById(`pf-slot-${evt.completed_slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; el.dataset.done = "1"; } }
+                            if (details) details.textContent = `${evt.slots_completed||0}/${slotInfo.length} strategies completed`;
+                        } else if (evt.phase === "reports") { for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; } } if (details) details.textContent = evt.message; }
                     } else if (evt.event === "complete") {
                         if (bar) bar.style.width = "100%";
-                        if (text) text.textContent = `Backtest complete in ${evt.elapsed?.toFixed(1) || "?"}s`;
+                        if (text) text.textContent = `Backtest complete in ${evt.elapsed?.toFixed(1)||"?"}s`;
                         if (details) details.textContent = "";
-
-                        // Mark all slots done
-                        for (const s of slotInfo) {
-                            const el = document.getElementById(`pf-slot-${s.slot_id}`);
-                            if (el) {
-                                const icon = el.querySelector(".slot-icon");
-                                if (icon) icon.innerHTML = "&#9989;";
-                                el.style.color = "var(--text-primary)";
-                            }
-                        }
-
+                        for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; } }
                         const results = evt.results;
                         if (results && !results.error) {
                             this.results = results;
                             App.state.portfolioResults = results;
-                            const resultsDiv = document.getElementById("pf-results");
-                            resultsDiv.innerHTML = this._renderResults();
-                            App.toast("Portfolio backtest finished!", "success");
-                        } else {
-                            throw new Error(results?.error || "Unknown error");
-                        }
-
-                    } else if (evt.event === "error") {
-                        throw new Error(evt.error || "Backtest failed");
-                    }
+                            document.getElementById("pf-results").innerHTML = this._renderResults();
+                            App.toast("Backtest finished!", "success");
+                            App.log(`Backtest completed for "${pf.name}" in ${evt.elapsed?.toFixed(1)||"?"}s`, "SUCCESS", "Multileg", pf.name);
+                        } else { throw new Error(results?.error || "Unknown error"); }
+                    } else if (evt.event === "error") { throw new Error(evt.error || "Backtest failed"); }
                 }
             }
         } catch (e) {
-            const progressDiv = document.getElementById("pf-progress");
-            progressDiv.innerHTML = `<div class="alert alert-danger">Backtest failed: ${e.message}</div>`;
-        } finally {
-            btn.disabled = false;
-            btn.textContent = "Run Portfolio Backtest";
+            document.getElementById("pf-progress").innerHTML = `<div class="alert alert-danger">Backtest failed: ${e.message}</div>`;
+            App.log(`Backtest failed: ${e.message}`, "ERROR", "Multileg", pf.name);
         }
     },
 
     _renderResults() {
         const r = this.results;
         if (!r) return "";
-
-        const pnlClass = r.total_pnl >= 0 ? "positive" : "negative";
         let flagsHTML = "";
         if (r.max_loss_hit) flagsHTML += '<span class="badge badge-danger">Max Loss Hit</span> ';
         if (r.max_profit_hit) flagsHTML += '<span class="badge badge-success">Max Profit Hit</span> ';
-
-        // Per-strategy table
+        let reportBtnHTML = "";
+        if (r.report_file) {
+            reportBtnHTML = `<a class="btn btn-sm btn-primary" href="/api/reports/${encodeURIComponent(r.report_file)}" download style="margin-right:6px;">&#128196; Download Report</a>`;
+        }
         let perStratRows = "";
         if (r.per_strategy) {
-            for (const [sid, sr] of Object.entries(r.per_strategy)) {
+            for (const [, sr] of Object.entries(r.per_strategy)) {
                 const cls = sr.pnl >= 0 ? "positive" : "negative";
-                perStratRows += `<tr>
-                    <td>${sr.display_name}</td>
-                    <td class="${cls}">${App.currency(sr.pnl)}</td>
-                    <td>${sr.trades}</td>
-                    <td>${sr.win_rate.toFixed(1)}%</td>
-                    <td>${sr.wins}</td>
-                    <td>${sr.losses}</td>
-                </tr>`;
+                perStratRows += `<tr><td>${sr.display_name}</td><td class="${cls}">${App.currency(sr.pnl)}</td><td>${sr.trades}</td><td>${sr.win_rate.toFixed(1)}%</td><td>${sr.wins}</td><td>${sr.losses}</td></tr>`;
             }
         }
-
-        return `
-            <div class="portfolio-results">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="font-weight: 600; font-size: 0.95rem;">Results: ${r.portfolio_name || ""}</span>
-                    <div>${flagsHTML}
-                        <button class="btn btn-sm btn-primary" onclick="App.navigate('portfolio_tearsheet')">Full Tearsheet</button>
-                    </div>
-                </div>
-
-                <div class="grid-6">
-                    ${App.metricHTML("Starting Capital", App.currency(r.starting_capital))}
-                    ${App.metricHTML("Final Balance", App.currency(r.final_balance))}
-                    ${App.metricHTML("Total P&L", App.currency(r.total_pnl), r.total_return_pct)}
-                    ${App.metricHTML("Total Trades", r.total_trades)}
-                    ${App.metricHTML("Win Rate", r.win_rate.toFixed(1) + "%")}
-                    ${App.metricHTML("Max Drawdown", r.max_drawdown.toFixed(2) + "%")}
-                </div>
-
-                ${perStratRows ? `
-                <div class="table-container" style="margin-top: 12px;">
-                    <table>
-                        <thead><tr><th>Strategy</th><th>P&L</th><th>Trades</th><th>Win Rate</th><th>Wins</th><th>Losses</th></tr></thead>
-                        <tbody>${perStratRows}</tbody>
-                    </table>
-                </div>` : ""}
+        return `<div class="portfolio-results">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:0.95rem;">Results: ${r.portfolio_name||""}</span>
+                <div>${flagsHTML}${reportBtnHTML}<button class="btn btn-sm btn-primary" onclick="App.navigate('portfolio_tearsheet')">Full Tearsheet</button></div>
             </div>
-        `;
+            <div class="grid-6">
+                ${App.metricHTML("Starting Capital", App.currency(r.starting_capital))}
+                ${App.metricHTML("Final Balance", App.currency(r.final_balance))}
+                ${App.metricHTML("Total P&L", App.currency(r.total_pnl), r.total_return_pct)}
+                ${App.metricHTML("Total Trades", r.total_trades)}
+                ${App.metricHTML("Win Rate", r.win_rate.toFixed(1) + "%")}
+                ${App.metricHTML("Max Drawdown", r.max_drawdown.toFixed(2) + "%")}
+            </div>
+            ${perStratRows ? `<div class="table-container" style="margin-top:12px;"><table><thead><tr><th>Strategy</th><th>P&L</th><th>Trades</th><th>Win Rate</th><th>Wins</th><th>Losses</th></tr></thead><tbody>${perStratRows}</tbody></table></div>` : ""}
+        </div>`;
     },
 };

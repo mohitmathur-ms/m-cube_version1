@@ -236,11 +236,11 @@ const ViewData = {
             yaxis2: { title: "Volume", side: "right", overlaying: "y", showgrid: false },
             xaxis:  { title: "Date", rangeslider: { visible: false } },
             template: "plotly_dark",
-            paper_bgcolor: "#21252b",
-            plot_bgcolor: "#21252b",
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
             height: 600,
             legend: { orientation: "h", yanchor: "bottom", y: 1.02, xanchor: "right", x: 1 },
-            font: { color: "#e6e6e6" },
+            font: { color: "#1a1a1a" },
             margin: { l: 60, r: 60, t: 50, b: 50 },
         });
     },
@@ -287,10 +287,10 @@ const ViewData = {
 
         const darkLayout = {
             template: "plotly_dark",
-            paper_bgcolor: "#21252b",
-            plot_bgcolor: "#21252b",
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
             height: 400,
-            font: { color: "#e6e6e6" },
+            font: { color: "#1a1a1a" },
             margin: { l: 50, r: 30, t: 50, b: 50 },
         };
 

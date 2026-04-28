@@ -31,9 +31,13 @@ const App = {
         };
     },
 
+    _logCount: 0,
+    _logCollapsed: false,
+
     /** Initialize the app */
     init() {
         this.bindNavigation();
+        this.log("System initialized", "MESSAGE", "SYSTEM");
         this.navigate("dashboard");
     },
 
@@ -72,6 +76,16 @@ const App = {
             item.classList.toggle("active", item.dataset.page === page);
         });
 
+        // Clear action bar for new page
+        this.setActionBar("");
+
+        // Log navigation
+        const pageNames = {
+            dashboard: "Dashboard", load_data: "Load Data", view_data: "View Data",
+            backtest: "Run Backtest", tearsheet: "Tearsheet", portfolio: "Multileg",
+            portfolio_tearsheet: "Portfolio Tearsheet",
+        };
+        this.log(`${pageNames[page] || page} tab loaded`, "MESSAGE", "SYSTEM", pageNames[page] || "");
         const main = document.getElementById("main-content");
 
         // Hide every other page's container.
@@ -354,6 +368,84 @@ const App = {
                 </div>
                 <div class="accordion-body">${content}</div>
             </div>`;
+    },
+
+    /* ─── Activity Log System ────────────────────────────────────────────── */
+
+    /** Add an entry to the persistent activity log panel.
+     *  @param {string} message  - Log message
+     *  @param {string} type     - MESSAGE | SUCCESS | ERROR | WARNING
+     *  @param {string} source   - SYSTEM, or page/module name
+     *  @param {string} stratTag - Optional strategy tag */
+    log(message, type = "MESSAGE", source = "SYSTEM", stratTag = "") {
+        const tbody = document.getElementById("log-tbody");
+        if (!tbody) return;
+
+        const now = new Date();
+        const ts = now.getFullYear() + "-" +
+            String(now.getMonth() + 1).padStart(2, "0") + "-" +
+            String(now.getDate()).padStart(2, "0") + " " +
+            String(now.getHours()).padStart(2, "0") + ":" +
+            String(now.getMinutes()).padStart(2, "0") + ":" +
+            String(now.getSeconds()).padStart(2, "0");
+
+        const typeClass = {
+            MESSAGE: "log-type-message",
+            SUCCESS: "log-type-success",
+            ERROR: "log-type-error",
+            WARNING: "log-type-warning",
+        }[type] || "log-type-message";
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${ts}</td>
+            <td class="${typeClass}">${type}</td>
+            <td>${message}</td>
+            <td>${source}</td>
+            <td>${stratTag}</td>
+        `;
+
+        // Insert at top (newest first)
+        tbody.insertBefore(row, tbody.firstChild);
+
+        this._logCount++;
+        const badge = document.getElementById("log-count-badge");
+        if (badge) {
+            badge.textContent = this._logCount;
+            badge.style.display = "";
+        }
+
+        // Auto-scroll to top
+        const panel = document.getElementById("log-panel");
+        if (panel) panel.scrollTop = 0;
+    },
+
+    /** Toggle log panel visibility */
+    toggleLog() {
+        this._logCollapsed = !this._logCollapsed;
+        document.body.classList.toggle("log-collapsed", this._logCollapsed);
+        const btn = document.getElementById("log-toggle-btn");
+        if (btn) {
+            const badge = document.getElementById("log-count-badge");
+            const badgeHTML = badge ? badge.outerHTML : "";
+            btn.innerHTML = this._logCollapsed ? `Show Log ${badgeHTML}` : `Log ${badgeHTML}`;
+        }
+    },
+
+    /** Clear all log entries */
+    clearLog() {
+        const tbody = document.getElementById("log-tbody");
+        if (tbody) tbody.innerHTML = "";
+        this._logCount = 0;
+        const badge = document.getElementById("log-count-badge");
+        if (badge) badge.style.display = "none";
+    },
+
+    /** Set page-specific buttons in the action bar.
+     *  @param {string} html - Button HTML to inject */
+    setActionBar(html) {
+        const el = document.getElementById("action-bar-buttons");
+        if (el) el.innerHTML = html || "";
     },
 };
 

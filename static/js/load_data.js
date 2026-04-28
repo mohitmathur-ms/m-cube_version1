@@ -77,17 +77,33 @@ const LoadData = {
             </div>
 
             <div id="scan-results"></div>
-            <div class="page-divider"></div>
-            <h2 class="section-title">Current Catalog Contents</h2>
-            <div id="catalog-contents">
-                <div class="alert alert-info">Loading catalog...</div>
+
+            <div class="status-buttons-row">
+                <button class="btn" onclick="LoadData.showLoadingStatusPopup()">
+                    Loading Status <span class="btn-badge" id="loading-status-badge" style="display:none;">0</span>
+                </button>
+                <button class="btn" onclick="LoadData.showCatalogPopup()">
+                    Catalog Contents <span class="btn-badge" id="catalog-count-badge" style="display:none;">0</span>
+                </button>
             </div>
+
+            <!-- Hidden containers that feed into the popups -->
+            <div id="load-progress" style="display:none;"></div>
+            <div id="load-results" style="display:none;"></div>
+            <div id="catalog-contents" style="display:none;"></div>
         `;
 
         App.state.selectedAsset = defaultAsset;
         App.state.selectedVenue = defaultVenues[0] || "";
         this.scanFolder();
         this.loadCatalogContents();
+
+        // Set action bar
+        App.setActionBar(`
+            <button class="btn btn-sm btn-primary" onclick="LoadData.scanFolder()">Scan Folder</button>
+            <button class="btn btn-sm" onclick="LoadData.showLoadingStatusPopup()">Loading Status</button>
+            <button class="btn btn-sm" onclick="LoadData.showCatalogPopup()">Catalog Contents</button>
+        `);
     },
 
     onAssetClassChange() {
@@ -243,8 +259,8 @@ const LoadData = {
 
                 ${unmatchedHTML}
 
-                <div id="load-progress" style="margin-top: 16px;"></div>
-                <div id="load-results" style="margin-top: 16px;"></div>
+                <div id="load-progress" style="display:none;"></div>
+                <div id="load-results" style="display:none;"></div>
             `;
 
             // Store only matched entries for loading
@@ -317,6 +333,10 @@ const LoadData = {
             </div>
         `;
         resultsDiv.innerHTML = "";
+        this._updateBadges();
+        App.log(`Loading ${entries.length} symbol(s) into catalog...`, "MESSAGE", "LoadData");
+        // Auto-open the loading status popup so user sees progress immediately
+        this.showLoadingStatusPopup();
 
         try {
             const venueSelect = document.getElementById("venue-select");
@@ -351,6 +371,8 @@ const LoadData = {
                 html += this._renderPendingJob(job);
             }
             resultsDiv.innerHTML = html;
+            this._updateBadges();
+            this._refreshOpenModal();
 
             const inlineDone = data.results.length + data.errors.length;
             // Track totals on the instance so _onPendingJobFinished can keep
@@ -367,6 +389,7 @@ const LoadData = {
                     `Loaded ${data.results.length} symbol(s) successfully.${tail}`,
                     "success"
                 );
+                App.log(`Loaded ${data.results.length} symbol(s) successfully.${tail}`, "SUCCESS", "LoadData");
             } else if (pendingJobs.length > 0) {
                 App.toast(`${pendingJobs.length} ingest job(s) running in background — cards will fill in as each finishes.`, "success");
             }
@@ -474,6 +497,8 @@ const LoadData = {
         // Update the progress bar incrementally each time a background job
         // resolves, then refresh the catalog list once they're all done.
         this._updateLoadProgress();
+        this._updateBadges();
+        this._refreshOpenModal();
         const remaining = document.querySelectorAll(
             '#load-results [id^="pending-job-"]'
         ).length;
@@ -512,6 +537,105 @@ const LoadData = {
         }
     },
 
+    /** Show a modal popup with loading status (progress + results) */
+    showLoadingStatusPopup() {
+        this._activeModal = "loading-status";
+        this._refreshLoadingStatusModal();
+    },
+
+    _refreshLoadingStatusModal() {
+        const progressDiv = document.getElementById("load-progress");
+        const resultsDiv = document.getElementById("load-results");
+        const progressHTML = progressDiv ? progressDiv.innerHTML : "";
+        const resultsHTML = resultsDiv ? resultsDiv.innerHTML : "";
+
+        const content = progressHTML || resultsHTML
+            ? `<div>${progressHTML}</div><div style="margin-top:12px;">${resultsHTML}</div>`
+            : '<div class="alert alert-info">No loading activity yet. Select symbols above and click Load.</div>';
+
+        this._openModal("Loading Status", content);
+    },
+
+    /** Show a modal popup with current catalog contents */
+    showCatalogPopup() {
+        this._activeModal = "catalog";
+        const catalogDiv = document.getElementById("catalog-contents");
+        const content = catalogDiv ? catalogDiv.innerHTML : '<div class="alert alert-info">Loading catalog...</div>';
+        this._openModal("Current Catalog Contents", content);
+    },
+
+    /** Refresh the currently open modal if it matches the given type */
+    _refreshOpenModal() {
+        if (!document.getElementById("ld-modal-backdrop")) return;
+        if (this._activeModal === "loading-status") {
+            this._refreshLoadingStatusModal();
+        } else if (this._activeModal === "catalog") {
+            this.showCatalogPopup();
+        }
+    },
+
+    /** Generic modal open helper */
+    _openModal(title, bodyHTML) {
+        const existing = document.getElementById("ld-modal-backdrop");
+        // If modal already open, just update the body content
+        if (existing) {
+            const body = existing.querySelector(".modal-body");
+            if (body) body.innerHTML = bodyHTML;
+            const titleEl = existing.querySelector(".modal-header-title");
+            if (titleEl) titleEl.textContent = title;
+            return;
+        }
+
+        const backdrop = document.createElement("div");
+        backdrop.className = "modal-backdrop";
+        backdrop.id = "ld-modal-backdrop";
+        backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) this._closeModal();
+        });
+
+        backdrop.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <span class="modal-header-title">${title}</span>
+                    <button class="modal-close-btn" onclick="LoadData._closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">${bodyHTML}</div>
+            </div>`;
+
+        document.body.appendChild(backdrop);
+    },
+
+    _closeModal() {
+        const existing = document.getElementById("ld-modal-backdrop");
+        if (existing) existing.remove();
+        this._activeModal = null;
+    },
+
+    /** Update the badge counts on the status buttons */
+    _updateBadges() {
+        // Loading status badge — show count of pending jobs
+        const pendingCount = document.querySelectorAll('#load-results [id^="pending-job-"]').length;
+        const statusBadge = document.getElementById("loading-status-badge");
+        if (statusBadge) {
+            if (pendingCount > 0) {
+                statusBadge.textContent = pendingCount;
+                statusBadge.className = "btn-badge running";
+                statusBadge.style.display = "";
+            } else {
+                // Show total results count if any exist
+                const totalResults = document.getElementById("load-results");
+                const hasResults = totalResults && totalResults.innerHTML.trim().length > 0;
+                if (hasResults) {
+                    statusBadge.textContent = "Done";
+                    statusBadge.className = "btn-badge";
+                    statusBadge.style.display = "";
+                } else {
+                    statusBadge.style.display = "none";
+                }
+            }
+        }
+    },
+
     async loadCatalogContents() {
         const div = document.getElementById("catalog-contents");
         if (!div) return;
@@ -521,8 +645,16 @@ const LoadData = {
             const types = data.bar_types || [];
             const details = data.bar_type_details || {};
 
+            // Update catalog badge
+            const catalogBadge = document.getElementById("catalog-count-badge");
+            if (catalogBadge) {
+                catalogBadge.textContent = types.length;
+                catalogBadge.style.display = types.length > 0 ? "" : "none";
+            }
+
             if (types.length === 0) {
                 div.innerHTML = '<div class="alert alert-info">Catalog is empty. Load some data above to get started!</div>';
+                this._refreshOpenModal();
                 return;
             }
 
@@ -554,6 +686,7 @@ const LoadData = {
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
+            this._refreshOpenModal();
         } catch (e) {
             div.innerHTML = `<div class="alert alert-danger">Could not read catalog: ${e.message}</div>`;
         }

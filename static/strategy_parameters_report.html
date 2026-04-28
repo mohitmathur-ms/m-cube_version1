@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M-Cube Strategy &amp; Portfolio Parameters Report</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #161921;
+            --surface2: #1c1f2b;
+            --border: #2a2d3a;
+            --text: #e1e4eb;
+            --text-muted: #8b8fa3;
+            --accent: #6c8aff;
+            --accent-dim: #3d5aaf;
+            --green: #4caf7d;
+            --red: #e06070;
+            --orange: #e09050;
+            --yellow: #d4c455;
+            --purple: #a06cd5;
+            --cyan: #50c8d0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* Header */
+        .report-header {
+            text-align: center;
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+        .report-header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .report-header .subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+        .report-header .generated {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        /* Summary grid */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+        .summary-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .summary-card .number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .summary-card .label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        /* TOC */
+        .toc {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2.5rem;
+        }
+        .toc h2 {
+            font-size: 1.1rem;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.5rem;
+        }
+        .toc a {
+            color: var(--text);
+            text-decoration: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.15s;
+        }
+        .toc a:hover { background: var(--surface2); }
+        .toc .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Strategy sections */
+        .strategy-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        .strategy-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .strategy-badge {
+            width: 42px; height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+        .strategy-header h2 { font-size: 1.4rem; font-weight: 600; }
+        .strategy-header .file-path {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-family: 'Consolas', 'Fira Code', monospace;
+        }
+        .strategy-body { padding: 1.5rem 2rem; }
+
+        .description-box {
+            background: var(--surface2);
+            border-left: 3px solid var(--accent);
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+        }
+
+        /* Logic boxes */
+        .logic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .logic-box {
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .logic-box.buy {
+            background: rgba(76, 175, 125, 0.08);
+            border-color: rgba(76, 175, 125, 0.25);
+        }
+        .logic-box.sell {
+            background: rgba(224, 96, 112, 0.08);
+            border-color: rgba(224, 96, 112, 0.25);
+        }
+        .logic-box h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .logic-box.buy h4 { color: var(--green); }
+        .logic-box.sell h4 { color: var(--red); }
+        .logic-box code {
+            font-family: 'Consolas', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+
+        /* Category label */
+        .param-category {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin: 1.5rem 0 0.75rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .param-category:first-of-type { margin-top: 0; }
+
+        /* Parameter table */
+        .param-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.88rem;
+            margin-bottom: 0.5rem;
+        }
+        .param-table thead th {
+            background: var(--surface2);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.6rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .param-table thead th:first-child { border-radius: 8px 0 0 0; }
+        .param-table thead th:last-child { border-radius: 0 8px 0 0; }
+        .param-table tbody tr { transition: background 0.1s; }
+        .param-table tbody tr:hover { background: var(--surface2); }
+        .param-table td {
+            padding: 0.65rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .param-table .param-name {
+            font-family: 'Consolas', 'Fira Code', monospace;
+            color: var(--cyan);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .param-table .param-type {
+            font-family: 'Consolas', 'Fira Code', monospace;
+            color: var(--purple);
+            font-size: 0.8rem;
+        }
+        .param-table .param-default {
+            font-family: 'Consolas', 'Fira Code', monospace;
+            color: var(--orange);
+            font-weight: 600;
+        }
+        .param-table .param-range {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+        .param-table .param-why {
+            color: var(--text-muted);
+            font-size: 0.84rem;
+            max-width: 350px;
+        }
+
+        /* Execution params */
+        .exec-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .exec-section h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+
+        /* Footer */
+        .report-footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .report-header h1 { font-size: 1.5rem; }
+            .strategy-header { flex-direction: column; align-items: flex-start; }
+            .param-table { font-size: 0.8rem; }
+            .param-table td, .param-table th { padding: 0.5rem; }
+        }
+
+        /* Print */
+        @media print {
+            body { background: #fff; color: #222; padding: 0; }
+            .strategy-section, .exec-section, .toc, .summary-card {
+                background: #fff;
+                border-color: #ddd;
+                break-inside: avoid;
+            }
+            .param-table thead th { background: #f5f5f5; color: #333; }
+            .report-header { background: #f8f8f8; }
+            .report-header h1 { -webkit-text-fill-color: #333; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="report-header">
+        <h1>M-Cube Strategy &amp; Portfolio Parameters Report</h1>
+        <div class="subtitle">Complete reference of all strategy, portfolio, and execution parameters &mdash; defaults &amp; usage</div>
+        <div class="generated">Generated on 2026-04-28 &bull; 6 strategies &bull; 90+ configurable parameters &bull; Portfolio, Slot, Leg &amp; Exit configs</div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="number">6</div>
+            <div class="label">Strategies</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">100+</div>
+            <div class="label">Total Parameters</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">10</div>
+            <div class="label">Portfolio-Level</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">7</div>
+            <div class="label">Slot / Leg Config</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">15</div>
+            <div class="label">Exit Config (SL / TP / Timing)</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">5</div>
+            <div class="label">UI Pages Covered</div>
+        </div>
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <div class="toc-grid">
+            <a href="#ema-cross"><span class="dot" style="background:var(--green)"></span> 1. EMA Cross</a>
+            <a href="#bollinger"><span class="dot" style="background:var(--purple)"></span> 2. Bollinger Bands</a>
+            <a href="#rsi"><span class="dot" style="background:var(--orange)"></span> 3. RSI Mean Reversion</a>
+            <a href="#four-ma"><span class="dot" style="background:var(--cyan)"></span> 4. Four Moving Averages</a>
+            <a href="#range-breakout"><span class="dot" style="background:var(--red)"></span> 5. Range Breakout</a>
+            <a href="#decoy"><span class="dot" style="background:var(--yellow)"></span> 6. Decoy Long / Short</a>
+            <a href="#portfolio-config"><span class="dot" style="background:var(--accent)"></span> Portfolio Configuration</a>
+            <a href="#slot-leg"><span class="dot" style="background:var(--cyan)"></span> Slot / Leg Configuration</a>
+            <a href="#exit-config"><span class="dot" style="background:var(--orange)"></span> Exit Config (SL / TP / Timing)</a>
+            <a href="#load-data"><span class="dot" style="background:var(--green)"></span> Load Data Page</a>
+            <a href="#execution"><span class="dot" style="background:var(--accent)"></span> Backtest Page (Single-Instrument)</a>
+            <a href="#view-data"><span class="dot" style="background:var(--purple)"></span> View Data Page</a>
+            <a href="#tearsheet"><span class="dot" style="background:var(--yellow)"></span> Tearsheet &amp; Results</a>
+            <a href="#engine-constants"><span class="dot" style="background:var(--text-muted)"></span> Engine &amp; Runtime Constants</a>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 1. EMA CROSS ─────────────────── -->
+    <div class="strategy-section" id="ema-cross">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(76,175,125,0.15); color:var(--green);">&#x2197;</div>
+            <div>
+                <h2>EMA Cross</h2>
+                <div class="file-path">strategies/ema_cross.py &bull; Config: EMACrossConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                A trend-following strategy that uses two Exponential Moving Averages. Generates buy signals when the
+                fast EMA crosses above the slow EMA (golden cross), and sell signals when it crosses below (death cross).
+                Simple yet effective for capturing sustained trends.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Buy Signal</h4>
+                    <code>fast_ema &ge; slow_ema</code><br>
+                    <small style="color:var(--text-muted)">When portfolio is flat or net short</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Sell Signal</h4>
+                    <code>fast_ema &lt; slow_ema</code><br>
+                    <small style="color:var(--text-muted)">When portfolio is flat or net long</small>
+                </div>
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">fast_ema_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">10</td>
+                        <td class="param-range">2 &ndash; 100</td>
+                        <td class="param-why">Controls the sensitivity of the fast EMA. Lower values react faster to price changes, catching trends earlier but generating more false signals. Default of 10 balances responsiveness with noise filtering.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">slow_ema_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">20</td>
+                        <td class="param-range">5 &ndash; 200</td>
+                        <td class="param-why">Defines the baseline trend direction. Higher values smooth out noise, producing fewer but more reliable signals. The default 20-period captures medium-term trends. Must be greater than fast_ema_period.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Number of units (lots/contracts) per trade. Controls position sizing and risk exposure. A value of 1 means one standard unit per signal.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 2. BOLLINGER BANDS ─────────────────── -->
+    <div class="strategy-section" id="bollinger">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(160,108,213,0.15); color:var(--purple);">&#x2194;</div>
+            <div>
+                <h2>Bollinger Bands</h2>
+                <div class="file-path">strategies/bollinger_bands.py &bull; Config: BollingerConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                A mean-reversion strategy that uses Bollinger Bands &mdash; a moving average with upper and lower bands
+                set at a configurable number of standard deviations. Buys when price touches the lower band (oversold)
+                and sells at the upper band (overbought), betting on price returning to the mean.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Buy Signal</h4>
+                    <code>close &le; lower_band</code><br>
+                    <small style="color:var(--text-muted)">Price at or below lower Bollinger Band</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Sell Signal</h4>
+                    <code>close &ge; upper_band</code><br>
+                    <small style="color:var(--text-muted)">Price at or above upper Bollinger Band</small>
+                </div>
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">bb_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">20</td>
+                        <td class="param-range">5 &ndash; 100</td>
+                        <td class="param-why">Lookback window for calculating the moving average and standard deviation. The standard 20-period captures roughly one trading month. Lower values make bands more reactive; higher values produce smoother, wider bands.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">bb_std</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">2.0</td>
+                        <td class="param-range">0.5 &ndash; 4.0</td>
+                        <td class="param-why">Number of standard deviations for the bands. At 2.0, roughly 95% of price action stays within the bands (assuming normal distribution). Higher values produce fewer but higher-conviction signals; lower values generate more frequent trades.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Number of units per trade. Controls position sizing and overall risk exposure.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 3. RSI MEAN REVERSION ─────────────────── -->
+    <div class="strategy-section" id="rsi">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(224,144,80,0.15); color:var(--orange);">&#x21C5;</div>
+            <div>
+                <h2>RSI Mean Reversion</h2>
+                <div class="file-path">strategies/rsi_mean_reversion.py &bull; Config: RSIConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                Uses the Relative Strength Index (RSI) to identify overbought and oversold conditions. When RSI drops
+                below the oversold threshold, the instrument is considered undervalued and a buy is triggered. When RSI
+                rises above the overbought threshold, a sell is triggered. Classic momentum oscillator strategy.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Buy Signal</h4>
+                    <code>RSI &le; oversold (default: 30)</code><br>
+                    <small style="color:var(--text-muted)">Instrument is oversold</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Sell Signal</h4>
+                    <code>RSI &ge; overbought (default: 70)</code><br>
+                    <small style="color:var(--text-muted)">Instrument is overbought</small>
+                </div>
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">rsi_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">14</td>
+                        <td class="param-range">2 &ndash; 50</td>
+                        <td class="param-why">Lookback window for RSI calculation. The standard 14-period (proposed by J. Welles Wilder) provides a balanced view of recent momentum. Shorter periods increase sensitivity and generate more signals; longer periods smooth out noise.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">overbought</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">70.0</td>
+                        <td class="param-range">50.0 &ndash; 95.0</td>
+                        <td class="param-why">RSI level above which the instrument is considered overbought and a sell signal is generated. The classic 70 level works well for most markets. Raise it (e.g., 80) in strong uptrends to avoid premature sells.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">oversold</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">30.0</td>
+                        <td class="param-range">5.0 &ndash; 50.0</td>
+                        <td class="param-why">RSI level below which the instrument is considered oversold and a buy signal is generated. The classic 30 level catches most reversals. Lower it (e.g., 20) to reduce false signals in bearish markets.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Number of units per trade. Controls position sizing and risk.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 4. FOUR MOVING AVERAGES ─────────────────── -->
+    <div class="strategy-section" id="four-ma">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(80,200,208,0.15); color:var(--cyan);">&#x2263;</div>
+            <div>
+                <h2>Four Moving Averages</h2>
+                <div class="file-path">strategies/four_ma.py &bull; Config: FourMAConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                A multi-timeframe trend confirmation strategy using four moving averages of increasing periods.
+                Generates buy signals only when all four MAs are perfectly aligned bullish (shortest on top), and sell
+                signals when bearishly aligned (shortest on bottom). This strict alignment requirement filters out
+                choppy markets and only trades strong, confirmed trends. Supports both SMA and EMA modes.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Buy Signal (Bullish Alignment)</h4>
+                    <code>MA1 &gt; MA2 &gt; MA3 &gt; MA4</code><br>
+                    <small style="color:var(--text-muted)">All four MAs perfectly stacked bullish</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Sell Signal (Bearish Alignment)</h4>
+                    <code>MA1 &lt; MA2 &lt; MA3 &lt; MA4</code><br>
+                    <small style="color:var(--text-muted)">All four MAs perfectly stacked bearish</small>
+                </div>
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">use_ema</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">False</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Toggle between Simple Moving Average (SMA) and Exponential Moving Average (EMA). EMA gives more weight to recent prices, making it more responsive. SMA treats all periods equally, providing smoother signals.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">ma1_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">5</td>
+                        <td class="param-range">2 &ndash; 200</td>
+                        <td class="param-why">Fastest MA &mdash; captures short-term momentum. The 5-period is sensitive to recent price moves and leads the alignment/misalignment of the stack.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">ma2_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">10</td>
+                        <td class="param-range">2 &ndash; 200</td>
+                        <td class="param-why">Second MA &mdash; intermediate short-term trend filter. Confirms momentum established by MA1 is sustained over a slightly longer window.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">ma3_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">20</td>
+                        <td class="param-range">2 &ndash; 200</td>
+                        <td class="param-why">Third MA &mdash; medium-term trend indicator. Roughly one trading month. Adds a layer of trend confirmation to reduce whipsaws.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">ma4_period</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">50</td>
+                        <td class="param-range">2 &ndash; 500</td>
+                        <td class="param-why">Slowest MA &mdash; long-term trend baseline. When this aligns with the others, the trend is deeply established. The 50-period is a widely-watched institutional level.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Number of units per trade. Controls position sizing and risk.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 5. RANGE BREAKOUT ─────────────────── -->
+    <div class="strategy-section" id="range-breakout">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(224,96,112,0.15); color:var(--red);">&#x21A5;</div>
+            <div>
+                <h2>Range Breakout (Opening Range Breakout with Pyramiding)</h2>
+                <div class="file-path">strategies/range_breakout.py &bull; Config: RangeBreakoutConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                The most complex strategy in the system. Establishes a price range during a configurable time window,
+                then trades breakouts above/below that range. Supports multi-leg pyramiding where each successive leg
+                fires only after the previous leg&rsquo;s target is hit. Each leg can have its own lot size and range
+                end time. Includes buffers, re-entry limits, stop-losses, and an end-of-day square-off.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Buy Signal (Long Breakout)</h4>
+                    <code>price &gt; range_high + buffer</code><br>
+                    <small style="color:var(--text-muted)">After range window closes, before breakout cutoff</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Sell Signal (Short Breakout)</h4>
+                    <code>price &lt; range_low &minus; buffer</code><br>
+                    <small style="color:var(--text-muted)">After range window closes, before breakout cutoff</small>
+                </div>
+            </div>
+
+            <!-- Time Parameters -->
+            <div class="param-category">Time Window Parameters</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">range_start_hhmm</td>
+                        <td class="param-type">int (HHMM)</td>
+                        <td class="param-default">930</td>
+                        <td class="param-range">0 &ndash; 2359</td>
+                        <td class="param-why">Start of the range accumulation window. 930 = 9:30 AM, aligning with common market opens (e.g., NSE). The range high/low are tracked from this time.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">range_end_hhmm</td>
+                        <td class="param-type">int (HHMM)</td>
+                        <td class="param-default">1030</td>
+                        <td class="param-range">0 &ndash; 2359</td>
+                        <td class="param-why">Default end of range window. The first hour of trading (9:30&ndash;10:30) typically establishes the day&rsquo;s key levels. After this time, breakout entries are allowed.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">breakout_end_hhmm</td>
+                        <td class="param-type">int (HHMM)</td>
+                        <td class="param-default">1130</td>
+                        <td class="param-range">0 &ndash; 2359</td>
+                        <td class="param-why">Last time a new breakout entry is allowed. Prevents late-day entries that lack follow-through. After this time, only existing positions are managed.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_hhmm</td>
+                        <td class="param-type">int (HHMM)</td>
+                        <td class="param-default">1515</td>
+                        <td class="param-range">0 &ndash; 2359</td>
+                        <td class="param-why">Forced exit time for all open positions. 15:15 is minutes before Indian market close (15:30). Ensures no overnight risk from intraday strategy. All legs are closed at this time.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">timezone_offset_min</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">-720 &ndash; 720</td>
+                        <td class="param-why">Timezone offset in minutes from UTC. IST = 330 (5h30m). Ensures HHMM parameters are interpreted in the correct local time regardless of the server&rsquo;s timezone.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Breakout Buffer Parameters -->
+            <div class="param-category">Breakout Buffer Parameters</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">breakout_buffer_pct</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.1</td>
+                        <td class="param-range">0.0 &ndash; 5.0</td>
+                        <td class="param-why">Percentage buffer added beyond the range high/low before triggering entry. Prevents false breakouts caused by minor wicks. 0.1% is a minimal filter; increase for volatile instruments.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">breakout_buffer_mode</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">0 &ndash; 1</td>
+                        <td class="param-why">Selects buffer calculation method. <strong>0</strong> = percentage of range high/low. <strong>1</strong> = fixed points. Use points mode for instruments where percentage doesn&rsquo;t scale well (e.g., indices).</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">breakout_buffer_pts</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">0.0 &ndash; 1,000,000</td>
+                        <td class="param-why">Fixed-point buffer when mode=1. For example, 10 points on Nifty means entry triggers 10 points beyond range extreme. Only active when breakout_buffer_mode = 1.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">range_monitoring_type</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">0 &ndash; 1</td>
+                        <td class="param-why"><strong>0</strong> = realtime (uses candle wicks/high-low for breakout detection &mdash; more aggressive). <strong>1</strong> = minute close (only triggers on confirmed candle close &mdash; fewer false signals but slower entry).</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Target & Stop Parameters -->
+            <div class="param-category">Target &amp; Stop-Loss Parameters</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">target_pct</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">10.0</td>
+                        <td class="param-range">0.1 &ndash; 100.0</td>
+                        <td class="param-why">Profit target percentage per leg. When target_stop_basis=1, this is a percentage of range size (not entry price). Hitting the target on leg N promotes leg N+1 for pyramiding.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">stop_pct</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">40.0</td>
+                        <td class="param-range">0.1 &ndash; 100.0</td>
+                        <td class="param-why">Stop-loss percentage per leg. At 40% of range size (default), allows room for normal volatility. Hitting a stop does <strong>not</strong> promote the next leg &mdash; only targets do.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">target_stop_basis</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">0 &ndash; 1</td>
+                        <td class="param-why"><strong>0</strong> = target/stop calculated from entry price. <strong>1</strong> = calculated as percentage of range size (default). Range-based sizing automatically adapts to daily volatility.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">opposite_side_sl</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">False</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">When true, the stop-loss for a long entry is the range low, and vice versa. This uses the natural support/resistance of the opening range rather than a fixed percentage.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">pessimistic_intra_bar_exits</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">False</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">When a bar hits both target and stop, <strong>false</strong> = target wins (optimistic). <strong>True</strong> = stop wins (pessimistic/conservative). Use pessimistic for more realistic backtesting.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Pyramid / Leg Parameters -->
+            <div class="param-category">Pyramid / Leg Parameters</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">num_legs</td>
+                        <td class="param-type">PositiveInt</td>
+                        <td class="param-default">3</td>
+                        <td class="param-range">1 &ndash; 10</td>
+                        <td class="param-why">Number of pyramid legs. Each leg fires after the previous leg&rsquo;s target is hit, allowing progressive position building in a trending breakout. 3 legs is a moderate pyramid depth.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">leg1_lots &hellip; leg10_lots</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">0 &ndash; 1000</td>
+                        <td class="param-why">Position size for each pyramid leg. Allows scaling in/out: e.g., start with 1 lot on leg 1, increase to 2 on leg 2 as conviction grows, or decrease to manage risk.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">leg1_range_end_hhmm &hellip; leg10_range_end_hhmm</td>
+                        <td class="param-type">int (HHMM)</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">0 &ndash; 2359</td>
+                        <td class="param-why">Per-leg override for range end time. 0 = inherit the global range_end_hhmm. Later legs can use wider range windows (e.g., leg 3 uses 11:00 range) for wider breakout levels on the same instrument.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">max_reentries_per_leg</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">3</td>
+                        <td class="param-range">0 &ndash; 10</td>
+                        <td class="param-why">How many times a leg can re-enter after being stopped out in the same day. Prevents unlimited re-entries on choppy days. 0 = no re-entries allowed (one shot per leg).</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Entry/Exit Control -->
+            <div class="param-category">Entry &amp; Exit Control</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">enable_long</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">True</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Enable long-side breakout entries. Set to false to only trade short breakouts &mdash; useful when backtesting short-only strategies or when market context is bearish.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">enable_short</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">True</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Enable short-side breakout entries. Set to false to only trade long breakouts.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">one_side_entry_only</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">False</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">When true, whichever side (long or short) triggers first locks out the other side for the rest of the day. Prevents whipsawing between long and short on the same day.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">first_entry_cutoff_minutes</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Minutes after range_end before which leg 1&rsquo;s first entry must occur. 0 = disabled (use breakout_end_hhmm). Adds a tighter window specifically for the initial entry.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">reexecute_cutoff_minutes</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Minutes after range_end beyond which re-entries are blocked. 0 = disabled. Prevents late-session re-entries that have less time to reach targets.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Base position size multiplier applied to all legs. The effective size per leg = trade_size &times; legN_lots.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ─────────────────── 6. DECOY LONG/SHORT ─────────────────── -->
+    <div class="strategy-section" id="decoy">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(212,196,85,0.15); color:var(--yellow);">&#x21AF;</div>
+            <div>
+                <h2>Decoy Long / Decoy Short</h2>
+                <div class="file-path">custom_strategies/decoy_long_short.py &bull; Config: DecoyConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                A contrarian price-action strategy based on structural deception patterns. Looks for situations where
+                the candle structure (higher highs/lows or lower highs/lows) suggests one direction, but the candle
+                color contradicts it. This &ldquo;deception&rdquo; often signals smart money accumulation/distribution.
+                Originally ported from Pine Script by blockchainpcn.
+            </div>
+
+            <div class="logic-grid">
+                <div class="logic-box buy">
+                    <h4>Decoy Long (Buy Signal)</h4>
+                    <code>Higher High + Higher Low + RED candle</code><br>
+                    <small style="color:var(--text-muted)">Bullish structure but bearish close = accumulation</small>
+                </div>
+                <div class="logic-box sell">
+                    <h4>Decoy Short (Sell Signal)</h4>
+                    <code>Lower High + Lower Low + GREEN candle</code><br>
+                    <small style="color:var(--text-muted)">Bearish structure but bullish close = distribution</small>
+                </div>
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">use_strict_color</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">True</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why"><strong>True</strong> = candle color is determined by Close vs Open (standard candlestick). <strong>False</strong> = color is determined by Close vs Previous Close (Heikin-Ashi style). Strict mode is more precise for individual candle patterns.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">ignore_doji</td>
+                        <td class="param-type">bool</td>
+                        <td class="param-default">True</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Doji candles (open == close) have ambiguous color. When true, doji candles are skipped entirely, avoiding false signals from indecisive bars.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">min_body_pct</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">0.0 &ndash; 100.0</td>
+                        <td class="param-why">Minimum candle body size as a percentage of the candle&rsquo;s total range (high &minus; low). Filters out candles with tiny bodies relative to wicks, which carry weak directional conviction. 0 = no filter.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Decimal</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Number of units per trade. Controls position sizing and risk.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── PORTFOLIO CONFIGURATION ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="portfolio-config">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(108,138,255,0.15); color:var(--accent);">&#x2637;</div>
+            <div>
+                <h2>Portfolio Configuration</h2>
+                <div class="file-path">UI: Portfolio Modal &bull; Backend: core/models.py &rarr; PortfolioConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                Portfolio-level parameters apply to the entire multi-leg portfolio backtest. They control how capital is
+                divided among strategy slots, set global date ranges, risk limits, and end-of-day square-off behavior.
+                Individual slots/legs can override some of these (timing, dates).
+            </div>
+
+            <!-- Capital & Allocation -->
+            <div class="param-category">Capital &amp; Allocation</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">starting_capital</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">100,000</td>
+                        <td class="param-range">&ge; 1,000 &bull; step: 10,000</td>
+                        <td class="param-why">Initial account balance for the entire portfolio. This is the total pool from which capital is allocated to each strategy slot. All return metrics (% returns, drawdown) are calculated relative to this value.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">allocation_mode</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"equal"</td>
+                        <td class="param-range"><strong>equal</strong> | <strong>percentage</strong></td>
+                        <td class="param-why">Determines how starting_capital is divided across enabled slots.<br>
+                            <strong>equal</strong> &mdash; each slot gets <code>capital / N</code> (simple, no favouritism).<br>
+                            <strong>percentage</strong> &mdash; each slot gets its own <code>allocation_pct</code> share, allowing you to weight high-conviction strategies more heavily.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">name</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">"New Portfolio"</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Unique identifier for saving and loading the portfolio configuration. Portfolios are persisted as JSON files in the <code>portfolios/</code> directory using this name.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">description</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">"" (empty)</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Optional notes or remarks about the portfolio. Displayed in the portfolio table for quick reference. Useful for documenting the rationale behind a specific portfolio configuration.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Risk Limits -->
+            <div class="param-category">Risk Limits</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">max_loss</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">null (no limit)</td>
+                        <td class="param-range">&ge; 0 &bull; USD</td>
+                        <td class="param-why">Portfolio-level stop-loss in dollars. When the cumulative portfolio loss reaches this amount, the backtest flags <code>max_loss_hit = true</code> and may halt further trading. Protects against catastrophic drawdowns across all legs combined.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">max_profit</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">null (no limit)</td>
+                        <td class="param-range">&ge; 0 &bull; USD</td>
+                        <td class="param-why">Portfolio-level take-profit target in dollars. When cumulative profits reach this threshold, the backtest flags <code>max_profit_hit = true</code>. Useful for testing &ldquo;walk-away&rdquo; strategies that lock in a daily/session profit target.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Timing -->
+            <div class="param-category">Timing &amp; Dates</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">start_date</td>
+                        <td class="param-type">Date (ISO)</td>
+                        <td class="param-default">null (catalog min)</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Portfolio-wide backtest start date. All slots use this unless they have their own override. Defaults to the earliest date available in the data catalog. Allows focusing on specific market regimes.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">end_date</td>
+                        <td class="param-type">Date (ISO)</td>
+                        <td class="param-default">null (catalog max)</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Portfolio-wide backtest end date. All slots use this unless they have their own override. Defaults to the latest date in the catalog.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_time</td>
+                        <td class="param-type">Time (HH:MM)</td>
+                        <td class="param-default">null (none)</td>
+                        <td class="param-range">00:00 &ndash; 23:59</td>
+                        <td class="param-why">Portfolio-level daily square-off time. All open positions across all legs are force-closed at this time each day. Ensures no overnight risk for intraday strategies. Individual legs and slots can override this.<br>
+                            <strong>Precedence:</strong> Leg &gt; Slot &gt; Portfolio</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_tz</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">null (UTC)</td>
+                        <td class="param-range">UTC, America/New_York, America/Chicago, America/Los_Angeles, Europe/London, Europe/Berlin, Asia/Tokyo, Asia/Singapore, Asia/Kolkata</td>
+                        <td class="param-why">Timezone for interpreting squareoff_time. Critical for multi-market portfolios &mdash; e.g., an Indian equity leg needs Asia/Kolkata (IST) to close at 15:15 local time, while a US equity leg uses America/New_York.<br>
+                            <strong>Precedence:</strong> Leg &gt; Slot &gt; Portfolio</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── SLOT / LEG CONFIGURATION ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="slot-leg">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(80,200,208,0.15); color:var(--cyan);">&#x2630;</div>
+            <div>
+                <h2>Slot / Leg Configuration</h2>
+                <div class="file-path">UI: Leg Modal &bull; Backend: core/models.py &rarr; StrategySlotConfig</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                Each &ldquo;leg&rdquo; in a portfolio represents one strategy running on one instrument. These parameters
+                define which strategy to use, what instrument to trade, position sizing, and capital allocation. A portfolio
+                can have multiple legs, each independently configured.
+            </div>
+
+            <div class="param-category">Basic Leg Setup</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">strategy_name</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"EMA Cross"</td>
+                        <td class="param-range">All registered strategies</td>
+                        <td class="param-why">Selects which trading strategy this leg will execute. The available list is auto-discovered from built-in (<code>strategies/</code>) and custom (<code>custom_strategies/</code>) strategy directories. Each leg can run a different strategy.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">bar_type_str</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"" (user selects)</td>
+                        <td class="param-range">All loaded instruments</td>
+                        <td class="param-why">The instrument and timeframe this leg trades (e.g., &ldquo;EUR_USD.IDEALPRO-1-MINUTE-MID&rdquo;). Determines which price bars are fed to the strategy. Each leg can trade a different instrument, enabling multi-asset portfolios.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size</td>
+                        <td class="param-type">Number</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&ge; 1</td>
+                        <td class="param-why">Position size in units (lots/contracts) for this leg. Controls how many units are bought/sold per signal. Directly scales the P&amp;L and risk for this specific leg within the portfolio.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">allocation_pct</td>
+                        <td class="param-type">Number</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">0 &ndash; 100 &bull; step: 0.5</td>
+                        <td class="param-why">Capital allocation percentage for this slot. <strong>Only active when <code>allocation_mode = "percentage"</code></strong>. For example, if starting_capital is 100,000 and allocation_pct is 40, this leg gets $40,000. The sum of all enabled slot percentages should be between 1% and 100%.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">enabled</td>
+                        <td class="param-type">Boolean</td>
+                        <td class="param-default">true</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Toggle to include or exclude this slot from the portfolio backtest without deleting it. Only enabled slots are executed and receive capital allocation. Useful for A/B testing slot combinations.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="param-category">Slot-Level Date Overrides</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">start_date <small>(slot)</small></td>
+                        <td class="param-type">Date (ISO)</td>
+                        <td class="param-default">null (inherit portfolio)</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Per-slot start date override. When set, this slot uses its own start date instead of the portfolio-level start_date. Useful when different legs trade instruments with different data availability (e.g., one crypto pair available from 2020, another from 2022).</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">end_date <small>(slot)</small></td>
+                        <td class="param-type">Date (ISO)</td>
+                        <td class="param-default">null (inherit portfolio)</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Per-slot end date override. When set, this slot uses its own end date instead of the portfolio-level end_date. Allows running individual legs on different date windows within the same portfolio.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="param-category">Strategy Parameters (Dynamic)</div>
+            <div class="description-box" style="margin-bottom:0;">
+                Each leg also exposes the selected strategy&rsquo;s own parameters (in the &ldquo;Parameters&rdquo; tab of the leg modal).
+                These are the same parameters documented in the strategy sections above (e.g., <code>fast_ema_period</code> for EMA Cross,
+                <code>bb_period</code> for Bollinger, etc.). They are rendered dynamically based on the strategy&rsquo;s <code>PARAMS</code> dictionary &mdash;
+                booleans as checkboxes, numbers as inputs with min/max constraints, and time-type params as HH:MM inputs.
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── EXIT CONFIG (SL / TP / TIMING) ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="exit-config">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(224,144,80,0.15); color:var(--orange);">&#x2716;</div>
+            <div>
+                <h2>Exit Configuration (Stop-Loss / Target / Timing)</h2>
+                <div class="file-path">UI: Leg Modal tabs &bull; Backend: core/models.py &rarr; ExitConfig &rarr; ManagedExitStrategy</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                Each leg has an independent exit configuration that controls stop-losses, profit targets, and timing overrides.
+                These are set in the Stoploss, Target, and Timing tabs of the leg editing modal. The exit logic is handled
+                by the <code>ManagedExitStrategy</code> wrapper which wraps around the core strategy and manages position exits.
+            </div>
+
+            <!-- Stop-Loss -->
+            <div class="param-category">Stop-Loss Configuration</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">stop_loss_type</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"none"</td>
+                        <td class="param-range"><strong>none</strong> | <strong>percentage</strong> | <strong>points</strong> | <strong>trailing</strong></td>
+                        <td class="param-why">Selects the stop-loss mechanism for this leg.<br>
+                            <strong>none</strong> &mdash; no SL; exits only when the strategy generates an opposite signal.<br>
+                            <strong>percentage</strong> &mdash; SL triggers when price moves X% against entry.<br>
+                            <strong>points</strong> &mdash; SL triggers when price moves X points/ticks against entry.<br>
+                            <strong>trailing</strong> &mdash; SL follows price in the profitable direction; locks in gains as the trade moves favorably.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">stop_loss_value</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">&ge; 0 &bull; step: 0.5</td>
+                        <td class="param-why">The distance for the stop-loss. Interpretation depends on <code>stop_loss_type</code>:<br>
+                            &bull; If <strong>percentage</strong>: e.g., 2.0 means SL at 2% below entry for longs.<br>
+                            &bull; If <strong>points</strong>: e.g., 50 means SL at 50 points/ticks below entry for longs.<br>
+                            &bull; If <strong>trailing</strong>: initial trailing distance from the highest/lowest price reached.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trailing_sl_step</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">&ge; 0 &bull; step: 0.5</td>
+                        <td class="param-why">Step size for updating the trailing stop. The trailing SL only moves when price has moved at least this many points/percent in the profitable direction. Prevents excessive SL adjustments on minor price fluctuations. Only applies when <code>stop_loss_type = "trailing"</code>.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trailing_sl_offset</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">&ge; 0 &bull; step: 0.5</td>
+                        <td class="param-why">Initial offset for the trailing stop before it begins trailing. For example, an offset of 10 means the trailing logic only activates once the position is 10 points/percent in profit. Gives the trade room to develop before the trailing mechanism engages. Only applies when <code>stop_loss_type = "trailing"</code>.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">sl_wait_bars</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">&ge; 0</td>
+                        <td class="param-why">Number of bars to wait before the SL becomes active. A value of 3 means the stop-loss is only enforced starting from the 4th bar after entry. Gives the trade initial breathing room and avoids stop-outs on the entry bar&rsquo;s noise. 0 = SL active immediately.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">on_sl_action</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"close"</td>
+                        <td class="param-range"><strong>close</strong> | <strong>re_execute</strong> | <strong>reverse</strong></td>
+                        <td class="param-why">What to do when the stop-loss is hit.<br>
+                            <strong>close</strong> &mdash; close the position and wait for the next signal (standard behavior).<br>
+                            <strong>re_execute</strong> &mdash; close and immediately re-enter in the same direction if conditions still hold (up to <code>max_re_executions</code>).<br>
+                            <strong>reverse</strong> &mdash; close and enter a position in the opposite direction (contrarian SL flip).</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">max_re_executions</td>
+                        <td class="param-type">int</td>
+                        <td class="param-default">0</td>
+                        <td class="param-range">&ge; 0</td>
+                        <td class="param-why">Maximum number of times the strategy can re-enter after a stop-loss when <code>on_sl_action = "re_execute"</code>. Prevents infinite re-entry loops on highly volatile days. For example, a value of 2 allows up to 2 re-entries after stop-outs before giving up. 0 = no limit (use with caution).</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Target -->
+            <div class="param-category">Profit Target Configuration</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">target_type</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"none"</td>
+                        <td class="param-range"><strong>none</strong> | <strong>percentage</strong> | <strong>points</strong></td>
+                        <td class="param-why">Selects the take-profit mechanism for this leg.<br>
+                            <strong>none</strong> &mdash; no TP; position only exits on opposite signal or SL.<br>
+                            <strong>percentage</strong> &mdash; TP triggers when price moves X% in the profitable direction from entry.<br>
+                            <strong>points</strong> &mdash; TP triggers when price moves X points/ticks in the profitable direction.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">target_value</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">0.0</td>
+                        <td class="param-range">&ge; 0 &bull; step: 0.5</td>
+                        <td class="param-why">The distance for the take-profit. Interpretation depends on <code>target_type</code>:<br>
+                            &bull; If <strong>percentage</strong>: e.g., 5.0 means TP at 5% above entry for longs.<br>
+                            &bull; If <strong>points</strong>: e.g., 100 means TP at 100 points above entry for longs.<br>
+                            Combined with SL, this defines the trade&rsquo;s risk-reward ratio.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">on_target_action</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"close"</td>
+                        <td class="param-range"><strong>close</strong> | <strong>re_execute</strong> | <strong>reverse</strong></td>
+                        <td class="param-why">What to do when the profit target is hit.<br>
+                            <strong>close</strong> &mdash; close the position and wait for the next signal (book profits).<br>
+                            <strong>re_execute</strong> &mdash; close and immediately re-enter in the same direction (ride the trend).<br>
+                            <strong>reverse</strong> &mdash; close and open an opposite position (mean-reversion flip at extremes).</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">target_lock_trigger</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">null (disabled)</td>
+                        <td class="param-range">&ge; 0</td>
+                        <td class="param-why">Profit percentage that triggers profit locking. Once unrealised profit reaches this level, the target is dynamically replaced with <code>target_lock_minimum</code> to lock in a guaranteed minimum profit. Prevents giving back large unrealised gains. <em>(Backend only &mdash; not currently exposed in UI.)</em></td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">target_lock_minimum</td>
+                        <td class="param-type">float</td>
+                        <td class="param-default">null (disabled)</td>
+                        <td class="param-range">&ge; 0</td>
+                        <td class="param-why">Minimum profit percentage to lock in once <code>target_lock_trigger</code> fires. For example, trigger=5.0 and minimum=2.0 means: once the trade is +5%, set a floor at +2% so you never exit below +2% profit. <em>(Backend only &mdash; not currently exposed in UI.)</em></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Timing Overrides -->
+            <div class="param-category">Per-Leg Timing Overrides</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">squareoff_time <small>(slot-level)</small></td>
+                        <td class="param-type">Time (HH:MM)</td>
+                        <td class="param-default">null (inherit portfolio)</td>
+                        <td class="param-range">00:00 &ndash; 23:59</td>
+                        <td class="param-why">Slot-level squareoff time override. When set, overrides the portfolio-level squareoff_time for all legs in this slot. Useful when one slot trades a market with a different close time than others.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_tz <small>(slot-level)</small></td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">null (inherit portfolio)</td>
+                        <td class="param-range">IANA timezone list</td>
+                        <td class="param-why">Slot-level timezone override. Used in combination with slot squareoff_time to correctly interpret the close time for this slot&rsquo;s market.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_time <small>(leg-level / ExitConfig)</small></td>
+                        <td class="param-type">Time (HH:MM)</td>
+                        <td class="param-default">null (inherit slot &rarr; portfolio)</td>
+                        <td class="param-range">00:00 &ndash; 23:59</td>
+                        <td class="param-why">Highest-priority squareoff time override, specific to this one leg. Overrides both slot and portfolio settings. Used when a single leg within a slot needs a unique close time (e.g., commodity vs equity legs in the same slot).</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">squareoff_tz <small>(leg-level / ExitConfig)</small></td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">null (inherit slot &rarr; portfolio)</td>
+                        <td class="param-range">IANA timezone list</td>
+                        <td class="param-why">Highest-priority timezone override for this specific leg. Combined with leg-level squareoff_time for precise per-leg scheduling.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Precedence diagram -->
+            <div style="background:var(--surface2); border-radius:10px; padding:1.25rem; margin-top:1.25rem;">
+                <h4 style="color:var(--accent); font-size:0.85rem; margin-bottom:0.75rem;">SQUAREOFF RESOLUTION PRECEDENCE</h4>
+                <div style="font-family:'Consolas','Fira Code',monospace; font-size:0.85rem; color:var(--text); line-height:1.8;">
+                    <span style="color:var(--green);">Leg (ExitConfig)</span>
+                    <span style="color:var(--text-muted);"> &rarr; overrides &rarr; </span>
+                    <span style="color:var(--yellow);">Slot</span>
+                    <span style="color:var(--text-muted);"> &rarr; overrides &rarr; </span>
+                    <span style="color:var(--orange);">Portfolio</span>
+                    <span style="color:var(--text-muted);"> &rarr; fallback &rarr; </span>
+                    <span style="color:var(--red);">None (no squareoff)</span>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem;">
+                    Time and timezone are resolved independently &mdash; a leg can set only time and inherit timezone from portfolio.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── LOAD DATA PAGE ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="load-data">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(76,175,125,0.15); color:var(--green);">&#x2913;</div>
+            <div>
+                <h2>Load Data Page</h2>
+                <div class="file-path">UI: Load Data tab &bull; Backend: server.py &rarr; /api/csv/load &bull; JS: static/js/load_data.js</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                The Load Data page is the first step in the workflow. It controls how raw CSV price data is ingested
+                and converted into the Parquet data catalog that the backtest engine reads. All parameters here define
+                what data gets loaded, from which exchange, and where it&rsquo;s stored.
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">catalog_path</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">./catalog</td>
+                        <td class="param-range">Any valid directory path</td>
+                        <td class="param-why">Root directory for the Parquet data catalog. All loaded bar data is stored here in a structured format. The backtest engine reads from this path. Changing it allows maintaining separate catalogs for different projects or asset classes.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">asset_class</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"crypto"</td>
+                        <td class="param-range"><strong>crypto</strong> | <strong>forex</strong> | <strong>equity</strong> | <strong>index</strong> | <strong>commodity</strong></td>
+                        <td class="param-why">Declares the asset class for the data being loaded. Affects how instruments are named, how price precision is set, and how bar types are constructed. Must match the actual data source to ensure correct instrument IDs.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">venue</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"BINANCE"</td>
+                        <td class="param-range"><strong>BINANCE</strong> | <strong>IDEALPRO</strong> | <strong>NSE</strong> | <strong>CBOE</strong> | (others)</td>
+                        <td class="param-why">The exchange or venue the data comes from. Becomes part of the instrument ID (e.g., <code>BTCUSDT.BINANCE</code>). Ensures correct venue-specific handling for tick size, lot size, and naming conventions.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">csv_folder</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">"" (user enters)</td>
+                        <td class="param-range">Any valid folder path</td>
+                        <td class="param-why">Directory containing the raw CSV files to ingest. The system scans this folder and lists all CSV files for selection. Supports any directory on the local filesystem.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">csv_files <small>(multi-select)</small></td>
+                        <td class="param-type">Multi-select</td>
+                        <td class="param-default">[] (none selected)</td>
+                        <td class="param-range">All CSV files in csv_folder</td>
+                        <td class="param-why">Specific CSV files to load from the folder. Multi-select allows loading multiple instruments in one batch. Each file typically represents one instrument&rsquo;s OHLCV data at a specific timeframe.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">csv_search</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">"" (empty)</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Filter/search text to narrow down the file list in the multi-select. Useful when the folder contains hundreds of CSV files and you need to find specific instruments quickly.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── BACKTEST PAGE ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="execution">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(108,138,255,0.15); color:var(--accent);">&#x25B6;</div>
+            <div>
+                <h2>Backtest Page (Single-Instrument)</h2>
+                <div class="file-path">UI: Backtest tab &bull; Backend: server.py &rarr; /api/backtest/run-stream &bull; JS: static/js/backtest.js</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                The Backtest page is for running strategies on individual instruments (or multiple instruments independently).
+                Unlike the Portfolio page, each instrument runs in its own isolated backtest with its own capital.
+                These are the global execution parameters set on this page.
+            </div>
+
+            <div class="param-category">Execution Parameters</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">starting_capital</td>
+                        <td class="param-type">Number</td>
+                        <td class="param-default">100,000</td>
+                        <td class="param-range">&ge; 1,000 &bull; step: 10,000</td>
+                        <td class="param-why">Initial account balance for each individual backtest. Each instrument gets its own full allocation of this capital (no splitting). All return metrics are calculated relative to this value.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">trade_size <small>(per strategy)</small></td>
+                        <td class="param-type">Number</td>
+                        <td class="param-default">1</td>
+                        <td class="param-range">&ge; 1 &bull; step: 1</td>
+                        <td class="param-why">Position size in units (lots/contracts) for each strategy. Set independently per strategy when multiple strategies are selected. Controls how many units are bought/sold per signal.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="param-category">Instrument Selection &amp; Date Ranges</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">instruments <small>(checkboxes)</small></td>
+                        <td class="param-type">Multi-checkbox</td>
+                        <td class="param-default">[] (none selected)</td>
+                        <td class="param-range">All bar types in catalog</td>
+                        <td class="param-why">Select which instruments/bar types to backtest. Multiple instruments can be selected &mdash; each runs as an independent backtest. The list is populated from the data catalog with available bar types.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">inst_search</td>
+                        <td class="param-type">Text</td>
+                        <td class="param-default">"" (empty)</td>
+                        <td class="param-range">&mdash;</td>
+                        <td class="param-why">Filter text to search through the instrument list. Filters by name as you type. Useful when the catalog contains many instruments.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">start_date <small>(per instrument)</small></td>
+                        <td class="param-type">Date</td>
+                        <td class="param-default">Catalog min for that instrument</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Per-instrument backtest start date. Each selected instrument can have its own date range. Defaults to the earliest date available for that specific instrument in the catalog. Allows testing different instruments on different time windows.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">end_date <small>(per instrument)</small></td>
+                        <td class="param-type">Date</td>
+                        <td class="param-default">Catalog max for that instrument</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Per-instrument backtest end date. Each selected instrument can have its own date range. Defaults to the latest date available for that specific instrument in the catalog.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="param-category">Strategy Selection &amp; Custom Upload</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">strategies <small>(checkboxes)</small></td>
+                        <td class="param-type">Multi-checkbox</td>
+                        <td class="param-default">[] (none selected)</td>
+                        <td class="param-range">All registered strategies</td>
+                        <td class="param-why">Select which strategies to run. Multiple strategies can be selected &mdash; each runs independently on each selected instrument. The cartesian product of instruments &times; strategies defines the total number of backtests.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">custom_strategy_file</td>
+                        <td class="param-type">File upload</td>
+                        <td class="param-default">none</td>
+                        <td class="param-range">.py files only</td>
+                        <td class="param-why">Upload a custom Python strategy file. The file is validated for the required structure (PARAMS dict, strategy class, config class) and placed in the <code>custom_strategies/</code> directory. Once uploaded, it appears in the strategy selection list alongside built-in strategies.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── VIEW DATA PAGE ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="view-data">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(160,108,213,0.15); color:var(--purple);">&#x2338;</div>
+            <div>
+                <h2>View Data Page</h2>
+                <div class="file-path">UI: View Data tab &bull; Backend: server.py &rarr; /api/data/* &bull; JS: static/js/view_data.js</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                The View Data page allows inspecting loaded bar data before running backtests. It provides a table and
+                chart view of OHLCV bars with date filtering. Useful for verifying data quality, checking for gaps,
+                and understanding the price history of loaded instruments.
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">bar_type <small>(select)</small></td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">"" (first available)</td>
+                        <td class="param-range">All bar types in catalog</td>
+                        <td class="param-why">Selects which instrument and timeframe to display. The dropdown is populated from the data catalog. Shows the full bar type string (e.g., &ldquo;BTCUSDT.BINANCE-1-DAY-LAST&rdquo;) for precise identification.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">date_from</td>
+                        <td class="param-type">Date</td>
+                        <td class="param-default">Catalog min</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">Start date for filtering displayed bars. Limits the table and chart to show data from this date onward. Defaults to the earliest available data for the selected bar type.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">date_to</td>
+                        <td class="param-type">Date</td>
+                        <td class="param-default">Catalog max</td>
+                        <td class="param-range">YYYY-MM-DD</td>
+                        <td class="param-why">End date for filtering displayed bars. Limits the table and chart to show data up to this date. Defaults to the latest available data for the selected bar type.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="param-category">Display Limits (Constants)</div>
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Value</th><th>Where</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">MAX_TABLE_ROWS</td>
+                        <td class="param-type">int (constant)</td>
+                        <td class="param-default">500</td>
+                        <td class="param-range">view_data.js</td>
+                        <td class="param-why">Maximum number of rows shown in the data table at once. Prevents browser slowdown when viewing large datasets. Data beyond this limit is fetched but only the most recent 500 rows are rendered.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">FETCH_LIMIT</td>
+                        <td class="param-type">int (constant)</td>
+                        <td class="param-default">5,000</td>
+                        <td class="param-range">view_data.js</td>
+                        <td class="param-why">Maximum number of bars fetched from the server per request. Caps the API response size to prevent memory issues when querying years of minute-level data. Sufficient for most visual inspection needs.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── TEARSHEET & RESULTS ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="tearsheet">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(212,196,85,0.15); color:var(--yellow);">&#x2261;</div>
+            <div>
+                <h2>Tearsheet &amp; Results Page</h2>
+                <div class="file-path">UI: Results tabs &bull; JS: static/js/tearsheet.js &amp; portfolio_tearsheet.js</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                After a backtest completes, the tearsheet pages display performance analytics. These selectors
+                let you drill down into specific instrument or strategy results within a multi-instrument or multi-strategy run.
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Range / Options</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">instrument_select</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">First result</td>
+                        <td class="param-range">All instruments in results</td>
+                        <td class="param-why">When multiple instruments were backtested, selects which instrument&rsquo;s results to display in the tearsheet charts and tables. Allows switching between instruments without re-running the backtest.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">strategy_select</td>
+                        <td class="param-type">Select</td>
+                        <td class="param-default">First result</td>
+                        <td class="param-range">All strategies in results</td>
+                        <td class="param-why">When multiple strategies were tested, selects which strategy&rsquo;s results to view. Combined with instrument_select, provides a two-dimensional drill-down into the results matrix.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ─────────────────── ENGINE & RUNTIME CONSTANTS ─────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="strategy-section" id="engine-constants">
+        <div class="strategy-header">
+            <div class="strategy-badge" style="background:rgba(139,143,163,0.15); color:var(--text-muted);">&#x2699;</div>
+            <div>
+                <h2>Engine &amp; Runtime Constants</h2>
+                <div class="file-path">server.py &bull; backtest.js &bull; core/backtest_runner.py</div>
+            </div>
+        </div>
+        <div class="strategy-body">
+            <div class="description-box">
+                These are internal constants that are not user-configurable in the UI but affect backtest behavior.
+                They are hardcoded in the source and can only be changed by editing the code directly. Documented here
+                for completeness and to explain their impact on results.
+            </div>
+
+            <table class="param-table">
+                <thead><tr><th>Constant</th><th>Value</th><th>Where</th><th>Why It&rsquo;s Used</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td class="param-name">default_leverage</td>
+                        <td class="param-default">1 (no leverage)</td>
+                        <td class="param-range">backtest_runner.py</td>
+                        <td class="param-why">Fixed leverage multiplier for the trading venue. Set to 1x (no leverage), meaning positions require full capital. This is a NautilusTrader venue configuration value and is not adjustable from the UI.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">account_type</td>
+                        <td class="param-default">CASH</td>
+                        <td class="param-range">backtest_runner.py</td>
+                        <td class="param-why">Venue account type used by NautilusTrader. CASH means positions must be fully funded (no margin). Affects how buying power is calculated during the backtest.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">base_currency</td>
+                        <td class="param-default">USD</td>
+                        <td class="param-range">backtest_runner.py</td>
+                        <td class="param-why">Account denomination currency. All P&amp;L, starting capital, and balance metrics are in USD. This is the currency used for the venue&rsquo;s starting balance.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">HIGH_TRADE_THRESHOLD</td>
+                        <td class="param-default">10,000</td>
+                        <td class="param-range">backtest.js</td>
+                        <td class="param-why">Sanity-check threshold. If a backtest produces more than 10,000 trades, a warning is displayed in the UI. High trade counts may indicate a noisy strategy or incorrect timeframe selection.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">RATIO_THRESHOLD</td>
+                        <td class="param-default">10</td>
+                        <td class="param-range">backtest.js</td>
+                        <td class="param-why">Cross-instrument ratio threshold used for trade-count consistency checks. If one instrument&rsquo;s trade count is more than 10x another, a warning is raised suggesting potential data or configuration issues.</td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">DOJI_WARN_THRESHOLD</td>
+                        <td class="param-default">0.30 (30%)</td>
+                        <td class="param-range">server.py</td>
+                        <td class="param-why">If more than 30% of bars in a loaded dataset are doji candles (open == close), a warning is shown. High doji rates indicate low-liquidity or flat-price data that may produce unreliable backtest results.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="report-footer">
+        M-Cube Backtesting Platform &bull; Complete Strategy &amp; Portfolio Parameters Report &bull; Generated 2026-04-28
+    </div>
+
+</div>
+</body>
+</html>
