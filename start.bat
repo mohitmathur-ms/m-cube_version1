@@ -130,10 +130,10 @@ REM ===========================================================================
 echo [run] Starting server on http://localhost:5000 ...
 start "" cmd /c "timeout /t 3 /nobreak >nul && start """" http://localhost:5000"
 "%VENV_PY%" server.py
+set "SERVER_EXIT=!ERRORLEVEL!"
 
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo Server exited with code %ERRORLEVEL%.
-    pause
-)
+echo.
+echo Server stopped (exit code !SERVER_EXIT!).
+pause
 endlocal
+exit /b !SERVER_EXIT!
