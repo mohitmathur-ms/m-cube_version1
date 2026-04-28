@@ -51,6 +51,14 @@ const Dashboard = {
         this.loadCatalogStatus();
     },
 
+    /** Refresh catalog status on every nav-in (cheap call, may have changed
+     *  while the user was on the Load Data tab). Static page chrome above is
+     *  kept in the DOM so the user sees it immediately. */
+    onShow(container, { firstVisit }) {
+        if (firstVisit) return;  // already loaded by render()
+        this.loadCatalogStatus();
+    },
+
     async loadCatalogStatus() {
         const statusDiv = document.getElementById("catalog-status");
         try {

@@ -6,6 +6,7 @@ This module bridges local CSV data → NautilusTrader native types → Parquet c
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pandas as pd
@@ -122,9 +123,44 @@ def save_to_catalog(
     return catalog
 
 
+_CATALOG_CACHE: dict[str, ParquetDataCatalog] = {}
+_CATALOG_LOCK = threading.Lock()
+
+
 def load_catalog(catalog_path: str = DEFAULT_CATALOG_PATH) -> ParquetDataCatalog:
-    """Load an existing ParquetDataCatalog."""
-    return ParquetDataCatalog(catalog_path)
+    """Load an existing ParquetDataCatalog (cached per resolved path).
+
+    ParquetDataCatalog reads its directory manifest on construction; doing
+    that on every request — `/api/data/bar_types`, `/api/data/bars`,
+    `/api/catalog/status` all call this — repeats 50–300 ms of I/O per tab
+    switch. The actual bar reads stay lazy on each `.bars()` call, so the
+    cached instance always sees new files written by `save_to_catalog`.
+    """
+    key = str(Path(catalog_path).resolve())
+    cached = _CATALOG_CACHE.get(key)
+    if cached is not None:
+        return cached
+    with _CATALOG_LOCK:
+        cached = _CATALOG_CACHE.get(key)
+        if cached is not None:
+            return cached
+        cat = ParquetDataCatalog(catalog_path)
+        _CATALOG_CACHE[key] = cat
+        return cat
+
+
+def invalidate_catalog_cache(catalog_path: str | None = None) -> None:
+    """Drop cached catalog handles. Call after structural writes (e.g. ingest).
+
+    Reading existing files works without invalidating — the cached instance
+    re-reads parquet on demand. Call this only if the catalog directory
+    itself moves or is recreated.
+    """
+    with _CATALOG_LOCK:
+        if catalog_path is None:
+            _CATALOG_CACHE.clear()
+        else:
+            _CATALOG_CACHE.pop(str(Path(catalog_path).resolve()), None)
 
 
 def load_csv_and_store(

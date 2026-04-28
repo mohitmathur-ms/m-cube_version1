@@ -1276,4 +1276,7 @@ if __name__ == "__main__":
     print("  M_Cube Crypto Dashboard (HTML/CSS/JS)")
     print("  Open http://localhost:5000 in your browser")
     print("=" * 60)
-    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
+    # threaded=True so concurrent tab switches don't queue behind each other on
+    # the dev server's single Werkzeug worker. The catalog read paths are
+    # I/O-bound and safe to run from threads.
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False, threaded=True)

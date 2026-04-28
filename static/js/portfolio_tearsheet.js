@@ -7,7 +7,23 @@
 const PortfolioTearsheet = {
     COLORS: ["#00d4aa", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a29bfe", "#fd79a8", "#74b9ff", "#ffeaa7"],
 
+    /** Re-render only when the underlying portfolio results object reference
+     *  has changed. Same reference → keep the existing DOM so the active
+     *  sub-tab (summary / equity / strategies / trades) survives nav. */
+    onShow(container, { firstVisit }) {
+        const cur = App.state.portfolioResults;
+        if (firstVisit) {
+            this._lastRenderedResults = cur;
+            return;
+        }
+        if (cur !== this._lastRenderedResults) {
+            this._lastRenderedResults = cur;
+            this.render(container);
+        }
+    },
+
     render(container) {
+        this._lastRenderedResults = App.state.portfolioResults;
         const r = App.state.portfolioResults;
 
         if (!r) {

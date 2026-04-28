@@ -11,6 +11,26 @@ const App = {
         selectedVenue: "BINANCE",
     },
 
+    /** Per-page <div> containers that we keep alive across navigations.
+     *  Hiding (display:none) instead of destroying preserves form values,
+     *  scroll position, Plotly chart state and any module-local DOM refs.
+     *  Cleared only on full page reload. */
+    _pages: {},
+    _pageInitialized: {},
+
+    /** Map of page id → module. Single source of truth for the router. */
+    _pageModules() {
+        return {
+            dashboard:           Dashboard,
+            load_data:           LoadData,
+            view_data:           ViewData,
+            backtest:            Backtest,
+            tearsheet:           Tearsheet,
+            portfolio:           Portfolio,
+            portfolio_tearsheet: PortfolioTearsheet,
+        };
+    },
+
     /** Initialize the app */
     init() {
         this.bindNavigation();
@@ -28,12 +48,22 @@ const App = {
         });
     },
 
-    /** Navigate to a page */
+    /** Navigate to a page.
+     *  First visit: build a dedicated <div> container and call Module.render().
+     *  Subsequent visits: just toggle visibility — DOM (and therefore every
+     *  form selection, dropdown value, date input, scroll position, chart
+     *  zoom) survives. If the page exposes onShow(container), it's invoked
+     *  on every nav-in (including the first) so result-dependent tabs can
+     *  refresh themselves when underlying state has changed. */
     navigate(page) {
         // Cancel any in-flight requests from the previous page — prevents
         // stale fetches from clobbering the new page's DOM.
         for (const ac of this._pendingAborters) ac.abort();
         this._pendingAborters.clear();
+
+        const modules = this._pageModules();
+        const mod = modules[page];
+        if (!mod) return;
 
         this.currentPage = page;
 
@@ -42,16 +72,46 @@ const App = {
             item.classList.toggle("active", item.dataset.page === page);
         });
 
-        // Render page
         const main = document.getElementById("main-content");
-        switch (page) {
-            case "dashboard":   Dashboard.render(main); break;
-            case "load_data":   LoadData.render(main); break;
-            case "view_data":   ViewData.render(main); break;
-            case "backtest":    Backtest.render(main); break;
-            case "tearsheet":   Tearsheet.render(main); break;
-            case "portfolio":   Portfolio.render(main); break;
-            case "portfolio_tearsheet": PortfolioTearsheet.render(main); break;
+
+        // Hide every other page's container.
+        for (const [name, el] of Object.entries(this._pages)) {
+            if (name !== page && el) el.style.display = "none";
+        }
+
+        // Get or create this page's container.
+        let container = this._pages[page];
+        const isFirstVisit = !container;
+        if (isFirstVisit) {
+            container = document.createElement("div");
+            container.id = `page-${page}`;
+            container.className = "page-container";
+            main.appendChild(container);
+            this._pages[page] = container;
+        }
+        container.style.display = "";
+
+        // First visit: build the page's DOM. Subsequent visits: skip — the
+        // existing DOM is reused so user selections persist.
+        if (isFirstVisit) {
+            try {
+                mod.render(container);
+            } catch (e) {
+                container.innerHTML = `<div class="alert alert-danger">Failed to load page: ${e && e.message ? e.message : e}</div>`;
+                console.error(`[App.navigate] render(${page}) threw:`, e);
+            }
+            this._pageInitialized[page] = true;
+        }
+
+        // Optional per-page hook fired on every show (including the first).
+        // Pages that depend on App.state (e.g. Tearsheet on backtestResults)
+        // implement this to re-render when the underlying data changes.
+        if (typeof mod.onShow === "function") {
+            try {
+                mod.onShow(container, { firstVisit: isFirstVisit });
+            } catch (e) {
+                console.error(`[App.navigate] onShow(${page}) threw:`, e);
+            }
         }
     },
 
@@ -107,6 +167,62 @@ const App = {
 
     /** Pending request aborters, cancelled on navigation. */
     _pendingAborters: new Set(),
+
+    /** In-memory GET cache keyed by endpoint. Cleared on page reload. */
+    _apiCache: new Map(),
+
+    /** Cached GET. Returns the cached response if present and fresh, else
+     *  fetches once and shares the in-flight promise across concurrent callers
+     *  so duplicate requests collapse. Use for *config* endpoints whose values
+     *  rarely change within a session (asset-classes, strategies, bar_types,
+     *  templates, …). Pass `{force: true}` to bust. Default TTL: 5 minutes. */
+    async cachedApi(endpoint, options = {}) {
+        const { ttlMs = 5 * 60 * 1000, force = false, ...apiOpts } = options;
+        const now = Date.now();
+        const entry = this._apiCache.get(endpoint);
+        if (!force && entry && entry.expires > now) {
+            // Either a resolved value or an in-flight promise — both work.
+            return entry.value instanceof Promise ? entry.value : entry.value;
+        }
+        const promise = this.api(endpoint, apiOpts).then(
+            (val) => {
+                this._apiCache.set(endpoint, { value: val, expires: Date.now() + ttlMs });
+                return val;
+            },
+            (err) => {
+                this._apiCache.delete(endpoint);
+                throw err;
+            },
+        );
+        this._apiCache.set(endpoint, { value: promise, expires: now + ttlMs });
+        return promise;
+    },
+
+    /** Drop one or all entries from the API cache (e.g. after an ingest
+     *  invalidates bar_types). */
+    invalidateCache(endpoint) {
+        if (endpoint == null) this._apiCache.clear();
+        else this._apiCache.delete(endpoint);
+    },
+
+    /** Repopulate a <select>'s options without dropping the current value if
+     *  it still appears among the new options. Pass an array of either
+     *  `"value"` strings or `{value, label}` / `{value, text}` objects. */
+    repopulateSelect(sel, options, { keepSelection = true } = {}) {
+        if (!sel) return;
+        const prev = keepSelection ? sel.value : null;
+        const html = options.map(o => {
+            if (typeof o === "string") return `<option value="${o}">${o}</option>`;
+            const v = o.value;
+            const t = o.label ?? o.text ?? v;
+            return `<option value="${v}">${t}</option>`;
+        }).join("");
+        sel.innerHTML = html;
+        if (keepSelection && prev != null) {
+            const match = [...sel.options].some(o => o.value === prev);
+            if (match) sel.value = prev;
+        }
+    },
 
     barTypeLabel(bt) {
         if (!bt) return "";

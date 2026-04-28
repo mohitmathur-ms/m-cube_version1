@@ -6,7 +6,24 @@
 const Tearsheet = {
     COLORS: ["#00d4aa", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a29bfe", "#fd79a8"],
 
+    /** Re-render only when the underlying backtest results object reference
+     *  has changed (i.e. a new backtest finished). Same reference → keep the
+     *  existing DOM so the user's instrument + strategy selection survives a
+     *  trip to another tab and back. */
+    onShow(container, { firstVisit }) {
+        const cur = App.state.backtestResults;
+        if (firstVisit) {
+            this._lastRenderedResults = cur;
+            return;
+        }
+        if (cur !== this._lastRenderedResults) {
+            this._lastRenderedResults = cur;
+            this.render(container);
+        }
+    },
+
     render(container) {
+        this._lastRenderedResults = App.state.backtestResults;
         if (!App.state.backtestResults) {
             container.innerHTML = `
                 <h1 class="page-title">&#128200; Performance Tearsheet</h1>
