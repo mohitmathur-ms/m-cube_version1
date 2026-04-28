@@ -23,7 +23,25 @@
       "Bash(mkdir -p d:/mcube_manshit_21April/mcube_html_11_April_2026/scratch/logs)",
       "Bash(venv/Scripts/python.exe perf_screens/reingest_fx.py)",
       "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, WorkingSet64, StartTime | Format-Table -AutoSize\")",
-      "Bash(venv/Scripts/python.exe scripts/aggregate_phase_profiles.py)"
+      "Bash(venv/Scripts/python.exe scripts/aggregate_phase_profiles.py)",
+      "Bash(git pull *)",
+      "Bash(where python *)",
+      "Bash(venv/Scripts/python.exe --version)",
+      "Bash(venv/Scripts/python.exe -c \"import sys; print\\(sys.version_info\\)\")",
+      "Bash(venv/Scripts/python.exe -m pip --version)",
+      "Bash(venv/Scripts/python.exe -m pip install --upgrade pip setuptools wheel)",
+      "Bash(venv/Scripts/python.exe -m pip install --prefer-binary -r requirements.txt)",
+      "Bash(venv/Scripts/python.exe -c \"import ast, sys; ast.parse\\(open\\('server.py'\\).read\\(\\)\\); print\\('server.py parses OK'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5000)",
+      "Bash(pwd -W)",
+      "Bash(cmd.exe //c \"$\\(pwd -W\\)\\\\\\\\start.bat\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5000)",
+      "Bash(taskkill //F //PID 16376)",
+      "Bash(curl -s -o /dev/null http://localhost:5000)",
+      "Bash(powershell -NoProfile -Command '$u='\\\\''http://localhost:5000'\\\\''; for\\($i=0; $i -lt 3; $i++\\){ try{ Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 1 | Out-Null; Write-Output '\\\\''OK'\\\\''; break } catch{ Write-Output \"miss $i\"; Start-Sleep -Milliseconds 200 } }')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000)",
+      "Bash(git -c user.name=mohitmathur-ms -c user.email=mohitmathur-ms@users.noreply.github.com commit -m ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"
