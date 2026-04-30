@@ -98,6 +98,35 @@ def download_report(filename):
     return send_from_directory(str(REPORTS_DIR), safe_name, as_attachment=True)
 
 
+# ─── Orderbook API ───────────────────────────────────────────────────────────
+
+@app.route("/api/orderbook/list")
+def api_orderbook_list():
+    """List saved orderbook CSV files from the reports directory."""
+    REPORTS_DIR.mkdir(exist_ok=True)
+    files = sorted(
+        [f.name for f in REPORTS_DIR.glob("order_book_*.csv")],
+        key=lambda n: (REPORTS_DIR / n).stat().st_mtime,
+        reverse=True,
+    )
+    return jsonify({"files": files})
+
+
+@app.route("/api/orderbook/load")
+def api_orderbook_load():
+    """Load a saved orderbook CSV file and return its records as JSON."""
+    filename = request.args.get("file", "")
+    safe_name = Path(filename).name  # prevent directory traversal
+    if not safe_name.startswith("order_book_") or not safe_name.endswith(".csv"):
+        return jsonify({"error": "Invalid file name"}), 400
+    filepath = REPORTS_DIR / safe_name
+    if not filepath.exists():
+        return jsonify({"error": "File not found"}), 404
+    df = pd.read_csv(filepath)
+    records = df.fillna("").to_dict(orient="records")
+    return jsonify({"data": records})
+
+
 # ─── Catalog API ─────────────────────────────────────────────────────────────
 
 @app.route("/api/catalog/status")
@@ -1254,6 +1283,9 @@ def api_portfolio_backtest():
             ob_df = build_orderbook_dataframe(all_results_for_reports)
             if not ob_df.empty:
                 ob_df.to_csv(REPORTS_DIR / f"order_book_{prefix}.csv", index=False)
+                results["order_book"] = ob_df.fillna("").to_dict(orient="records")
+            else:
+                results["order_book"] = []
 
             logs_df = build_logs_dataframe(all_results_for_reports)
             if not logs_df.empty:

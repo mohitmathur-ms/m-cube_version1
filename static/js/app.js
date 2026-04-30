@@ -26,6 +26,7 @@ const App = {
             view_data:           ViewData,
             backtest:            Backtest,
             tearsheet:           Tearsheet,
+            orderbook:           Orderbook,
             portfolio:           Portfolio,
             portfolio_tearsheet: PortfolioTearsheet,
         };
@@ -82,8 +83,8 @@ const App = {
         // Log navigation
         const pageNames = {
             dashboard: "Dashboard", load_data: "Load Data", view_data: "View Data",
-            backtest: "Run Backtest", tearsheet: "Tearsheet", portfolio: "Multileg",
-            portfolio_tearsheet: "Portfolio Tearsheet",
+            backtest: "Run Backtest", tearsheet: "Tearsheet", orderbook: "Orderbook",
+            portfolio: "Multileg", portfolio_tearsheet: "Portfolio Tearsheet",
         };
         this.log(`${pageNames[page] || page} tab loaded`, "MESSAGE", "SYSTEM", pageNames[page] || "");
         const main = document.getElementById("main-content");

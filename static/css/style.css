@@ -796,6 +796,12 @@ tr:last-child td {
 .comparison-table td.positive { color: var(--success); }
 .comparison-table td.negative { color: var(--danger); }
 
+/* ─── Orderbook Table ────────────────────────────────────────────────────── */
+.ob-row-positive { background: var(--success-soft); }
+.ob-row-negative { background: var(--danger-soft); }
+span.positive { color: var(--success); }
+span.negative { color: var(--danger); }
+
 /* ─── Strategy Config Card ───────────────────────────────────────────────── */
 .strategy-config {
     background: var(--bg-card);
