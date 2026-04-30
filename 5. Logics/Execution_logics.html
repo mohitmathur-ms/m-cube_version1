@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Execution Parameters — Logic Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    flex-shrink: 0;
+  }
+  nav .nav-brand {
+    padding: 0 20px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  nav a {
+    display: block;
+    padding: 6px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  nav a:hover, nav a.active { color: var(--text); border-left-color: var(--accent); background: rgba(91,124,250,.07); }
+  nav .nav-section {
+    padding: 14px 20px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  main { flex: 1; padding: 40px 48px 80px; max-width: 1000px; }
+
+  /* ── HEADINGS ── */
+  h1 { font-size: 26px; color: #fff; margin-bottom: 6px; }
+  h2 { font-size: 20px; color: var(--accent); margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; color: var(--accent2); margin: 28px 0 10px; }
+  h4 { font-size: 14px; color: var(--warn); margin: 20px 0 8px; }
+  p  { margin: 8px 0; }
+
+  /* ── META HEADER ── */
+  .doc-meta {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .doc-meta strong { color: var(--text); }
+
+  /* ── PARAM CARD ── */
+  .param-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 20px 0 28px;
+    overflow: hidden;
+  }
+  .param-card .card-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .param-card .card-header .param-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .param-card .card-header .field-key  { font-size: 12px; color: var(--accent); font-family: monospace; background: rgba(91,124,250,.12); padding: 2px 8px; border-radius: 4px; }
+  .param-card .card-header .param-type { font-size: 11px; color: var(--muted); }
+  .param-card .card-body { padding: 16px 18px; }
+
+  /* ── FIELD TABLE ── */
+  .field-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 13px;
+  }
+  .field-table th {
+    background: var(--surface);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .field-table td {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .field-table tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+  .field-table .key-col { font-family: monospace; color: var(--accent); font-size: 12px; }
+  .field-table .val-col { color: var(--text); }
+  .field-table .desc-col { color: var(--muted); font-size: 12px; }
+
+  /* ── CODE ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: #b8c8f8;
+    margin: 12px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .badge-green  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.3); }
+  .badge-blue   { background: rgba(91,124,250,.15);  color: var(--accent);  border: 1px solid rgba(91,124,250,.3); }
+  .badge-yellow { background: rgba(247,201,72,.12);  color: var(--warn);    border: 1px solid rgba(247,201,72,.3); }
+  .badge-red    { background: rgba(233,96,96,.12);   color: var(--danger);  border: 1px solid rgba(233,96,96,.3); }
+  .badge-gray   { background: rgba(122,128,160,.12); color: var(--muted);   border: 1px solid rgba(122,128,160,.3); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(91,124,250,.08);  border-color: var(--accent);  color: var(--text); }
+  .callout-warn    { background: rgba(247,201,72,.08);  border-color: var(--warn);    color: var(--text); }
+  .callout-danger  { background: rgba(233,96,96,.08);   border-color: var(--danger);  color: var(--text); }
+  .callout-success { background: rgba(126,214,160,.08); border-color: var(--accent2); color: var(--text); }
+
+  /* ── VISIBILITY MATRIX ── */
+  .vis-grid {
+    display: grid;
+    grid-template-columns: 1fr 90px 90px 1fr;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 14px 0;
+    font-size: 13px;
+  }
+  .vis-grid .vg-header {
+    background: var(--surface);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .vis-grid .vg-cell {
+    padding: 8px 12px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .vis-grid .vg-cell:last-child, .vis-grid .vg-header:last-child { border-right: none; }
+  .vis-grid .vg-hide { color: var(--muted); font-size: 12px; }
+  .vis-grid .vg-show { color: var(--accent2); font-weight: 600; font-size: 12px; }
+
+  /* ── STATE MACHINE ── */
+  .state-flow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .state-box {
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+  .state-waiting { background: rgba(247,201,72,.15); color: var(--warn); border: 1px solid rgba(247,201,72,.4); }
+  .state-active  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.4); }
+  .state-arrow   { color: var(--muted); font-size: 18px; }
+  .state-cond    { font-size: 11px; color: var(--muted); text-align: center; }
+
+  /* ── DATA FLOW DIAGRAM ── */
+  .flow-diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 2;
+    color: var(--muted);
+  }
+  .flow-diagram .flow-node  { color: var(--accent2); font-weight: 600; }
+  .flow-diagram .flow-arrow { color: var(--accent); }
+  .flow-diagram .flow-label { color: var(--muted); font-size: 11px; }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* ── GENERAL TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: var(--surface); color: var(--muted); text-align: left; padding: 8px 12px; border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ═══════════════════════════════════════════ SIDEBAR ══════════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">MegaServe AI Engine</div>
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Tab Overview</a>
+  <a href="#data-flow">Data Flow</a>
+
+  <div class="nav-section">Execution Settings</div>
+  <a href="#product">1. Product</a>
+  <a href="#strategy-tag">2. Strategy Tag</a>
+  <a href="#leg-fail">3. Leg Fail Action</a>
+  <a href="#leg-execution">4. Leg Execution</a>
+
+  <div class="nav-section">Execution Mode</div>
+  <a href="#exec-mode">5. Portfolio Exec Mode</a>
+  <a href="#based-on">6. Based On</a>
+  <a href="#entry-price">7. Entry Price</a>
+  <a href="#rounding">8. Rounding Value</a>
+  <a href="#adjust-price">9. Adjust Price</a>
+
+  <div class="nav-section">Timing</div>
+  <a href="#run-on-days">9. Run On Days</a>
+  <a href="#start-time">10. Start Time</a>
+  <a href="#end-time">11. End Time</a>
+  <a href="#sqoff-time">12. SqOff Time</a>
+
+  <div class="nav-section">Reference</div>
+  <a href="#visibility">Visibility Matrix</a>
+  <a href="#init">Engine Init</a>
+  <a href="#gating">Entry Gating</a>
+  <a href="#dataflow">Data Flow</a>
+  <a href="#validation">Validation</a>
+  <a href="#summary">Full Summary</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ MAIN ══════════════════════════════════════════════ -->
+<main>
+
+  <h1>Execution Parameters Tab</h1>
+  <p style="color:var(--muted); margin-bottom:20px;">Full parameter reference — logic, engine behaviour & validation</p>
+
+  <div class="doc-meta">
+    <strong>Project:</strong> MegaServe AI Trading Engine &nbsp;|&nbsp;
+    <strong>Last Updated:</strong> 2026-04-22<br/>
+    <strong>Source Files:</strong>
+    <code>tabs/execution_parameters.py</code> &nbsp;·&nbsp;
+    <code>engine/backtester.py</code> &nbsp;·&nbsp;
+    <code>engine/monitoring.py</code> &nbsp;·&nbsp;
+    <code>engine/execution.py</code> &nbsp;·&nbsp;
+    <code>core/validators.py</code> &nbsp;·&nbsp;
+    <code>core/helper.py</code>
+  </div>
+
+  <!-- ─── OVERVIEW ─── -->
+  <h2 id="overview">Overview</h2>
+  <p>The <strong>Execution Parameters Tab</strong> is divided into two groups that jointly control <em>how</em> and <em>when</em> every leg in the portfolio enters the market.</p>
+
+  <table>
+    <thead><tr><th>Group</th><th>Purpose</th><th>Fields</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Execution Settings</span></td>
+        <td>Broker-facing and system-level execution settings</td>
+        <td>Product, Strategy Tag, If One or More Leg Fail, Leg Execution (hidden)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">Execution Mode</span></td>
+        <td>Controls <em>when</em> the portfolio is allowed to start entering legs (market-condition trigger)</td>
+        <td>Portfolio Execution Mode, Based On, Entry Price, Rounding Value, Adjust Price</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-yellow">Timing</span></td>
+        <td>Controls <em>which days</em> and <em>what intraday/calendar windows</em> the portfolio is active</td>
+        <td>Run On Days, Start Time, End Time, SqOff Time</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin-top:10px; color:var(--muted); font-size:13px;">Together these <strong>13 parameters</strong> (12 visible + 1 hidden) determine how, when, and on which days every leg in the portfolio enters and exits.</p>
+
+  <!-- ─── DATA FLOW ─── -->
+  <h2 id="data-flow">Data Flow</h2>
+  <div class="flow-diagram">
+    <span class="flow-node">UI (ExecutionParametersTab)</span><br/>
+    <span class="flow-arrow">  │  get_data() → dict</span><br/>
+    <span class="flow-arrow">  ▼</span><br/>
+    <span class="flow-node">portfolio.py → save_portfolio()</span><br/>
+    <span class="flow-arrow">  │  data["execution_params"]</span><br/>
+    <span class="flow-arrow">  ▼</span><br/>
+    <span class="flow-node">JSON Config (portfolios.json)</span><br/>
+    <span class="flow-arrow">  │  loaded by backtester / helper</span><br/>
+    <span class="flow-arrow">  ▼</span><br/>
+    <span class="flow-node">_build_exec_mode(ep)</span>   <span class="flow-label">← engine/backtester.py</span><br/>
+    <span class="flow-arrow">  │  state["exec_mode"]</span><br/>
+    <span class="flow-arrow">  ▼</span><br/>
+    <span class="flow-node">check_portfolio_exec_mode()</span>   <span class="flow-label">← engine/monitoring.py  (every tick)</span><br/>
+    <span class="flow-arrow">  │  status = "ACTIVE" when triggered</span><br/>
+    <span class="flow-arrow">  ▼</span><br/>
+    <span class="flow-node">entry_fill_leg()</span>   <span class="flow-label">← engine/execution.py  (entry gating)</span>
+  </div>
+
+  <hr/>
+
+  <!-- ═══════════════════════════════════════ PART 1: EXECUTION SETTINGS ══════════════════════════════════════════ -->
+  <h2>PART 1 — Execution Settings</h2>
+
+  <!-- 1. Product -->
+  <div class="param-card" id="product">
+    <div class="card-header">
+      <span class="param-name">1. Product</span>
+      <span class="field-key">execution_params.product</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-blue">Default: MIS</span>
+    </div>
+    <div class="card-body">
+      <p>Specifies the <strong>order product type</strong> sent to the broker for every leg in this portfolio.</p>
+
+      <h4>Options</h4>
+      <table>
+        <thead><tr><th>Option</th><th>Full Name</th><th>Usage</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-green">MIS</span></td>
+            <td>Margin Intraday Square-off</td>
+            <td>Intraday only. Auto-squared by broker at EOD (~15:10–15:20). Lower margin requirement. Most common for options strategies.</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-yellow">NRML</span></td>
+            <td>Normal / Carry-Forward</td>
+            <td>Overnight / positional product. Full margin required. Use when <code>Positional Portfolio</code> is enabled.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout callout-info">
+        <strong>Engine Note:</strong> The <code>product</code> field is passed directly to the broker order API. The backtester does not evaluate it — it is metadata forwarded to the live execution layer. <strong>CNC is not supported</strong> — options backtesting uses <code>MIS</code> or <code>NRML</code> only.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Strategy Tag -->
+  <div class="param-card" id="strategy-tag">
+    <div class="card-header">
+      <span class="param-name">2. Strategy Tag</span>
+      <span class="field-key">execution_params.strategy_tag</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-red">Required — cannot be empty</span>
+    </div>
+    <div class="card-body">
+      <p>Links this portfolio to a <strong>Strategy</strong> defined in the Strategies configuration. Every enabled portfolio must have a non-empty Strategy Tag before it can be run.</p>
+
+      <h4>Engine Resolution</h4>
+      <pre>strategy = next(
+    (s for s in strategies
+     if s.get("strategy_tag") == strategy_tag or s.get("tag") == strategy_tag),
+    None
+)</pre>
+      <p>This lookup is used to:</p>
+      <ul>
+        <li>Identify which <strong>user accounts</strong> (brokers / API keys) should execute this portfolio's orders.</li>
+        <li>Validate the strategy is <strong>enabled</strong> — a disabled strategy raises a <code>ValueError</code> and blocks the run.</li>
+        <li>Associate trades with the correct backtester run entry: <code>pid = user|strategy_tag|portfolio_name</code>.</li>
+      </ul>
+
+      <h4>Validation Rules</h4>
+      <table>
+        <thead><tr><th>Rule</th><th>Error</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>Cannot be empty</td><td><code>strategy_tag in execution_params cannot be empty</code></td><td><code>core/validators.py</code></td></tr>
+          <tr><td>Tag must exist in Strategies list</td><td><code>Strategy Tag 'X' not found in Strategies</code></td><td><code>core/helper.py</code></td></tr>
+          <tr><td>Referenced strategy must be enabled</td><td><code>Strategy Tag 'X' is disabled</code></td><td><code>core/helper.py</code></td></tr>
+          <tr><td>Strategy must have user_account entries</td><td>Portfolio skipped silently</td><td><code>core/helper.py</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3. Leg Fail Action -->
+  <div class="param-card" id="leg-fail">
+    <div class="card-header">
+      <span class="param-name">3. If One or More Leg Fail</span>
+      <span class="field-key">execution_params.leg_fail_action</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-yellow">Risk-Critical</span>
+    </div>
+    <div class="card-body">
+      <p>Defines the <strong>recovery policy</strong> when one or more legs in a multi-leg portfolio fail to place (order rejection, no liquidity, strike not found).</p>
+
+      <table>
+        <thead><tr><th>Option</th><th>Behaviour</th><th>Use When</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-green">KeepPlacedLegs</span> <em>(default)</em></td>
+            <td>Legs placed before the failure remain open and active. Failed leg is logged and skipped.</td>
+            <td>Partial fills are acceptable; e.g. hedge leg failure doesn't create naked risk on remaining legs.</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-red">CancelPlacedLegs</span></td>
+            <td>All legs placed before the failure are cancelled / squared off. The entry attempt is rolled back to zero net position.</td>
+            <td>Portfolio only makes sense as a complete unit — e.g. Iron Condor where missing 1 leg creates naked risk.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout callout-warn">
+        <strong>Backtester Note:</strong> The backtester does not simulate partial-fill failures. This setting has no effect during backtesting — it applies only in live/paper trading.
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Leg Execution (hidden) -->
+  <div class="param-card" id="leg-execution">
+    <div class="card-header">
+      <span class="param-name">4. Leg Execution</span>
+      <span class="field-key">execution_params.leg_execution</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-gray">Hidden — Backward Compat Only</span>
+    </div>
+    <div class="card-body">
+      <p>This field is <strong>not visible</strong> in the current UI but is still saved and loaded for backward compatibility with older portfolio configs.</p>
+      <table>
+        <thead><tr><th>Option</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr><td><code>Parallel</code> (default)</td><td>All legs submitted simultaneously to the broker.</td></tr>
+          <tr><td><code>Sequential</code></td><td>Legs submitted one at a time, each waiting for previous confirmation.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout callout-info">The current codebase defaults to <code>Parallel</code>. The UI has removed this control from view. It remains in <code>get_data()</code> / <code>set_data()</code> and <code>core/validators.py</code> to avoid breaking existing saved configs.</div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <!-- ═══════════════════════════════════════ PART 2: EXECUTION MODE ══════════════════════════════════════════ -->
+  <h2>PART 2 — Execution Mode</h2>
+
+  <!-- 5. Portfolio Execution Mode -->
+  <div class="param-card" id="exec-mode">
+    <div class="card-header">
+      <span class="param-name">5. Portfolio Execution Mode</span>
+      <span class="field-key">execution_params.portfolio_execution_mode</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-blue">Default: Start time</span>
+    </div>
+    <div class="card-body">
+      <p>The <strong>master trigger</strong> that controls when the engine transitions from <code>WAITING_FOR_ENTRY</code> → <code>ACTIVE</code>, allowing all legs to begin entering.</p>
+
+      <h4>State Machine</h4>
+      <div class="state-flow">
+        <div>
+          <div class="state-box state-waiting">WAITING_FOR_ENTRY</div>
+          <div class="state-cond">Dynamic modes (initial state)</div>
+        </div>
+        <span class="state-arrow">→</span>
+        <div>
+          <div class="state-box state-active">ACTIVE</div>
+          <div class="state-cond">Trigger condition met</div>
+        </div>
+      </div>
+      <p style="margin-top:6px; color:var(--muted); font-size:12px;"><em>Start time / Manual modes initialise directly to ACTIVE.</em></p>
+
+      <h4>Mode Reference</h4>
+
+      <h3>5.1 Start time <span class="badge badge-green" style="font-size:11px; vertical-align:middle;">Default</span></h3>
+      <p>Portfolio enters legs at exactly the <strong>Portfolio Start Time</strong> (set in the Timing tab). No additional condition is checked.</p>
+      <pre>status = "ACTIVE"  # set immediately at state build time</pre>
+      <ul>
+        <li>Based On, Entry Price, Rounding Value, Adjust Price are all <strong>hidden</strong> in the UI.</li>
+        <li>The engine checks <code>curr_time &gt;= timing["start"]</code> before firing any leg, but <code>exec_mode</code> itself is pre-set ACTIVE.</li>
+      </ul>
+
+      <h3>5.2 Manual</h3>
+      <p>The portfolio waits indefinitely until it receives an <strong>external trigger signal</strong> — e.g. from another portfolio's "Start Other Portfolio" action on its Target/Stoploss hit.</p>
+      <pre>status = "WAITING_FOR_ENTRY"
+triggered by:  exec_mode["triggered"] = True  (set externally)</pre>
+      <ul>
+        <li>Used for <strong>portfolio chaining</strong> — Portfolio A's target fires "Start Other Portfolio B".</li>
+        <li>A triggered Manual portfolio is exempt from the <code>end_blocked</code> guard (can enter even late in the day).</li>
+        <li>Based On, Entry Price, Rounding Value, Adjust Price are <strong>hidden</strong> in the UI.</li>
+      </ul>
+
+      <h3>5.3 CombinedPremium</h3>
+      <p>Waits until the <strong>ATM straddle premium</strong> (ATM Call mid + ATM Put mid) reaches the configured target level.</p>
+      <pre># ATM combined premium computed every tick:
+premium = (ask_atm_call + bid_atm_call)/2 + (ask_atm_put + bid_atm_put)/2
+
+# Trigger direction auto-detected:
+trigger = curr_premium &lt;= target   # when target &lt; day_start
+trigger = curr_premium &gt;= target   # when target &gt; day_start
+trigger = True                      # when target == day_start</pre>
+      <table>
+        <thead><tr><th>Based On</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr><td><code>None</code></td><td>Uses absolute <code>Entry Price</code> as target. Fires when premium crosses that fixed level.</td></tr>
+          <tr><td><code>DayOpen</code></td><td>Captures premium at market open (first tick). Applies Rounding + Adjust Price to compute target. Fires when <code>curr_comb &lt; target</code>.</td></tr>
+          <tr><td><code>StartTime</code></td><td>Captures premium at Portfolio Start Time. Fires immediately if rounding &gt; 0, no adjust string, or when <code>curr_comb &lt; target</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.4 UnderlyingLevel</h3>
+      <p>Waits until the <strong>underlying index price</strong> touches or crosses the configured target level.</p>
+      <pre># Based On = None: direction inferred from day-start
+trigger = curr_idx &lt;= target   # when target &lt; day_start
+trigger = curr_idx &gt;= target   # when target &gt; day_start
+
+# Based On = DayOpen / StartTime: crossover model
+trigger = (last_idx &lt;= target &lt;= curr_idx) or (last_idx &gt;= target &gt;= curr_idx)</pre>
+      <ul>
+        <li>Uses index OHLC <code>close</code> price per tick.</li>
+        <li>For DayOpen/StartTime: requires the index to actually <em>cross</em> the level, not just be above/below it at start.</li>
+      </ul>
+
+      <h3>5.5 CombinedPremiumCrossOver</h3>
+      <p>Advanced version of CombinedPremium that requires a <strong>full crossover cycle</strong> before triggering, filtering premature entries.</p>
+
+      <h4>DayOpen Crossover Sequence</h4>
+      <div class="state-flow" style="flex-direction:column; align-items:flex-start; gap:6px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="state-box state-waiting">STAGE_BELOW_INIT</div>
+          <span style="color:var(--muted); font-size:12px;">Wait for premium to first drop below target</span>
+        </div>
+        <div style="color:var(--accent); padding-left:20px;">↓ premium &lt; target</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="state-box state-waiting">STAGE_ABOVE</div>
+          <span style="color:var(--muted); font-size:12px;">Wait for premium to rise back above target</span>
+        </div>
+        <div style="color:var(--accent); padding-left:20px;">↓ premium ≥ target</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="state-box state-waiting">STAGE_BELOW_TRIG</div>
+          <span style="color:var(--muted); font-size:12px;">Wait for final decay below target</span>
+        </div>
+        <div style="color:var(--accent); padding-left:20px;">↓ premium &lt; target</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="state-box state-active">TRIGGERED → ACTIVE</div>
+        </div>
+      </div>
+
+      <h4>StartTime Crossover Sequence</h4>
+      <pre>1. Base set at StartTime: WAIT_ABOVE (waiting for rise above target + 0.01)
+2. Rise detected → WAIT_BELOW (waiting for decay below target)
+3. curr_comb &lt; target → TRIGGER</pre>
+    </div>
+  </div>
+
+  <!-- 6. Based On -->
+  <div class="param-card" id="based-on">
+    <div class="card-header">
+      <span class="param-name">6. Based On</span>
+      <span class="field-key">execution_params.based_on</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-blue">Default: None</span>
+      <span class="badge badge-gray">Hidden for Start time / Manual</span>
+    </div>
+    <div class="card-body">
+      <p>Determines the <strong>reference point</strong> used to calculate the dynamic entry target level for CombinedPremium, UnderlyingLevel, and CombinedPremiumCrossOver modes.</p>
+
+      <table>
+        <thead><tr><th>Option</th><th>Reference Capture Point</th><th>Additional Fields Shown</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>None</code></td>
+            <td>No reference capture. <code>Entry Price</code> used directly as absolute target.</td>
+            <td>Entry Price</td>
+          </tr>
+          <tr>
+            <td><code>DayOpen</code></td>
+            <td>First tick of the trading day (r_idx == 0). Market-open price.</td>
+            <td>Rounding Value, Adjust Price</td>
+          </tr>
+          <tr>
+            <td><code>StartTime</code></td>
+            <td>First tick at or after Portfolio Start Time. More controlled — measures from strategy activation.</td>
+            <td>Rounding Value, Adjust Price</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre># Engine reference capture:
+if exec_cfg["based_on"] == "DayOpen" and exec_cfg["ref_val"] is None:
+    exec_cfg["ref_val"] = curr_ref_candidate   # at r_idx == 0
+
+elif exec_cfg["based_on"] == "StartTime" and exec_cfg["ref_val"] is None:
+    if curr_time &gt;= timing["start"]:
+        exec_cfg["ref_val"] = curr_ref_candidate</pre>
+    </div>
+  </div>
+
+  <!-- 7. Entry Price -->
+  <div class="param-card" id="entry-price">
+    <div class="card-header">
+      <span class="param-name">7. Entry Price</span>
+      <span class="field-key">execution_params.entry_price</span>
+      <span class="param-type">float</span>
+      <span class="badge badge-blue">Default: 0.0</span>
+      <span class="badge badge-gray">Shown only when Based On = None</span>
+    </div>
+    <div class="card-body">
+      <p>The <strong>absolute target level</strong> used when <code>Based On = None</code>. This is the exact premium or index price the system waits for before triggering portfolio entry.</p>
+
+      <h4>Engine Assignment</h4>
+      <pre># Direct copy to target_val — no rounding or adjustment applied
+if exec_cfg["based_on"] == "None" and exec_cfg["target_val"] is None:
+    exec_cfg["target_val"] = exec_cfg["entry_price"]</pre>
+
+      <h4>Save-time Validation</h4>
+      <pre># In portfolio.py → save_portfolio()
+if mode not in ["Start time", "Manual"] and based_on == "None":
+    if entry_price == 0.0:
+        QMessageBox.warning(...)  # blocks save — entry price required</pre>
+      <div class="callout callout-danger">
+        <strong>Validation:</strong> Must be non-zero when mode is dynamic and <code>Based On = None</code>. The portfolio cannot be saved with entry_price = 0 in this configuration.
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Rounding Value -->
+  <div class="param-card" id="rounding">
+    <div class="card-header">
+      <span class="param-name">8. Rounding Value</span>
+      <span class="field-key">execution_params.rounding_value</span>
+      <span class="param-type">float</span>
+      <span class="badge badge-blue">Default: 0.0</span>
+      <span class="badge badge-gray">Shown only when Based On = DayOpen or StartTime</span>
+    </div>
+    <div class="card-body">
+      <p>Applied to the captured <code>ref_val</code> to snap it to the nearest grid before applying the adjustment. Prevents entry targets from landing at awkward fractional price levels.</p>
+
+      <h4>Rounding Algorithm</h4>
+      <pre>if rnd > 0:
+    if rnd &lt; 1.0:
+        # Fractional threshold: snap to floor or ceiling
+        frac = ref % 1.0
+        ref  = float(math.floor(ref) + 1) if frac &gt;= rnd else float(math.floor(ref))
+    else:
+        # Integer rounding: snap to nearest multiple of rnd
+        ref = math.floor(ref / rnd + 0.5) * rnd</pre>
+
+      <table>
+        <thead><tr><th>Rounding Value</th><th>ref_val</th><th>Result</th><th>Explanation</th></tr></thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>4823.70</td><td>4823.70</td><td>No rounding applied</td></tr>
+          <tr><td><code>0.5</code></td><td>4823.70</td><td>4824.00</td><td>frac=0.70 ≥ 0.5 → ceiling</td></tr>
+          <tr><td><code>0.5</code></td><td>4823.30</td><td>4823.00</td><td>frac=0.30 &lt; 0.5 → floor</td></tr>
+          <tr><td><code>5</code></td><td>4823.00</td><td>4825.00</td><td>Nearest multiple of 5</td></tr>
+          <tr><td><code>50</code></td><td>4823.00</td><td>4850.00</td><td>Nearest multiple of 50</td></tr>
+          <tr><td><code>100</code></td><td>200.00</td><td>200.00</td><td>Already on grid</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 9. Adjust Price -->
+  <div class="param-card" id="adjust-price">
+    <div class="card-header">
+      <span class="param-name">9. Adjust Price</span>
+      <span class="field-key">execution_params.adjust_price</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-blue">Default: "" (empty)</span>
+      <span class="badge badge-gray">Shown only when Based On = DayOpen or StartTime</span>
+    </div>
+    <div class="card-body">
+      <p>A <strong>string expression</strong> applied to the (already rounded) reference value to compute the final entry target. Supports absolute and percentage adjustments.</p>
+
+      <h4>Adjustment Algorithm</h4>
+      <pre>adj_str = exec_cfg["adjust"].strip()
+target  = ref   # ref already rounded
+
+if adj_str:
+    if adj_str.endswith("%"):
+        target = ref * (1 - float(adj_str[:-1]) / 100)
+    else:
+        target = ref + float(adj_str)</pre>
+
+      <table>
+        <thead><tr><th>Adjust Price</th><th>ref_val</th><th>target_val</th><th>Formula</th></tr></thead>
+        <tbody>
+          <tr><td><code>+10</code></td><td>4820.0</td><td>4830.0</td><td>4820 + 10</td></tr>
+          <tr><td><code>-15</code></td><td>4820.0</td><td>4805.0</td><td>4820 + (−15)</td></tr>
+          <tr><td><code>+5%</code></td><td>200.0</td><td>190.0</td><td>200 × (1 − 5/100)</td></tr>
+          <tr><td><code>-10%</code></td><td>200.0</td><td>220.0</td><td>200 × (1 − (−10)/100)</td></tr>
+          <tr><td><em>empty</em></td><td>4820.0</td><td>4820.0</td><td>No adjustment</td></tr>
+        </tbody>
+      </table>
+      <div class="callout callout-warn">
+        <strong>% Sign Note:</strong> The formula applies <code>1 − pct/100</code>. A positive % string <em>reduces</em> the target; a negative % string <em>increases</em> it. This is designed for premium-decay scenarios (e.g. <code>+5%</code> on a 200-point straddle targets 190).
+      </div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <!-- ═══════════════════════════════════════ PART 3: TIMING ══════════════════════════════════════════ -->
+  <h2>PART 3 — Timing</h2>
+
+  <!-- 9. Run On Days -->
+  <div class="param-card" id="run-on-days">
+    <div class="card-header">
+      <span class="param-name">9. Run On Days</span>
+      <span class="field-key">timing.run_days</span>
+      <span class="param-type">str</span>
+      <span class="badge badge-blue">Default: All Days</span>
+    </div>
+    <div class="card-body">
+      <p>Specifies which <strong>calendar days</strong> the portfolio is permitted to run. Acts as a coarse day-of-week gate applied before any intraday time-window or condition checks.</p>
+      <table>
+        <thead><tr><th>Option</th><th>Days Active</th><th>Use Case</th></tr></thead>
+        <tbody>
+          <tr><td><code>All Days</code></td><td>Mon–Sun</td><td>24/7 or weekend-eligible instruments</td></tr>
+          <tr><td><code>Mon - Fri</code></td><td>Mon–Fri</td><td>Standard weekday-only options strategies</td></tr>
+          <tr><td><code>Mon - Thu</code></td><td>Mon–Thu</td><td>Strategies that avoid Friday expiry volatility</td></tr>
+          <tr><td><code>Custom</code></td><td>User-selected</td><td>Reveals 7 checkboxes (Mon–Sun) for arbitrary day selection</td></tr>
+        </tbody>
+      </table>
+      <h4>Data Storage</h4>
+      <pre>{
+    "run_days":     "Mon - Fri",
+    "selected_days": ["Mon","Tue","Wed","Thu","Fri"]   // only present when Custom
+}</pre>
+    </div>
+  </div>
+
+  <!-- 10. Start Time -->
+  <div class="param-card" id="start-time">
+    <div class="card-header">
+      <span class="param-name">10. Start Time</span>
+      <span class="field-key">timing.start_time</span>
+      <span class="param-type">str (HH:mm:ss)</span>
+      <span class="badge badge-blue">Default: 09:30:00</span>
+    </div>
+    <div class="card-body">
+      <p>The <strong>earliest intraday time</strong> the portfolio is allowed to enter legs. Until this time is reached no legs can fire, regardless of their individual leg-level start time overrides.</p>
+      <h4>Engine Behaviour</h4>
+      <pre>_raw_ls  = parse_time_str(leg["conf"].get("Start Time"))   # leg-level override
+if _raw_ls and timing.get("is_winter"):
+    _raw_ls = add_one_hour(_raw_ls)                         # winter-time adjustment
+leg_start = _raw_ls or timing["start"]                      # fallback to portfolio start
+
+if curr_time >= leg_start:
+    can_execute = True</pre>
+      <ul>
+        <li>Each leg can optionally carry its own <code>Start Time</code> override (set in Leg config).</li>
+        <li>If no leg-level override, the portfolio Start Time is used as the gate.</li>
+        <li>Winter/summer time adjustment is applied automatically via <code>is_winter</code> flag.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 11. End Time -->
+  <div class="param-card" id="end-time">
+    <div class="card-header">
+      <span class="param-name">11. End Time</span>
+      <span class="field-key">timing.end_time</span>
+      <span class="param-type">str (HH:mm:ss)</span>
+      <span class="badge badge-blue">Default: 16:15:00</span>
+    </div>
+    <div class="card-body">
+      <p>The <strong>cutoff time for new entries</strong>. After this time no new leg entries are initiated. Existing open positions continue to be monitored for Target/SL.</p>
+      <h4>Engine Behaviour</h4>
+      <pre>if timing["end_blocked"] and not _triggered_manual:
+    continue   # skip new entry — end time reached</pre>
+      <h4>Manual Portfolio Exception</h4>
+      <p>A <strong>Manual</strong> portfolio that has been externally triggered bypasses the <code>end_blocked</code> guard, enabling late-session portfolio chaining.</p>
+      <pre>_triggered_manual = (
+    state["exec_mode"]["mode"] == "Manual"
+    and state["exec_mode"].get("triggered")
+)
+if timing["end_blocked"] and not _triggered_manual:
+    continue   # blocked — unless manually triggered</pre>
+      <div class="callout callout-info">
+        <strong>Constraint:</strong> End Time must be after Start Time. The system does not enforce this at the UI level — it is the user's responsibility.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 12. SqOff Time -->
+  <div class="param-card" id="sqoff-time">
+    <div class="card-header">
+      <span class="param-name">12. SqOff Time</span>
+      <span class="field-key">timing.sqoff_time</span>
+      <span class="param-type">str (HH:mm:ss)</span>
+      <span class="badge badge-blue">Default: 16:15:00</span>
+    </div>
+    <div class="card-body">
+      <p>The <strong>intraday forced exit time</strong>. At or after this time, all active legs not already exited via Target or Stoploss are force-squared-off at the last known market price.</p>
+      <h4>Typical Intraday Pattern</h4>
+      <pre>09:30:00  Start Time  →  Entry gates open
+16:15:00  End Time    →  No new entries
+16:15:00  SqOff Time  →  Force-close all remaining positions</pre>
+      <div class="callout callout-info">
+        End Time and SqOff Time are commonly set to the same value for standard intraday strategies. They can differ if you want to stop new entries at an earlier time but allow Target/SL management to continue until a later forced close.
+      </div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <!-- ─── VISIBILITY MATRIX ─── -->
+  <h2 id="visibility">PART 4 — Visibility Matrix</h2>
+  <p>The UI dynamically hides/shows fields via <code>_update_visibility()</code> based on the current mode and <code>Based On</code> selection. Timing fields are always visible.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Start time</th>
+        <th>Manual</th>
+        <th>CombinedPremium / UnderlyingLevel / CombinedPremiumCrossOver</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Based On</td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td><span class="badge badge-green">Visible</span></td>
+      </tr>
+      <tr>
+        <td>Entry Price</td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td>Visible only if <code>Based On = None</code></td>
+      </tr>
+      <tr>
+        <td>Rounding Value</td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td>Visible only if <code>Based On = DayOpen</code> or <code>StartTime</code></td>
+      </tr>
+      <tr>
+        <td>Adjust Price</td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td><span class="badge badge-gray">Hidden</span></td>
+        <td>Visible only if <code>Based On = DayOpen</code> or <code>StartTime</code></td>
+      </tr>
+      <tr>
+        <td>Run On Days &rarr; Holiday Policy</td>
+        <td><span class="badge badge-green">Always Visible</span></td>
+        <td><span class="badge badge-green">Always Visible</span></td>
+        <td><span class="badge badge-green">Always Visible</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <!-- ─── ENGINE INIT ─── -->
+  <h2 id="init">PART 5 — Engine Initialisation</h2>
+  <p><code>_build_exec_mode()</code> in <code>engine/backtester.py</code> constructs the runtime state dict from saved config:</p>
+  <pre>def _build_exec_mode(ep: dict) -> dict:
+    mode = ep.get("portfolio_execution_mode", "Start time")
+    return {
+        "mode":            mode,
+        "based_on":        ep.get("based_on", "None"),
+        "entry_price":     float(ep.get("entry_price", 0.0)),
+        "rounding":        float(ep.get("rounding_value", 0.0)),
+        "adjust":          str(ep.get("adjust_price", "")),
+        "status":          "WAITING_FOR_ENTRY" if mode not in ("Start time", "Manual") else "ACTIVE",
+        "ref_val":         None,    # set on DayOpen/StartTime first tick
+        "target_val":      None,    # computed from ref_val + rounding + adjust
+        "day_start_val":   None,    # captured at r_idx == 0 for logging
+        "triggered":       False,
+        "crossover_state": "",      # used by CombinedPremiumCrossOver
+    }</pre>
+
+  <div class="callout callout-info">
+    <strong>Key:</strong> <code>Start time</code> and <code>Manual</code> initialise directly to <code>ACTIVE</code>. All other modes start <code>WAITING_FOR_ENTRY</code> and rely on <code>check_portfolio_exec_mode()</code> running every tick until triggered.
+  </div>
+
+  <hr/>
+
+  <!-- ─── ENTRY GATING ─── -->
+  <h2 id="gating">PART 6 — Entry Gating in execution.py</h2>
+  <p>Inside <code>entry_fill_leg()</code>, the exec_mode state gates every attempted leg entry:</p>
+  <pre>exec_mode = state["exec_mode"]["mode"]
+
+if exec_mode == "Manual" and not state["exec_mode"].get("triggered"):
+    return   # skip — not yet externally triggered
+
+elif exec_mode not in ("Start time", "Manual"):
+    if state["exec_mode"]["status"] == "ACTIVE" and state["exec_mode"]["triggered"]:
+        pass   # allow entry
+    else:
+        return   # skip — still WAITING_FOR_ENTRY
+
+elif state["exec_mode"]["mode"] == "Manual" and state["exec_mode"].get("triggered"):
+    pass   # allow entry (externally triggered)</pre>
+
+  <div class="callout callout-success">
+    A <code>Manual</code> portfolio triggered late in the day (after <code>end_time</code>) is still allowed to enter — the <code>end_blocked</code> guard is bypassed for triggered Manual portfolios.
+  </div>
+
+  <hr/>
+
+  <!-- ─── DATA FLOW ─── -->
+  <h2 id="dataflow">PART 7 — Data Flow Summary</h2>
+  <div class="flow-diagram">
+    <span class="flow-node">UI (ExecutionParametersTab)</span><br/>
+    <span class="flow-arrow">  &VerticalBar;&nbsp; get_data() &rarr; dict</span><br/>
+    <span class="flow-arrow">  &darr;</span><br/>
+    <span class="flow-node">portfolio.py &rarr; save_portfolio()</span><br/>
+    <span class="flow-arrow">  &VerticalBar;&nbsp; data["execution_params"] + data["timing"]</span><br/>
+    <span class="flow-arrow">  &darr;</span><br/>
+    <span class="flow-node">JSON Config (portfolios.json)</span><br/>
+    <span class="flow-arrow">  &VerticalBar;&nbsp; loaded by backtester / helper</span><br/>
+    <span class="flow-arrow">  &darr;</span><br/>
+    <span class="flow-node">_build_exec_mode(ep)</span>&nbsp;&nbsp;<span class="flow-label">&larr; engine/backtester.py</span><br/>
+    <span class="flow-arrow">  &VerticalBar;&nbsp; state["exec_mode"]</span><br/>
+    <span class="flow-arrow">  &darr;</span><br/>
+    <span class="flow-node">check_portfolio_exec_mode()</span>&nbsp;&nbsp;<span class="flow-label">&larr; engine/monitoring.py (every tick)</span><br/>
+    <span class="flow-arrow">  &VerticalBar;&nbsp; status = "ACTIVE" when triggered</span><br/>
+    <span class="flow-arrow">  &darr;</span><br/>
+    <span class="flow-node">entry_fill_leg()</span>&nbsp;&nbsp;<span class="flow-label">&larr; engine/execution.py (timing gate + exec_mode gate)</span>
+  </div>
+
+  <hr/>
+
+  <!-- ─── VALIDATION ─── -->
+  <h2 id="validation">PART 8 — Validation Summary</h2>
+  <table>
+    <thead><tr><th>Parameter</th><th>Rule</th><th>Error / Outcome</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>strategy_tag</code></td>
+        <td>Cannot be empty</td>
+        <td>ValueError blocks run</td>
+        <td><code>core/validators.py</code></td>
+      </tr>
+      <tr>
+        <td><code>strategy_tag</code></td>
+        <td>Must exist and be enabled in Strategies list</td>
+        <td>ValueError blocks run</td>
+        <td><code>core/helper.py</code></td>
+      </tr>
+      <tr>
+        <td><code>entry_price</code></td>
+        <td>Must be non-zero when mode is dynamic and <code>based_on = None</code></td>
+        <td>Warning dialog blocks portfolio save</td>
+        <td><code>tabs/portfolio.py</code></td>
+      </tr>
+      <tr>
+        <td><code>product</code></td>
+        <td>No runtime validation</td>
+        <td>Broker-layer responsibility</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td><code>leg_fail_action</code></td>
+        <td>No runtime validation in backtester</td>
+        <td>Live execution layer only</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>Timing fields</td>
+        <td>No hard enforcement &mdash; logical order (start &lt; end &le; sqoff) is user responsibility</td>
+        <td>Incorrect ordering may cause unexpected behaviour</td>
+        <td>UI</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <!-- ─── FULL SUMMARY ─── -->
+  <h2 id="summary">PART 9 — Complete Parameter Reference</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Parameter</th><th>Field Key</th><th>Type</th><th>Default</th><th>Section</th><th>Visibility</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Product</td><td><code>execution_params.product</code></td><td>str</td><td>MIS</td><td><span class="badge badge-blue">Exec Settings</span></td><td>Always</td></tr>
+      <tr><td>2</td><td>Strategy Tag</td><td><code>execution_params.strategy_tag</code></td><td>str</td><td>"Default"</td><td><span class="badge badge-blue">Exec Settings</span></td><td>Always &nbsp;<span class="badge badge-red">Required</span></td></tr>
+      <tr><td>3</td><td>If Leg Fail</td><td><code>execution_params.leg_fail_action</code></td><td>str</td><td>KeepPlacedLegs</td><td><span class="badge badge-blue">Exec Settings</span></td><td>Always</td></tr>
+      <tr style="opacity:.55"><td>H</td><td><em>Leg Execution (hidden)</em></td><td><code>execution_params.leg_execution</code></td><td>str</td><td>Parallel</td><td><span class="badge badge-gray">Exec Settings</span></td><td>Hidden</td></tr>
+      <tr><td>4</td><td>Portfolio Execution Mode</td><td><code>execution_params.portfolio_execution_mode</code></td><td>str</td><td>Start time</td><td><span class="badge badge-green">Exec Mode</span></td><td>Always</td></tr>
+      <tr><td>5</td><td>Based On</td><td><code>execution_params.based_on</code></td><td>str</td><td>None</td><td><span class="badge badge-green">Exec Mode</span></td><td>Dynamic modes only</td></tr>
+      <tr><td>6</td><td>Entry Price</td><td><code>execution_params.entry_price</code></td><td>float</td><td>0.0</td><td><span class="badge badge-green">Exec Mode</span></td><td>Based On = None</td></tr>
+      <tr><td>7</td><td>Rounding Value</td><td><code>execution_params.rounding_value</code></td><td>float</td><td>0.0</td><td><span class="badge badge-green">Exec Mode</span></td><td>Based On = DayOpen / StartTime</td></tr>
+      <tr><td>8</td><td>Adjust Price</td><td><code>execution_params.adjust_price</code></td><td>str</td><td>""</td><td><span class="badge badge-green">Exec Mode</span></td><td>Based On = DayOpen / StartTime</td></tr>
+      <tr><td>10</td><td>Run On Days</td><td><code>timing.run_days</code></td><td>str</td><td>All Days</td><td><span class="badge badge-yellow">Timing</span></td><td>Always</td></tr>
+      <tr><td>11</td><td>Start Time</td><td><code>timing.start_time</code></td><td>str</td><td>09:30:00</td><td><span class="badge badge-yellow">Timing</span></td><td>Always</td></tr>
+      <tr><td>12</td><td>End Time</td><td><code>timing.end_time</code></td><td>str</td><td>16:15:00</td><td><span class="badge badge-yellow">Timing</span></td><td>Always</td></tr>
+      <tr><td>13</td><td>SqOff Time</td><td><code>timing.sqoff_time</code></td><td>str</td><td>16:15:00</td><td><span class="badge badge-yellow">Timing</span></td><td>Always</td></tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">
+    <em>Last updated: 2026-04-22 &nbsp;&middot;&nbsp; Source: <code>gui/tabs/execution_parameters.py</code>, <code>engine/backtester.py</code>, <code>engine/monitoring.py</code>, <code>engine/execution.py</code>, <code>core/validators.py</code>, <code>core/helper.py</code></em>
+  </div>
+
+</main>
+</div>
+</body>
+</html>

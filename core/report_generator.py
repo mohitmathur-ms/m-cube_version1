@@ -160,7 +160,14 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         col_qty = _resolve_column(df, ["peak_qty", "quantity", "Quantity", "qty"])
         col_avg_open = _resolve_column(df, ["avg_px_open", "AvgPxOpen", "avg_open"])
         col_avg_close = _resolve_column(df, ["avg_px_close", "AvgPxClose", "avg_close"])
-        col_pnl = _resolve_column(df, ["realized_pnl", "RealizedPnl", "realized_return", "pnl"])
+        # Prefer the base-currency PnL column (e.g. realized_pnl_usd) so that
+        # daily aggregation in the HTML report doesn't mix currencies.
+        _base_pnl_col = next(
+            (c for c in df.columns if c.startswith("realized_pnl_")
+             and c not in ("realized_pnl_",)),
+            None,
+        )
+        col_pnl = _base_pnl_col or _resolve_column(df, ["realized_pnl", "RealizedPnl", "realized_return", "pnl"])
         col_ts_open = _resolve_column(df, ["ts_opened", "TsOpened", "opened_time", "ts_init"])
         col_ts_close = _resolve_column(df, ["ts_closed", "TsClosed", "closed_time", "ts_last"])
         col_id = _resolve_column(df, ["id", "Id", "position_id", "index"])

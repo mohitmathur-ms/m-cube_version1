@@ -1,0 +1,27 @@
+{
+  "tab_id": "pf-reexecute",
+  "tab_label": "ReExecute",
+  "description": "Global toggle flags that modify re-execution and re-entry behaviour after SL/Target hits.",
+  "backend_enabled": false,
+  "fieldsets": [
+    {
+      "id": "reexecute_flags",
+      "legend": "ReExecute Settings",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "no_reexec_sl_cost", "label": "No ReExecute If Moved SL to Cost", "type": "checkbox", "default": false, "html_id": "pf-m-reex-noslcost", "backend_enabled": false, "description": "Blocks Re-Execute when leg's SL was previously moved to cost." },
+        { "key": "no_wait_trade_reexec", "label": "No Wait & Trade for ReExecute", "type": "checkbox", "default": false, "html_id": "pf-m-reex-nowait", "backend_enabled": false, "description": "Skips Wait & Trade delay on re-executed legs — enters at immediate market." },
+        { "key": "no_strike_change_reexec", "label": "No Strike Change for ReExecute", "type": "checkbox", "default": false, "html_id": "pf-m-reex-nostrike", "backend_enabled": false, "description": "Forces re-executed legs to keep original strike instead of re-resolving ATM." },
+        { "key": "no_reentry_after_end", "label": "No ReEntry/ReExecute after Portfolio End Time", "type": "checkbox", "default": false, "html_id": "pf-m-reex-noend", "backend_enabled": false, "description": "Blocks all new entries (re-execute and re-entry) after portfolio End Time." }
+      ]
+    },
+    {
+      "id": "reentry_flags",
+      "legend": "ReEntry Settings",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "no_reentry_sl_cost", "label": "No ReEntry If Moved SL to Cost", "type": "checkbox", "default": true, "html_id": "pf-m-reex-noreentry", "backend_enabled": false, "description": "Blocks Re-Entry action when leg's SL was moved to cost. Default ON." }
+      ]
+    }
+  ]
+}

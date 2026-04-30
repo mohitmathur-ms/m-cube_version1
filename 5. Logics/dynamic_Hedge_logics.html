@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dynamic Hedge — Parameter & Logic Documentation</title>
+  <style>
+    :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* file-specific aliases */
+    --bg2: var(--surface);
+    --bg3: var(--surface2);
+    --accent3: var(--warn);
+    --red: var(--danger);
+    --text-muted: var(--muted);
+  }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;font-size:15px;}
+    .layout{display:flex;min-height:100vh;}
+    /* Sidebar */
+    .sidebar{width:265px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:28px 0;position:sticky;top:0;height:100vh;overflow-y:auto;}
+    .sidebar-logo{padding:0 22px 22px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+    .sidebar-logo .badge{display:inline-block;background:var(--accent);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:4px;text-transform:uppercase;margin-bottom:6px;}
+    .sidebar-logo h2{font-size:14px;font-weight:700;color:#fff;}
+    .sidebar-logo p{font-size:11px;color:var(--text-muted);margin-top:3px;}
+    .nav-section{padding:6px 22px 2px;font-size:10px;font-weight:700;letter-spacing:1.2px;color:var(--text-muted);text-transform:uppercase;margin-top:10px;}
+    .nav a{display:block;padding:7px 22px;font-size:13px;color:var(--text-muted);text-decoration:none;border-left:3px solid transparent;transition:all .15s;}
+    .nav a:hover{color:var(--text);background:var(--bg3);border-left-color:var(--accent);}
+    /* Main */
+    .main{flex:1;padding:48px 52px;max-width:980px;}
+    .page-header{border-bottom:2px solid var(--border);padding-bottom:24px;margin-bottom:40px;}
+    .page-header .module-tag{font-size:11px;color:var(--accent);letter-spacing:.8px;text-transform:uppercase;font-weight:600;margin-bottom:10px;}
+    .page-header h1{font-size:32px;font-weight:800;color:#fff;letter-spacing:-.5px;}
+    .page-header .subtitle{margin-top:8px;color:var(--text-muted);font-size:14px;}
+    .meta-row{display:flex;gap:24px;margin-top:16px;flex-wrap:wrap;}
+    .meta-item{font-size:12px;color:var(--text-muted);}
+    .meta-item span{color:var(--text);font-weight:600;}
+    /* Sections */
+    section{margin-bottom:52px;}
+    h2{font-size:20px;font-weight:700;color:#fff;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+    h2 .sec-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:var(--accent);color:#fff;font-size:13px;font-weight:800;border-radius:6px;flex-shrink:0;}
+    h3{font-size:16px;font-weight:700;color:#c8d4f5;margin:28px 0 12px;}
+    p{margin-bottom:14px;}
+    /* Cards */
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:16px;}
+    .card-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+    .param-name{font-family:'Consolas',monospace;font-size:15px;font-weight:700;color:var(--accent);background:rgba(79,142,247,.1);padding:3px 10px;border-radius:5px;}
+    .widget-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:4px;background:var(--bg3);color:var(--text-muted);border:1px solid var(--border);}
+    .mode-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:4px;}
+    .mode-premium{background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3);}
+    .mode-distance{background:rgba(247,169,79,.15);color:var(--accent3);border:1px solid rgba(247,169,79,.3);}
+    /* Tables */
+    table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;}
+    thead tr{background:var(--bg3);}
+    th{text-align:left;padding:10px 14px;font-weight:700;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);}
+    td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+    tr:last-child td{border-bottom:none;}
+    tbody tr:hover{background:rgba(255,255,255,.02);}
+    td code{font-family:'Consolas',monospace;font-size:12px;background:var(--code-bg);padding:2px 6px;border-radius:4px;color:var(--accent2);}
+    .prop-table{width:100%;border-collapse:collapse;margin:0;}
+    .prop-table td{padding:5px 0;font-size:13px;border:none;}
+    .prop-table td:first-child{color:var(--text-muted);width:140px;font-weight:600;}
+    /* Code */
+    pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:18px 20px;overflow-x:auto;font-family:'Consolas',monospace;font-size:13px;line-height:1.6;color:#c8d4f5;margin:16px 0;}
+    .kw{color:#c678dd;}.str{color:#98c379;}.num{color:#d19a66;}.cmt{color:#5c6370;font-style:italic;}.fn{color:#61afef;}
+    .ok{color:var(--accent2);}.fail{color:var(--red);}.hi{color:var(--accent3);}
+    /* Callouts */
+    .callout{border-left:4px solid var(--accent);background:rgba(79,142,247,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:13.5px;}
+    .callout.warn{border-left-color:var(--accent3);background:rgba(247,169,79,.07);}
+    .callout.info{border-left-color:var(--accent2);background:rgba(56,217,169,.07);}
+    .callout.highlight{border-left-color:var(--accent2);background:rgba(56,217,169,.07);font-size:14px;}
+    /* Tags */
+    .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
+    .tag-yes{background:rgba(56,217,169,.15);color:var(--accent2);}
+    .tag-no{background:rgba(247,96,96,.15);color:var(--red);}
+    .tag-buy{background:rgba(56,217,169,.15);color:var(--accent2);}
+    .tag-sell{background:rgba(247,96,96,.15);color:var(--red);}
+    /* Vis grid */
+    .vis-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;}
+    .vis-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px 18px;}
+    .vis-box .vis-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+    .vis-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+    .vis-row:last-child{border-bottom:none;}
+    /* Rules box */
+    .rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;}
+    .rule-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px 18px;}
+    .rule-box .rule-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;}
+    .rule-item{font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);}
+    .rule-item:last-child{border-bottom:none;}
+    /* Trace */
+    .trace-box{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;font-family:'Consolas',monospace;font-size:12.5px;line-height:1.8;overflow-x:auto;}
+    .t-step{color:var(--accent3);font-weight:700;}
+    .t-ok{color:var(--accent2);}
+    .t-fail{color:var(--red);}
+    .t-info{color:var(--text-muted);}
+    .t-head{color:#fff;font-weight:700;}
+    /* Flow */
+    .flow{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;font-family:'Consolas',monospace;font-size:12.5px;line-height:1.7;color:#a8b4d0;overflow-x:auto;margin:16px 0;}
+    /* Arch */
+    .arch{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:20px;font-family:'Consolas',monospace;font-size:12px;line-height:1.65;color:#a8b4d0;overflow-x:auto;margin:16px 0;}
+    /* TOC */
+    .toc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:40px;}
+    .toc h3{font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700;}
+    .toc ol{padding-left:20px;}
+    .toc li{margin-bottom:4px;font-size:13.5px;}
+    .toc a{color:var(--accent);text-decoration:none;}
+    .toc a:hover{text-decoration:underline;}
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="badge">Backtesting Engine</div>
+      <h2>Dynamic Hedge</h2>
+      <p>Parameter &amp; Logic Docs</p>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Sections</div>
+      <a href="#overview">1. Overview</a>
+      <a href="#architecture">2. Architecture</a>
+      <a href="#enablement">3. Enablement</a>
+      <a href="#core-rules">4. Core Hedge Rules</a>
+      <a href="#parameters">5. Parameters</a>
+      <a href="#visibility">6. Field Visibility</a>
+      <a href="#hedge-type-logic">7. Hedge Type Logic</a>
+      <a href="#sqoff-logic">8. SqOff Mode Logic</a>
+      <a href="#creation">9. Leg Creation</a>
+      <a href="#limits">10. Execution Limits</a>
+      <a href="#orderbook">11. Orderbook Markers</a>
+      <a href="#schema">12. Config Schema</a>
+      <a href="#examples">13. Examples</a>
+      <a href="#edgecases">14. Edge Cases</a>
+      <a href="#files">15. File Reference</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+
+    <header class="page-header">
+      <div class="module-tag">execution.py · monitoring.py · dynamic_hedge.py</div>
+      <h1>Dynamic Hedge</h1>
+      <p class="subtitle">Complete parameter reference and execution logic documentation</p>
+      <div class="meta-row">
+        <div class="meta-item">Project <span>MegaServe Backtesting Engine</span></div>
+        <div class="meta-item">Updated <span>2026-04-21</span></div>
+      </div>
+    </header>
+
+    <div class="toc">
+      <h3>Contents</h3>
+      <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#architecture">System Architecture</a></li>
+        <li><a href="#enablement">Enablement Logic</a></li>
+        <li><a href="#core-rules">Core Hedge Rules</a></li>
+        <li><a href="#parameters">Parameters Reference</a></li>
+        <li><a href="#visibility">Field Visibility Rules</a></li>
+        <li><a href="#hedge-type-logic">Hedge Type Logic</a></li>
+        <li><a href="#sqoff-logic">SqOff Mode Logic</a></li>
+        <li><a href="#creation">Hedge Leg Creation</a></li>
+        <li><a href="#limits">Execution Limits</a></li>
+        <li><a href="#orderbook">Orderbook Markers</a></li>
+        <li><a href="#schema">Configuration Schema</a></li>
+        <li><a href="#examples">End-to-End Examples</a></li>
+        <li><a href="#edgecases">Edge Cases &amp; Failure Modes</a></li>
+        <li><a href="#files">File Reference Map</a></li>
+      </ol>
+    </div>
+
+    <!-- 1 -->
+    <section id="overview">
+      <h2><span class="sec-num">1</span> Overview</h2>
+      <p>The <strong>Dynamic Hedge</strong> system automatically opens a protective hedge leg whenever a parent leg with <strong>"Hedge Required"</strong> enters a trade. Two axes of configuration control the behaviour:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;">
+        <div class="card" style="margin-bottom:0;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Hedge Type — how to find the strike</div>
+          <div style="font-size:13px;margin-bottom:6px;"><strong style="color:var(--accent);">PremiumBased</strong> — scans the OTM side of the parent strike within a distance window, filtered by premium range.</div>
+          <div style="font-size:13px;"><strong style="color:var(--accent3);">DistanceBased</strong> — takes exactly <code>parent_strike ± fixed_dist</code>. No scan, no premium filter.</div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">SqOff Mode — when to exit the hedge</div>
+          <div style="font-size:13px;margin-bottom:6px;"><strong style="color:var(--accent);">LegSqOff</strong> — hedge exits when parent exits.</div>
+          <div style="font-size:13px;"><strong style="color:var(--accent3);">PortfolioSqOff</strong> — hedge stays alive after parent exits; closes only on portfolio-level event or EOD.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="architecture">
+      <h2><span class="sec-num">2</span> System Architecture</h2>
+      <div class="arch">
+┌──────────────────────────────────────────────────────────┐
+│                  Portfolio Configuration                   │
+│  Legs Table            DynamicHedgeTab                    │
+│  [✓] Hedge Required    hedge_type · sqoff_leg_on          │
+│                        ── PremiumBased ──                  │
+│                        dist from strike min/max            │
+│                        premium min/max                     │
+│                        ── DistanceBased ──                 │
+│                        hedge_fixed_min_distance            │
+└───────────────────────────────┬──────────────────────────┘
+                                ▼
+               ┌─────────────────────────────────┐
+               │       engine/execution.py        │
+               │  parent_stk = leg["resolved_strike"] │
+               │                                  │
+               │  DistanceBased:                  │
+               │   CALL → parent_stk + dist ──────│──▶ exact, no scan
+               │   PUT  → parent_stk - dist ──────│
+               │                                  │
+               │  PremiumBased:                   │
+               │   find_hedge_strike(             │
+               │     base = parent_stk) ──────────│──▶ OTM scan + premium filter
+               └─────────────────────────────────┘
+                                │
+                  ┌─────────────┴───────────────┐
+                  ▼                              ▼
+          LegSqOff                      PortfolioSqOff
+          exits on parent exit          stays ACTIVE until
+                                        Portfolio SL/Tgt/EOD</div>
+    </section>
+
+    <!-- 3 -->
+    <section id="enablement">
+      <h2><span class="sec-num">3</span> Enablement Logic</h2>
+      <div class="callout"><strong>Rule:</strong> <code>dynamic_hedge["enabled"]</code> = <em>ANY leg where "Hedge Required" == True</em></div>
+      <table>
+        <thead><tr><th>Leg Setup</th><th>enabled</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>No legs checked</td><td><span class="tag tag-no">false</span></td><td>System bypassed entirely</td></tr>
+          <tr><td>≥ 1 leg checked</td><td><span class="tag tag-yes">true</span></td><td>Hedge activates for flagged legs only</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 4. CORE RULES -->
+    <section id="core-rules">
+      <h2><span class="sec-num">4</span> Core Hedge Rules</h2>
+      <div class="callout highlight">These three rules apply to <strong>every</strong> hedge leg created, regardless of hedge type or sqoff mode.</div>
+      <div class="rules-grid">
+        <div class="rule-box">
+          <div class="rule-title">C/P — Same as Parent</div>
+          <div class="rule-item">CALL parent → <strong>CALL</strong> hedge</div>
+          <div class="rule-item">PUT parent → <strong>PUT</strong> hedge</div>
+        </div>
+        <div class="rule-box">
+          <div class="rule-title">BUY/SELL — Opposite of Parent</div>
+          <div class="rule-item"><span class="tag tag-sell">SELL</span> parent → <span class="tag tag-buy">BUY</span> hedge</div>
+          <div class="rule-item"><span class="tag tag-buy">BUY</span> parent → <span class="tag tag-sell">SELL</span> hedge</div>
+        </div>
+      </div>
+      <div class="rule-box" style="margin-top:0;">
+        <div class="rule-title">Strike — Always OTM of Parent Strike</div>
+        <div class="rule-item">CALL parent → hedge strike <strong>&gt; parent strike</strong> (further OTM for calls)</div>
+        <div class="rule-item">PUT parent → hedge strike <strong>&lt; parent strike</strong> (further OTM for puts)</div>
+        <div class="rule-item" style="color:var(--text-muted);font-size:12px;margin-top:6px;">Base reference is always the parent leg's own strike — not ATM.</div>
+      </div>
+      <pre><span class="cmt">Examples:</span>
+SELL CALL @ <span class="num">652</span>  →  BUY CALL @ strike > <span class="num">652</span>  (e.g. <span class="ok">657</span>)
+SELL PUT  @ <span class="num">600</span>  →  BUY PUT  @ strike &lt; <span class="num">600</span>  (e.g. <span class="ok">595</span>)
+BUY  CALL @ <span class="num">652</span>  →  SELL CALL @ strike > <span class="num">652</span></pre>
+    </section>
+
+    <!-- 5. PARAMETERS -->
+    <section id="parameters">
+      <h2><span class="sec-num">5</span> Parameters Reference</h2>
+
+      <div class="card">
+        <div class="card-header"><span class="param-name">hedge_type</span><span class="widget-badge">ComboBox</span></div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>"PremiumBased"</code></td></tr>
+          <tr><td>Options</td><td><code>"PremiumBased"</code>, <code>"DistanceBased"</code></td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.hedge_type</code></td></tr>
+        </table>
+        <table style="margin-top:12px;">
+          <thead><tr><th>Option</th><th>Strike Selection</th><th>Premium Filter</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mode-badge mode-premium">PremiumBased</span></td><td>Best candidate in OTM distance window from parent strike</td><td>Yes</td></tr>
+            <tr><td><span class="mode-badge mode-distance">DistanceBased</span></td><td>Exact: <code>parent_strike ± fixed_dist</code></td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="param-name">sqoff_leg_on</span><span class="widget-badge">ComboBox</span></div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>"LegSqOff"</code></td></tr>
+          <tr><td>Options</td><td><code>"LegSqOff"</code>, <code>"PortfolioSqOff"</code></td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.sqoff_leg_on</code></td></tr>
+        </table>
+        <table style="margin-top:12px;">
+          <thead><tr><th>Option</th><th>Hedge Exit Trigger</th></tr></thead>
+          <tbody>
+            <tr><td><code>LegSqOff</code></td><td>Immediately when parent leg exits (any reason)</td></tr>
+            <tr><td><code>PortfolioSqOff</code></td><td>Only on Portfolio SL, Target, Max P/L, or end-of-day sqoff</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="param-name">hedge_distance_strike.min</span>
+          <span class="widget-badge">SpinBox (int)</span>
+          <span class="mode-badge mode-premium">PremiumBased only</span>
+        </div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>10</code></td></tr>
+          <tr><td>Range</td><td><code>0 – 100</code> strike steps</td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.hedge_distance_atm.min</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Minimum distance from the parent leg's own strike where candidate search begins. CALL: from <code>parent_strike + min</code>. PUT: from <code>parent_strike - min</code>.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="param-name">hedge_distance_strike.max</span>
+          <span class="widget-badge">SpinBox (int)</span>
+          <span class="mode-badge mode-premium">PremiumBased only</span>
+        </div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>20</code></td></tr>
+          <tr><td>Range</td><td><code>0 – 100</code> strike steps</td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.hedge_distance_atm.max</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Outer boundary of search window. CALL: <code>[parent+min, parent+max]</code>. PUT: <code>[parent-max, parent-min]</code>.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="param-name">premium_range.min</span>
+          <span class="widget-badge">DoubleSpinBox</span>
+          <span class="mode-badge mode-premium">PremiumBased only</span>
+        </div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>0.05</code></td></tr>
+          <tr><td>Range</td><td><code>0.00 – 100,000.00</code></td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.premium_range.min</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Minimum acceptable market premium. Strikes quoting below this are excluded.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="param-name">premium_range.max</span>
+          <span class="widget-badge">DoubleSpinBox</span>
+          <span class="mode-badge mode-premium">PremiumBased only</span>
+        </div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>40.00</code></td></tr>
+          <tr><td>Range</td><td><code>0.00 – 100,000.00</code></td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.premium_range.max</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Maximum acceptable premium — caps hedge cost.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="param-name">hedge_fixed_min_distance</span>
+          <span class="widget-badge">QLineEdit (integer)</span>
+          <span class="mode-badge mode-distance">DistanceBased only</span>
+        </div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><code>50</code></td></tr>
+          <tr><td>Range</td><td><code>0 – 10,000</code> (validated, no arrows)</td></tr>
+          <tr><td>JSON key</td><td><code>dynamic_hedge.hedge_fixed_min_distance</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Fixed offset from parent leg's own strike. No premium filter — whatever the market quotes at that strike is accepted.</p>
+        <table style="margin-top:8px;">
+          <thead><tr><th>Parent</th><th>Formula</th><th>Example (dist=5)</th></tr></thead>
+          <tbody>
+            <tr><td>SELL CALL @ 652</td><td><code>parent_strike + dist</code></td><td>BUY CALL @ 657</td></tr>
+            <tr><td>SELL PUT @ 600</td><td><code>parent_strike − dist</code></td><td>BUY PUT @ 595</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="param-name">Hedge Required</span><span class="widget-badge">QCheckBox (per leg)</span></div>
+        <table class="prop-table">
+          <tr><td>Default</td><td><span class="tag tag-no">False</span></td></tr>
+          <tr><td>JSON key</td><td><code>legs[n]["Hedge Required"]</code></td></tr>
+        </table>
+        <p style="margin-top:12px;font-size:13.5px;">Per-leg opt-in. Drives <code>dynamic_hedge.enabled</code> — all unchecked = system bypassed.</p>
+      </div>
+
+      <h3>Quick Reference</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Widget</th><th>Default</th><th>Visible when</th></tr></thead>
+        <tbody>
+          <tr><td><code>hedge_type</code></td><td>ComboBox</td><td>PremiumBased</td><td>Always</td></tr>
+          <tr><td><code>sqoff_leg_on</code></td><td>ComboBox</td><td>LegSqOff</td><td>Always</td></tr>
+          <tr><td><code>hedge_distance_strike.min</code></td><td>SpinBox</td><td>10</td><td>PremiumBased</td></tr>
+          <tr><td><code>hedge_distance_strike.max</code></td><td>SpinBox</td><td>20</td><td>PremiumBased</td></tr>
+          <tr><td><code>premium_range.min</code></td><td>DoubleSpinBox</td><td>0.05</td><td>PremiumBased</td></tr>
+          <tr><td><code>premium_range.max</code></td><td>DoubleSpinBox</td><td>40.00</td><td>PremiumBased</td></tr>
+          <tr><td><code>hedge_fixed_min_distance</code></td><td>QLineEdit</td><td>50</td><td>DistanceBased</td></tr>
+          <tr><td><code>Hedge Required</code></td><td>QCheckBox</td><td>False</td><td>Always (per leg)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 6. VISIBILITY -->
+    <section id="visibility">
+      <h2><span class="sec-num">6</span> Field Visibility Rules</h2>
+      <div class="vis-grid">
+        <div class="vis-box">
+          <div class="vis-title" style="color:var(--accent);">PremiumBased</div>
+          <div class="vis-row"><span>SqOff Leg On</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Hedge Distance from Strike (Min)</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Hedge Distance from Strike (Max)</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Min Premium</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Max Premium</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Hedge Fixed Min Distance</span><span class="tag tag-no">Hidden</span></div>
+        </div>
+        <div class="vis-box">
+          <div class="vis-title" style="color:var(--accent3);">DistanceBased</div>
+          <div class="vis-row"><span>SqOff Leg On</span><span class="tag tag-yes">Visible</span></div>
+          <div class="vis-row"><span>Hedge Distance from Strike (Min)</span><span class="tag tag-no">Hidden</span></div>
+          <div class="vis-row"><span>Hedge Distance from Strike (Max)</span><span class="tag tag-no">Hidden</span></div>
+          <div class="vis-row"><span>Min Premium</span><span class="tag tag-no">Hidden</span></div>
+          <div class="vis-row"><span>Max Premium</span><span class="tag tag-no">Hidden</span></div>
+          <div class="vis-row"><span>Hedge Fixed Min Distance</span><span class="tag tag-yes">Visible</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. HEDGE TYPE LOGIC -->
+    <section id="hedge-type-logic">
+      <h2><span class="sec-num">7</span> Hedge Type Logic</h2>
+
+      <h3>7.1 PremiumBased</h3>
+      <p><code>find_hedge_strike(rec, parent_stk, leg_type, hedge_params)</code> — <code>engine/execution.py</code></p>
+      <pre><span class="cmt"># Base = parent leg's own strike (not ATM)</span>
+<span class="kw">if</span> leg_type == CALL:
+    candidates = [parent_stk + dist_min  ...  parent_stk + dist_max]  <span class="cmt"># above = OTM</span>
+<span class="kw">else</span>:  <span class="cmt"># PUT</span>
+    candidates = [parent_stk - dist_max  ...  parent_stk - dist_min]  <span class="cmt"># below = OTM</span>
+
+valid = [s <span class="kw">for</span> s <span class="kw">in</span> candidates <span class="kw">if</span> prem_min &lt;= <span class="fn">premium</span>(s) &lt;= prem_max]
+valid.<span class="fn">sort</span>(key=<span class="kw">lambda</span> x: (x.prem, x.dist))   <span class="cmt"># cheapest first</span>
+<span class="kw">return</span> valid[<span class="num">0</span>].strike  <span class="kw">if</span> valid  <span class="kw">else</span>  <span class="kw">None</span></pre>
+
+      <h3>7.2 DistanceBased</h3>
+      <p style="font-size:13.5px;">No scan, no premium filter. Computed strike is snapped to the nearest valid <code>strike_step</code> so the option chain quote is guaranteed to resolve.</p>
+      <pre><span class="cmt"># No ATM lookup. No chain scan. No premium filter.</span>
+parent_stk  = <span class="fn">float</span>(leg.get(<span class="str">"resolved_strike"</span>, <span class="num">0</span>))   <span class="cmt"># resolved numeric strike (not raw DSL string)</span>
+fixed_dist  = <span class="fn">int</span>(dh_cfg.get(<span class="str">"hedge_fixed_min_distance"</span>, <span class="num">0</span>))
+strike_step = <span class="fn">int</span>(meta.get(<span class="str">"general"</span>, {}).get(<span class="str">"strike_step"</span>, <span class="num">1</span>)) <span class="kw">or</span> <span class="num">1</span>
+raw_stk     = parent_stk + fixed_dist  <span class="kw">if</span>  l_cp == <span class="num">0</span>  <span class="kw">else</span>  parent_stk - fixed_dist
+hedge_stk   = <span class="fn">round</span>(raw_stk / strike_step) * strike_step   <span class="cmt"># snapped to valid chain strike</span></pre>
+      <div class="callout warn" style="margin-top:0;">
+        <strong>Example:</strong> <code>parent_stk=650</code>, <code>fixed_dist=7</code>, <code>strike_step=5</code><br>
+        <code>raw_stk = 657 → round(657/5)*5 = 655</code> — hedge is placed at <strong>655</strong>, not 657.
+      </div>
+
+      <h3>Comparison</h3>
+      <table>
+        <thead><tr><th>Property</th><th>PremiumBased</th><th>DistanceBased</th></tr></thead>
+        <tbody>
+          <tr><td>Base reference</td><td>Parent leg's own strike</td><td>Parent leg's own strike</td></tr>
+          <tr><td>Strike result</td><td>Best candidate in OTM range</td><td>Snapped to nearest <code>strike_step</code></td></tr>
+          <tr><td>Premium filter</td><td>Yes — min/max bounds</td><td>No — any price accepted</td></tr>
+          <tr><td>ATM lookup needed</td><td>No</td><td>No</td></tr>
+          <tr><td>Can return None</td><td>Yes — if no candidates pass</td><td>No — always resolves after snap</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 8. SQOFF LOGIC -->
+    <section id="sqoff-logic">
+      <h2><span class="sec-num">8</span> SqOff Mode Logic</h2>
+
+      <h3>8.1 LegSqOff</h3>
+      <p>When the parent exits for any reason, the linked hedge is immediately squared off in the same bar.</p>
+      <div class="flow">Parent exits at T  →  Hedge exits at T  (PARENT EXIT)</div>
+
+      <h3>8.2 PortfolioSqOff</h3>
+      <p>The hedge exit sync block in <code>monitoring.py</code> is skipped when <code>_dh_sqoff_mode == "PortfolioSqOff"</code>. Hedge stays <code>ACTIVE</code> and closes only when:</p>
+      <table>
+        <thead><tr><th>Trigger</th><th>Handler</th></tr></thead>
+        <tbody>
+          <tr><td>Portfolio SL hit</td><td><code>process_portfolio_sqoff()</code></td></tr>
+          <tr><td>Portfolio Target hit</td><td><code>process_portfolio_sqoff()</code></td></tr>
+          <tr><td>User Max Loss hit</td><td><code>process_portfolio_sqoff()</code></td></tr>
+          <tr><td>User Max Profit hit</td><td><code>process_portfolio_sqoff()</code></td></tr>
+          <tr><td>Sqoff time</td><td><code>_close_active_legs()</code></td></tr>
+          <tr><td>EOD cleanup</td><td><code>process_eod_cleanup()</code></td></tr>
+        </tbody>
+      </table>
+      <div class="flow">Parent exits at T  →  Hedge stays ACTIVE
+Portfolio SL at T+N  →  Hedge exits  (PORTFOLIO_SQOFF)</div>
+      <div class="callout info"><strong>Note:</strong> While ACTIVE the hedge's running PnL contributes to portfolio combined PnL — it can itself help trigger the portfolio SL/Target it's waiting for.</div>
+    </section>
+
+    <!-- 9 -->
+    <section id="creation">
+      <h2><span class="sec-num">9</span> Hedge Leg Creation</h2>
+      <p style="font-size:13.5px;">Triggered when a leg with <code>"Hedge Required": true</code> transitions <code>IDLE → ACTIVE</code>.</p>
+      <table>
+        <thead><tr><th>Property</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Leg ID</td><td><code>H_{parent_leg_id}_{exec_count}</code></td></tr>
+          <tr><td>C/P</td><td>Same as parent</td></tr>
+          <tr><td>BUY/SELL</td><td>Opposite of parent</td></tr>
+          <tr><td>Strike</td><td>OTM of parent: <code>parent ± dist</code> snapped to <code>strike_step</code> (DistanceBased) or best filtered candidate (PremiumBased)</td></tr>
+          <tr><td>Entry price</td><td><strong>BUY hedge:</strong> <code>ask_open → ask_close → close</code><br><strong>SELL hedge:</strong> <code>bid_open → bid_close → close</code><br>NaN values skipped; <code>close</code> is the final fallback. If all unavailable, price = <code>0.0</code> and <code>HEDGE_PRICE_UNAVAILABLE</code> is logged. Hedge is always created.</td></tr>
+          <tr><td><code>Stoploss Type</code></td><td><code>"None"</code> — hedge has <strong>no independent SL</strong>. Exits only via parent exit (LegSqOff) or portfolio-level exit (PortfolioSqOff).</td></tr>
+          <tr><td><code>Target Type</code></td><td><code>"None"</code> — hedge has <strong>no independent Target</strong>. Same exit rules as above.</td></tr>
+          <tr><td><code>is_dynamic_hedge</code></td><td><code>True</code></td></tr>
+          <tr><td><code>parent_leg_id</code></td><td>Parent leg's ID</td></tr>
+        </tbody>
+      </table>
+      <div class="callout highlight" style="margin-top:16px;">
+        <strong>Key rule:</strong> Hedge legs never self-exit. They hold their position until forced out by their configured sqoff mode.
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="limits">
+      <h2><span class="sec-num">10</span> Execution Limits</h2>
+      <table>
+        <thead><tr><th>JSON key</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>general.max_hedge_executions</code></td><td>24</td><td>Max hedge legs created. <code>0</code> = unlimited.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 11 -->
+    <section id="orderbook">
+      <h2><span class="sec-num">11</span> Orderbook Markers</h2>
+      <table>
+        <thead><tr><th>Field</th><th>Parent Leg</th><th>Hedge Leg</th></tr></thead>
+        <tbody>
+          <tr><td><code>_IS_HEDGE</code></td><td><span class="tag tag-no">False</span></td><td><span class="tag tag-yes">True</span></td></tr>
+          <tr><td><code>_PARENT_ID</code></td><td><code>None</code></td><td>Parent leg ID</td></tr>
+          <tr><td><code>OrderID</code></td><td><code>portfolio_1.1_epoch</code></td><td><code>portfolio_H1.1_epoch</code></td></tr>
+          <tr><td><code>EXIT REASON</code></td><td>varies</td><td><code>PARENT EXIT</code> (LegSqOff) · <code>COMBINED LOSS HIT</code> / <code>COMBINED PROFIT HIT</code> / <code>END OF DAY SQOFF</code> (PortfolioSqOff)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:28px;">Engine Log Events</h3>
+      <table>
+        <thead><tr><th>Event</th><th>Level</th><th>Message Format</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Hedge created</td>
+            <td><span class="tag" style="background:rgba(56,217,169,.15);color:var(--accent2);">TRADING</span></td>
+            <td><code>HEDGE_ENTRY | HedgeID=H_1_1 | Parent=1 | Site=BUY | Type=C | Strike=657 | EntryPrice=2.10</code></td>
+          </tr>
+          <tr>
+            <td>No qualifying strike found</td>
+            <td><span class="tag" style="background:rgba(56,217,169,.15);color:var(--accent2);">TRADING</span></td>
+            <td><code>HEDGE_NO_CANDIDATE | Parent=1 | Mode=PremiumBased | DistWindow=... | PremWindow=...</code></td>
+          </tr>
+          <tr>
+            <td>Strike not in chain</td>
+            <td><span class="tag" style="background:rgba(247,169,79,.15);color:var(--accent3);">WARNING</span></td>
+            <td><code>HEDGE_STRIKE_NOT_IN_CHAIN | HedgeID=H_1_1 | Strike=657 | Mode=DistanceBased</code></td>
+          </tr>
+          <tr>
+            <td>Price unavailable (NaN/zero)</td>
+            <td><span class="tag" style="background:rgba(247,169,79,.15);color:var(--accent3);">WARNING</span></td>
+            <td><code>HEDGE_PRICE_UNAVAILABLE | HedgeID=H_1_1 | Strike=657 | Using last close=0.0</code></td>
+          </tr>
+          <tr>
+            <td>Execution cap hit</td>
+            <td><span class="tag" style="background:rgba(247,169,79,.15);color:var(--accent3);">WARNING</span></td>
+            <td><code>MAX_HEDGE_LIMIT_REACHED | Limit=24</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 12 -->
+    <section id="schema">
+      <h2><span class="sec-num">12</span> Configuration Schema</h2>
+      <h3>PremiumBased</h3>
+      <pre>{
+  <span class="str">"dynamic_hedge"</span>: {
+    <span class="str">"enabled"</span>: <span class="kw">true</span>, <span class="str">"hedge_type"</span>: <span class="str">"PremiumBased"</span>, <span class="str">"sqoff_leg_on"</span>: <span class="str">"LegSqOff"</span>,
+    <span class="str">"hedge_distance_atm"</span>: { <span class="str">"min"</span>: <span class="num">5</span>, <span class="str">"max"</span>: <span class="num">10</span> },
+    <span class="str">"premium_range"</span>:      { <span class="str">"min"</span>: <span class="num">0.05</span>, <span class="str">"max"</span>: <span class="num">40.0</span> }
+  }
+}</pre>
+      <h3>DistanceBased</h3>
+      <pre>{
+  <span class="str">"dynamic_hedge"</span>: {
+    <span class="str">"enabled"</span>: <span class="kw">true</span>, <span class="str">"hedge_type"</span>: <span class="str">"DistanceBased"</span>, <span class="str">"sqoff_leg_on"</span>: <span class="str">"PortfolioSqOff"</span>,
+    <span class="str">"hedge_fixed_min_distance"</span>: <span class="num">5</span>
+  }
+}</pre>
+    </section>
+
+    <!-- 13 -->
+    <section id="examples">
+      <h2><span class="sec-num">13</span> End-to-End Examples</h2>
+
+      <h3>13.1 PremiumBased + LegSqOff</h3>
+      <div class="trace-box">
+<span class="t-step">09:30 — SELL CALL @ 652 enters</span>  <span class="t-info">(dist=[5,10], prem=[0.05,40])</span>
+  find_hedge_strike(base=<span class="hi">652</span>, CALL, dist=[5,10])
+    657→3.50 <span class="t-ok">✓</span>  659→2.80 <span class="t-ok">✓</span>  661→2.10 <span class="t-ok">✓</span>  663→0.02 <span class="t-fail">✗</span>
+    sort by prem ASC → <span class="t-ok">selected: 661 @ 2.10</span>
+  H_1_0: BUY CALL 661
+
+<span class="t-step">11:00 — Parent SL hit → exits</span>
+  H_1_0 exits immediately  <span class="t-info">(LegSqOff)</span>
+
+<span class="t-head">Orderbook:</span>
+  SELL CALL 652 | _IS_HEDGE=<span class="t-fail">False</span> | EXIT=LEG_SL_HIT
+  BUY  CALL 661 | _IS_HEDGE=<span class="t-ok">True</span>  | EXIT=PARENT EXIT
+      </div>
+
+      <h3 style="margin-top:32px;">13.2 DistanceBased + PortfolioSqOff</h3>
+      <div class="trace-box">
+<span class="t-step">09:30 — SELL CALL @ 652 enters</span>  <span class="t-info">(fixed_dist=5)</span>
+  hedge_stk = 652 + 5 = <span class="t-ok">657</span>  (no premium check)
+  H_1_0: BUY CALL 657 @ market price
+
+<span class="t-step">11:00 — Parent SL hit → exits</span>
+  H_1_0 stays ACTIVE  <span class="t-info">(PortfolioSqOff — not closed here)</span>
+
+<span class="t-step">13:15 — Portfolio SL breached</span>
+  H_1_0 exits via process_portfolio_sqoff()
+
+<span class="t-head">Orderbook:</span>
+  SELL CALL 652 | _IS_HEDGE=<span class="t-fail">False</span> | EXIT=LEG_SL_HIT
+  BUY  CALL 657 | _IS_HEDGE=<span class="t-ok">True</span>  | EXIT=PORTFOLIO_SQOFF
+      </div>
+    </section>
+
+    <!-- 14 -->
+    <section id="edgecases">
+      <h2><span class="sec-num">14</span> Edge Cases &amp; Failure Modes</h2>
+      <table>
+        <thead><tr><th>Scenario</th><th>Behavior</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>DistanceBased: <code>fixed_dist</code> not aligned with <code>strike_step</code></td>
+            <td>Computed strike is snapped: <code>round(raw / step) * step</code>. Hedge always resolves to a valid chain strike.</td>
+          </tr>
+          <tr>
+            <td>DistanceBased: snapped strike still not in chain</td>
+            <td><code>get_option_quote()</code> returns <code>None</code> → <code>HEDGE_STRIKE_NOT_IN_CHAIN</code> logged at WARNING; hedge skipped for this activation.</td>
+          </tr>
+          <tr>
+            <td>PremiumBased: no candidates in window</td>
+            <td><code>find_hedge_strike()</code> returns <code>None</code>; <code>HEDGE_NO_CANDIDATE</code> logged at TRADING; parent enters without a hedge.</td>
+          </tr>
+          <tr>
+            <td>PremiumBased: all candidates fail premium filter</td>
+            <td>Same — <code>HEDGE_NO_CANDIDATE</code> logged; hedge skipped.</td>
+          </tr>
+          <tr>
+            <td>Quote has NaN or zero price fields</td>
+            <td><code>_safe_px()</code> filters NaN/None to falsy; fallback chain <code>ask_open → ask_close → close → 0.0</code> is walked. Hedge is always created. If price resolves to <code>0.0</code>, <code>HEDGE_PRICE_UNAVAILABLE</code> is logged at WARNING.</td>
+          </tr>
+          <tr>
+            <td>Hedge inherits parent SL / Target</td>
+            <td>Prevented at creation: <code>h_conf</code> is explicitly overridden with <code>"Stoploss Type": "None"</code> and <code>"Target Type": "None"</code>. Hedge never self-exits.</td>
+          </tr>
+          <tr>
+            <td><code>max_hedge_executions</code> reached</td>
+            <td><code>MAX_HEDGE_LIMIT_REACHED</code> logged at WARNING; hedge skipped; parent enters normally.</td>
+          </tr>
+          <tr>
+            <td>PortfolioSqOff + hedge outlives the day</td>
+            <td><code>process_eod_cleanup()</code> closes all remaining ACTIVE legs including any orphaned hedge legs.</td>
+          </tr>
+          <tr>
+            <td><code>enabled = false</code></td>
+            <td>Entire dynamic hedge system bypassed — no hedge legs created.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 15 -->
+    <section id="files">
+      <h2><span class="sec-num">15</span> File Reference Map</h2>
+      <table>
+        <thead><tr><th>File</th><th>Role</th><th>Key Symbols</th></tr></thead>
+        <tbody>
+          <tr><td><code>gui/tabs/dynamic_hedge.py</code></td><td>UI tab — parameters, field visibility toggle</td><td><code>_on_hedge_type_changed()</code>, <code>get_data()</code>, <code>set_data()</code></td></tr>
+          <tr><td><code>gui/tabs/portfolio.py</code></td><td>Leg table, Hedge Required checkbox, enablement</td><td><code>is_hedge_required()</code></td></tr>
+          <tr><td><code>engine/execution.py</code></td><td>Strike resolution (both modes), hedge leg injection</td><td><code>find_hedge_strike()</code>, DistanceBased calc block</td></tr>
+          <tr><td><code>engine/monitoring.py</code></td><td>LegSqOff executes exit / PortfolioSqOff skips it</td><td><code>_dh_sqoff_mode</code> guard</td></tr>
+          <tr><td><code>engine/backtester.py</code></td><td>State init, execution counters</td><td><code>portfolios_state</code>, <code>total_hedge_executions</code></td></tr>
+          <tr><td><code>dsl/portfolios.json</code></td><td>Config persistence</td><td><code>dynamic_hedge</code> object</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div style="margin-top:40px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);">
+      End of document — dynamic_Hedge_logics.html &nbsp;·&nbsp; MegaServe Backtesting Engine &nbsp;·&nbsp; 2026-04-21
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ReExecute Tab — Logic Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* alias so old inline style="color:var(--blue)" still resolves */
+    --blue: var(--accent2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    flex-shrink: 0;
+  }
+  nav .nav-brand {
+    padding: 0 20px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  nav a {
+    display: block;
+    padding: 6px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  nav a:hover, nav a.active { color: var(--text); border-left-color: var(--accent); background: rgba(91,124,250,.07); }
+  nav .nav-section {
+    padding: 14px 20px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  main { flex: 1; padding: 40px 48px 80px; max-width: 1000px; }
+
+  /* ── HEADINGS ── */
+  h1 { font-size: 26px; color: #fff; margin-bottom: 6px; }
+  h2 { font-size: 20px; color: var(--accent); margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 15px; color: var(--accent2); margin: 22px 0 10px; }
+  h4 { font-size: 14px; color: var(--warn); margin: 20px 0 8px; }
+  p  { margin: 8px 0; }
+  strong { color: var(--text); }
+
+  /* ── META HEADER ── */
+  .doc-meta {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .doc-meta strong { color: var(--text); }
+
+  /* ── GENERAL TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: var(--surface); color: var(--muted); text-align: left; padding: 8px 12px; border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+  /* ── CODE ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: #b8c8f8;
+    margin: 12px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  /* ── BADGES (standalone) ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .badge-green  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.3); }
+  .badge-blue   { background: rgba(91,124,250,.15);  color: var(--accent);  border: 1px solid rgba(91,124,250,.3); }
+  .badge-yellow { background: rgba(247,201,72,.12);  color: var(--warn);    border: 1px solid rgba(247,201,72,.3); }
+  .badge-red    { background: rgba(233,96,96,.12);   color: var(--danger);  border: 1px solid rgba(233,96,96,.3); }
+  .badge-gray   { background: rgba(122,128,160,.12); color: var(--muted);   border: 1px solid rgba(122,128,160,.3); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(91,124,250,.08);  border-color: var(--accent);  color: var(--text); }
+  .callout-warn    { background: rgba(247,201,72,.08);  border-color: var(--warn);    color: var(--text); }
+  .callout-danger  { background: rgba(233,96,96,.08);   border-color: var(--danger);  color: var(--text); }
+  .callout-success { background: rgba(126,214,160,.08); border-color: var(--accent2); color: var(--text); }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  ul { padding-left: 20px; margin: 8px 0; }
+  ol { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ══════════════════════ ADDITIONAL COMPONENTS ══════════════════════ */
+
+  /* ── SECTION CARD ── */
+  .section {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 20px 0 28px;
+    overflow: hidden;
+  }
+  .section-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .section-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    flex: 1;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  .section-header .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(91,124,250,.18);
+    color: var(--accent);
+    border: 1px solid rgba(91,124,250,.35);
+  }
+  .section-header .badge.green  { background: rgba(126,214,160,.15); color: var(--accent2); border-color: rgba(126,214,160,.35); }
+  .section-header .badge.orange { background: rgba(247,201,72,.12);  color: var(--warn);    border-color: rgba(247,201,72,.35); }
+  .section-header .badge.purple { background: rgba(192,132,252,.12); color: #c084fc;        border-color: rgba(192,132,252,.35); }
+  .section-body { padding: 16px 18px; }
+
+  /* ── INFO / WARN / SUCCESS / DANGER BOXES ── */
+  .info-box, .warn-box, .success-box, .danger-box, .purple-box {
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .info-box    { background: rgba(91,124,250,.08);  border-left: 4px solid var(--accent);  color: var(--text); }
+  .warn-box    { background: rgba(247,201,72,.08);  border-left: 4px solid var(--warn);    color: var(--text); }
+  .success-box { background: rgba(126,214,160,.08); border-left: 4px solid var(--accent2); color: var(--text); }
+  .danger-box  { background: rgba(233,96,96,.08);   border-left: 4px solid var(--danger);  color: var(--text); }
+  .purple-box  { background: rgba(192,132,252,.08); border-left: 4px solid #c084fc;        color: var(--text); }
+
+  /* ── EXAMPLE CARDS ── */
+  .example-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 14px 0;
+  }
+  @media (max-width: 680px) { .example-grid { grid-template-columns: 1fr; } }
+  .example-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .example-card .card-head {
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .example-card.pos    .card-head { background: rgba(126,214,160,.12); color: var(--accent2); }
+  .example-card.neg    .card-head { background: rgba(233,96,96,.10);   color: var(--danger);  }
+  .example-card.blue   .card-head { background: rgba(91,124,250,.12);  color: var(--accent);  }
+  .example-card.orange .card-head { background: rgba(247,201,72,.10);  color: var(--warn);    }
+  .example-card .card-body { padding: 12px 14px; font-size: 13px; line-height: 1.7; background: var(--surface2); }
+
+  /* ── TAGS ── */
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .tag.blue   { background: rgba(91,124,250,.15);  color: var(--accent);  border: 1px solid rgba(91,124,250,.3); }
+  .tag.green  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.3); }
+  .tag.red    { background: rgba(233,96,96,.12);   color: var(--danger);  border: 1px solid rgba(233,96,96,.3); }
+  .tag.orange { background: rgba(247,201,72,.12);  color: var(--warn);    border: 1px solid rgba(247,201,72,.3); }
+  .tag.purple { background: rgba(192,132,252,.12); color: #c084fc;        border: 1px solid rgba(192,132,252,.3); }
+
+  /* ── DEFAULT PILL ── */
+  .default {
+    display: inline-block;
+    background: rgba(122,128,160,.12);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-family: 'Consolas', monospace;
+    color: var(--muted);
+  }
+
+  /* ── FORMULA ── */
+  .formula {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: #b8c8f8;
+    margin: 12px 0;
+    line-height: 1.8;
+    white-space: pre;
+  }
+  .formula .comment { color: var(--muted); }
+  .formula .kw      { color: #93c5fd; }
+  .formula .val     { color: #86efac; }
+  .formula .eq      { color: #fde68a; }
+
+  /* ── FLOW STEPS ── */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 14px 0; }
+  .flow-step { display: flex; align-items: flex-start; gap: 12px; }
+  .flow-step .dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .flow-step .dot.green  { background: rgba(126,214,160,.85); color: #0f1117; }
+  .flow-step .dot.red    { background: var(--danger); }
+  .flow-step .dot.orange { background: var(--warn); color: #1a1a1a; }
+  .flow-step .flow-text  { flex: 1; padding-bottom: 10px; color: var(--text); }
+  .flow-connector { width: 28px; height: 14px; border-left: 2px dashed var(--border); margin-left: 13px; }
+
+  /* ── QUICKREF ── */
+  .quickref td.param { font-weight: 600; color: var(--accent); }
+  .quickref td.loc   { font-family: monospace; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ═══════════════════════════════════════════ SIDEBAR ══════════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">MegaServe AI Engine</div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Tab Overview</a>
+
+  <div class="nav-section">Checkboxes — ReExecute</div>
+  <a href="#s1">P1. No ReExec if SL Cost</a>
+  <a href="#s2">P2. No Wait &amp; Trade</a>
+  <a href="#s3">P3. No Strike Change</a>
+  <a href="#s4">P4. No ReExec after End Time</a>
+
+  <div class="nav-section">ReEntry Settings</div>
+  <a href="#s5">P5. No ReEntry if SL Cost</a>
+
+
+  <div class="nav-section">Reference</div>
+  <a href="#s6">Quick-Reference Summary</a>
+  <a href="#s7">Interactions &amp; Edge Cases</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ MAIN ══════════════════════════════════════════════ -->
+<main>
+
+  <h1>ReExecute Tab</h1>
+  <p style="color:var(--muted); margin-bottom:20px;">Full parameter reference — plugins, engine behaviour &amp; interaction notes</p>
+
+  <div class="doc-meta">
+    <strong>Project:</strong> MegaServe AI Trading Engine &nbsp;|&nbsp;
+    <strong>Last Updated:</strong> 2026-04-23<br/>
+    <strong>Source Files:</strong>
+    <code>gui/tabs/reexecute.py</code> &nbsp;·&nbsp;
+    <code>engine/backtester.py</code> &nbsp;·&nbsp;
+    <code>engine/monitoring.py</code> &nbsp;·&nbsp;
+    <code>engine/execution.py</code> &nbsp;·&nbsp;
+    <code>engine/move_sl.py</code>
+  </div>
+
+<!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+<div class="section" id="overview">
+  <div class="section-header">
+    <span class="badge">00</span>
+    <h2>Overview &amp; Tab Layout</h2>
+    <span class="tag blue">Context</span>
+  </div>
+  <div class="section-body">
+    <p>
+      The <strong>ReExecute Tab</strong> controls what happens when a leg's SL or Target is hit and
+      the leg is configured to re-execute or re-enter. It is divided into two panels:
+    </p>
+    <table>
+      <tr><th>Panel</th><th>Contents</th></tr>
+      <tr>
+        <td><strong>Left — Checkboxes</strong><br><em>(green labels)</em></td>
+        <td>
+          Four global toggle flags that modify re-execution behaviour:<br>
+          No ReExecute If Moved SL To Cost &nbsp;·&nbsp;
+          No Wait &amp; Trade for ReExecute &nbsp;·&nbsp;
+          No Strike Change for ReExecute &nbsp;·&nbsp;
+          No Reentry/ReExecute after Portfolio End Time
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Right panel</strong></td>
+        <td>
+          <strong>No ReEntry If Moved SL to Cost</strong> — blocks the <em>ReEntry</em> action type
+          when the leg's SL was previously moved to cost (mirrors Plugin 1 for Re-Entry).
+        </td>
+      </tr>
+    </table>
+
+    <div class="info-box">
+      <strong>ReExecute vs ReEntry — key distinction:</strong><br>
+      <strong>Re-Execute</strong> — leg re-enters immediately at the <em>current market price</em> of the same (or original) strike after SL/Target hit.<br>
+      <strong>Re-Entry</strong> — leg waits for the market price to return to the <em>original entry price</em> before re-entering (price-based waiting).
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 1. NO REEXECUTE IF MOVED SL TO COST ═══ -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <span class="badge green">01</span>
+    <h2>No ReExecute If Moved SL to Cost</h2>
+    <span class="tag green">Checkbox</span>
+    <span class="default">Default: OFF</span>
+  </div>
+  <div class="section-body">
+    <p>
+      When <strong>ticked</strong>: if the SL of a leg was previously moved to its cost (entry price)
+      via the <em>Move SL to Cost</em> feature, the engine will <strong>not</strong> trigger any further
+      Re-Execution for that specific leg — even if the leg's SL is subsequently hit.
+    </p>
+    <p>
+      The rationale is that once SL is at cost the position is risk-free. Allowing re-execution
+      after such a hit would open a fresh risk exposure that the user may not want.
+    </p>
+
+    <h3>How the engine tracks this</h3>
+    <p>
+      When <code>MoveSLManager.apply()</code> moves a leg's SL to cost it stamps
+      <code>leg["sl_moved_to_cost"] = True</code> on the leg object. During the action-dispatch
+      loop in <code>process_active_legs()</code>, before queuing a <code>Re-Execute</code> action,
+      the engine checks:
+    </p>
+    <div class="formula"><span class="kw">if</span> reexec_cfg[<span class="val">"no_reexec_sl_cost"</span>] <span class="kw">and</span> leg[<span class="val">"sl_moved_to_cost"</span>]:
+    <span class="comment"># Block re-execution → log REEXEC_BLOCKED_SL_COST and skip</span></div>
+
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Ticked — re-execution blocked</div>
+        <div class="card-body">
+          Leg 1 entered @ $5.00. SL moved to $5.00 (cost).<br>
+          Later SL hit → <strong>No re-execution fired.</strong><br>
+          Log: <code>REEXEC_BLOCKED_SL_COST | LegID=1</code>
+        </div>
+      </div>
+      <div class="example-card neg">
+        <div class="card-head">❌ Unticked (default) — re-execution proceeds</div>
+        <div class="card-body">
+          Leg 1 entered @ $5.00. SL moved to $5.00 (cost).<br>
+          Later SL hit → <strong>Re-execution fires normally.</strong><br>
+          A new position is opened at current market price.
+        </div>
+      </div>
+    </div>
+
+    <div class="warn-box">
+      <strong>Scope:</strong> This flag blocks Re-Execution only. It does <em>not</em> affect Re-Entry.
+      Use <a href="#s5"><em>No ReEntry If Moved SL to Cost</em></a> to block Re-Entry for the same scenario.
+    </div>
+
+    <table>
+      <tr><th>Config key</th><th>Engine flag on leg</th><th>Log message</th><th>File</th></tr>
+      <tr>
+        <td><code>no_reexec_sl_cost</code></td>
+        <td><code>leg["sl_moved_to_cost"]</code></td>
+        <td><code>REEXEC_BLOCKED_SL_COST</code></td>
+        <td><code>engine/monitoring.py</code></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 2. NO WAIT & TRADE FOR REEXECUTE ═══ -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <span class="badge green">02</span>
+    <h2>No Wait &amp; Trade for ReExecute</h2>
+    <span class="tag green">Checkbox</span>
+    <span class="default">Default: OFF</span>
+  </div>
+  <div class="section-body">
+    <p>
+      When <strong>ticked</strong>: the <em>Wait &amp; Trade</em> delay configured on each leg
+      is <strong>skipped entirely</strong> for re-executions. The re-executed leg enters at the
+      very next available tick after its SL/Target hit, without waiting.
+    </p>
+    <p>
+      The original leg still waits its configured Wait &amp; Trade delay on first entry.
+      Only subsequent re-executions bypass the wait.
+    </p>
+
+    <h3>Example</h3>
+    <p>
+      Original leg: <strong>Wait &amp; Trade = −10%</strong>, <strong>OnSL = Re-Execute</strong>.
+    </p>
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Ticked — re-executed leg skips wait</div>
+        <div class="card-body">
+          09:30 — Original leg enters after waiting for −10% Wait &amp; Trade level.<br>
+          10:15 — SL hit → re-execution queued.<br>
+          10:15 — <strong>Re-executed leg enters immediately</strong> (no wait applied).<br>
+        </div>
+      </div>
+      <div class="example-card neg">
+        <div class="card-head">❌ Unticked (default) — re-executed leg also waits</div>
+        <div class="card-body">
+          09:30 — Original leg enters after −10% wait.<br>
+          10:15 — SL hit → re-execution queued.<br>
+          <strong>Re-executed leg waits for −10% again</strong> before entering.
+        </div>
+      </div>
+    </div>
+
+    <h3>How the engine detects a re-execution</h3>
+    <p>
+      Inside <code>process_idle_leg_entries()</code>, before applying the Wait &amp; Trade delay,
+      the engine checks <code>leg["exec_count"]</code>. A value <code>&gt;= 1</code> means the leg
+      has been executed at least once, i.e. it is a re-execution:
+    </p>
+    <div class="formula"><span class="kw">_is_reexec</span> <span class="eq">=</span> leg.get(<span class="val">"exec_count"</span>, 0) <span class="eq">&gt;=</span> 1
+
+<span class="kw">if</span> wt_delay <span class="eq">&gt;</span> 0 <span class="kw">and</span> _is_reexec <span class="kw">and</span> reexec_cfg[<span class="val">"no_wait_trade_reexec"</span>]:
+    wt_delay <span class="eq">=</span> 0   <span class="comment"># skip — log WAIT_TRADE_SKIPPED_REEXEC</span></div>
+
+    <table>
+      <tr><th>Config key</th><th>Detection</th><th>Log message</th><th>File</th></tr>
+      <tr>
+        <td><code>no_wait_trade_reexec</code></td>
+        <td><code>exec_count &gt;= 1</code></td>
+        <td><code>WAIT_TRADE_SKIPPED_REEXEC</code></td>
+        <td><code>engine/execution.py</code></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 3. NO STRIKE CHANGE FOR REEXECUTE ═══ -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <span class="badge green">03</span>
+    <h2>No Strike Change for ReExecute</h2>
+    <span class="tag green">Checkbox</span>
+    <span class="default">Default: OFF</span>
+  </div>
+  <div class="section-body">
+    <p>
+      When <strong>ticked</strong>: the re-executed leg uses the <strong>same strike as the
+      original leg</strong> instead of resolving the current ATM (or ATM±offset) dynamically
+      at the time of re-execution.
+    </p>
+    <p>
+      This is particularly useful for strategies involving <em>Opposite Position</em>, calendar
+      spreads, or any case where consistency of strike across multiple executions is important.
+    </p>
+
+    <h3>Example</h3>
+    <div class="example-grid">
+      <div class="example-card blue">
+        <div class="card-head">📌 Setup</div>
+        <div class="card-body">
+          Leg configured as <strong>ATM CALL</strong>. OnSL = Re-Execute.<br>
+          10:15 — First entry. ATM = <strong>$525</strong>. Strike locked to 525 CE.
+        </div>
+      </div>
+      <div class="example-card orange">
+        <div class="card-head">⏱ 12:10 — SL hit, re-execute triggers</div>
+        <div class="card-body">
+          Current ATM has moved to <strong>$530</strong>.<br><br>
+          <strong>Ticked:</strong> Re-executes at <strong>$525</strong> CE (original strike).<br>
+          <strong>Unticked (default):</strong> Re-executes at <strong>$530</strong> CE (current ATM).
+        </div>
+      </div>
+    </div>
+
+    <h3>Scope &amp; Constraints</h3>
+    <ul>
+      <li>Only applies to <strong>ATM-based strikes</strong> (e.g. <code>atm</code>, <code>atm+2</code>, <code>atm-1</code>). Fixed numeric strikes are always used as-is regardless of this flag.</li>
+      <li>The original resolved strike is stored in <code>leg["resolved_strike"]</code> at entry time and persists through the IDLE state.</li>
+      <li>Also <strong>suppresses the Straddle Width Multiplier override</strong> for re-executed legs — the locked strike is used as-is and the multiplier formula is not re-applied.</li>
+      <li>Does <em>not</em> interfere with <code>same_strike</code> re-entry mode (which manages its own lock).</li>
+    </ul>
+
+    <div class="formula"><span class="comment"># In process_idle_leg_entries() — strike resolution logic</span>
+strike_key <span class="eq">=</span> safe_strike_key(leg[<span class="val">"conf"</span>][<span class="val">"Strike"</span>])   <span class="comment"># e.g. "atm"</span>
+
+_is_atm_based <span class="eq">=</span> strike_key.startswith(<span class="val">"atm"</span>)
+
+<span class="kw">if</span> reexec_cfg[<span class="val">"no_strike_change_reexec"</span>] <span class="kw">and</span> _is_reexec <span class="kw">and</span> _is_atm_based:
+    strike_key <span class="eq">=</span> leg[<span class="val">"resolved_strike"</span>]   <span class="comment"># e.g. "525" — log STRIKE_LOCKED_REEXEC</span></div>
+
+    <table>
+      <tr><th>Config key</th><th>Applies to</th><th>Log message</th><th>File</th></tr>
+      <tr>
+        <td><code>no_strike_change_reexec</code></td>
+        <td>ATM-based strikes only</td>
+        <td><code>STRIKE_LOCKED_REEXEC</code></td>
+        <td><code>engine/execution.py</code></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 4. NO REENTRY / REEXECUTE AFTER PORTFOLIO END TIME ═══ -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <span class="badge green">04</span>
+    <h2>No ReEntry / ReExecute after Portfolio End Time</h2>
+    <span class="tag green">Checkbox</span>
+    <span class="default">Default: OFF (allow till SqOff)</span>
+  </div>
+  <div class="section-body">
+    <p>
+      Controls whether Re-Execution and Re-Entry are allowed after the portfolio's
+      <strong>End Time</strong> has elapsed (but before the <strong>SqOff Time</strong>).
+    </p>
+
+    <table>
+      <tr><th>State</th><th>Between Start → End Time</th><th>Between End Time → SqOff</th></tr>
+      <tr>
+        <td><strong>Unticked (default)</strong></td>
+        <td>✅ Re-Execution &amp; Re-Entry allowed</td>
+        <td>✅ Re-Execution &amp; Re-Entry <strong>still allowed</strong> up to SqOff</td>
+      </tr>
+      <tr>
+        <td><strong>Ticked</strong></td>
+        <td>✅ Re-Execution &amp; Re-Entry allowed</td>
+        <td>❌ Re-Execution &amp; Re-Entry <strong>blocked</strong> after End Time</td>
+      </tr>
+    </table>
+
+    <div class="info-box">
+      <strong>Open positions are never affected by this flag.</strong><br>
+      Legs that are already ACTIVE continue to run with their SL / Target logic until they are
+      closed by SqOff or their own exit condition. This flag only blocks <em>new</em> entries.
+    </div>
+
+    <h3>Scenario — Start 09:30 · End 11:30 · SqOff 16:15</h3>
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Ticked — strict end-time block</div>
+        <div class="card-body">
+          11:31 — Leg SL hit → <strong>No re-execution.</strong><br>
+          Leg exits and stays flat.<br>
+          Open positions continue until SqOff 16:15.
+        </div>
+      </div>
+      <div class="example-card blue">
+        <div class="card-head">🔄 Unticked (default) — allow till SqOff</div>
+        <div class="card-body">
+          11:31 — Leg SL hit → <strong>Re-execution fires.</strong><br>
+          New position opens and runs till SqOff 16:15.<br>
+          Further hits can re-execute up to SqOff.
+        </div>
+      </div>
+    </div>
+
+    <div class="warn-box">
+      <strong>Exception — Manual / Cross-portfolio trigger:</strong> If a portfolio was started
+      via a <em>Start Other Portfolio</em> cross-portfolio action, the <code>end_blocked</code>
+      gate is bypassed entirely for that trigger cycle regardless of this checkbox. This ensures
+      explicit cross-portfolio triggers always take effect.
+    </div>
+
+    <h3>Engine hooks (two locations)</h3>
+    <table>
+      <tr><th>Location</th><th>What it gates</th></tr>
+      <tr>
+        <td><code>process_active_legs()</code><br><code>engine/monitoring.py</code></td>
+        <td>Action-dispatch loop — blocks <code>Re-Execute</code> and <code>ReEntry</code> actions from being queued after End Time.</td>
+      </tr>
+      <tr>
+        <td><code>process_idle_leg_entries()</code><br><code>engine/execution.py</code></td>
+        <td>IDLE-leg entry gate — prevents any IDLE leg (including re-execution slots) from entering after End Time.</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 5. NO REENTRY IF MOVED SL TO COST ═══ -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <span class="badge orange">05</span>
+    <h2>No ReEntry If Moved SL to Cost</h2>
+    <span class="tag orange">Checkbox</span>
+    <span class="default">Default: ON (ticked)</span>
+  </div>
+  <div class="section-body">
+    <p>
+      When <strong>ticked</strong> (default): if the SL of a leg was moved to its cost (entry price)
+      via <em>Move SL to Cost</em>, the engine will <strong>not</strong> queue a Re-Entry waiting state
+      for that leg when its SL is subsequently hit.
+    </p>
+    <p>
+      This mirrors <a href="#s1">Plugin 1</a> but applies to the <strong>Re-Entry</strong> action type
+      (price-based waiting) rather than immediate Re-Execute.
+    </p>
+
+    <div class="success-box">
+      <strong>Default is ON</strong> — this is the safe, conservative default. Most strategies
+      that move SL to cost intend to fully exit the position at breakeven; allowing a re-entry
+      would re-open exposure which is usually unintended.
+    </div>
+
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Ticked (default) — re-entry blocked</div>
+        <div class="card-body">
+          Leg SL moved to cost ($5.00). SL hit at $5.00.<br>
+          Leg closed at breakeven.<br>
+          <strong>No re-entry waiting state is set.</strong><br>
+          Log: <code>REENTRY_BLOCKED_SL_COST | LegID=1</code>
+        </div>
+      </div>
+      <div class="example-card neg">
+        <div class="card-head">❌ Unticked — re-entry proceeds</div>
+        <div class="card-body">
+          Leg SL moved to cost ($5.00). SL hit at $5.00.<br>
+          Leg closed at breakeven.<br>
+          <strong>Re-entry waiting state activated</strong> — leg waits for
+          price to return to $5.00 before re-entering.
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Config key</th><th>Default</th><th>Engine flag on leg</th><th>Log message</th><th>File</th></tr>
+      <tr>
+        <td><code>no_reentry_sl_cost</code></td>
+        <td><code>True</code></td>
+        <td><code>leg["sl_moved_to_cost"]</code></td>
+        <td><code>REENTRY_BLOCKED_SL_COST</code></td>
+        <td><code>engine/monitoring.py</code></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 6. QUICK REFERENCE SUMMARY ═══ -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <span class="badge">06</span>
+    <h2>Quick-Reference Summary</h2>
+    <span class="tag blue">All Parameters</span>
+  </div>
+  <div class="section-body">
+    <table class="quickref">
+      <tr>
+        <th>#</th>
+        <th>Parameter</th>
+        <th>Type</th>
+        <th>Default</th>
+        <th>Blocks</th>
+        <th>Config Key</th>
+        <th>Engine File</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td class="param">No ReExecute If Moved SL to Cost</td>
+        <td>Checkbox</td>
+        <td>OFF</td>
+        <td>Re-Execute only</td>
+        <td class="loc">no_reexec_sl_cost</td>
+        <td class="loc">monitoring.py</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td class="param">No Wait &amp; Trade for ReExecute</td>
+        <td>Checkbox</td>
+        <td>OFF</td>
+        <td>W&amp;T delay on re-exec</td>
+        <td class="loc">no_wait_trade_reexec</td>
+        <td class="loc">execution.py</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td class="param">No Strike Change for ReExecute</td>
+        <td>Checkbox</td>
+        <td>OFF</td>
+        <td>ATM re-resolution on re-exec</td>
+        <td class="loc">no_strike_change_reexec</td>
+        <td class="loc">execution.py</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td class="param">No ReEntry/ReExecute after End Time</td>
+        <td>Checkbox</td>
+        <td>OFF</td>
+        <td>All new entries after End Time</td>
+        <td class="loc">no_reentry_after_end</td>
+        <td class="loc">monitoring.py + execution.py</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td class="param">No ReEntry If Moved SL to Cost</td>
+        <td>Checkbox</td>
+        <td><strong>ON</strong></td>
+        <td>Re-Entry only</td>
+        <td class="loc">no_reentry_sl_cost</td>
+        <td class="loc">monitoring.py</td>
+      </tr>
+
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 7. INTERACTION & EDGE CASES ═══ -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <span class="badge">07</span>
+    <h2>Interaction &amp; Edge Cases</h2>
+    <span class="tag blue">Engineering Notes</span>
+  </div>
+  <div class="section-body">
+
+    <h3>Plugin 1 vs Plugin 5 — same trigger, different action</h3>
+    <p>
+      Both <em>No ReExecute If Moved SL to Cost</em> (P1) and <em>No ReEntry If Moved SL to Cost</em> (P5)
+      react to the same <code>leg["sl_moved_to_cost"]</code> flag. The difference is which action they block:
+    </p>
+    <table>
+      <tr><th>Plugin</th><th>Blocked Action</th><th>Leg state after block</th></tr>
+      <tr><td>P1 — No ReExecute</td><td><code>Re-Execute</code> action type</td><td>Leg remains CLOSED — no new position</td></tr>
+      <tr><td>P5 — No ReEntry</td><td><code>ReEntry</code> action type</td><td>Leg remains CLOSED — no waiting state</td></tr>
+    </table>
+    <p>Both can be active simultaneously for full protection across both action types.</p>
+
+    <hr/>
+
+    <h3>Plugin 3 + Straddle Width Multiplier</h3>
+    <p>
+      When <em>No Strike Change for ReExecute</em> (P3) is active for a re-execution, the engine
+      <strong>also suppresses the Straddle Width Multiplier</strong> override for that leg on that tick.
+      This prevents the multiplier from recalculating a new strike and overriding the locked one.
+      The guard in the engine:
+    </p>
+    <div class="formula"><span class="kw">if</span> straddle_mult != 0 <span class="kw">and not</span> is_prem_greek \
+        <span class="kw">and</span> mode != <span class="val">"same_strike"</span> \
+        <span class="kw">and not</span> _no_strike_change_active:   <span class="comment"># ← P3 guard</span>
+    <span class="comment"># apply multiplier...</span></div>
+
+    <hr/>
+
+    <h3>Plugin 4 + Manual / Cross-Portfolio trigger</h3>
+    <p>
+      If a portfolio's execution mode is <code>Manual</code> and it was triggered by a
+      <em>Start Other Portfolio</em> action from another portfolio, the <code>end_blocked</code>
+      gate is bypassed for that trigger. Plugin 4's checkbox has no effect on cross-portfolio
+      triggered entries — the trigger always takes priority.
+    </p>
+
+    <hr/>
+
+    <h3>sl_moved_to_cost flag persistence</h3>
+    <p>
+      The <code>leg["sl_moved_to_cost"]</code> flag is set once and <strong>never cleared</strong>
+      within a trading day. If a leg somehow re-executes after the SL was moved to cost (e.g.
+      Plugin 1 is off), the flag carries over into the next execution cycle. This means if Plugin 1
+      is later enabled mid-session (live mode), it will correctly block the <em>next</em>
+      re-execution attempt on that leg.
+    </p>
+
+    <hr/>
+
+    <h3>Execution order within a tick</h3>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="dot">1</div>
+        <div class="flow-text"><strong>process_active_legs()</strong> — SL/Target check, action dispatch.<br>Plugin 1, 4 (dispatch), 5 gates applied here.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot">2</div>
+        <div class="flow-text"><strong>process_reentry_waiting()</strong> — Check if waiting legs reached their re-entry price.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot">3</div>
+        <div class="flow-text"><strong>process_idle_leg_entries()</strong> — Enter IDLE legs.<br>Plugin 2, 3, 4 (entry gate) applied here.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot green">4</div>
+        <div class="flow-text"><strong>Portfolio SL/TGT checks</strong> — Portfolio-level force_sqoff and re-execution logic.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="doc-footer">
+    MegaServe AI Engine &nbsp;·&nbsp; ReExecute Tab Reference &nbsp;·&nbsp; Last updated 2026-04-23
+  </div>
+
+</main>
+</div>
+</body>
+</html>

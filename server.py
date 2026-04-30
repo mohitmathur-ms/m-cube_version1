@@ -649,6 +649,11 @@ def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
         "wins": results["wins"],
         "losses": results["losses"],
         "win_rate": results["win_rate"],
+        "total_days": results.get("total_days", 0),
+        "winning_days": results.get("winning_days", 0),
+        "losing_days": results.get("losing_days", 0),
+        "win_pct_days": results.get("win_pct_days", 0.0),
+        "loss_pct_days": results.get("loss_pct_days", 0.0),
         "equity_curve_ts": results.get("equity_curve_ts", []),
     }
 
@@ -1266,10 +1271,14 @@ def api_portfolio_backtest():
             results["report_file"] = f"{prefix}_report.html"
             results["report_name"] = prefix
 
-            # Clean up non-serializable data
+            # Clean up non-serializable / internal-only data
             for key in ["fills_report", "positions_report", "account_report",
-                         "slot_to_strategy_id", "slot_to_trader_id", "errors"]:
+                         "slot_to_strategy_id", "slot_to_trader_id", "errors",
+                         "daily_pnl"]:
                 results.pop(key, None)
+            # Also remove daily_pnl from per-strategy entries
+            for sr in results.get("per_strategy", {}).values():
+                sr.pop("daily_pnl", None)
             results["equity_curve"] = [float(v) for v in results["equity_curve"]]
             for pt in results.get("equity_curve_ts", []):
                 pt["balance"] = float(pt["balance"])

@@ -1,0 +1,107 @@
+{
+  "tab_id": "pf-rangebrk",
+  "tab_label": "Range BreakOut",
+  "description": "Range Breakout (RBO) — replaces standard start-time entry with a two-phase market-structure entry. Engine builds a price range, then fires entries on breakout.",
+  "backend_enabled": false,
+  "fieldsets": [
+    {
+      "id": "rbo_toggle",
+      "legend": null,
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "rbo_enabled",
+          "label": "Enable RangeBreakOut",
+          "type": "checkbox",
+          "default": false,
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-enabled",
+          "description": "Master toggle. When false, all legs enter via their own Start Time. When true, entry is controlled by RBOManager state machine."
+        }
+      ]
+    },
+    {
+      "id": "rbo_settings",
+      "legend": "Range BreakOut Settings",
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "range_monitoring_start",
+          "label": "Range Monitoring Start Time",
+          "type": "time",
+          "default": "09:30:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-monstart",
+          "description": "Time at which IDLE -> MONITORING. Engine begins tracking max(bar.high) and min(bar.low)."
+        },
+        {
+          "key": "range_monitoring_end",
+          "label": "Range Monitoring End Time",
+          "type": "time",
+          "default": "10:30:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-monend",
+          "description": "Time at which range is frozen and MONITORING -> ENTRY. Changing this auto-syncs entry_start."
+        },
+        {
+          "key": "entry_start",
+          "label": "Entry Start Time",
+          "type": "time",
+          "default": "10:30:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-entrystart",
+          "description": "Earliest time breakout detection is active. Usually auto-synced to range_monitoring_end."
+        },
+        {
+          "key": "entry_end",
+          "label": "Entry End Time",
+          "type": "time",
+          "default": "16:15:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-entryend",
+          "description": "Base deadline for new breakout entries. May be extended by range_buffer until first side fires."
+        },
+        {
+          "key": "entry_at",
+          "label": "Entry At",
+          "type": "select",
+          "default": "Any",
+          "options": ["Any", "RangeHigh", "RangeLow", "C_OnHigh_P_OnLow", "P_OnHigh_C_OnLow"],
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-entryat",
+          "description": "Which legs execute on which breakout direction. Any = all legs on both sides."
+        },
+        {
+          "key": "range_buffer",
+          "label": "Range Buffer (mins)",
+          "type": "number",
+          "default": 0,
+          "min": 0,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-buffer",
+          "description": "Extends entry window beyond entry_end, but only until the first side fires (buffer collapse)."
+        },
+        {
+          "key": "monitoring",
+          "label": "Monitoring",
+          "type": "select",
+          "default": "Underlying",
+          "options": ["Underlying"],
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-monitoring",
+          "description": "Data source for range tracking. Only 'Underlying' is supported."
+        },
+        {
+          "key": "cancel_other",
+          "label": "Cancel Other Side if One Executes",
+          "type": "checkbox",
+          "default": false,
+          "backend_enabled": false,
+          "html_id": "pf-m-rbo-cancelother",
+          "description": "When true, executing one breakout side permanently blocks the other for the rest of the day."
+        }
+      ]
+    }
+  ]
+}

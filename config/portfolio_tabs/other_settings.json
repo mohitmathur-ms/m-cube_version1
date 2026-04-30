@@ -1,0 +1,21 @@
+{
+  "tab_id": "pf-other",
+  "tab_label": "Other Settings",
+  "description": "Miscellaneous portfolio settings — straddle width multiplier, leg delay, and action-on filters.",
+  "fieldsets": [
+    {
+      "id": "other_settings",
+      "legend": "Other Settings",
+      "fields": [
+        { "key": "trail_wait_trade", "label": "Trail Wait Trade", "type": "checkbox", "default": false, "html_id": "pf-m-other-trailwait", "backend_enabled": false, "description": "Trail the Wait & Trade price for re-executed legs." },
+        { "key": "straddle_width_multiplier", "label": "Straddle Width Multiplier", "type": "number", "default": 0, "step": 0.01, "html_id": "pf-m-other-swm", "backend_enabled": false, "description": "Multiplied by ATM straddle width to derive dynamic SL. 0.00 = disabled." },
+        { "key": "delay_between_legs", "label": "Delay Between Legs in Sec.", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-other-legdelay", "backend_enabled": false, "description": "Seconds to wait between re-executing consecutive legs." },
+        { "key": "on_target_action_on", "label": "On Target Action On", "type": "select", "default": "OnTarget_N_Trailing_Both", "options": ["OnTarget_N_Trailing_Both","OnTarget_Only","OnTarget_Trailing_Only"], "html_id": "pf-m-other-tgtaction", "backend_enabled": false, "description": "Which target hit type triggers the configured action. Both/Fixed only/Trailing only." },
+        { "key": "on_sl_action_on", "label": "On SL Action On", "type": "select", "default": "OnSL_N_Trailing_Both", "options": ["OnSL_N_Trailing_Both","OnSL_Only","OnSL_Trailing_Only"], "html_id": "pf-m-other-slaction", "backend_enabled": false, "description": "Which SL hit type triggers the configured action. Both/Fixed only/Trailing only." },
+        { "key": "description", "label": "Description / Remarks", "type": "text", "default": "", "placeholder": "Optional remarks", "html_id": "pf-m-desc", "backend_enabled": true, "description": "Free-text description stored with the portfolio." },
+        { "key": "max_loss", "label": "Max Loss ($)", "type": "number", "default": null, "min": 0, "html_id": "pf-m-maxloss", "backend_enabled": true, "description": "If total P&L drops to this negative amount, flag the portfolio." },
+        { "key": "max_profit", "label": "Max Profit ($)", "type": "number", "default": null, "min": 0, "html_id": "pf-m-maxprofit", "backend_enabled": true, "description": "If total P&L reaches this positive amount, flag the portfolio." }
+      ]
+    }
+  ]
+}

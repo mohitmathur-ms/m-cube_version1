@@ -201,7 +201,8 @@ const Tearsheet = {
             <div class="grid-4">
                 ${App.metricHTML("Total Return", `${r.total_return_pct >= 0 ? "+" : ""}${r.total_return_pct.toFixed(2)}%`)}
                 ${App.metricHTML("Total P&L", App.currency(r.total_pnl))}
-                ${App.metricHTML("Win Rate", `${r.win_rate.toFixed(1)}%`)}
+                ${App.metricHTML("Win Rate (Trades)", `${r.win_rate.toFixed(1)}%`)}
+                ${App.metricHTML("Win% (Days)", `${(r.win_pct_days || 0).toFixed(1)}%`)}
                 ${App.metricHTML("Total Trades", r.total_trades)}
             </div>
             <div class="page-divider"></div>

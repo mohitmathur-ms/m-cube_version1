@@ -1,0 +1,53 @@
+{
+  "tab_id": "pf-stoploss",
+  "tab_label": "Stoploss",
+  "description": "Portfolio-level stoploss settings with trailing SL, move SL to cost, and selective squareoff.",
+  "fieldsets": [
+    {
+      "id": "stoploss_settings",
+      "legend": "Stoploss Settings",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "sl_enabled", "label": "Enable Stoploss", "type": "checkbox", "default": false, "html_id": "pf-m-sl-enabled", "backend_enabled": false },
+        { "key": "sl_type", "label": "Type", "type": "select", "default": "Combined Loss", "options": ["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"], "html_id": "pf-m-sl-type", "backend_enabled": false },
+        { "key": "sl_value", "label": "Value", "type": "number", "default": 0, "min": 0, "step": 0.01, "html_id": "pf-m-sl-value", "backend_enabled": false },
+        { "key": "on_sl_action", "label": "On SL Action", "type": "select", "default": "SqOff", "options": ["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"], "html_id": "pf-m-sl-action", "backend_enabled": false },
+        { "key": "sl_delay", "label": "Delay (sec)", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-sl-delay", "backend_enabled": false },
+        { "key": "sl_reexecute_count", "label": "ReExecute Count", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-sl-reexcount", "backend_enabled": false }
+      ]
+    },
+    {
+      "id": "trailing_sl_settings",
+      "legend": "Trailing SL Settings",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "trail_sl_enabled", "label": "Enable Trailing SL", "type": "checkbox", "default": false, "html_id": "pf-m-sl-trail-enabled", "backend_enabled": false },
+        { "key": "trail_sl_every", "label": "For Every Profit of", "type": "number", "default": 0, "min": 0, "step": 0.01, "html_id": "pf-m-sl-trail-every", "backend_enabled": false },
+        { "key": "trail_sl_by", "label": "Tighten SL By", "type": "number", "default": 0, "min": 0, "step": 0.01, "html_id": "pf-m-sl-trail-by", "backend_enabled": false }
+      ]
+    },
+    {
+      "id": "move_sl_to_cost",
+      "legend": "Move SL to Cost",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "move_sl_enabled", "label": "Enable Move SL to Cost", "type": "checkbox", "default": false, "html_id": "pf-m-sl-move-enabled", "backend_enabled": false },
+        { "key": "move_sl_safety_seconds", "label": "Safety Seconds", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-sl-move-safety", "backend_enabled": false },
+        { "key": "move_sl_action", "label": "Move SL Action", "type": "select", "default": "Move Only for Profitable Legs", "options": ["Move Only for Profitable Legs","Move SL for All Legs Despite Loss / Profit","Move SL to LTP + Buffer for Loss Making Legs"], "html_id": "pf-m-sl-move-action", "backend_enabled": false },
+        { "key": "trail_after_move_sl", "label": "Trail SL only after Move SL to Cost", "type": "checkbox", "default": false, "html_id": "pf-m-sl-move-trail", "backend_enabled": false },
+        { "key": "no_move_buy_legs", "label": "No Move SL for BUY Legs", "type": "checkbox", "default": false, "html_id": "pf-m-sl-move-nobuy", "backend_enabled": false },
+        { "key": "hit_on_leg_sl", "label": "Re-apply on every Leg SL hit", "type": "checkbox", "default": false, "html_id": "pf-m-sl-move-hitsl", "backend_enabled": false },
+        { "key": "hit_on_leg_target", "label": "Re-apply on every Leg Target hit", "type": "checkbox", "default": false, "html_id": "pf-m-sl-move-hittgt", "backend_enabled": false }
+      ]
+    },
+    {
+      "id": "selective_sqoff",
+      "legend": "On SL Hit — Selective SqOff",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "sqoff_loss_legs", "label": "SqOff Only Loss Making Legs", "type": "checkbox", "default": false, "html_id": "pf-m-sl-sqoff-loss", "backend_enabled": false },
+        { "key": "sqoff_profit_legs", "label": "SqOff Only Profit Making Legs", "type": "checkbox", "default": false, "html_id": "pf-m-sl-sqoff-profit", "backend_enabled": false }
+      ]
+    }
+  ]
+}

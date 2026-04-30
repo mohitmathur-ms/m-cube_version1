@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Other Settings — Logic Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* alias so inline style="color:var(--blue)" resolves correctly */
+    --blue: var(--accent2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0 40px;
+    flex-shrink: 0;
+  }
+  nav .nav-brand {
+    padding: 0 20px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  nav a {
+    display: block;
+    padding: 6px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  nav a:hover, nav a.active { color: var(--text); border-left-color: var(--accent); background: rgba(91,124,250,.07); }
+  nav .nav-section {
+    padding: 14px 20px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  main { flex: 1; padding: 40px 48px 80px; max-width: 1000px; }
+
+  /* ── HEADINGS ── */
+  h1 { font-size: 26px; color: #fff; margin-bottom: 6px; }
+  h2 { font-size: 20px; color: var(--accent); margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 15px; color: var(--accent2); margin: 22px 0 10px; }
+  h4 { font-size: 14px; color: var(--warn); margin: 20px 0 8px; }
+  p  { margin: 8px 0; }
+  strong { color: var(--text); }
+
+  /* ── META HEADER ── */
+  .doc-meta {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .doc-meta strong { color: var(--text); }
+
+  /* ── GENERAL TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: var(--surface); color: var(--muted); text-align: left; padding: 8px 12px; border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+  /* ── CODE ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: #b8c8f8;
+    margin: 12px 0;
+    line-height: 1.6;
+  }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  /* ── BADGES (standalone) ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .badge-green  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.3); }
+  .badge-blue   { background: rgba(91,124,250,.15);  color: var(--accent);  border: 1px solid rgba(91,124,250,.3); }
+  .badge-yellow { background: rgba(247,201,72,.12);  color: var(--warn);    border: 1px solid rgba(247,201,72,.3); }
+  .badge-red    { background: rgba(233,96,96,.12);   color: var(--danger);  border: 1px solid rgba(233,96,96,.3); }
+  .badge-gray   { background: rgba(122,128,160,.12); color: var(--muted);   border: 1px solid rgba(122,128,160,.3); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout-info    { background: rgba(91,124,250,.08);  border-color: var(--accent);  color: var(--text); }
+  .callout-warn    { background: rgba(247,201,72,.08);  border-color: var(--warn);    color: var(--text); }
+  .callout-danger  { background: rgba(233,96,96,.08);   border-color: var(--danger);  color: var(--text); }
+  .callout-success { background: rgba(126,214,160,.08); border-color: var(--accent2); color: var(--text); }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  ul { padding-left: 20px; margin: 8px 0; }
+  ol { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ══════════════════════ ADDITIONAL COMPONENTS ══════════════════════ */
+
+  /* ── SECTION CARD ── */
+  .section {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 20px 0 28px;
+    overflow: hidden;
+  }
+  .section-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .section-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    flex: 1;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  .section-header .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(91,124,250,.18);
+    color: var(--accent);
+    border: 1px solid rgba(91,124,250,.35);
+  }
+  .section-header .badge.green  { background: rgba(126,214,160,.15); color: var(--accent2); border-color: rgba(126,214,160,.35); }
+  .section-header .badge.orange { background: rgba(247,201,72,.12);  color: var(--warn);    border-color: rgba(247,201,72,.35); }
+  .section-header .badge.purple { background: rgba(192,132,252,.12); color: #c084fc;        border-color: rgba(192,132,252,.35); }
+  .section-body { padding: 16px 18px; }
+
+  /* ── INFO / WARN / SUCCESS BOXES ── */
+  .info-box, .warn-box, .success-box, .danger-box {
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .info-box    { background: rgba(91,124,250,.08);  border-left: 4px solid var(--accent);  color: var(--text); }
+  .warn-box    { background: rgba(247,201,72,.08);  border-left: 4px solid var(--warn);    color: var(--text); }
+  .success-box { background: rgba(126,214,160,.08); border-left: 4px solid var(--accent2); color: var(--text); }
+  .danger-box  { background: rgba(233,96,96,.08);   border-left: 4px solid var(--danger);  color: var(--text); }
+
+  /* ── EXAMPLE CARDS ── */
+  .example-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 14px 0;
+  }
+  @media (max-width: 680px) { .example-grid { grid-template-columns: 1fr; } }
+  .example-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .example-card .card-head {
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .example-card.pos    .card-head { background: rgba(126,214,160,.12); color: var(--accent2); }
+  .example-card.neg    .card-head { background: rgba(233,96,96,.10);   color: var(--danger);  }
+  .example-card.blue   .card-head { background: rgba(91,124,250,.12);  color: var(--accent);  }
+  .example-card.orange .card-head { background: rgba(247,201,72,.10);  color: var(--warn);    }
+  .example-card .card-body { padding: 12px 14px; font-size: 13px; line-height: 1.7; background: var(--surface2); }
+
+  /* ── OPTION MATRIX ── */
+  .option-matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 14px 0;
+  }
+  @media (max-width: 720px) { .option-matrix { grid-template-columns: 1fr; } }
+  .opt-card { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .opt-card .opt-head {
+    background: rgba(91,124,250,.15);
+    border-bottom: 1px solid var(--border);
+    color: var(--accent);
+    padding: 8px 12px;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .opt-card .opt-body { padding: 10px 12px; font-size: 12.5px; line-height: 1.65; background: var(--surface2); color: var(--text); }
+
+  /* ── TAGS ── */
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .tag.blue   { background: rgba(91,124,250,.15);  color: var(--accent);  border: 1px solid rgba(91,124,250,.3); }
+  .tag.green  { background: rgba(126,214,160,.15); color: var(--accent2); border: 1px solid rgba(126,214,160,.3); }
+  .tag.red    { background: rgba(233,96,96,.12);   color: var(--danger);  border: 1px solid rgba(233,96,96,.3); }
+  .tag.orange { background: rgba(247,201,72,.12);  color: var(--warn);    border: 1px solid rgba(247,201,72,.3); }
+
+  /* ── FLOW STEPS ── */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 14px 0; }
+  .flow-step { display: flex; align-items: flex-start; gap: 12px; }
+  .flow-step .dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .flow-step .dot.green  { background: rgba(126,214,160,.85); color: #0f1117; }
+  .flow-step .dot.orange { background: var(--warn); color: #1a1a1a; }
+  .flow-step .flow-text  { flex: 1; padding-bottom: 10px; color: var(--text); }
+  .flow-connector { width: 28px; height: 14px; border-left: 2px dashed var(--border); margin-left: 13px; }
+
+  /* ── FORMULA ── */
+  .formula {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12.5px;
+    color: #b8c8f8;
+    margin: 12px 0;
+    line-height: 1.8;
+    white-space: pre;
+  }
+  .formula .comment { color: var(--muted); }
+  .formula .kw      { color: #93c5fd; }
+  .formula .val     { color: #86efac; }
+  .formula .eq      { color: #fde68a; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ═══════════════════════════════════════════ SIDEBAR ══════════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">MegaServe AI Engine</div>
+
+  <div class="nav-section">Portfolio Settings</div>
+  <a href="#s1">Straddle Width Multiplier</a>
+  <a href="#s2">Delay Between Legs</a>
+  <a href="#s3">On Target Action On</a>
+  <a href="#s4">On SL Action On</a>
+
+  <div class="nav-section">Reference</div>
+  <a href="#s5">Interactions &amp; Edge Cases</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ MAIN ══════════════════════════════════════════════ -->
+<main>
+
+  <h1>Other Settings</h1>
+  <p style="color:var(--muted); margin-bottom:20px;">Full parameter reference — logic, engine behaviour &amp; interaction notes</p>
+
+  <div class="doc-meta">
+    <strong>Project:</strong> MegaServe AI Trading Engine &nbsp;|&nbsp;
+    <strong>Last Updated:</strong> 2026-04-23<br/>
+    <strong>Source Files:</strong>
+    <code>gui/tabs/other_settings.py</code> &nbsp;·&nbsp;
+    <code>engine/backtester.py</code> &nbsp;·&nbsp;
+    <code>engine/monitoring.py</code> &nbsp;·&nbsp;
+    <code>engine/execution.py</code>
+  </div>
+
+<!-- ═══ 1. STRADDLE WIDTH MULTIPLIER ═══ -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <span class="badge">01</span>
+    <h2>Straddle Width Multiplier</h2>
+    <span class="tag blue">Numeric — negative allowed</span>
+    <span class="badge badge-red">0.00 = Disabled</span>
+  </div>
+  <div class="section-body">
+
+    <p>
+      Overrides the strike selected for ATM-based legs by using the
+      <strong>combined ATM premium (CE + PE) at portfolio start</strong> as a width measure,
+      then shifting each leg's strike by <code>combined × multiplier</code>.
+    </p>
+
+    <div class="warn-box">
+      <strong>⚠ Important constraints:</strong>
+      <ul style="margin-top:8px;">
+        <li><strong>0.00 = Feature disabled</strong> (default). When set to <code>0.00</code>, the multiplier block is skipped entirely — no strike override is applied and the leg uses its configured strike as normal (ATM, ATM+1, ATM−2, etc.).</li>
+        <li><strong>Overrides</strong> the leg's configured strike (e.g. ATM, ATM+1).
+            Use carefully — it can significantly change which strikes are traded.</li>
+        <li><strong>Not applicable</strong> to Premium / Greek-based leg portfolios
+            (<em>Premium Greek</em> flag checked in General settings).</li>
+        <li>Also not applied when a leg is in <em>same_strike</em> re-entry mode
+            (the locked numeric strike is used as-is).</li>
+        <li>Negative values are fully supported and produce ITM selections.</li>
+      </ul>
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Formula</h3>
+    <div class="formula">
+<span class="comment"># At portfolio start — captured once, reset on each re-execution</span>
+<span class="kw">combined_premium</span> <span class="eq">=</span> <span class="val">ATM_CE_premium + ATM_PE_premium</span>
+
+<span class="comment"># For CALL (CE) legs:</span>
+<span class="kw">CE_strike</span> <span class="eq">=</span> ATM + (combined_premium × multiplier)
+
+<span class="comment"># For PUT (PE) legs:</span>
+<span class="kw">PE_strike</span> <span class="eq">=</span> ATM − (combined_premium × multiplier)
+
+<span class="comment"># Rounded to nearest strike_step (SPY default = $1)</span>
+<span class="kw">final_strike</span> <span class="eq">=</span> round(raw_strike / strike_step) × strike_step
+    </div>
+
+    <h3 style="margin:14px 0 8px;">SPY Examples</h3>
+    <p>
+      Assume SPY spot = <strong>$525.30</strong>, ATM = <strong>$525</strong>.<br>
+      ATM CE premium = <strong>$3.10</strong>, ATM PE premium = <strong>$2.90</strong>.<br>
+      Combined = <strong>$6.00</strong>. Strike step = <strong>$1</strong>.
+    </p>
+
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Multiplier = +0.50 (OTM selection)</div>
+        <div class="card-body">
+          <strong>CE leg:</strong><br>
+          525 + (6.00 × 0.50) = 525 + 3.00 = <strong>$528</strong> CE<br><br>
+          <strong>PE leg:</strong><br>
+          525 − (6.00 × 0.50) = 525 − 3.00 = <strong>$522</strong> PE<br><br>
+          <em>Result: OTM strangle — both legs are out-of-the-money.</em>
+        </div>
+      </div>
+      <div class="example-card neg">
+        <div class="card-head">🔄 Multiplier = −0.50 (ITM selection)</div>
+        <div class="card-body">
+          <strong>CE leg:</strong><br>
+          525 + (6.00 × −0.50) = 525 − 3.00 = <strong>$522</strong> CE<br><br>
+          <strong>PE leg:</strong><br>
+          525 − (6.00 × −0.50) = 525 + 3.00 = <strong>$528</strong> PE<br><br>
+          <em>Result: ITM strangle — both legs are in-the-money.</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="example-grid">
+      <div class="example-card pos">
+        <div class="card-head">✅ Multiplier = +1.00 (full width OTM)</div>
+        <div class="card-body">
+          <strong>CE leg:</strong> 525 + 6.00 = <strong>$531</strong> CE<br>
+          <strong>PE leg:</strong> 525 − 6.00 = <strong>$519</strong> PE<br><br>
+          <em>Full combined-premium width strangle.</em>
+        </div>
+      </div>
+      <div class="example-card neg">
+        <div class="card-head">⛔ Multiplier = 0.00 — Feature Disabled</div>
+        <div class="card-body">
+          The multiplier block is <strong>skipped entirely</strong>. No strike override is applied.<br><br>
+          Each leg falls back to its own configured strike (ATM, ATM+1, ATM−2, etc.)
+          as if this setting did not exist.<br><br>
+          <em><strong>0.00 is the default</strong> — set any non-zero value to activate.</em>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin:18px 0 8px;">Premium Capture Timing</h3>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="dot">1</div>
+        <div class="flow-text">Portfolio reaches its <strong>Start Time</strong> — first leg becomes eligible to enter.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot">2</div>
+        <div class="flow-text">Engine fetches the <strong>ATM CE bid/ask mid</strong> and <strong>ATM PE bid/ask mid</strong> from the current tick's option chain.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot">3</div>
+        <div class="flow-text"><code>combined_premium</code> is stored in portfolio state. All subsequent legs in this cycle use the <em>same</em> stored value.</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-step">
+        <div class="dot orange">R</div>
+        <div class="flow-text">On <strong>re-execution</strong> (SL/TGT hit → ReExecute), the cached premium is cleared. The next execution tick re-captures it at the current ATM level.</div>
+      </div>
+    </div>
+
+    <h3 style="margin:18px 0 8px;">Log Messages Emitted</h3>
+    <table>
+      <tr><th>Log Key</th><th>When</th><th>Fields</th></tr>
+      <tr>
+        <td><code>STRADDLE_PREM_CAPTURED</code></td>
+        <td>First capture of combined premium</td>
+        <td>ATM, CE prem, PE prem, Combined, Multiplier</td>
+      </tr>
+      <tr>
+        <td><code>STRADDLE_STRIKE_OVERRIDE</code></td>
+        <td>Each leg entry where override applies</td>
+        <td>LegID, Configured strike, ATM, Combined, Multiplier, RawStrike, Rounded, Step</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 2. DELAY BETWEEN LEGS ═══ -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <span class="badge">02</span>
+    <h2>Delay Between Legs in Sec.</h2>
+    <span class="tag blue">Integer seconds · default 0</span>
+  </div>
+  <div class="section-body">
+
+    <p>
+      A <strong>post-re-execution</strong> delay. After a portfolio SL or Target is hit and
+      the action is <em>ReExecute</em>, this timer must fully elapse before any IDLE leg
+      is allowed to re-enter the market.
+    </p>
+
+    <div class="info-box">
+      <strong>Scope:</strong> This setting applies <em>only</em> to <strong>re-executions</strong>
+      triggered by portfolio-level SL / Target actions. It does <em>not</em> apply to the initial
+      (first-time) leg entry — use the per-leg <strong>Wait &amp; Trade</strong> field for that.
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Execution Timeline</h3>
+    <div class="formula">
+<span class="comment"># Example: Delay Between Legs = 5 seconds</span>
+
+<span class="val">10:30:35</span> — Portfolio Target hit, all legs squared off
+<span class="val">10:30:35</span> — REEXEC_DELAY_STARTED logged, countdown begins
+<span class="val">10:30:36</span> — tick: delay not elapsed, no leg entry
+<span class="val">10:30:37</span> — tick: delay not elapsed, no leg entry
+<span class="val">10:30:38</span> — tick: delay not elapsed, no leg entry
+<span class="val">10:30:40</span> — tick: 5s elapsed → REEXEC_DELAY_ELAPSED logged
+              → IDLE legs now allowed to enter
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Difference vs. Wait &amp; Trade</h3>
+    <table>
+      <tr><th></th><th>Wait &amp; Trade (per-leg)</th><th>Delay Between Legs (portfolio)</th></tr>
+      <tr>
+        <td><strong>Configured at</strong></td>
+        <td>Each individual leg row</td>
+        <td>Other Settings tab</td>
+      </tr>
+      <tr>
+        <td><strong>Triggers on</strong></td>
+        <td>Initial leg entry (first execution)</td>
+        <td>Re-execution after SL/TGT hit</td>
+      </tr>
+      <tr>
+        <td><strong>Scope</strong></td>
+        <td>Per-leg, independent timers</td>
+        <td>Entire portfolio — blocks all legs</td>
+      </tr>
+      <tr>
+        <td><strong>Default</strong></td>
+        <td>0 (no delay)</td>
+        <td>0 (no delay)</td>
+      </tr>
+    </table>
+
+    <h3 style="margin:14px 0 8px;">Log Messages</h3>
+    <table>
+      <tr><th>Log Key</th><th>When</th></tr>
+      <tr><td><code>REEXEC_DELAY_STARTED</code></td><td>Immediately after re-execution sqoff, before any re-entry</td></tr>
+      <tr><td><code>REEXEC_DELAY_ELAPSED</code></td><td>First tick after delay expires; legs begin entering</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 3. ON TARGET ACTION ON ═══ -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <span class="badge">03</span>
+    <h2>On Target Action On</h2>
+    <span class="tag blue">Dropdown</span>
+  </div>
+  <div class="section-body">
+
+    <p>
+      When the portfolio has <strong>both a fixed Target and a Trailing Target</strong> enabled,
+      this setting controls <em>which type of hit</em> triggers the configured Target Action
+      (e.g. SqOff, ReExecute, Execute Other Portfolio, etc.).
+    </p>
+
+    <div class="info-box">
+      <strong>Why this matters:</strong> Without this filter, both the fixed Target and the
+      Trailing Target would fire the same action. This caused issues where users wanted
+      <em>only</em> the trailing target to close and re-enter, but the fixed target was
+      also triggering the re-execution (or vice-versa).
+    </div>
+
+    <div class="option-matrix">
+      <div class="opt-card">
+        <div class="opt-head">OnTarget_N_Trailing_Both (default)</div>
+        <div class="opt-body">
+          Target Action fires on <strong>any</strong> target hit — whether the fixed
+          profit target is reached <em>or</em> the trailing lock-profit target is hit.<br><br>
+          Use when the same action should happen regardless of <em>how</em> the target triggered.
+        </div>
+      </div>
+      <div class="opt-card">
+        <div class="opt-head">OnTarget_Only</div>
+        <div class="opt-body">
+          Target Action fires <strong>only</strong> when the <em>fixed</em> portfolio profit target
+          is hit.<br><br>
+          A trailing target hit is <em>silently ignored</em> — no action is taken, the portfolio
+          continues running. A suppression log is emitted.
+        </div>
+      </div>
+      <div class="opt-card">
+        <div class="opt-head">OnTarget_Trailing_Only</div>
+        <div class="opt-body">
+          Target Action fires <strong>only</strong> when the <em>trailing</em> lock-profit target
+          is hit.<br><br>
+          A fixed target hit is <em>silently ignored</em> — no action is taken, the portfolio
+          continues running. A suppression log is emitted.
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Decision Flow</h3>
+    <div class="formula">
+<span class="comment"># Internal reason codes produced by check_portfolio_sl_tgt()</span>
+Fixed target hit  → p_reason = <span class="val">"TARGET"</span>
+Trailing hit      → p_reason = <span class="val">"TARGET_TRAIL"</span>
+
+<span class="comment"># Filter applied in handle_portfolio_delay_and_action()</span>
+<span class="kw">if</span> on_target_action_on == <span class="val">"OnTarget_Only"</span> <span class="kw">and</span> p_reason == <span class="val">"TARGET_TRAIL"</span>:
+    → <span class="eq">SUPPRESS</span>  (log ON_TARGET_ACTION_SUPPRESSED, continue)
+
+<span class="kw">if</span> on_target_action_on == <span class="val">"OnTarget_Trailing_Only"</span> <span class="kw">and</span> p_reason == <span class="val">"TARGET"</span>:
+    → <span class="eq">SUPPRESS</span>  (log ON_TARGET_ACTION_SUPPRESSED, continue)
+
+<span class="kw">else</span>:
+    → <span class="eq">DISPATCH ACTION</span>  (SqOff / ReExecute / Execute Other Portfolio / etc.)
+    </div>
+
+    <div class="warn-box">
+      <strong>Suppression clears pending delay:</strong> If the target fired while a
+      portfolio delay (<code>p_tgt_delay</code>) was pending, suppression also cancels
+      that pending delay. This prevents stale delays from firing if the target condition
+      re-appears later in a different form.
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Log Messages</h3>
+    <table>
+      <tr><th>Log Key</th><th>When</th></tr>
+      <tr><td><code>ON_TARGET_ACTION_SUPPRESSED</code></td><td>Hit was suppressed by this filter — includes Reason and Filter fields</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 4. ON SL ACTION ON ═══ -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <span class="badge">04</span>
+    <h2>On SL Action On</h2>
+    <span class="tag blue">Dropdown</span>
+  </div>
+  <div class="section-body">
+
+    <p>
+      When the portfolio has <strong>both a fixed Stoploss and a Trailing Stoploss</strong> enabled,
+      this setting controls which type of SL hit triggers the configured SL Action
+      (SqOff, ReExecute, etc.).
+    </p>
+
+    <div class="info-box">
+      <strong>How trailing vs. fixed SL is identified:</strong>
+      The engine tracks whether the portfolio's SL value has ever been moved by the trailing
+      logic (<code>was_trailed</code> flag). If the SL has been trailed and then the PnL
+      falls below that trailed level, the hit is classified as <code>STOPLOSS_TRAIL</code>.
+      If no trailing has occurred, it is classified as <code>STOPLOSS</code>.
+    </div>
+
+    <div class="option-matrix">
+      <div class="opt-card">
+        <div class="opt-head">OnSL_N_Trailing_Both (default)</div>
+        <div class="opt-body">
+          SL Action fires on <strong>any</strong> SL hit — whether the configured fixed SL
+          is hit directly <em>or</em> the trailing SL has moved and then been crossed.<br><br>
+          Equivalent to the previous default behaviour.
+        </div>
+      </div>
+      <div class="opt-card">
+        <div class="opt-head">OnSL_Only</div>
+        <div class="opt-body">
+          SL Action fires <strong>only</strong> on a <em>fixed</em> SL hit
+          (the SL value was never trailed).<br><br>
+          A trailing-SL hit is silently ignored — no action taken, monitoring continues.
+        </div>
+      </div>
+      <div class="opt-card">
+        <div class="opt-head">OnSL_Trailing_Only</div>
+        <div class="opt-body">
+          SL Action fires <strong>only</strong> when the trailing SL has moved and then
+          been crossed.<br><br>
+          A fixed SL hit (before any trailing has occurred) is silently ignored.
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Decision Flow</h3>
+    <div class="formula">
+<span class="comment"># Internal reason codes produced by check_portfolio_sl_tgt()</span>
+Fixed SL hit    (trailing never activated) → p_reason = <span class="val">"STOPLOSS"</span>
+Trailing SL hit (SL was moved, then crossed)→ p_reason = <span class="val">"STOPLOSS_TRAIL"</span>
+
+<span class="comment"># Filter applied in handle_portfolio_delay_and_action()</span>
+<span class="kw">if</span> on_sl_action_on == <span class="val">"OnSL_Only"</span> <span class="kw">and</span> p_reason == <span class="val">"STOPLOSS_TRAIL"</span>:
+    → <span class="eq">SUPPRESS</span>  (log ON_SL_ACTION_SUPPRESSED, continue)
+
+<span class="kw">if</span> on_sl_action_on == <span class="val">"OnSL_Trailing_Only"</span> <span class="kw">and</span> p_reason == <span class="val">"STOPLOSS"</span>:
+    → <span class="eq">SUPPRESS</span>  (log ON_SL_ACTION_SUPPRESSED, continue)
+
+<span class="kw">else</span>:
+    → <span class="eq">DISPATCH ACTION</span>  (read p_sl_action from portfolio SL config)
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Trailing SL — Step-by-Step Example</h3>
+    <p>
+      Portfolio SL = <strong>$500</strong> loss limit. Trailing SL: trail every <strong>$200</strong>,
+      trail by <strong>$100</strong>. On SL Action On = <strong>OnSL_Trailing_Only</strong>.
+    </p>
+    <div class="formula">
+<span class="val">PnL = +$0    </span> → SL at -$500.  No trailing yet. was_trailed = <span class="eq">False</span>
+<span class="val">PnL = +$200  </span> → Trailing step: SL moves to -$400. was_trailed = <span class="eq">True</span>
+<span class="val">PnL = +$400  </span> → Trailing step: SL moves to -$300. was_trailed = <span class="eq">True</span>
+<span class="val">PnL = -$300  </span> → PnL fell to trailed SL → reason = <span class="val">STOPLOSS_TRAIL</span>
+                 OnSL_Trailing_Only → <span class="eq">ACTION FIRES</span> ✅
+
+<span class="comment"># If instead PnL dropped to -$500 before trailing ever moved:</span>
+<span class="val">PnL = -$500  </span> → reason = <span class="val">STOPLOSS</span>
+                 OnSL_Trailing_Only → <span class="eq">SUPPRESS</span> — portfolio keeps running
+    </div>
+
+    <h3 style="margin:14px 0 8px;">Log Messages</h3>
+    <table>
+      <tr><th>Log Key</th><th>When</th></tr>
+      <tr><td><code>ON_SL_ACTION_SUPPRESSED</code></td><td>Hit was suppressed by this filter — includes Reason and Filter fields</td></tr>
+      <tr><td><code>TRAIL_SL_UPDATED</code></td><td>Each time the trailing SL moves (also sets was_trailed=True)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 6. INTERACTIONS ═══ -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <span class="badge">05</span>
+    <h2>Parameter Interactions &amp; Edge Cases</h2>
+    <span class="tag green">Reference</span>
+  </div>
+  <div class="section-body">
+
+    <h3>Straddle Width Multiplier + Re-Execution</h3>
+    <p>
+      When the portfolio re-executes (SL or Target hit → ReExecute action), the stored
+      <code>combined_premium</code> is <strong>reset</strong>. The next time a leg enters,
+      the engine re-fetches the ATM CE and PE premiums at the <em>current</em> tick, which
+      may differ significantly from the original entry. This ensures the strike selection
+      always reflects the current market width, not a stale value from the start of the day.
+    </p>
+
+    <hr/>
+
+    <h3>On Target / On SL Action On + Delay</h3>
+    <p>
+      The action-type filter runs <strong>before</strong> the portfolio-level delay guard.
+      This means:
+    </p>
+    <ul>
+      <li>If a suppressed hit type fires while a delay is counting down, the delay is
+          <strong>cancelled</strong> (not just paused). The portfolio resumes normal monitoring.</li>
+      <li>If the unsuppressed hit type fires later, a fresh delay countdown begins.</li>
+    </ul>
+
+    <hr/>
+
+    <h3>Delay Between Legs + End Time</h3>
+    <p>
+      If the portfolio's <strong>End Time</strong> is reached while a re-execution delay is
+      still counting down, the delay is ignored and <em>no</em> new leg entries are allowed
+      (the <code>end_blocked</code> flag prevents entries regardless of delay state).
+      This is consistent with existing end-time behaviour.
+    </p>
+
+    <hr/>
+
+    <h3>Backward Compatibility</h3>
+    <p>
+      Portfolios created before these fields were introduced automatically receive safe defaults:
+    </p>
+    <table>
+      <tr><th>Parameter</th><th>Default</th><th>Effect</th></tr>
+      <tr><td>Straddle Width Multiplier</td><td><strong>0.00</strong> (disabled)</td><td>0.00 = feature skipped entirely; set any non-zero value to activate</td></tr>
+      <tr><td>Delay Between Legs</td><td>0</td><td>No delay on re-execution</td></tr>
+      <tr><td>On Target Action On</td><td>OnTarget_N_Trailing_Both</td><td>Both trailing and fixed targets fire</td></tr>
+      <tr><td>On SL Action On</td><td>OnSL_N_Trailing_Both</td><td>Both trailing and fixed SL fire</td></tr>
+    </table>
+    <p>
+      Legacy string values in portfolio JSON (<code>"On Stoploss Only"</code>,
+      <code>"On Target Only"</code>) are automatically mapped to the new format at load time.
+    </p>
+  </div>
+</div>
+
+  <div class="doc-footer">
+    MegaServe AI Engine &nbsp;·&nbsp; Other Settings Reference &nbsp;·&nbsp; Last updated 2026-04-23
+  </div>
+
+</main>
+</div>
+</body>
+</html>

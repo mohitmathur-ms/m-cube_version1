@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio SL / Target — Full Parameter Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* file-specific aliases */
+    --text-dim: var(--muted);
+    --th-bg: var(--surface);
+    --tr-alt: var(--surface2);
+    --accent3: var(--warn);
+    --tag-sl: rgba(233,96,96,.10);
+    --tag-tgt: rgba(126,214,160,.10);
+    --tag-eng: rgba(91,124,250,.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  /* ── Layout ── */
+  .page-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* ── Header banner ── */
+  .doc-header {
+    background: linear-gradient(135deg, #0d2137 0%, #111827 60%, #0d1a0d 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 24px 22px;
+    margin-bottom: 32px;
+  }
+  .doc-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e6edf3;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+  .doc-header .meta {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .doc-header .meta span { margin-right: 18px; }
+
+  /* ── TOC ── */
+  .toc-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 36px;
+  }
+  .toc-box > p { font-weight: 600; color: var(--accent); margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .toc-box .toc { list-style: none; padding: 0; }
+  .toc-box .toc li { margin: 3px 0; }
+  .toc-box .toc a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  .toc-box .toc a:hover { color: var(--accent); }
+  .toc-box .toc li li { padding-left: 16px; }
+  .toc-box .toc li li li { padding-left: 32px; }
+
+  /* ── Typography ── */
+  h1 { font-size: 26px; color: #e6edf3; margin: 40px 0 14px; font-weight: 700; }
+  h2 { font-size: 20px; color: #e6edf3; margin: 36px 0 12px; font-weight: 600;
+        border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 15px; color: var(--accent); margin: 28px 0 10px; font-weight: 600; }
+  h4 { font-size: 13px; color: var(--accent2); margin: 18px 0 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  h5, h6 { font-size: 13px; color: var(--text-dim); margin: 12px 0 6px; font-weight: 600; }
+
+  p { margin: 0 0 12px; }
+
+  /* ── Part banners ── */
+  h1:first-of-type { display: none; } /* suppress duplicate title */
+
+  /* Part section banners */
+  h1 + hr + h2[id^="part"],
+  h2[id*="part"] {
+    background: linear-gradient(90deg, #1c2d3f, transparent);
+    border-left: 3px solid var(--accent);
+    border-bottom: none;
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin-top: 44px;
+  }
+
+  /* ── Horizontal rule ── */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0;
+  }
+
+  /* ── Links ── */
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Code ── */
+  code {
+    background: var(--code-bg);
+    color: #79c0ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 12px 0 18px;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: #e2e8f0;
+    font-size: 12.5px;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 13px;
+  }
+  thead th {
+    background: var(--th-bg);
+    color: var(--accent);
+    padding: 9px 12px;
+    text-align: left;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  tbody td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: var(--tr-alt); }
+  tbody tr:hover { background: #1c2233; }
+
+  /* ── Parameter definition tables (2-col) ── */
+  table:has(td:first-child code) tbody td:first-child {
+    width: 30%;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* ── Lists ── */
+  ul, ol {
+    padding-left: 22px;
+    margin: 6px 0 12px;
+  }
+  li { margin: 4px 0; }
+
+  /* ── Blockquote (used for notes) ── */
+  blockquote {
+    border-left: 3px solid var(--accent3);
+    background: #1f1a0d;
+    padding: 10px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0;
+    color: #d4a843;
+    font-size: 13px;
+  }
+
+  /* ── Strong / em ── */
+  strong { color: #e6edf3; font-weight: 600; }
+  em { color: #d2a8ff; font-style: normal; font-weight: 500; }
+
+  /* ── Section part labels ── */
+  .part-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .part-sl  { background: var(--tag-sl);  color: #ff7b7b; border: 1px solid #4a1a1a; }
+  .part-tgt { background: var(--tag-tgt); color: #7bff9e; border: 1px solid #1a4a2e; }
+  .part-eng { background: var(--tag-eng); color: #7bb8ff; border: 1px solid #1a3a5c; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #58a6ff44; }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; color: black; }
+    .doc-header { background: #f0f4f8; }
+    pre, code { background: #f6f8fa; color: #24292e; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <h1>Portfolio SL / Target — Full Parameter Reference</h1>
+  <div class="meta">
+    <span>📁 MegaServe AI Trading Engine</span>
+    <span>🗓 Last Updated: 2026-04-29</span>
+    <span>📄 Source: engine/target_sl.py · engine/backtester.py · engine/execution.py · gui/tabs/target_sl.py</span>
+  </div>
+</div>
+
+<div class="page-wrap">
+<h1 id="portfolio-level-stop-loss-target-full-parameter-reference"><a class="toclink" href="#portfolio-level-stop-loss-target-full-parameter-reference">Portfolio-Level Stop Loss &amp; Target — Full Parameter Reference</a></h1>
+<p><strong>Project:</strong> MegaServe AI Trading Engine<br />
+<strong>Document:</strong> Portfolio SL / Target — All Parameters, Logic &amp; Behaviour<br />
+<strong>Last Updated:</strong> 2026-04-29<br />
+<strong>Source Files:</strong><br />
+- <code>engine/target_sl.py</code> — SL/TGT hit evaluation<br />
+- <code>engine/execution.py</code> — <code>process_portfolio_sqoff()</code> — leg-close execution<br />
+- <code>engine/backtester.py</code> — risk dict initialisation (~lines 305–390); <code>QTY</code> constant (line 45)<br />
+- <code>engine/move_sl.py</code> — <code>MoveSLManager</code><br />
+- <code>gui/tabs/target_sl.py</code> — UI (StoplossTab + TargetTab)<br />
+- <code>core/validators.py</code> — config validators</p>
+<hr />
+<h2 id="overview"><a class="toclink" href="#overview">Overview</a></h2>
+<p>Portfolio-level SL/Target operates on the <strong>combined PnL of all active legs in the portfolio</strong>, checked every tick. It is completely independent of per-leg SL/TGT. When a condition fires the engine dispatches an action (sqoff, re-execute, cross-portfolio trigger, etc.) optionally after a delay guard.</p>
+<p>There are six sub-systems:</p>
+<table>
+<thead>
+<tr>
+<th>Sub-system</th>
+<th>Tab / Group</th>
+<th>Config key prefix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Portfolio Fixed Stop Loss</td>
+<td>Stoploss → Stoploss Settings</td>
+<td><code>stoploss.*</code></td>
+</tr>
+<tr>
+<td>Portfolio Trailing Stop Loss</td>
+<td>Stoploss → Trailing SL Settings</td>
+<td><code>stoploss.trailing.*</code></td>
+</tr>
+<tr>
+<td>Move SL to Cost</td>
+<td>Stoploss → Move SL to Cost</td>
+<td><code>stoploss.move_sl_to_cost.*</code></td>
+</tr>
+<tr>
+<td>Portfolio Fixed Target</td>
+<td>Target → Target Settings</td>
+<td><code>target.*</code></td>
+</tr>
+<tr>
+<td>Portfolio Trailing Target</td>
+<td>Target → Trailing Settings</td>
+<td><code>target.trailing.*</code></td>
+</tr>
+<tr>
+<td>Global User Limits</td>
+<td>User Settings (separate)</td>
+<td><code>UserSettings.*</code></td>
+</tr>
+</tbody>
+</table>
+<p>All checks run inside <code>check_portfolio_sl_tgt()</code> every tick, in evaluation order:<br />
+1. Trailing SL ratchet<br />
+2. Fixed SL hit check<br />
+3. Trailing Target activation / ratchet<br />
+4. Fixed Target hit check</p>
+<hr />
+<h1 id="part-1-stoploss-tab"><a class="toclink" href="#part-1-stoploss-tab">PART 1 — STOPLOSS TAB</a></h1>
+<hr />
+<h2 id="1-stoploss-settings"><a class="toclink" href="#1-stoploss-settings">1. Stoploss Settings</a></h2>
+<h3 id="11-enable-stoploss"><a class="toclink" href="#11-enable-stoploss">1.1 Enable Stoploss</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.enabled</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Master switch for the entire portfolio stoploss system. When <code>false</code>, no SL type is evaluated, no SL delay is checked, and no SL action fires. All other fields in the Stoploss Settings group are disabled in the UI when this is off.</p>
+<hr />
+<h3 id="12-stoploss-type"><a class="toclink" href="#12-stoploss-type">1.2 Stoploss Type</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.type</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>"Combined Loss"</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Determines <strong>what condition triggers the portfolio stoploss</strong>. Five active types, two placeholders.</p>
+<h4 id="combined-loss-default"><a class="toclink" href="#combined-loss-default">Combined Loss <em>(default)</em></a></h4>
+<pre><code>Trigger:  curr_pnl  &lt;=  -(stoploss.value)
+</code></pre>
+<p>Fires when the portfolio's combined unrealised + realised PnL drops to or below the configured loss threshold. The threshold is expressed as a positive number representing the maximum allowed loss (e.g. value = 300 means the SL fires when PnL ≤ −300).</p>
+<ul>
+<li>Most commonly used SL type.</li>
+<li>Works with all actions including cross-portfolio and re-execute.</li>
+<li>Compatible with Trailing SL, Delay, and both Leg Filters.</li>
+</ul>
+<h4 id="combined-premium"><a class="toclink" href="#combined-premium">Combined Premium</a></h4>
+<pre><code>threshold  =  -(stoploss.value  ×  QTY)
+Trigger:   state["pnl"]["combined"]  &lt;=  threshold
+</code></pre>
+<p>Converts the entered premium value into a <strong>PnL-based loss threshold</strong> by multiplying it by the hardcoded per-lot quantity (<code>QTY = 100</code>, defined in <code>backtester.py</code>). The stoploss fires when the portfolio's raw combined PnL falls to or below the computed negative threshold.</p>
+<ul>
+<li>Requires at least one leg to have filled (<code>p_comb_prem_captured = True</code>).</li>
+<li><strong>Value entered is a per-lot premium amount, not a raw PnL figure.</strong> The engine scales it to a full PnL threshold internally.</li>
+<li>Uses <code>state["pnl"]["combined"]</code> directly — bypasses per-lot scaling even when <code>tgt_sl_perlot</code> is enabled.</li>
+<li>Log: <code>Combined Premium hit - portfolio stoploss hit | PnL=X | Limit=Y | Premium_SL=Z | Qty=100</code></li>
+</ul>
+<blockquote>
+<strong>Example:</strong> <code>stoploss.value = 100</code>, <code>QTY = 100</code> → threshold = −(100 × 100) = −₹10,000. SL fires when PnL ≤ −₹10,000.
+</blockquote>
+<h4 id="absolute-combined-premium"><a class="toclink" href="#absolute-combined-premium">Absolute Combined Premium</a></h4>
+<pre><code>Trigger:  curr_combined_premium  &gt;=  value
+</code></pre>
+<p>Unconditional — fires when the combined premium exceeds an absolute fixed level regardless of the initial premium. Directional only upward.</p>
+<ul>
+<li>Use when you know the exact premium level at which you want to stop.</li>
+<li>Does not compare to initial; fires purely on the raw current premium value.</li>
+</ul>
+<h4 id="underlying-movement-ui-label-underlying-movemnet"><a class="toclink" href="#underlying-movement-ui-label-underlying-movemnet">Underlying Movement  <em>(UI label: "Underlying Movemnet")</em></a></h4>
+<pre><code>Trigger:  index price crosses value (in either direction)
+  (prev_tick_idx &lt;= value &lt;= curr_tick_idx)
+  OR
+  (prev_tick_idx &gt;= value &gt;= curr_tick_idx)
+</code></pre>
+<p>Fires when the underlying index (e.g. SPY) crosses a specified price level from either side. State variable <code>last_idx_p</code> carries the previous tick's index price to detect the crossing.</p>
+<ul>
+<li>Triggers once on the first crossing tick.</li>
+<li>The <code>value</code> field is the price level to watch, not a loss amount.</li>
+<li>Leg Filters (Selective SqOff) are automatically disabled for this type.</li>
+</ul>
+<h4 id="loss-and-underlying-range"><a class="toclink" href="#loss-and-underlying-range">Loss and Underlying Range</a></h4>
+<pre><code>Trigger:  curr_pnl &lt;= -(stoploss.value)
+      AND (curr_idx &lt;= underlying_below  OR  curr_idx &gt;= underlying_above)
+</code></pre>
+<p>Dual condition — <strong>both</strong> must be true simultaneously. The portfolio SL fires only when the PnL loss threshold is breached <strong>and</strong> the underlying is outside the defined price band.</p>
+<ul>
+<li>Useful for range-bound strategies: tolerate losses while the index stays inside the band, exit if the index breaks out AND the portfolio is in loss.</li>
+<li>Requires the two additional fields: <code>underlying_below</code> and <code>underlying_above</code>.</li>
+<li>If only one direction is relevant, set the other to 0 (disabled).</li>
+<li>Leg Filters are automatically disabled for this type.</li>
+</ul>
+<h4 id="delta-theta-not-enabled"><a class="toclink" href="#delta-theta-not-enabled">Delta / Theta <em>(Not Enabled)</em></a></h4>
+<p>Placeholder options — not implemented. Selecting these disables SL evaluation.</p>
+<hr />
+<h3 id="13-stoploss-value"><a class="toclink" href="#13-stoploss-value">1.3 Stoploss Value</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.value</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td>Range: 0 – 10,000,000</td>
+</tr>
+</tbody>
+</table>
+<p>The numeric threshold for the selected SL type:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Meaning of Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Combined Loss</td>
+<td>Maximum allowed loss in ₹ (positive number; SL fires at PnL ≤ −value)</td>
+</tr>
+<tr>
+<td>Combined Premium</td>
+<td>Per-lot premium amount (₹). Engine computes SL threshold = <code>-(value × QTY)</code> and compares against portfolio PnL.</td>
+</tr>
+<tr>
+<td>Absolute Combined Premium</td>
+<td>Absolute combined premium ceiling (₹ or points) — compared directly against live premium price, no PnL math</td>
+</tr>
+<tr>
+<td>Underlying Movement</td>
+<td>Index price level to watch for crossover</td>
+</tr>
+<tr>
+<td>Loss and Underlying Range</td>
+<td>Maximum allowed loss in ₹ (same as Combined Loss)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="14-on-sl-action"><a class="toclink" href="#14-on-sl-action">1.4 On SL Action</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.action</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>"SqOff"</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>What the engine does when the SL condition fires (after any configured delay). Seven options:</p>
+<h4 id="sqoff-default"><a class="toclink" href="#sqoff-default">SqOff <em>(default)</em></a></h4>
+<p>Closes all active legs in this portfolio immediately. Sets <code>force_sqoff = True</code> on this portfolio. Log: <code>PORTFOLIO_SQOFF | Reason=STOPLOSS</code>.</p>
+<h4 id="reexecute"><a class="toclink" href="#reexecute">ReExecute</a></h4>
+<p>Closes all legs and immediately re-opens them (re-enters the strategy). Each re-entry increments <code>reexec_curr</code>. Stops re-entering once <code>reexec_count</code> is reached (0 = unlimited). Log: <code>PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=N</code>.</p>
+<h4 id="sqoff-other-portfolio"><a class="toclink" href="#sqoff-other-portfolio">SqOff Other Portfolio</a></h4>
+<p>Closes this portfolio <strong>and</strong> force-sqoffs the named target portfolio. Both portfolios close on the same tick. Requires <code>Target Portfolio</code> name to be set. Log: <code>PORTFOLIO_SQOFF | Reason=STOPLOSS</code> on both portfolios.</p>
+<h4 id="execute-other-portfolio"><a class="toclink" href="#execute-other-portfolio">Execute Other Portfolio</a></h4>
+<p>Closes this portfolio and <strong>triggers execution</strong> (sets <code>execute_trigger = True</code>) on all IDLE legs of the named target portfolio. Used to activate a hedge or alternate strategy when SL hits. Requires <code>Target Portfolio</code> name.</p>
+<h4 id="reexecute-at-entry-price"><a class="toclink" href="#reexecute-at-entry-price">ReExecute at Entry Price</a></h4>
+<p>Closes all legs and waits to re-enter each leg at its original entry price (STRIKED LOCKED). The engine monitors each tick until the option price returns to entry price before re-entering. Log: <code>STRIKED LOCKED {strike} {CP} AT PRICE {price}</code>.</p>
+<h4 id="reexecute-samestrike-at-entryprice"><a class="toclink" href="#reexecute-samestrike-at-entryprice">ReExecute SameStrike at EntryPrice</a></h4>
+<p>Same as above but re-enters at the exact same strike as the original entry (does not allow strike drift). Log: <code>REEXECUTING AS STRIKE {X} GOT {price} AGAIN</code> when re-entry condition is met.</p>
+<h4 id="start-other-portfolio"><a class="toclink" href="#start-other-portfolio">Start Other Portfolio</a></h4>
+<p>Closes this portfolio and activates the named target portfolio's execution mode (sets its <code>exec_mode</code> to active). Used to chain portfolio execution. Requires <code>Target Portfolio</code> name. Log: <code>START_OTHER_PORTFOLIO | Triggering={src} | Target={dst}</code>.</p>
+<hr />
+<h3 id="15-target-portfolio"><a class="toclink" href="#15-target-portfolio">1.5 Target Portfolio</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.portfolio_name</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>""</code></td>
+<td>Visible only for cross-portfolio actions</td>
+</tr>
+</tbody>
+</table>
+<p>Name of the portfolio to act upon when the action is <code>SqOff Other Portfolio</code>, <code>Execute Other Portfolio</code>, or <code>Start Other Portfolio</code>. Hidden in the UI for all other actions. Must exactly match the <code>portfolio_name</code> of the target portfolio in the same session.</p>
+<hr />
+<h3 id="16-delay-sec"><a class="toclink" href="#16-delay-sec">1.6 Delay (sec)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.delay</code></th>
+<th>Type: <code>int</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0</code></td>
+<td>Range: 0 – 9999</td>
+</tr>
+</tbody>
+</table>
+<p>Confirmation delay in seconds before the SL action fires. When &gt; 0, the engine does <strong>not</strong> immediately act on the first tick the SL condition is met. Instead:</p>
+<ol>
+<li>First hit: sets <code>p_delay_pending = True</code>, records <code>p_delay_start_time</code>. Log: <code>PORTFOLIO_DELAY_PENDING | Reason=STOPLOSS | Delay=Ns</code>.</li>
+<li>Each subsequent tick: checks <code>elapsed = (curr_dt - start_time).total_seconds()</code>.</li>
+<li>If <code>elapsed &lt; delay</code>: waits, no action.</li>
+<li>If <code>elapsed &gt;= delay</code> AND condition still holds: fires the SL action.</li>
+<li>If the condition clears before the delay expires (e.g. PnL recovers): <code>p_delay_pending = False</code>. Log: <code>PORTFOLIO_DELAY_CLEARED | Condition persistent=False</code>. The delay counter resets completely — next time the condition is met, a fresh <code>delay</code> window starts.</li>
+</ol>
+<p><strong>Oscillating behaviour:</strong> If the condition repeatedly hits and clears within the delay window, each new hit restarts the delay timer. The SL only fires when the condition holds continuously for the full delay duration.</p>
+<p><strong>Interaction with Trailing SL:</strong> Delay and Trailing SL work together — the trailing SL keeps ratcheting during the delay window, so the SL threshold may move during the wait period.</p>
+<hr />
+<h3 id="17-reexecute-count"><a class="toclink" href="#17-reexecute-count">1.7 ReExecute Count</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.reexecute_count</code></th>
+<th>Type: <code>int</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0</code> (= unlimited)</td>
+<td>Range: 0 – 1,000,000</td>
+</tr>
+</tbody>
+</table>
+<p>Maximum number of times the portfolio can re-execute after an SL hit when the action is <code>ReExecute</code>, <code>ReExecute at Entry Price</code>, or <code>ReExecute SameStrike at EntryPrice</code>.</p>
+<ul>
+<li><code>0</code> means unlimited re-executions — the strategy will re-enter every time the SL fires.</li>
+<li>Once <code>reexec_curr &gt;= reexec_count</code>, the next SL hit performs a final <code>SqOff</code> instead of re-executing.</li>
+<li>The counter <code>reexec_curr</code> increments on every re-execution and resets each trading day.</li>
+<li>Disabled in the UI when the action is not a ReExecute variant.</li>
+</ul>
+<hr />
+<h3 id="18-underlying-below-underlying-above"><a class="toclink" href="#18-underlying-below-underlying-above">1.8 Underlying Below / Underlying Above</a></h3>
+<table>
+<thead>
+<tr>
+<th>Fields</th>
+<th><code>stoploss.underlying_below</code>, <code>stoploss.underlying_above</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td>Visible only when type = "Loss and Underlying Range"</td>
+</tr>
+</tbody>
+</table>
+<p>Define the price band for the <strong>Loss and Underlying Range</strong> SL type:</p>
+<ul>
+<li><code>underlying_below</code>: SL contributes if <code>curr_index &lt;= this value</code>. Set to 0 to disable the lower bound.</li>
+<li><code>underlying_above</code>: SL contributes if <code>curr_index &gt;= this value</code>. Set to 0 to disable the upper bound.</li>
+</ul>
+<p>Combined condition: <code>PnL &lt;= -value AND (index &lt;= below OR index &gt;= above)</code>.</p>
+<p>Example: <code>value=50, below=0, above=595</code> → SL fires only when the portfolio is down ≥₹50 AND the index has broken above 595.</p>
+<hr />
+<h3 id="19-on-sl-sqoff-only-loss-making-legs"><a class="toclink" href="#19-on-sl-sqoff-only-loss-making-legs">1.9 On SL SqOff Only Loss Making Legs</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.sqoff_only_loss_legs</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td>Enabled only: Combined SL types + SqOff action</td>
+</tr>
+</tbody>
+</table>
+<p>When ticked, the SL does not close the entire portfolio. Instead it <strong>only closes legs whose current PnL is negative</strong> at the moment the SL fires. Legs that are in profit are left <code>ACTIVE</code> and the portfolio continues running.</p>
+<p><strong>Post-partial-close state:</strong><br />
+- <code>force_sqoff</code> is reset to <code>False</code> — portfolio is NOT fully closed<br />
+- <code>trail_state</code> is cleared — trailing SL recalculates from new combined PnL<br />
+- Portfolio keeps monitoring target and individual leg SLs on remaining legs<br />
+- SL will not immediately re-fire on the same tick<br />
+- Log: <code>PORTFOLIO_PARTIAL_SQOFF | Reason=STOPLOSS | Filter=LOSS_LEGS_ONLY</code></p>
+<p><strong>Example — 3-leg portfolio, SL fires:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Leg</th>
+<th>Leg PnL</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Leg 1 SELL C</td>
+<td>−₹45</td>
+<td>Closed</td>
+</tr>
+<tr>
+<td>Leg 2 SELL P</td>
+<td>+₹20</td>
+<td>Kept ACTIVE</td>
+</tr>
+<tr>
+<td>Leg 3 SELL C</td>
+<td>−₹12</td>
+<td>Closed</td>
+</tr>
+</tbody>
+</table>
+<p>Leg 2 continues running. The portfolio will exit Leg 2 when its own leg SL/TGT fires or when the portfolio target is reached.</p>
+<p><strong>Constraint:</strong> Mutually exclusive with <code>sqoff_only_profit_legs</code> — enabling one disables the other. Only available for <code>Combined Loss</code>, <code>Combined Premium</code>, and <code>Absolute Combined Premium</code> types with <code>SqOff</code> action.</p>
+<hr />
+<h3 id="110-on-sl-sqoff-only-profit-making-legs"><a class="toclink" href="#110-on-sl-sqoff-only-profit-making-legs">1.10 On SL SqOff Only Profit Making Legs</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.sqoff_only_profit_legs</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td>Enabled only: Combined SL types + SqOff action</td>
+</tr>
+</tbody>
+</table>
+<p>Inverse of the above. When the SL fires, <strong>only legs currently in profit are closed</strong>. Loss-making legs are left running.</p>
+<p><strong>Use case:</strong> Lock in profitable legs when the portfolio hits a loss threshold, while allowing the losing legs to recover (or their individual SLs to handle exit).</p>
+<p><strong>Post-partial-close state:</strong> Same as <code>sqoff_only_loss_legs</code> — portfolio continues, trail resets, SL does not re-fire on same tick. Log: <code>PORTFOLIO_PARTIAL_SQOFF | Reason=STOPLOSS | Filter=PROFIT_LEGS_ONLY</code>.</p>
+<p><strong>Constraint:</strong> Mutually exclusive with <code>sqoff_only_loss_legs</code>.</p>
+<hr />
+<h2 id="2-trailing-sl-settings"><a class="toclink" href="#2-trailing-sl-settings">2. Trailing SL Settings</a></h2>
+<h3 id="21-enable-trailing-sl"><a class="toclink" href="#21-enable-trailing-sl">2.1 Enable Trailing SL</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.trailing.enabled</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Activates the dynamic trailing stop loss. When enabled, the effective SL threshold tightens automatically as portfolio PnL improves, locking in progressively more profit protection. The trailing SL <strong>only moves in one direction</strong> (tighter — it never relaxes back).</p>
+<hr />
+<h3 id="22-for-every-profit-of"><a class="toclink" href="#22-for-every-profit-of">2.2 For Every Profit of (₹)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.trailing.trail_every</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Step size in ₹ PnL improvement that triggers one trailing ratchet. Each time the portfolio PnL improves by this amount from the last anchor point, the SL threshold tightens by <code>trail_by</code>.</p>
+<p><strong>Example:</strong> <code>trail_every = 50</code> → every ₹50 gain in PnL triggers a step.</p>
+<hr />
+<h3 id="23-tighten-sl-by"><a class="toclink" href="#23-tighten-sl-by">2.3 Tighten SL By (₹)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.trailing.trail_by</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Amount by which the SL threshold is reduced per trailing step. Reducing the SL threshold means the maximum allowed loss shrinks — the portfolio is protected at a tighter level.</p>
+<p><strong>Example:</strong> <code>trail_by = 20</code> → each step reduces the SL threshold by ₹20 (e.g. SL moves from ₹300 loss tolerance → ₹280 → ₹260 …).</p>
+<p><strong>Full trailing SL computation (per tick):</strong></p>
+<pre><code>gain  = curr_pnl - anchor_pnl
+if gain &gt;= trail_every:
+    steps               = int(gain / trail_every)
+    current_sl_val     -= steps * trail_by          ← SL tightens
+    anchor_pnl         += steps * trail_every       ← anchor advances
+</code></pre>
+<p><code>current_sl_val</code> starts at <code>stoploss.value</code> and can only decrease. If <code>trail_by</code> is too large relative to <code>trail_every</code>, the SL can reach 0, meaning any loss at all would trigger it.</p>
+<p><strong>Log:</strong> <code>TRAIL_SL_UPDATED | Steps=N | Combined_SL=X | PnL=Y</code></p>
+<p><strong>Interaction with Delay:</strong> Trailing ratcheting continues during a delay window. So if the SL fires, a delay is pending, and PnL improves during the wait, the SL threshold will have tightened further when/if the delay eventually dispatches.</p>
+<p><strong>Interaction with Move SL to Cost <code>trail_after_move_sl</code>:</strong> When that flag is enabled, trailing SL only activates after the Move SL to Cost feature has executed at least once (see Section 3.6).</p>
+<hr />
+<h2 id="3-move-sl-to-cost-settings"><a class="toclink" href="#3-move-sl-to-cost-settings">3. Move SL to Cost Settings</a></h2>
+<h3 id="31-enable-move-sl-to-cost"><a class="toclink" href="#31-enable-move-sl-to-cost">3.1 Enable Move SL to Cost</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.enabled</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Master switch for the Move SL to Cost feature. When active, whenever any leg in the portfolio hits its individual SL <strong>or</strong> Target (configurable), the engine repositions the SL of all other active legs to their entry price. This locks each remaining leg's cost basis, preventing a winning leg from turning into a loser after another leg has exited.</p>
+<hr />
+<h3 id="32-safety-seconds"><a class="toclink" href="#32-safety-seconds">3.2 Safety Seconds</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.safety_seconds</code></th>
+<th>Type: <code>int</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0</code></td>
+<td>Range: 0 – 9999</td>
+</tr>
+</tbody>
+</table>
+<p>Minimum number of seconds that must have elapsed since portfolio start before the Move SL to Cost feature can trigger. Prevents premature SL moves immediately at open when prices are volatile and fills may not have settled.</p>
+<p>Setting to <code>0</code> means it can trigger at any time after portfolio start.</p>
+<hr />
+<h3 id="33-move-sl-action"><a class="toclink" href="#33-move-sl-action">3.3 Move SL Action</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.action</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>"Move Only for Profitable Legs"</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Controls <strong>which legs</strong> have their SL repositioned when the trigger fires:</p>
+<h4 id="move-only-for-profitable-legs"><a class="toclink" href="#move-only-for-profitable-legs">Move Only for Profitable Legs</a></h4>
+<pre><code>For each active leg:
+  if leg_pnl &gt; 0:
+      leg[&quot;sl&quot;] = leg[&quot;entry_price&quot;]
+</code></pre>
+<p>Only moves SL to cost for legs that are currently in profit. Loss-making legs are left with their original SL unchanged.</p>
+<h4 id="move-sl-for-all-legs-despite-loss-profit"><a class="toclink" href="#move-sl-for-all-legs-despite-loss-profit">Move SL for All Legs Despite Loss / Profit</a></h4>
+<pre><code>For each active leg (regardless of PnL):
+    leg[&quot;sl&quot;] = leg[&quot;entry_price&quot;]
+</code></pre>
+<p>Moves SL to entry price for every active leg unconditionally — even legs that are currently in loss. This means a loss-making leg's SL moves to entry price (which is actually above its current price if it's a loss, so the leg will immediately close if it's already below entry).</p>
+<h4 id="move-sl-to-ltp-buffer-for-loss-making-legs"><a class="toclink" href="#move-sl-to-ltp-buffer-for-loss-making-legs">Move SL to LTP + Buffer for Loss Making Legs</a></h4>
+<pre><code>For each active leg:
+  if leg_pnl &gt; 0:
+      leg[&quot;sl&quot;] = leg[&quot;entry_price&quot;]               ← profitable legs → cost
+  else:
+      leg[&quot;sl&quot;] = current_ltp ± 0.05% buffer       ← loss legs → LTP with buffer
+</code></pre>
+<p>Profitable legs get SL moved to entry price. Loss-making legs get their SL moved to their current Last Traded Price plus a small buffer (0.05%), giving them a tight but realistic stop at the current price level.</p>
+<p><strong>Log:</strong> <code>MOVE_SL_TO_COST | Action={mode} | LegID={id}</code></p>
+<p>Dynamic hedge legs (<code>is_dynamic_hedge = True</code>) are always skipped regardless of the action selected.</p>
+<hr />
+<h3 id="34-trail-sl-only-after-move-sl-to-cost"><a class="toclink" href="#34-trail-sl-only-after-move-sl-to-cost">3.4 Trail SL only after Move SL to Cost</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.trail_after_move_sl</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>When enabled, the <strong>Trailing SL</strong> (Section 2) is suppressed until Move SL to Cost has executed at least once. This prevents the trailing mechanism from moving the SL before legs have their cost protected.</p>
+<p><strong>Typical use case:</strong> You want the SL to stay at the original value until the first leg exits, then start trailing from that point onward as the remaining legs are already at cost.</p>
+<hr />
+<h3 id="35-no-move-sl-for-buy-legs"><a class="toclink" href="#35-no-move-sl-for-buy-legs">3.5 No Move SL for BUY Legs</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.no_move_buy_legs</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>When ticked, BUY legs are completely excluded from the Move SL to Cost logic regardless of the selected action. Only SELL legs will have their SL repositioned. Useful for strategies where BUY legs act as hedges and should not have their SL altered.</p>
+<hr />
+<h3 id="36-re-apply-on-every-leg-sl-hit"><a class="toclink" href="#36-re-apply-on-every-leg-sl-hit">3.6 Re-apply on every Leg SL hit</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.hit_on_leg</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>By default, Move SL to Cost triggers once on the first leg exit. When this is checked, it re-applies <strong>every time</strong> any subsequent leg hits its individual SL. This ensures that each successive leg exit re-locks the remaining active legs to cost.</p>
+<hr />
+<h3 id="37-re-apply-on-every-leg-target-hit"><a class="toclink" href="#37-re-apply-on-every-leg-target-hit">3.7 Re-apply on every Leg Target hit  ✱</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>stoploss.move_sl_to_cost.tgt_hit_on_leg</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Same as above but triggered on individual leg <strong>Target</strong> hits rather than SL hits. When a leg closes at its target price, the SLs of all remaining active legs are repositioned per the selected action.</p>
+<p>The <code>✱</code> marker in the UI indicates that this option interacts with leg-level target logic and should be used carefully when legs have aggressive target values.</p>
+<hr />
+<h1 id="part-2-target-tab"><a class="toclink" href="#part-2-target-tab">PART 2 — TARGET TAB</a></h1>
+<hr />
+<h2 id="4-target-settings"><a class="toclink" href="#4-target-settings">4. Target Settings</a></h2>
+<h3 id="41-enable-target"><a class="toclink" href="#41-enable-target">4.1 Enable Target</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.enabled</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Master switch for the portfolio target system. When <code>false</code>, no target condition is evaluated. All fields in the Target Settings group are disabled in the UI when this is off.</p>
+<hr />
+<h3 id="42-target-type"><a class="toclink" href="#42-target-type">4.2 Target Type</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.type</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>"Combined Profit"</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Determines what condition triggers the portfolio target exit. Four active types, two placeholders.</p>
+<h4 id="combined-profit-default"><a class="toclink" href="#combined-profit-default">Combined Profit <em>(default)</em></a></h4>
+<pre><code>Trigger:  curr_pnl  &gt;=  target.value
+</code></pre>
+<p>Fires when the portfolio's combined unrealised + realised PnL reaches or exceeds the configured profit target. Value is expressed as a positive ₹ amount.</p>
+<h4 id="combined-premium_1"><a class="toclink" href="#combined-premium_1">Combined Premium</a></h4>
+<pre><code>threshold  =  target.value  ×  QTY
+Trigger:   state["pnl"]["combined"]  &gt;=  threshold
+</code></pre>
+<p>Converts the entered premium value into a <strong>PnL-based profit threshold</strong> by multiplying it by the hardcoded per-lot quantity (<code>QTY = 100</code>, defined in <code>backtester.py</code>). The target fires when the portfolio's raw combined PnL reaches or exceeds the computed threshold.</p>
+<ul>
+<li>Requires at least one leg to have filled (<code>p_comb_prem_captured = True</code>).</li>
+<li><strong>Value entered is a per-lot premium amount, not a raw PnL figure.</strong> The engine scales it to a full PnL threshold internally.</li>
+<li>Uses <code>state["pnl"]["combined"]</code> directly — bypasses per-lot scaling even when <code>tgt_sl_perlot</code> is enabled.</li>
+<li>Log: <code>Combined Premium hit - portfolio profit hit | PnL=X | Target=Y | Premium_Target=Z | Qty=100</code></li>
+</ul>
+<blockquote>
+<strong>Example:</strong> <code>target.value = 100</code>, <code>QTY = 100</code> → threshold = 100 × 100 = ₹10,000. Target fires when PnL ≥ ₹10,000.
+</blockquote>
+<h4 id="absolute-combined-premium_1"><a class="toclink" href="#absolute-combined-premium_1">Absolute Combined Premium</a></h4>
+<pre><code>Trigger:  curr_combined_premium  &lt;=  value
+</code></pre>
+<p>Fires when combined premium decays to or below an absolute fixed level. Directional only downward. Suitable for premium-decay targets in short-option strategies.</p>
+<h4 id="underlying-movement-ui-label-underlying-movemnet_1"><a class="toclink" href="#underlying-movement-ui-label-underlying-movemnet_1">Underlying Movement  <em>(UI label: "Underlying Movemnet")</em></a></h4>
+<pre><code>Trigger:  index price crosses value (in either direction)
+  (prev_tick_idx &lt;= value &lt;= curr_tick_idx)
+  OR
+  (prev_tick_idx &gt;= value &gt;= curr_tick_idx)
+</code></pre>
+<p>Fires when the underlying index crosses a price level. Independent of PnL — purely price-based. The value field is an index price level, not a profit amount. State variable <code>last_idx_p_tgt</code> is separate from the SL's <code>last_idx_p</code>.</p>
+<h4 id="delta-theta-not-enabled_1"><a class="toclink" href="#delta-theta-not-enabled_1">Delta / Theta <em>(Not Enabled)</em></a></h4>
+<p>Placeholder options — not implemented.</p>
+<hr />
+<h3 id="43-target-value"><a class="toclink" href="#43-target-value">4.3 Target Value</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.value</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td>Range: 0 – 10,000,000</td>
+</tr>
+</tbody>
+</table>
+<p>The numeric threshold for the selected target type:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Meaning of Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Combined Profit</td>
+<td>Profit to capture in ₹</td>
+</tr>
+<tr>
+<td>Combined Premium</td>
+<td>Per-lot premium amount (₹). Engine computes target threshold = <code>value × QTY</code> and compares against portfolio PnL.</td>
+</tr>
+<tr>
+<td>Absolute Combined Premium</td>
+<td>Absolute combined premium floor (₹ or points) — compared directly against live premium price, no PnL math</td>
+</tr>
+<tr>
+<td>Underlying Movement</td>
+<td>Index price level to watch for crossover</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="44-on-target-action"><a class="toclink" href="#44-on-target-action">4.4 On Target Action</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.action</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>"SqOff"</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>What happens when the target fires. Identical set of options as the SL action:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SqOff</code></td>
+<td>Close all active legs. Log: <code>PORTFOLIO_SQOFF \| Reason=TARGET</code></td>
+</tr>
+<tr>
+<td><code>ReExecute</code></td>
+<td>Close all legs and re-enter. Log: <code>PORTFOLIO_REEXECUTE \| Reason=TARGET \| Count=N</code></td>
+</tr>
+<tr>
+<td><code>SqOff Other Portfolio</code></td>
+<td>Close self + named target portfolio</td>
+</tr>
+<tr>
+<td><code>Execute Other Portfolio</code></td>
+<td>Close self + trigger IDLE legs on named target portfolio</td>
+</tr>
+<tr>
+<td><code>ReExecute at Entry Price</code></td>
+<td>Close and wait to re-enter at each leg's original entry price</td>
+</tr>
+<tr>
+<td><code>ReExecute SameStrike at EntryPrice</code></td>
+<td>Close and wait to re-enter at the exact same strike at entry price</td>
+</tr>
+<tr>
+<td><code>Start Other Portfolio</code></td>
+<td>Close self + activate named target portfolio</td>
+</tr>
+</tbody>
+</table>
+<p>Trailing Target hits always use <code>SqOff</code> regardless of this setting.</p>
+<hr />
+<h3 id="45-target-portfolio"><a class="toclink" href="#45-target-portfolio">4.5 Target Portfolio</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.portfolio_name</code></th>
+<th>Type: <code>str</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>""</code></td>
+<td>Visible only for cross-portfolio actions</td>
+</tr>
+</tbody>
+</table>
+<p>Name of the portfolio to act upon when the target action is <code>SqOff Other Portfolio</code>, <code>Execute Other Portfolio</code>, or <code>Start Other Portfolio</code>. Must exactly match the target portfolio's <code>portfolio_name</code>.</p>
+<hr />
+<h3 id="46-delay-sec"><a class="toclink" href="#46-delay-sec">4.6 Delay (sec)</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.delay</code></th>
+<th>Type: <code>int</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0</code></td>
+<td>Range: 0 – 9999</td>
+</tr>
+</tbody>
+</table>
+<p>Confirmation delay before the target action fires — identical mechanics to SL Delay (Section 1.6). When the target condition is met, the engine waits for <code>delay</code> seconds of continuous confirmation before acting.</p>
+<ul>
+<li><code>p_delay_pending</code> is shared between SL and TGT (only one can be pending at a time).</li>
+<li>Log: <code>PORTFOLIO_DELAY_PENDING | Reason=TARGET | Delay=Ns</code></li>
+<li>If the condition clears before delay expires: <code>PORTFOLIO_DELAY_CLEARED | Condition persistent=False</code></li>
+</ul>
+<hr />
+<h3 id="47-reexecute-count"><a class="toclink" href="#47-reexecute-count">4.7 ReExecute Count</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.reexecute_count</code></th>
+<th>Type: <code>int</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0</code> (= unlimited)</td>
+<td>Range: 0 – 1,000,000</td>
+</tr>
+</tbody>
+</table>
+<p>Maximum re-executions after a target hit. Same logic as SL ReExecute Count (Section 1.7) but applied to target re-entries. Counter <code>p_tgt_reexec_curr</code> increments per re-entry; resets each day. Once the count is reached, the next target hit performs a final <code>SqOff</code>.</p>
+<hr />
+<h2 id="5-trailing-target-settings"><a class="toclink" href="#5-trailing-target-settings">5. Trailing Target Settings</a></h2>
+<h3 id="51-enable-trailing"><a class="toclink" href="#51-enable-trailing">5.1 Enable Trailing</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.trailing.enabled</code></th>
+<th>Type: <code>bool</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Activates the trailing target / profit lock mechanism. Instead of exiting at a fixed profit level, the engine:<br />
+1. Waits for PnL to reach an activation threshold<br />
+2. Locks a minimum profit floor<br />
+3. Raises the floor progressively as PnL continues improving<br />
+4. Exits only when PnL falls back to the locked floor</p>
+<p>This allows the portfolio to capture more profit when a trend continues while still protecting a defined minimum gain.</p>
+<hr />
+<h3 id="52-lock-minimum-profit"><a class="toclink" href="#52-lock-minimum-profit">5.2 Lock Minimum Profit</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.trailing.lock_min_profit</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The initial profit floor that is locked the moment the trailing target activates. Once the PnL reaches <code>when_profit_reach</code>, the locked floor is immediately set to <code>lock_min_profit</code>. The portfolio will not exit for less than this amount.</p>
+<p><strong>Example:</strong> <code>lock_min_profit = 80</code> → as soon as trailing activates, the portfolio will close if PnL drops back to ₹80 or below.</p>
+<hr />
+<h3 id="53-when-profit-reach"><a class="toclink" href="#53-when-profit-reach">5.3 When Profit Reach</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.trailing.when_profit_reach</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The PnL level at which the trailing target activates. The portfolio is allowed to trade freely (without a trailing exit) until PnL first reaches this value. Once crossed, the trailing mechanism activates and <code>lock_min_profit</code> is set immediately.</p>
+<p><strong>Example:</strong> <code>when_profit_reach = 150</code> → trailing does nothing until PnL reaches ₹150, then the floor is locked at <code>lock_min_profit</code>.</p>
+<p><strong>Relationship:</strong> <code>when_profit_reach</code> should be ≥ <code>lock_min_profit</code> — you can't lock a profit floor higher than the activation threshold.</p>
+<hr />
+<h3 id="54-for-every-increase-by"><a class="toclink" href="#54-for-every-increase-by">5.4 For Every Increase By</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.trailing.trail_every</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Step size in ₹ after which the locked floor is raised. Once the trailing target is active and PnL continues rising, each time PnL increases by <code>trail_every</code> above the current anchor, the floor rises by <code>trail_by</code>.</p>
+<p><strong>Example:</strong> <code>trail_every = 30</code> → every ₹30 increase after activation raises the floor.</p>
+<hr />
+<h3 id="55-trail-profit-by"><a class="toclink" href="#55-trail-profit-by">5.5 Trail Profit By</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>target.trailing.trail_by</code></th>
+<th>Type: <code>float</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default</td>
+<td><code>0.0</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>How much the locked profit floor is raised per step. Works together with <code>trail_every</code>.</p>
+<p><strong>Example:</strong> <code>trail_by = 20</code> → each step raises the floor by ₹20.</p>
+<p><strong>Full trailing target computation (per tick):</strong></p>
+<pre><code>Phase 1 — Activation (first time PnL &gt;= when_profit_reach):
+    active        = True
+    current_stop  = lock_min_profit
+    anchor_pnl    = when_profit_reach
+    → Log: TRAIL_TARGET_ACTIVATED
+
+Phase 2 — Exit check (every tick while active):
+    if curr_pnl &lt;= current_stop:
+        → SqOff  (Log: PORTFOLIO_SQOFF | Reason=TARGET_TRAIL)
+
+Phase 3 — Ratchet up (every tick while active and pnl &gt; stop):
+    gain = curr_pnl - anchor_pnl
+    if gain &gt;= trail_every:
+        steps         = int(gain / trail_every)
+        current_stop += steps * trail_by
+        anchor_pnl   += steps * trail_every
+        → Log: TRAIL_TARGET_UPDATED | current_stop=X
+</code></pre>
+<p><strong>Note:</strong> Trailing target sqoff always uses local <code>SqOff</code> regardless of the <code>On Target Action</code> setting — no cross-portfolio actions are triggered on trailing target exits.</p>
+<hr />
+<h1 id="part-3-engine-internals"><a class="toclink" href="#part-3-engine-internals">PART 3 — ENGINE INTERNALS</a></h1>
+<hr />
+<h2 id="6-risk-config-dictionary"><a class="toclink" href="#6-risk-config-dictionary">6. Risk Config Dictionary</a></h2>
+<p>Built once per portfolio per trading day during initialisation (<code>backtester.py</code>):</p>
+<pre><code class="language-python">&quot;risk&quot;: {
+    # ── Stop Loss ─────────────────────────────────────────────
+    &quot;p_sl_enabled&quot;:              bool,    # stoploss.enabled
+    &quot;p_sl_type&quot;:                 str,     # stoploss.type
+    &quot;p_sl_val&quot;:                  float,   # stoploss.value (adjusted for per-lot if tgt_sl_perlot)
+    &quot;p_sl_action&quot;:               str,     # stoploss.action
+    &quot;p_sl_portfolio&quot;:            str,     # stoploss.portfolio_name
+    &quot;p_sl_delay&quot;:                int,     # stoploss.delay
+    &quot;p_sl_reexec_max&quot;:           int,     # stoploss.reexecute_count
+    &quot;p_sl_reexec_curr&quot;:          int,     # runtime counter, starts at 0
+    &quot;p_sl_underlying_below&quot;:     float,   # stoploss.underlying_below
+    &quot;p_sl_underlying_above&quot;:     float,   # stoploss.underlying_above
+    &quot;p_sl_sqoff_only_loss_legs&quot;: bool,    # stoploss.sqoff_only_loss_legs
+    &quot;p_sl_sqoff_only_profit_legs&quot;: bool,  # stoploss.sqoff_only_profit_legs
+
+    # ── Target ────────────────────────────────────────────────
+    &quot;p_tgt_enabled&quot;:             bool,    # target.enabled
+    &quot;p_tgt_type&quot;:                str,     # target.type
+    &quot;p_tgt_val&quot;:                 float,   # target.value
+    &quot;p_tgt_action&quot;:              str,     # target.action
+    &quot;p_tgt_portfolio&quot;:           str,     # target.portfolio_name
+    &quot;p_tgt_delay&quot;:               int,     # target.delay
+    &quot;p_tgt_reexec_max&quot;:          int,     # target.reexecute_count
+    &quot;p_tgt_reexec_curr&quot;:         int,     # runtime counter, starts at 0
+
+    # ── General ───────────────────────────────────────────────
+    &quot;tgt_sl_perlot&quot;:             bool,    # general.tgt_sl_perlot — scales value by total lots
+
+    # ── Trailing SL ───────────────────────────────────────────
+    &quot;sl_trail&quot;: {
+        &quot;enabled&quot;: bool,
+        &quot;every&quot;:   float,   # stoploss.trailing.trail_every
+        &quot;by&quot;:      float,   # stoploss.trailing.trail_by
+        &quot;anchor_pnl&quot;:   0.0,      # runtime
+        &quot;initialized&quot;:  False,    # runtime
+    },
+
+    # ── Trailing Target ───────────────────────────────────────
+    &quot;tgt_trail&quot;: {
+        &quot;enabled&quot;:           bool,
+        &quot;trail_every&quot;:       float,  # target.trailing.trail_every
+        &quot;trail_by&quot;:          float,  # target.trailing.trail_by
+        &quot;lock_min_profit&quot;:   float,  # target.trailing.lock_min_profit
+        &quot;when_profit_reach&quot;: float,  # target.trailing.when_profit_reach
+        &quot;anchor_pnl&quot;:        0.0,    # runtime
+        &quot;initialized&quot;:       False,  # runtime
+    },
+
+    # ── Combined Premium tracking ──────────────────────────────
+    &quot;p_comb_prem_initial&quot;:    float,   # captured on first full-fill tick
+    &quot;p_comb_prem_captured&quot;:   bool,
+    &quot;p_comb_prem_legs_added&quot;: set,     # leg IDs already included in initial sum
+    &quot;p_lot_qty&quot;:              int,     # = QTY (backtester.py L45); used to scale
+                                        #   Combined Premium SL/TGT value → PnL threshold
+}
+</code></pre>
+<hr />
+<h2 id="7-trail-state-per-portfolio-mutable-each-tick"><a class="toclink" href="#7-trail-state-per-portfolio-mutable-each-tick">7. Trail State (Per Portfolio, Mutable Each Tick)</a></h2>
+<p>Initialised by <code>init_trail_state(state, risk)</code> on the first tick any leg is active:</p>
+<pre><code class="language-python">state[&quot;trail_state&quot;] = {
+    &quot;sl&quot;: {
+        &quot;current_val&quot;: risk[&quot;p_sl_val&quot;],   # effective SL threshold (decreases as profit grows)
+        &quot;anchor_pnl&quot;:  0.0,
+        &quot;active&quot;:      True,
+    },
+    &quot;target&quot;: {
+        &quot;active&quot;:       False,             # True once PnL &gt;= when_profit_reach
+        &quot;current_stop&quot;: 0.0,               # locked profit floor (increases)
+        &quot;anchor_pnl&quot;:   0.0,
+    },
+}
+</code></pre>
+<hr />
+<h2 id="8-evaluation-order-per-tick"><a class="toclink" href="#8-evaluation-order-per-tick">8. Evaluation Order (Per-Tick)</a></h2>
+<pre><code>For each tick:
+  1. check_global_user_limits()            ← cross-portfolio user-level limits
+  2. For each portfolio:
+     a. init_trail_state()                 ← first tick only
+     b. check_portfolio_sl_tgt()
+          i.   Trailing SL ratchet         ← tighten SL if PnL improved
+          ii.  Fixed SL condition check    ← Combined Loss / Premium / Underlying / Range
+          iii. Trailing Target activation  ← lock floor when PnL reaches threshold
+          iv.  Trailing Target ratchet     ← raise floor as PnL keeps improving
+          v.   Trailing Target exit check  ← fire if PnL drops to floor
+          vi.  Fixed Target condition check
+     c. handle_portfolio_delay_and_action()
+          - If p_delay_pending: check elapsed vs configured delay
+          - If elapsed: dispatch action (force_sqoff / cross-portfolio flags)
+     d. process_portfolio_sqoff()          ← close legs (full or filtered) if force_sqoff
+     e. MoveSLManager tick                 ← reposition individual leg SLs if triggered
+</code></pre>
+<hr />
+<h2 id="9-key-log-events-reference"><a class="toclink" href="#9-key-log-events-reference">9. Key Log Events Reference</a></h2>
+<table>
+<thead>
+<tr>
+<th>Log Message</th>
+<th>When It Fires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Combined Premium hit - portfolio stoploss hit \| PnL=X \| Limit=Y \| Premium_SL=Z \| Qty=100</code></td>
+<td>Combined Premium SL fired — PnL crossed <code>-(value × QTY)</code> threshold</td>
+</tr>
+<tr>
+<td><code>Combined Premium hit - portfolio profit hit \| PnL=X \| Target=Y \| Premium_Target=Z \| Qty=100</code></td>
+<td>Combined Premium Target fired — PnL crossed <code>value × QTY</code> threshold</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_SQOFF \| Reason=STOPLOSS</code></td>
+<td>All legs closed — full SL exit</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_SQOFF \| Reason=TARGET</code></td>
+<td>All legs closed — target reached</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_SQOFF \| Reason=TARGET_TRAIL</code></td>
+<td>All legs closed — trailing target floor breached</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_PARTIAL_SQOFF \| Reason=STOPLOSS \| Filter=LOSS_LEGS_ONLY</code></td>
+<td>Partial close — only loss legs closed, profit legs kept running</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_PARTIAL_SQOFF \| Reason=STOPLOSS \| Filter=PROFIT_LEGS_ONLY</code></td>
+<td>Partial close — only profit legs closed, loss legs kept running</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_REEXECUTE \| Reason=STOPLOSS \| Count=N</code></td>
+<td>Re-entry after SL hit</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_REEXECUTE \| Reason=TARGET \| Count=N</code></td>
+<td>Re-entry after target hit</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_DELAY_PENDING \| Reason=STOPLOSS \| Delay=Ns</code></td>
+<td>SL hit but waiting for delay confirmation</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_DELAY_PENDING \| Reason=TARGET \| Delay=Ns</code></td>
+<td>Target hit but waiting for delay confirmation</td>
+</tr>
+<tr>
+<td><code>PORTFOLIO_DELAY_CLEARED \| Condition persistent=False</code></td>
+<td>Condition cleared before delay elapsed; reset</td>
+</tr>
+<tr>
+<td><code>TRAIL_SL_UPDATED \| Steps=N \| Combined_SL=X \| PnL=Y</code></td>
+<td>Trailing SL ratcheted tighter</td>
+</tr>
+<tr>
+<td><code>TRAIL_TARGET_ACTIVATED \| Lock=X \| WhenReach=Y</code></td>
+<td>Trailing target floor locked for first time</td>
+</tr>
+<tr>
+<td><code>TRAIL_TARGET_UPDATED \| current_stop=X</code></td>
+<td>Trailing target floor raised</td>
+</tr>
+<tr>
+<td><code>MOVE_SL_TO_COST \| Action={mode} \| LegID={id}</code></td>
+<td>Leg SL repositioned to entry/LTP</td>
+</tr>
+<tr>
+<td><code>STRIKED LOCKED {strike} {CP} AT PRICE {price}</code></td>
+<td>ReExecute at Entry Price — lock recorded, waiting for re-entry</td>
+</tr>
+<tr>
+<td><code>REEXECUTING AS STRIKE {X} GOT {price} AGAIN</code></td>
+<td>SameStrike re-entry condition met</td>
+</tr>
+<tr>
+<td><code>START_OTHER_PORTFOLIO \| Triggering={src} \| Target={dst}</code></td>
+<td>Start Other Portfolio action dispatched</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-global-user-limits-separate-from-portfolio-sltgt"><a class="toclink" href="#10-global-user-limits-separate-from-portfolio-sltgt">10. Global User Limits <em>(separate from portfolio SL/TGT)</em></a></h2>
+<p>Checked via <code>check_global_user_limits()</code> across all portfolios per user per tick.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Format</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MaxLoss</code></td>
+<td>Numeric string</td>
+<td>Sqoff all user portfolios when combined PnL ≤ −MaxLoss</td>
+</tr>
+<tr>
+<td><code>MaxProfit</code></td>
+<td>Numeric string</td>
+<td>Sqoff all user portfolios when combined PnL ≥ MaxProfit</td>
+</tr>
+<tr>
+<td><code>ProfitLock</code></td>
+<td><code>"reach~lock~every~trail"</code></td>
+<td>Trailing profit lock across all user portfolios</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Profit Lock logic:</strong></p>
+<pre><code>Phase 1 — Activate when combined_pnl &gt;= reach
+    current_lock = lock;  anchor = reach
+Phase 2 — Exit when combined_pnl &lt;= current_lock
+    sqoff all user portfolios → GLOBAL_TRAIL_STOP
+Phase 3 — Ratchet when gain = combined_pnl - anchor &gt;= every
+    current_lock += steps * trail;  anchor advances
+</code></pre>
+<hr />
+<h2 id="11-validator-rules"><a class="toclink" href="#11-validator-rules">11. Validator Rules</a></h2>
+<table>
+<thead>
+<tr>
+<th>Config Field</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stoploss.value</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.delay</code></td>
+<td>Must be integer ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.reexecute_count</code></td>
+<td>Must be integer ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.underlying_below</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.underlying_above</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.trailing.enabled</code></td>
+<td>Must be bool</td>
+</tr>
+<tr>
+<td><code>stoploss.trailing.trail_every</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.trailing.trail_by</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>stoploss.move_sl_to_cost.safety_seconds</code></td>
+<td>Must be integer ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.value</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.delay</code></td>
+<td>Must be integer ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.reexecute_count</code></td>
+<td>Must be integer ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.trailing.enabled</code></td>
+<td>Must be bool</td>
+</tr>
+<tr>
+<td><code>target.trailing.lock_min_profit</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.trailing.when_profit_reach</code></td>
+<td>Must be numeric ≥ 0; should be ≥ lock_min_profit</td>
+</tr>
+<tr>
+<td><code>target.trailing.trail_every</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>target.trailing.trail_by</code></td>
+<td>Must be numeric ≥ 0</td>
+</tr>
+<tr>
+<td><code>UserSettings.MaxLoss</code></td>
+<td>Must be numeric</td>
+</tr>
+<tr>
+<td><code>UserSettings.MaxProfit</code></td>
+<td>Must be numeric</td>
+</tr>
+<tr>
+<td><code>UserSettings.ProfitLock</code></td>
+<td>Must match <code>reach~lock~every~trail</code> regex</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+</body>
+</html>

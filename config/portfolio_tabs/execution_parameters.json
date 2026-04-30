@@ -1,0 +1,208 @@
+{
+  "tab_id": "pf-exec",
+  "tab_label": "Execution Parameters",
+  "description": "Controls how and when every leg in the portfolio enters the market. Divided into Execution Settings, Execution Mode, and Timing.",
+  "fieldsets": [
+    {
+      "id": "execution_settings",
+      "legend": "Execution Settings",
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "product",
+          "label": "Product",
+          "type": "select",
+          "default": "MIS",
+          "options": ["MIS", "NRML"],
+          "backend_enabled": false,
+          "html_id": "pf-m-product",
+          "description": "Broker order product type. MIS = intraday (lower margin), NRML = carry-forward (full margin)."
+        },
+        {
+          "key": "strategy_tag",
+          "label": "Strategy Tag",
+          "type": "select",
+          "default": "Default",
+          "options_from": "portfolio.strategy_names",
+          "backend_enabled": false,
+          "html_id": "pf-m-strattag",
+          "description": "Links this portfolio to a Strategy defined in Strategies config. Required for live execution."
+        },
+        {
+          "key": "on_leg_fail",
+          "label": "If One or More Leg Fail",
+          "type": "select",
+          "default": "KeepPlacedLegs",
+          "options": ["KeepPlacedLegs", "CancelPlacedLegs"],
+          "backend_enabled": false,
+          "html_id": "pf-m-legfail",
+          "description": "KeepPlacedLegs = keep successful legs open. CancelPlacedLegs = roll back all legs on any failure."
+        }
+      ]
+    },
+    {
+      "id": "execution_mode",
+      "legend": "Execution Mode",
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "execution_mode",
+          "label": "Portfolio Execution Mode",
+          "type": "select",
+          "default": "Start time",
+          "options": [
+            { "value": "Start time", "label": "Start time" },
+            { "value": "Manual", "label": "Manual" },
+            { "value": "CombinedPremium", "label": "CombinedPremium" },
+            { "value": "UnderlyingLevel", "label": "UnderlyingLevel" },
+            { "value": "CombinedPremiumCrossOver", "label": "CombinedPremiumCrossOver" }
+          ],
+          "backend_enabled": false,
+          "html_id": "pf-m-execmode",
+          "description": "Master trigger: Start time = enter at start, Manual = wait for external trigger, others = dynamic condition-based entry."
+        },
+        {
+          "key": "based_on",
+          "label": "Based On",
+          "type": "select",
+          "default": "None",
+          "options": ["None", "DayOpen", "StartTime"],
+          "backend_enabled": false,
+          "html_id": "pf-m-basedon",
+          "visible_when": "execution_mode not in ['Start time', 'Manual']",
+          "description": "Reference point for dynamic entry target. None = absolute Entry Price, DayOpen/StartTime = captured reference + rounding + adjust."
+        },
+        {
+          "key": "entry_price",
+          "label": "Entry Price",
+          "type": "number",
+          "default": 0,
+          "min": 0,
+          "step": 0.01,
+          "backend_enabled": false,
+          "html_id": "pf-m-entryprice",
+          "visible_when": "based_on == 'None' and execution_mode not in ['Start time', 'Manual']",
+          "description": "Absolute target level when Based On = None. System waits until premium/index reaches this price."
+        },
+        {
+          "key": "rounding_value",
+          "label": "Rounding Value",
+          "type": "number",
+          "default": 0,
+          "min": 0,
+          "step": 0.5,
+          "backend_enabled": false,
+          "html_id": "pf-m-rounding",
+          "visible_when": "based_on in ['DayOpen', 'StartTime']",
+          "description": "Snaps captured ref_val to nearest grid. <1 = fractional threshold, >=1 = nearest multiple."
+        },
+        {
+          "key": "adjust_price",
+          "label": "Adjust Price",
+          "type": "text",
+          "default": "",
+          "backend_enabled": false,
+          "html_id": "pf-m-adjustprice",
+          "visible_when": "based_on in ['DayOpen', 'StartTime']",
+          "description": "Expression applied to rounded ref_val. E.g. '+10', '-15', '+5%'. Percentage uses 1-pct/100 formula."
+        }
+      ]
+    },
+    {
+      "id": "timing",
+      "legend": "Timing",
+      "backend_enabled": false,
+      "note": "These are execution-level timing fields (intraday windows). Backtest date range is in the separate Timing tab.",
+      "fields": [
+        {
+          "key": "run_on_days",
+          "label": "Run On Days",
+          "type": "select",
+          "default": "All Days",
+          "options": ["All Days", "Mon - Fri", "Mon - Thu", "Custom"],
+          "backend_enabled": false,
+          "html_id": "pf-m-runondays",
+          "description": "Which calendar days the portfolio is permitted to run. Custom reveals Mon-Sun checkboxes."
+        },
+        {
+          "key": "selected_days",
+          "label": "Selected Days",
+          "type": "checkbox_group",
+          "default": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          "options": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+          "backend_enabled": false,
+          "visible_when": "run_on_days == 'Custom'",
+          "description": "Individual day selection when Run On Days = Custom."
+        },
+        {
+          "key": "start_time",
+          "label": "Start Time",
+          "type": "time",
+          "default": "09:30:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-starttime",
+          "description": "Earliest intraday time legs can enter. Each leg can override with its own start time."
+        },
+        {
+          "key": "end_time",
+          "label": "End Time",
+          "type": "time",
+          "default": "16:15:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-endtime",
+          "description": "Cutoff for new entries. Existing positions continue to be monitored for SL/TP."
+        },
+        {
+          "key": "sqoff_time_exec",
+          "label": "SqOff Time",
+          "type": "time",
+          "default": "16:15:00",
+          "backend_enabled": false,
+          "html_id": "pf-m-sqofftime-exec",
+          "description": "Intraday forced exit time. All remaining open positions are squared off."
+        },
+        {
+          "key": "start_day",
+          "label": "Start Day",
+          "type": "select",
+          "default": "Before Expiry",
+          "options": ["Before Expiry", "On Expiry", "Fixed"],
+          "backend_enabled": false,
+          "html_id": "pf-m-startday",
+          "description": "When to begin relative to expiry (for options scheduling)."
+        },
+        {
+          "key": "start_day_offset",
+          "label": "Start Day Offset",
+          "type": "number",
+          "default": 1,
+          "min": 0,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-startdayoff",
+          "description": "Number of days offset for Start Day (e.g. 1 = one day before expiry)."
+        },
+        {
+          "key": "sqoff_day",
+          "label": "SqOff Day",
+          "type": "number",
+          "default": 0,
+          "min": 0,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-sqoffday",
+          "description": "Days before expiry to squareoff (0 = on expiry day)."
+        },
+        {
+          "key": "holiday_handling",
+          "label": "If Holiday, Use Previous Day for Start / Next Day for SqOff, Else no Entry",
+          "type": "checkbox",
+          "default": false,
+          "backend_enabled": false,
+          "html_id": "pf-m-holiday",
+          "description": "Adjust start/squareoff around holidays automatically."
+        }
+      ]
+    }
+  ]
+}

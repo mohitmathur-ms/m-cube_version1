@@ -1050,11 +1050,14 @@ tr:last-child td {
     border-radius: 6px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
     width: 640px;
-    max-width: 90vw;
-    max-height: 80vh;
+    max-width: 94vw;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
     animation: modalSlideIn 0.2s ease;
+}
+.modal-dialog.modal-wide {
+    width: 1200px;
 }
 
 .modal-header {
@@ -1142,6 +1145,136 @@ tr:last-child td {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+}
+
+/* ─── UI-only fields (not yet wired to backend) ────────────────────────── */
+.pf-ui-only {
+    background: #fff0f0 !important;
+}
+.pf-ui-only select,
+.pf-ui-only input {
+    background: #fff0f0 !important;
+}
+.pf-fieldset.pf-ui-only {
+    border-color: #e8a0a0;
+}
+.pf-fieldset.pf-ui-only legend {
+    color: #c44;
+}
+.pf-field-row.pf-ui-only .pf-field-label {
+    color: #c44;
+}
+.pf-top-field.pf-ui-only {
+    background: #fff0f0;
+    border-radius: 3px;
+    padding: 2px 4px;
+}
+.pf-top-field.pf-ui-only .form-control,
+.pf-top-field.pf-ui-only input[type="checkbox"] {
+    background: #fff0f0 !important;
+}
+
+/* ─── Inline Leg Table ──────────────────────────────────────────────────── */
+.leg-inline-table {
+    width: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    border-collapse: collapse;
+}
+.leg-inline-table th {
+    background: #ebeef2;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 5px 6px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-color);
+}
+.leg-inline-table td {
+    padding: 4px 5px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-light);
+}
+.leg-inline-table select,
+.leg-inline-table input[type="number"] {
+    font-size: 0.78rem;
+    padding: 2px 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: #fff;
+}
+.leg-inline-table select { min-width: 80px; }
+.leg-inline-table input[type="number"] { width: 58px; }
+.leg-inline-table .leg-del-btn {
+    color: var(--danger);
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.85rem;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+}
+.leg-inline-table .leg-copy-btn {
+    cursor: pointer;
+    font-size: 0.78rem;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text-secondary);
+}
+.leg-inline-table .leg-copy-btn:hover { background: var(--bg-hover); }
+
+/* ─── Portfolio Modal Fieldsets ─────────────────────────────────────────── */
+.pf-fieldset {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 0;
+}
+.pf-fieldset legend {
+    font-weight: 600;
+    font-size: 0.84rem;
+    padding: 0 6px;
+    color: var(--text-primary);
+}
+.pf-fieldset .pf-field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.pf-fieldset .pf-field-row:last-child { margin-bottom: 0; }
+.pf-fieldset .pf-field-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 120px;
+    white-space: nowrap;
+}
+.pf-fieldset .pf-field-label.wide { min-width: 170px; }
+.pf-fieldset .form-control {
+    font-size: 0.82rem;
+    padding: 4px 8px;
+}
+
+/* ─── Portfolio Modal Footer ───────────────────────────────────────────── */
+.pf-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color);
+    background: #f8f9fa;
+    border-radius: 0 0 6px 6px;
+}
+.pf-modal-footer .footer-label {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.pf-modal-footer .form-control {
+    font-size: 0.82rem;
+    padding: 5px 8px;
 }
 
 /* ─── Slot Modal Sub-tabs ────────────────────────────────────────────────── */

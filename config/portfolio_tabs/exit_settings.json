@@ -1,0 +1,43 @@
+{
+  "tab_id": "pf-exit",
+  "tab_label": "Exit Settings",
+  "description": "Controls exit order type, leg exit ordering, and post-completion actions.",
+  "fieldsets": [
+    {
+      "id": "exit_settings",
+      "legend": null,
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "exit_order_type",
+          "label": "Exit Order Type",
+          "type": "select",
+          "default": "MARKET",
+          "options": ["MARKET", "Limit", "SL_Limit"],
+          "backend_enabled": false,
+          "html_id": "pf-m-exit-ordertype",
+          "description": "Order type for exits. Only MARKET is active in backtester; Limit and SL_Limit are reserved for future live trading."
+        },
+        {
+          "key": "exit_sell_first",
+          "label": "Exit Sell Legs First",
+          "type": "checkbox",
+          "default": true,
+          "backend_enabled": false,
+          "html_id": "pf-m-exit-sellfirst",
+          "description": "When checked, SELL legs are closed before BUY legs during batch squareoff events."
+        },
+        {
+          "key": "on_portfolio_complete",
+          "label": "On Portfolio Complete (Not Applicable on Manual SqOff)",
+          "type": "select",
+          "default": "None",
+          "options": ["None", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio"],
+          "backend_enabled": false,
+          "html_id": "pf-m-exit-oncomplete",
+          "description": "Action to take when all legs in the portfolio have completed. Not triggered on manual squareoff."
+        }
+      ]
+    }
+  ]
+}

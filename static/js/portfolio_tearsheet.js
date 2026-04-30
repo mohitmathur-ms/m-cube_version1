@@ -99,6 +99,7 @@ const PortfolioTearsheet = {
                 <td>${pct}%</td>
                 <td>${sr.trades}</td>
                 <td>${sr.win_rate.toFixed(1)}%</td>
+                <td>${(sr.win_pct_days || 0).toFixed(1)}%</td>
             </tr>`;
         }).join("");
 
@@ -108,7 +109,8 @@ const PortfolioTearsheet = {
                 ${App.metricHTML("Final Balance", App.currency(r.final_balance))}
                 ${App.metricHTML("Total P&L", App.currency(r.total_pnl), r.total_return_pct)}
                 ${App.metricHTML("Total Trades", r.total_trades)}
-                ${App.metricHTML("Win Rate", r.win_rate.toFixed(1) + "%")}
+                ${App.metricHTML("Win Rate (Trades)", r.win_rate.toFixed(1) + "%")}
+                ${App.metricHTML("Win% (Days)", (r.win_pct_days || 0).toFixed(1) + "%")}
                 ${App.metricHTML("Max Drawdown", r.max_drawdown.toFixed(2) + "%")}
             </div>
 
@@ -117,7 +119,7 @@ const PortfolioTearsheet = {
             <h3 style="margin: 20px 0 10px;">Strategy Contribution</h3>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>Strategy</th><th>P&L</th><th>Contribution</th><th>Trades</th><th>Win Rate</th></tr></thead>
+                    <thead><tr><th>Strategy</th><th>P&L</th><th>Contribution</th><th>Trades</th><th>Win Rate (Trades)</th><th>Win% (Days)</th></tr></thead>
                     <tbody>${contribRows}</tbody>
                 </table>
             </div>
@@ -275,6 +277,7 @@ const PortfolioTearsheet = {
                 <td class="${pnlCls}">${App.currency(sr.pnl)}</td>
                 <td>${sr.trades}</td>
                 <td>${sr.win_rate.toFixed(1)}%</td>
+                <td>${(sr.win_pct_days || 0).toFixed(1)}%</td>
                 <td>${App.currency(avgWin)}</td>
                 <td>${App.currency(avgLoss)}</td>
                 <td>${App.currency(best)}</td>
@@ -288,7 +291,7 @@ const PortfolioTearsheet = {
                 <table>
                     <thead><tr>
                         <th>Strategy</th><th>Instrument</th><th>P&L</th><th>Trades</th>
-                        <th>Win Rate</th><th>Avg Win</th><th>Avg Loss</th><th>Best</th><th>Worst</th>
+                        <th>Win Rate (Trades)</th><th>Win% (Days)</th><th>Avg Win</th><th>Avg Loss</th><th>Best</th><th>Worst</th>
                     </tr></thead>
                     <tbody>${rows}</tbody>
                 </table>

@@ -1,0 +1,35 @@
+{
+  "tab_id": "pf-monitoring",
+  "tab_label": "Monitoring",
+  "description": "Controls how leg-level and portfolio-level SL/Target/Trailing conditions are evaluated — Realtime, MinuteClose, or Interval.",
+  "backend_enabled": false,
+  "fieldsets": [
+    {
+      "id": "leg_target_monitoring",
+      "legend": "Leg Target Monitoring",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "leg_target_monitoring", "label": "Target", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-legtgt", "backend_enabled": false, "description": "How leg-level target conditions are evaluated." },
+        { "key": "leg_trailing_monitoring", "label": "Trailing", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-legtrail", "backend_enabled": false, "description": "How leg-level trailing stop is evaluated." }
+      ]
+    },
+    {
+      "id": "leg_stoploss_monitoring",
+      "legend": "Leg Stoploss Monitoring",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "leg_sl_monitoring", "label": "SL", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-legsl", "backend_enabled": false, "description": "How leg-level stoploss conditions are evaluated." },
+        { "key": "leg_sl_trailing_monitoring", "label": "Trailing", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-legsltrail", "backend_enabled": false, "description": "How leg-level trailing SL is evaluated." }
+      ]
+    },
+    {
+      "id": "combined_target_sl_monitoring",
+      "legend": "Combined Target SL Monitoring",
+      "backend_enabled": false,
+      "fields": [
+        { "key": "combined_target_monitoring", "label": "Target Monitoring", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-combtgt", "backend_enabled": false, "description": "How portfolio-level combined target is evaluated." },
+        { "key": "combined_sl_monitoring", "label": "SL Monitoring", "type": "select", "default": "Realtime", "options": ["Realtime","MinuteClose","Interval"], "html_id": "pf-m-mon-combsl", "backend_enabled": false, "description": "How portfolio-level combined SL is evaluated." }
+      ]
+    }
+  ]
+}

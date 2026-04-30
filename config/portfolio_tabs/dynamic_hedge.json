@@ -1,0 +1,100 @@
+{
+  "tab_id": "pf-dynhedge",
+  "tab_label": "Dynamic Hedge",
+  "description": "Auto-opens a protective hedge leg when a parent leg with 'Hedge Required' enters. Two modes: PremiumBased (OTM scan + premium filter) and DistanceBased (exact offset).",
+  "backend_enabled": false,
+  "fieldsets": [
+    {
+      "id": "dynamic_hedge_settings",
+      "legend": "Dynamic Hedge Settings",
+      "backend_enabled": false,
+      "fields": [
+        {
+          "key": "hedge_type",
+          "label": "Dynamic Hedge Type",
+          "type": "select",
+          "default": "PremiumBased",
+          "options": ["PremiumBased", "DistanceBased"],
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-type",
+          "description": "PremiumBased = scan OTM distance window filtered by premium. DistanceBased = exact parent_strike +/- fixed_dist."
+        },
+        {
+          "key": "sqoff_leg_on",
+          "label": "SqOff Leg On",
+          "type": "select",
+          "default": "LegSqOff",
+          "options": ["LegSqOff", "PortfolioSqOff"],
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-sqoff",
+          "description": "LegSqOff = hedge exits when parent exits. PortfolioSqOff = hedge stays alive until portfolio SL/Target/EOD."
+        },
+        {
+          "key": "hedge_distance_strike_min",
+          "label": "Hedge Distance from Strike (Min)",
+          "type": "number",
+          "default": 10,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-distmin",
+          "visible_when": "hedge_type == 'PremiumBased'",
+          "description": "Min distance from parent strike where candidate search begins. CALL: parent+min, PUT: parent-min."
+        },
+        {
+          "key": "hedge_distance_strike_max",
+          "label": "Hedge Distance from Strike (Max)",
+          "type": "number",
+          "default": 20,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-distmax",
+          "visible_when": "hedge_type == 'PremiumBased'",
+          "description": "Outer boundary of search window."
+        },
+        {
+          "key": "premium_min",
+          "label": "Min Premium",
+          "type": "number",
+          "default": 0.05,
+          "min": 0,
+          "max": 100000,
+          "step": 0.01,
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-premmin",
+          "visible_when": "hedge_type == 'PremiumBased'",
+          "description": "Minimum acceptable market premium. Strikes below this are excluded."
+        },
+        {
+          "key": "premium_max",
+          "label": "Max Premium",
+          "type": "number",
+          "default": 40.00,
+          "min": 0,
+          "max": 100000,
+          "step": 0.01,
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-premmax",
+          "visible_when": "hedge_type == 'PremiumBased'",
+          "description": "Maximum acceptable premium — caps hedge cost."
+        },
+        {
+          "key": "hedge_fixed_min_distance",
+          "label": "Hedge Fixed Min Distance",
+          "type": "number",
+          "default": 50,
+          "min": 0,
+          "max": 10000,
+          "step": 1,
+          "backend_enabled": false,
+          "html_id": "pf-m-dh-fixeddist",
+          "visible_when": "hedge_type == 'DistanceBased'",
+          "description": "Fixed offset from parent strike. No premium filter. Strike snapped to nearest strike_step."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "tab_id": "pf-timing",
+  "tab_label": "Timing",
+  "description": "Date range and squareoff timing for the portfolio.",
+  "fieldsets": [
+    {
+      "id": "timing_settings",
+      "legend": "Timing",
+      "fields": [
+        {
+          "key": "start_date",
+          "label": "Start Date",
+          "type": "date",
+          "default": null,
+          "backend_enabled": true,
+          "html_id": "pf-m-start",
+          "description": "First date for backtest data range. Overrides per-leg dates."
+        },
+        {
+          "key": "end_date",
+          "label": "End Date",
+          "type": "date",
+          "default": null,
+          "backend_enabled": true,
+          "html_id": "pf-m-end",
+          "description": "Last date for backtest data range. Overrides per-leg dates."
+        },
+        {
+          "key": "squareoff_time",
+          "label": "SqOff Time",
+          "type": "time",
+          "default": null,
+          "backend_enabled": true,
+          "html_id": "pf-m-sqoff",
+          "description": "Force-exit all open positions at this time. Used by backtest engine."
+        },
+        {
+          "key": "squareoff_tz",
+          "label": "Squareoff TZ",
+          "type": "select",
+          "default": "UTC",
+          "options": [
+            "UTC", "America/New_York", "America/Chicago", "America/Los_Angeles",
+            "Europe/London", "Europe/Berlin", "Asia/Tokyo", "Asia/Singapore", "Asia/Kolkata"
+          ],
+          "backend_enabled": true,
+          "html_id": "pf-m-sqofftz",
+          "description": "Timezone for the squareoff time."
+        }
+      ]
+    }
+  ]
+}

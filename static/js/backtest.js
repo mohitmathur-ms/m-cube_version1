@@ -798,6 +798,7 @@ const Backtest = {
                     <td class="${pnlClass}">${r.total_return_pct >= 0 ? "+" : ""}${r.total_return_pct.toFixed(2)}%</td>
                     <td>${r.total_trades}</td>
                     <td>${r.win_rate.toFixed(1)}%</td>
+                    <td>${(r.win_pct_days || 0).toFixed(1)}%</td>
                     <td>${r.wins}</td>
                     <td>${r.losses}</td>
                 </tr>`;
@@ -827,7 +828,8 @@ const Backtest = {
                         ${App.metricHTML("Final Balance", App.currency(r.final_balance))}
                         ${App.metricHTML("Total P&L", App.currency(r.total_pnl), pnlDelta)}
                         ${App.metricHTML("Total Trades", r.total_trades)}
-                        ${App.metricHTML("Win Rate", r.win_rate.toFixed(1) + "%")}
+                        ${App.metricHTML("Win Rate (Trades)", r.win_rate.toFixed(1) + "%")}
+                        ${App.metricHTML("Win% (Days)", (r.win_pct_days || 0).toFixed(1) + "%")}
                         ${App.metricHTML("Wins / Losses", `${r.wins} / ${r.losses}`)}
                     </div>
                 `;
@@ -892,7 +894,7 @@ const Backtest = {
                                 <tr>
                                     <th>Strategy</th><th>Starting Capital</th><th>Final Balance</th>
                                     <th>Total P&L</th><th>Return %</th><th>Trades</th>
-                                    <th>Win Rate</th><th>Wins</th><th>Losses</th>
+                                    <th>Win Rate (Trades)</th><th>Win% (Days)</th><th>Wins</th><th>Losses</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>

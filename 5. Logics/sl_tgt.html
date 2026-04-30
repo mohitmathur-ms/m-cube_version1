@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL & Target Logic Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* file-specific aliases */
+    --accent-blue: var(--accent);
+    --accent-green: var(--accent2);
+    --accent-red: var(--danger);
+    --accent-yellow: var(--warn);
+    --accent-purple: #c084fc;
+    --accent-orange: #fb923c;
+    --text-muted: var(--muted);
+    --text-dim: var(--muted);
+    --valid: rgba(126,214,160,.08);
+    --valid-text: var(--accent2);
+    --invalid: rgba(233,96,96,.08);
+    --invalid-text: var(--danger);
+    --warn-bg: rgba(247,201,72,.08);
+    --warn-text: var(--warn);
+    --badge-sl: rgba(233,96,96,.12);
+    --badge-sl-text: var(--danger);
+    --badge-tgt: rgba(91,124,250,.12);
+    --badge-tgt-text: var(--accent);
+    --badge-trail: rgba(126,214,160,.12);
+    --badge-trail-text: var(--accent2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  /* ── Layout ─────────────────────────────────────────── */
+  .layout { display: flex; min-height: 100vh; }
+  nav {
+    width: 240px;
+    min-width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav .logo {
+    padding: 0 20px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  nav a {
+    display: block;
+    padding: 7px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  nav a:hover { color: var(--text); background: rgba(79,142,247,0.07); }
+  nav a.active { color: var(--accent-blue); border-left-color: var(--accent-blue); }
+  nav .nav-section {
+    padding: 14px 20px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  main {
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 1100px;
+  }
+  /* ── Typography ──────────────────────────────────────── */
+  h1 { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  h2 {
+    font-size: 18px; font-weight: 700; color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 28px 0 12px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--text-muted); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  p { color: var(--text-muted); margin-bottom: 12px; }
+  /* ── Level Headers ────────────────────────────────────── */
+  .level-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 48px 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .level-badge {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .level-badge.l1 { background: rgba(79,142,247,0.15); color: var(--accent-blue); border: 2px solid var(--accent-blue); }
+  .level-badge.l2 { background: rgba(62,207,142,0.15); color: var(--accent-green); border: 2px solid var(--accent-green); }
+  .level-badge.l3 { background: rgba(167,139,250,0.15); color: var(--accent-purple); border: 2px solid var(--accent-purple); }
+  .level-title { font-size: 17px; font-weight: 700; color: var(--text); }
+  .level-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  /* ── Eval Order Banner ──────────────────────────────── */
+  .eval-order {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .eval-step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px; font-weight: 600;
+  }
+  .eval-step.l3 { background: rgba(167,139,250,0.1); color: var(--accent-purple); }
+  .eval-step.l2 { background: rgba(62,207,142,0.1); color: var(--accent-green); }
+  .eval-step.l1 { background: rgba(79,142,247,0.1); color: var(--accent-blue); }
+  .eval-arrow { color: var(--text-dim); font-size: 18px; padding: 0 8px; }
+  .eval-note { width: 100%; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+  /* ── Tables ──────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: 12px 0 24px; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  td.key { font-family: 'Fira Code', 'Cascadia Code', monospace; color: var(--accent-yellow); font-size: 12px; }
+  td strong { color: var(--text); font-weight: 600; }
+  /* ── Code blocks ─────────────────────────────────────── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12.5px;
+    color: #c9d1d9;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+    line-height: 1.75;
+  }
+  .kw { color: #ff7b72; }
+  .fn { color: #79c0ff; }
+  .cm { color: var(--text-dim); font-style: italic; }
+  .num { color: #a5d6ff; }
+  .str { color: #a8d8a8; }
+  .op { color: var(--accent-yellow); }
+  /* ── Validity badges ─────────────────────────────────── */
+  .valid { background: var(--valid); color: var(--valid-text); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .invalid { background: var(--invalid); color: var(--invalid-text); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .warn { background: var(--warn); color: var(--warn-text); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  /* ── Callout boxes ────────────────────────────────────── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout.info { background: rgba(79,142,247,0.08); border-color: var(--accent-blue); color: var(--text-muted); }
+  .callout.warn { background: rgba(245,200,66,0.08); border-color: var(--accent-yellow); color: var(--text-muted); }
+  .callout.danger { background: rgba(242,107,107,0.08); border-color: var(--accent-red); color: var(--text-muted); }
+  .callout.success { background: rgba(62,207,142,0.08); border-color: var(--accent-green); color: var(--text-muted); }
+  .callout strong { color: var(--text); }
+  /* ── Inline tags ─────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag.sl { background: var(--badge-sl); color: var(--badge-sl-text); }
+  .tag.tgt { background: var(--badge-tgt); color: var(--badge-tgt-text); }
+  .tag.trail { background: var(--badge-trail); color: var(--badge-trail-text); }
+  .tag.action { background: rgba(167,139,250,0.12); color: var(--accent-purple); }
+  code { font-family: 'Fira Code', monospace; background: var(--code-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 12px; color: var(--accent-yellow); }
+  /* ── Fill formula box ────────────────────────────────── */
+  .formula {
+    background: var(--code-bg);
+    border: 1px solid var(--accent-blue);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .formula .line { margin: 4px 0; }
+  .formula .comment { color: var(--text-dim); font-size: 12px; }
+  .formula .highlight { color: var(--accent-green); font-weight: 600; }
+  /* ── Log reference ───────────────────────────────────── */
+  .log-level {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .log-level.leg { background: rgba(79,142,247,0.12); color: var(--accent-blue); }
+  .log-level.portfolio { background: rgba(62,207,142,0.12); color: var(--accent-green); }
+  .log-level.user { background: rgba(167,139,250,0.12); color: var(--accent-purple); }
+  /* ── Action grid ─────────────────────────────────────── */
+  .action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 12px 0 24px;
+  }
+  .action-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .action-card .a-name { font-weight: 700; color: var(--text); font-size: 13px; margin-bottom: 4px; }
+  .action-card .a-code { font-family: monospace; font-size: 11px; color: var(--accent-yellow); margin-bottom: 6px; }
+  .action-card .a-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  /* ── Scrollbar ───────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* ── Page header ─────────────────────────────────────── */
+  .page-header { margin-bottom: 32px; }
+  .page-header h1 { margin-bottom: 4px; }
+  .page-header .subtitle { color: var(--text-muted); font-size: 14px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- Sidebar Navigation -->
+<nav>
+  <div class="logo">SL &amp; Target Reference</div>
+  <div class="nav-section">Overview</div>
+  <a href="#eval-order">Evaluation Order</a>
+  <div class="nav-section">Level 1 — Leg</div>
+  <a href="#leg-sl">SL Parameters</a>
+  <a href="#leg-trigger">Trigger Conditions</a>
+  <a href="#leg-fill">SL &amp; Target Fill Formula</a>
+  <a href="#leg-delay">SL Wait / Delay</a>
+  <a href="#leg-trail">Trailing SL</a>
+  <a href="#leg-actions">Actions (5 Types)</a>
+  <a href="#leg-combos">Valid Combinations</a>
+  <a href="#leg-invalid">Invalid Combinations</a>
+  <div class="nav-section">Level 2 — Portfolio</div>
+  <a href="#port-sl-types">SL Types</a>
+  <a href="#port-trail-sl">Trailing SL</a>
+  <a href="#port-tgt-types">Target Types</a>
+  <a href="#port-trail-tgt">Trailing Target</a>
+  <a href="#port-actions">Portfolio Actions</a>
+  <a href="#port-delay">Delay Logic</a>
+  <a href="#port-invalid">Impossible Combos</a>
+  <div class="nav-section">Level 3 — User</div>
+  <a href="#user-params">Parameters</a>
+  <a href="#user-logic">Logic</a>
+  <a href="#user-constraints">Constraints</a>
+  <div class="nav-section">Reference</div>
+  <a href="#logs">Log Entries</a>
+</nav>
+
+<!-- Main Content -->
+<main>
+
+<div class="page-header">
+  <h1>Stop-Loss &amp; Target Logic</h1>
+  <div class="subtitle">Complete reference for all SL/Target parameters across all three evaluation levels — triggers, fill pricing, trailing, actions, and valid combinations.</div>
+</div>
+
+<!-- EVAL ORDER -->
+<section id="eval-order">
+  <h2>Evaluation Order</h2>
+  <div class="eval-order">
+    <div class="eval-step l3"><span>3</span> User Level</div>
+    <div class="eval-arrow">→</div>
+    <div class="eval-step l2"><span>2</span> Portfolio Level</div>
+    <div class="eval-arrow">→</div>
+    <div class="eval-step l1"><span>1</span> Leg Level</div>
+    <div class="eval-note">Evaluated every <strong>1-second</strong> bar in this order. A higher-level limit that fires will <strong>force-square all lower-level legs immediately</strong> within the same second.</div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════ LEVEL 1 ═══ -->
+
+<div class="level-header">
+  <div class="level-badge l1">1</div>
+  <div>
+    <div class="level-title">Leg Level</div>
+    <div class="level-sub">Per-leg configuration in <code>portfolios.json</code> · Evaluated in <code>monitoring_bt.process_active_legs()</code></div>
+  </div>
+</div>
+
+<!-- Leg SL -->
+<section id="leg-sl">
+  <h2><span class="tag sl">SL</span> Leg SL Parameters</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Config Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SL Value</strong></td><td class="key">Stoploss %</td><td>Absolute option premium level. Position is flagged for exit when price crosses this.</td></tr>
+        <tr><td><strong>SL Wait (sec)</strong></td><td class="key">SL Wait (sec)</td><td>Seconds the condition must persist before exit executes. Clears automatically if condition reverses.</td></tr>
+        <tr><td><strong>On SL Actions</strong></td><td class="key">On SL Actions</td><td>List of action dicts (max 3 recommended). Evaluated after SL is confirmed and delay has elapsed.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3><span class="tag tgt">TARGET</span> Leg Target Parameters</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Config Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Target Value</strong></td><td class="key">Target %</td><td>Absolute premium level for profit exit.</td></tr>
+        <tr><td><strong>On Target Actions</strong></td><td class="key">On Target Actions</td><td>List of action dicts executed on target confirmation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Leg Trigger -->
+<section id="leg-trigger">
+  <h2>Trigger Conditions</h2>
+  <p>Triggers use raw <strong>bid/ask side high/low</strong> — not mid-price — sourced from 1-second bid/ask OHLC data.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Leg Direction</th><th><span class="tag sl">SL</span> Trigger</th><th><span class="tag tgt">TARGET</span> Trigger</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>SELL</strong></td>
+          <td><code>bid_high &gt;= sl_val</code></td>
+          <td><code>bid_low &lt;= tgt_val</code></td>
+        </tr>
+        <tr>
+          <td><strong>BUY</strong></td>
+          <td><code>ask_low &lt;= sl_val</code></td>
+          <td><code>ask_high &gt;= tgt_val</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout info">
+    <strong>Rationale:</strong> For a SELL position, risk is the option price rising — the bid side going high is the earliest directional signal. For a BUY position, risk is the price falling — the ask side going low signals the breach. Using raw bid/ask avoids mid-price smoothing which can delay triggers by up to half a spread.
+  </div>
+</section>
+
+<!-- Fill Price -->
+<section id="leg-fill">
+  <h2>SL &amp; Target Fill Price Formula</h2>
+  <p>The same VWAP-based formula applies to <strong>both SL and Target</strong> exits:</p>
+  <div class="formula">
+    <div class="line comment">-- Universal formula --</div>
+    <div class="line"><span class="highlight">exit_price = vwap  if  vwap &gt; hit_price  else  hit_price</span></div>
+  </div>
+  <div class="table-wrap" style="margin-top:12px">
+    <table>
+      <thead><tr><th>Event</th><th>Direction</th><th>Hit Price</th><th>VWAP Used</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag sl">SL</span></td><td><strong>SELL</strong></td><td><code>bid_high</code></td><td><code>ask_vwap</code> (buying back at ask)</td></tr>
+        <tr><td><span class="tag sl">SL</span></td><td><strong>BUY</strong></td><td><code>ask_low</code></td><td><code>bid_vwap</code> (selling at bid)</td></tr>
+        <tr><td><span class="tag tgt">TARGET</span></td><td><strong>SELL</strong></td><td><code>bid_low</code></td><td><code>ask_vwap</code> (buying back at ask)</td></tr>
+        <tr><td><span class="tag tgt">TARGET</span></td><td><strong>BUY</strong></td><td><code>ask_high</code></td><td><code>bid_vwap</code> (selling at bid)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre><span class="cm"># SL   — SELL:  exit = ask_vwap if ask_vwap &gt; bid_high  else bid_high</span>
+<span class="cm"># SL   — BUY:   exit = bid_vwap if bid_vwap &gt; ask_low   else ask_low</span>
+<span class="cm"># TGT  — SELL:  exit = ask_vwap if ask_vwap &gt; bid_low   else bid_low</span>
+<span class="cm"># TGT  — BUY:   exit = bid_vwap if bid_vwap &gt; ask_high  else ask_high</span></pre>
+  <div class="callout success">
+    <strong>Conservative fill model:</strong> If the second's VWAP is higher than the trigger-level price (bid/ask H or L that fired the condition), the VWAP is used. Otherwise the trigger-level price itself is the fill. This gives the worst-case, realistic fill for both SL and Target exits.
+  </div>
+</section>
+
+<!-- Delay -->
+<section id="leg-delay">
+  <h2>SL Wait / Delay Logic</h2>
+  <pre><span class="kw">On trigger second:</span>
+  delay_pending    = True
+  delay_start_time = current_dt
+
+<span class="kw">Each subsequent second:</span>
+  <span class="kw">if</span> condition reverses → delay_pending = <span class="num">False</span>  <span class="cm"># DELAY_CLEARED</span>
+  <span class="kw">elif</span> elapsed &lt; SL_Wait_sec → skip (hold)
+  <span class="kw">else</span> → execute exit</pre>
+</section>
+
+<!-- Leg Trailing -->
+<section id="leg-trail">
+  <h2><span class="tag trail">TRAILING</span> Leg-Level Trailing SL</h2>
+  <p>Two mechanisms drive trailing SL at the leg level:</p>
+
+  <h3>A. Move SL to Cost</h3>
+  <p>Triggered when <strong>another leg</strong> in the same portfolio hits its SL or Target. Configured under <code>stoploss.move_sl_to_cost</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Enabled</strong></td><td class="key">enabled</td><td>Toggle</td></tr>
+        <tr><td><strong>Safety Seconds</strong></td><td class="key">safety_seconds</td><td>Minimum elapsed seconds from market open before move activates</td></tr>
+        <tr><td><strong>Action</strong></td><td class="key">action</td><td>How to reposition the SL (see table below)</td></tr>
+        <tr><td><strong>Trail After Move SL</strong></td><td class="key">trail_after_move_sl</td><td>Enable step-based tightening after SL is moved to cost</td></tr>
+        <tr><td><strong>No Move Buy Legs</strong></td><td class="key">no_move_buy_legs</td><td>Exclude BUY legs from SL repositioning</td></tr>
+        <tr><td><strong>Hit On Leg SL</strong></td><td class="key">hit_on_leg</td><td>Re-trigger on any subsequent leg SL hit (not just first)</td></tr>
+        <tr><td><strong>Hit On Leg Target</strong></td><td class="key">tgt_hit_on_leg</td><td>Also trigger when a leg hits its target</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h4>Move SL Actions</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Action</th><th>Logic</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Move Only for Profitable Legs</strong></td><td>If <code>pnl &gt; 0</code> → set <code>sl = entry_price</code>; loss-making legs untouched</td></tr>
+        <tr><td><strong>Move SL for All Legs Despite Loss / Profit</strong></td><td>Always set <code>sl = entry_price</code> for all remaining ACTIVE legs</td></tr>
+        <tr><td><strong>Move SL to LTP + Buffer for Loss Making Legs</strong></td><td>Profitable → <code>sl = entry_price</code>; Loss-making SELL → <code>sl = ltp × 1.0005</code>; Loss-making BUY → <code>sl = ltp × 0.9995</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>B. Trail After Move SL</h3>
+  <p>When <code>trail_after_move_sl = True</code>, once SL is moved to cost the leg enters step-based tightening using the portfolio's <code>sl_trail</code> config:</p>
+  <pre><span class="cm"># Set once when Move SL fires:</span>
+leg["move_sl_trail_anchor"] = ltp
+
+<span class="cm"># Each second thereafter:</span>
+leg_gain = curr_leg_pnl - move_sl_trail_anchor
+<span class="kw">if</span> leg_gain &gt;= sl_trail["every"]:
+    steps = <span class="fn">int</span>(leg_gain / sl_trail["every"])
+    new_sl = sl_pending_val ± (steps × sl_trail["by"])   <span class="cm"># ± depends on SELL/BUY</span>
+    move_sl_trail_anchor += steps × sl_trail["every"]
+    <span class="cm"># log: LEG_TRAIL_SL_UPDATED</span></pre>
+</section>
+
+<!-- Leg Actions -->
+<section id="leg-actions">
+  <h2>Leg Actions (5 Types)</h2>
+  <div class="action-grid">
+    <div class="action-card">
+      <div class="a-name">SqOff</div>
+      <div class="a-code">"type": "SqOff"</div>
+      <div class="a-desc">Default behavior. Leg closes at fill price. No re-entry. This is the fallback when <em>KeepLegRunning</em> is absent — including SqOff in the list is optional.</div>
+    </div>
+    <div class="action-card">
+      <div class="a-name">Re-Execute</div>
+      <div class="a-code">"type": "Re-Execute"<br>"count": N</div>
+      <div class="a-desc">Leg re-enters at market. If <em>KeepLegRunning</em> is also active: spawns a new concurrent slot. Otherwise: current leg → IDLE for immediate market re-entry. Count-limited.</div>
+    </div>
+    <div class="action-card">
+      <div class="a-name">Execute</div>
+      <div class="a-code">"type": "Execute"<br>"leg_id": "X"</div>
+      <div class="a-desc">Triggers an IDLE leg (by <code>leg_id</code>) to execute immediately, regardless of current leg status. Requires target leg to be in IDLE state.</div>
+    </div>
+    <div class="action-card">
+      <div class="a-name">ReEntry</div>
+      <div class="a-code">"type": "ReEntry"<br>"count": N</div>
+      <div class="a-desc">Leg closes, then waits at a specific price for re-entry. Count-limited.</div>
+    </div>
+    <div class="action-card">
+      <div class="a-name">KeepLegRunning</div>
+      <div class="a-code">"type": "KeepLegRunning"</div>
+      <div class="a-desc">Clears the SL or Target condition. Leg stays ACTIVE and keeps running. Disabled automatically if market is closing (<code>end_blocked</code>).</div>
+    </div>
+  </div>
+  <div class="callout info"><strong>SqOff note:</strong> <code>SqOff</code> in the actions list is skipped in the dispatch loop — closure happens by default when <em>KeepLegRunning</em> is absent. Including it alongside other actions is valid for readability but adds no behavior.</div>
+</section>
+
+<!-- Combos -->
+<section id="leg-combos">
+  <h2>Valid Action Combinations (max 3)</h2>
+  <h3>Single Actions</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Action</th><th>Valid</th><th>Effective Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SqOff</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed, no re-entry</td></tr>
+        <tr><td><strong>Re-Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed → IDLE → re-enters at market (count-limited)</td></tr>
+        <tr><td><strong>Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed (default), another IDLE leg triggered by <code>leg_id</code></td></tr>
+        <tr><td><strong>ReEntry</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed, waits at price for re-entry (count-limited)</td></tr>
+        <tr><td><strong>KeepLegRunning</strong></td><td><span class="valid">✓ VALID</span></td><td>SL/Target cleared, leg continues running</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Two-Action Combinations</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Combination</th><th>Valid</th><th>Effective Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Re-Execute + Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed → re-enters <em>and</em> another IDLE leg is triggered simultaneously</td></tr>
+        <tr><td><strong>Re-Execute + KeepLegRunning</strong></td><td><span class="valid">✓ VALID</span></td><td>Current leg stays running + a new <em>concurrent</em> slot is spawned (no closure of current)</td></tr>
+        <tr><td><strong>Execute + KeepLegRunning</strong></td><td><span class="valid">✓ VALID</span></td><td>SL/Target cleared (leg keeps running) + another IDLE leg triggered</td></tr>
+        <tr><td><strong>Execute + ReEntry</strong></td><td><span class="valid">✓ VALID</span></td><td>Leg closed, another IDLE leg triggered, current leg waits to re-enter at price</td></tr>
+        <tr><td><strong>SqOff + Re-Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Same as Re-Execute alone (SqOff is skipped in dispatch loop)</td></tr>
+        <tr><td><strong>SqOff + Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Same as Execute alone</td></tr>
+        <tr><td><strong>Re-Execute + ReEntry</strong></td><td><span class="invalid">✗ INVALID</span></td><td>Both attempt leg re-entry via different mechanisms; Re-Execute sets leg to IDLE for immediate market entry, conflicting with ReEntry's price-wait logic</td></tr>
+        <tr><td><strong>KeepLegRunning + ReEntry</strong></td><td><span class="invalid">✗ INVALID</span></td><td>KeepLegRunning prevents closure; ReEntry requires a closed leg to set up its price-wait. Contradictory.</td></tr>
+        <tr><td><strong>SqOff + KeepLegRunning</strong></td><td><span class="invalid">✗ INVALID</span></td><td>Closure (default) directly contradicts KeepLegRunning. KeepLegRunning wins but intent is nonsensical.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Three-Action Combinations</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Combination</th><th>Valid</th><th>Effective Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Re-Execute + Execute + KeepLegRunning</strong></td><td><span class="valid">✓ VALID</span></td><td>Keep current leg running + spawn concurrent new slot + trigger another IDLE leg</td></tr>
+        <tr><td><strong>Re-Execute + KeepLegRunning + Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Same as above (order irrelevant)</td></tr>
+        <tr><td><strong>SqOff + Re-Execute + Execute</strong></td><td><span class="valid">✓ VALID</span></td><td>Equivalent to Re-Execute + Execute (SqOff skipped)</td></tr>
+        <tr><td><strong>Re-Execute + Execute + ReEntry</strong></td><td><span class="invalid">✗ INVALID</span></td><td>Re-Execute and ReEntry conflict (see two-action rule)</td></tr>
+        <tr><td><strong>Execute + ReEntry + KeepLegRunning</strong></td><td><span class="invalid">✗ INVALID</span></td><td>KeepLegRunning + ReEntry conflict (see two-action rule)</td></tr>
+        <tr><td><strong>SqOff + Re-Execute + KeepLegRunning</strong></td><td><span class="invalid">✗ INVALID</span></td><td>SqOff + KeepLegRunning conflict</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Invalid Summary -->
+<section id="leg-invalid">
+  <h2>Impossible Combinations — Summary</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rule</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr><td><strong>KeepLegRunning + ReEntry</strong></td><td>ReEntry requires the leg to be closed first; KeepLegRunning prevents closure</td></tr>
+        <tr><td><strong>KeepLegRunning + SqOff</strong></td><td>Mutually exclusive exit intents; KeepLegRunning wins but the combination is logically inconsistent</td></tr>
+        <tr><td><strong>Re-Execute + ReEntry</strong></td><td>Two competing re-entry mechanisms on the same leg; Re-Execute wins (IDLE state) but ReEntry's price-wait never activates — undefined state</td></tr>
+        <tr><td><strong>More than 3 actions</strong></td><td>Not hard-blocked in code but unsupported and unvalidated; behavior is undefined beyond 3</td></tr>
+        <tr><td><strong>Execute without valid <code>leg_id</code></strong></td><td>If <code>leg_id</code> is absent or the target leg is not in IDLE state, Execute silently does nothing</td></tr>
+        <tr><td><strong>Re-Execute with <code>count = 0</code></strong></td><td>Zero count means unlimited re-executions; leg will re-execute every SL hit until market close — only valid if intentional</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════ LEVEL 2 ═══ -->
+
+<div class="level-header">
+  <div class="level-badge l2">2</div>
+  <div>
+    <div class="level-title">Portfolio Level</div>
+    <div class="level-sub">Configured in <code>portfolios.json</code> under <code>stoploss</code> / <code>target</code> blocks · Evaluated in <code>target_sl_bt.check_portfolio_sl_tgt()</code></div>
+  </div>
+</div>
+
+<!-- Portfolio SL Types -->
+<section id="port-sl-types">
+  <h2><span class="tag sl">SL</span> Portfolio SL Types</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Type</th><th>Trigger Condition</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Combined Loss</strong></td>
+          <td><code>curr_pnl &lt;= -sl_val</code></td>
+          <td>Most common. Flat combined-PnL loss threshold.</td>
+        </tr>
+        <tr>
+          <td><strong>Combined Premium</strong></td>
+          <td><code>curr_premium &gt;= sl_val</code> (if sl_val &gt; initial) <br>or <code>&lt;= sl_val</code> (if sl_val &lt; initial)</td>
+          <td>Based on directional change from captured initial premium. Requires <code>p_comb_prem_captured = True</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Absolute Combined Premium</strong></td>
+          <td><code>curr_premium &gt;= sl_val</code></td>
+          <td>Absolute premium level regardless of initial. Requires premium capture.</td>
+        </tr>
+        <tr>
+          <td><strong>Underlying Movement</strong></td>
+          <td>Index crosses <code>sl_val</code> level bi-directionally</td>
+          <td><code>(prev &lt;= sl &lt;= curr) or (prev &gt;= sl &gt;= curr)</code>. Fires once on crossing.</td>
+        </tr>
+        <tr>
+          <td><strong>Loss and Underlying Range</strong></td>
+          <td><code>curr_pnl &lt;= -sl_val</code> AND (<code>index &lt;= below</code> OR <code>index &gt;= above</code>)</td>
+          <td>Both conditions must be true simultaneously. Requires <code>underlying_below</code> and/or <code>underlying_above</code> set.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Portfolio Trailing SL -->
+<section id="port-trail-sl">
+  <h2><span class="tag trail">TRAILING</span> Portfolio Trailing SL</h2>
+  <p>Configured in <code>stoploss.trailing</code> block. The SL tightens in discrete steps as portfolio profit grows.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Enabled</strong></td><td class="key">enabled</td><td>Toggle</td></tr>
+        <tr><td><strong>Trail Every</strong></td><td class="key">trail_every</td><td>Profit gain increment that tightens the SL by one step</td></tr>
+        <tr><td><strong>Trail By</strong></td><td class="key">trail_by</td><td>Amount by which the SL limit is reduced per step</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre><span class="cm"># Initial state at portfolio activation:</span>
+trail_state["sl"]["current_val"] = p_sl_val
+anchor_pnl = <span class="num">0</span>
+
+<span class="cm"># Each second:</span>
+gain = curr_pnl - anchor_pnl
+<span class="kw">if</span> gain &gt;= trail_every:
+    steps = <span class="fn">int</span>(gain / trail_every)
+    current_sl -= steps × trail_by     <span class="cm"># SL tightens</span>
+    anchor_pnl += steps × trail_every
+    <span class="cm"># log: TRAIL_SL_UPDATED</span>
+
+<span class="cm"># Then check SL hit using current_sl (not original p_sl_val)</span></pre>
+  <div class="callout warn"><strong>Note:</strong> The trailing SL only ever tightens — it never loosens. Once steps are taken they are permanent for that day.</div>
+</section>
+
+<!-- Portfolio Target Types -->
+<section id="port-tgt-types">
+  <h2><span class="tag tgt">TARGET</span> Portfolio Target Types</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Type</th><th>Trigger Condition</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Combined Profit</strong></td>
+          <td><code>curr_pnl &gt;= tgt_val</code></td>
+          <td>Most common. Flat combined-PnL profit threshold.</td>
+        </tr>
+        <tr>
+          <td><strong>Combined Premium</strong></td>
+          <td><code>curr_premium &lt;= tgt_val</code> (if tgt_val &lt; initial) <br>or <code>&gt;= tgt_val</code> (if &gt; initial)</td>
+          <td>Directional premium decay to target level. Requires premium capture.</td>
+        </tr>
+        <tr>
+          <td><strong>Absolute Combined Premium</strong></td>
+          <td><code>curr_premium &lt;= tgt_val</code></td>
+          <td>Absolute premium at or below target. Requires premium capture.</td>
+        </tr>
+        <tr>
+          <td><strong>Underlying Movement</strong></td>
+          <td>Index crosses <code>tgt_val</code> level bi-directionally</td>
+          <td>Same crossing check as SL Underlying Movement.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Portfolio Trailing Target -->
+<section id="port-trail-tgt">
+  <h2><span class="tag trail">TRAILING</span> Portfolio Trailing Target (Profit Lock)</h2>
+  <p>Configured in <code>target.trailing</code> block. A profit-locking ratchet stop — locks minimum profit and tightens the lock as profit grows.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Enabled</strong></td><td class="key">enabled</td><td>Toggle</td></tr>
+        <tr><td><strong>When Profit Reach</strong></td><td class="key">when_profit_reach</td><td>Activation threshold — trailing activates when PnL first crosses this</td></tr>
+        <tr><td><strong>Lock Min Profit</strong></td><td class="key">lock_min_profit</td><td>Minimum profit locked at activation (floor of the exit)</td></tr>
+        <tr><td><strong>Trail Every</strong></td><td class="key">trail_every</td><td>Profit gain increment that raises the lock by one step</td></tr>
+        <tr><td><strong>Trail By</strong></td><td class="key">trail_by</td><td>Amount by which the lock floor is raised per step</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre><span class="cm"># Activation:</span>
+<span class="kw">if</span> curr_pnl &gt;= when_profit_reach:
+    active = <span class="num">True</span>
+    current_stop = lock_min_profit
+    anchor_pnl   = when_profit_reach
+    <span class="cm"># log: TRAIL_TARGET_ACTIVATED</span>
+
+<span class="cm"># Active phase (each second):</span>
+<span class="kw">if</span> curr_pnl &lt;= current_stop:
+    → p_hit = <span class="num">True</span>  <span class="cm"># exits portfolio  | TRAIL_TARGET</span>
+<span class="kw">else</span>:
+    gain = curr_pnl - anchor_pnl
+    <span class="kw">if</span> gain &gt;= trail_every:
+        steps = <span class="fn">int</span>(gain / trail_every)
+        current_stop += steps × trail_by    <span class="cm"># lock ratchets up</span>
+        anchor_pnl   += steps × trail_every
+        <span class="cm"># log: TRAIL_TARGET_UPDATED</span></pre>
+  <div class="callout success"><strong>Lock is permanent:</strong> The floor only ever rises. Once activated it overrides the fixed target; the fixed target check is guarded by <code>and not p_hit</code> so it cannot fire while trailing target is active.</div>
+</section>
+
+<!-- Portfolio Actions -->
+<section id="port-actions">
+  <h2>Portfolio Actions on SL / Target Hit</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Action</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SqOff</strong></td><td>Close all ACTIVE legs in this portfolio. Standard exit.</td></tr>
+        <tr><td><strong>SqOff Other Portfolio</strong></td><td>Close this portfolio + force-close all ACTIVE legs in <code>target_portfolio</code></td></tr>
+        <tr><td><strong>Execute Other Portfolio</strong></td><td>Close this portfolio + set <code>execute_trigger = True</code> on all IDLE legs in <code>target_portfolio</code></td></tr>
+        <tr><td><strong>Start Other Portfolio</strong></td><td>Close this portfolio + resume execution mode of <code>target_portfolio</code> (sets to ACTIVE or WAITING_FOR_ENTRY depending on its entry mode)</td></tr>
+        <tr><td><strong>ReExecute</strong></td><td>Close this portfolio + re-queue for re-entry (count-limited by <code>reexecute_count</code>)</td></tr>
+        <tr><td><strong>ReExecute at Entry Price</strong></td><td>Close this portfolio + re-enter at original entry prices</td></tr>
+        <tr><td><strong>ReExecute SameStrike at EntryPrice</strong></td><td>Close this portfolio + re-enter at original strikes <em>and</em> entry prices</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn"><strong>Trailing actions</strong> (<code>TARGET_TRAIL</code>) always use <strong>SqOff</strong> regardless of what action is configured — cross-portfolio actions are not dispatched from trailing exits.</div>
+</section>
+
+<!-- Portfolio Delay -->
+<section id="port-delay">
+  <h2>Portfolio Delay Logic</h2>
+  <pre><span class="cm"># On trigger second:</span>
+p_delay_pending    = <span class="num">True</span>
+p_delay_start_time = current_dt
+
+<span class="cm"># Each subsequent second:</span>
+<span class="kw">if</span> condition reverses:
+    p_delay_pending = <span class="num">False</span>    <span class="cm"># PORTFOLIO_DELAY_CLEARED</span>
+<span class="kw">elif</span> elapsed &lt; p_delay:
+    skip (continue holding)
+<span class="kw">else</span>:
+    dispatch action</pre>
+</section>
+
+<!-- Portfolio Impossible -->
+<section id="port-invalid">
+  <h2>Impossible Combinations</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Condition</th><th>Why Invalid / Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Combined Premium / Abs Combined Premium SL without premium capture</strong></td><td><code>p_comb_prem_captured</code> must be True; if initial premium was never recorded the check is silently skipped every second</td></tr>
+        <tr><td><strong>Loss and Underlying Range with <code>below=0</code> and <code>above=0</code></strong></td><td>Both sub-conditions always fail (<code>index &lt;= 0</code> and <code>index &gt;= 0</code> never match normal index values); SL never fires</td></tr>
+        <tr><td><strong>Fixed Target + Trailing Target simultaneously</strong></td><td>Trailing target overrides once active; fixed target is guarded by <code>and not p_hit</code> and is effectively disabled</td></tr>
+        <tr><td><strong>Cross-portfolio actions without valid <code>portfolio_name</code></strong></td><td>The loop finds no matching portfolio; action silently does nothing</td></tr>
+        <tr><td><strong>ReExecute beyond <code>reexecute_count</code></strong></td><td>Enforced in <code>execution_bt.py</code>; re-entry is refused once limit is reached</td></tr>
+        <tr><td><strong>Trailing SL + Fixed SL simultaneously on same portfolio</strong></td><td>Trailing SL replaces the fixed SL value — <code>current_sl</code> starts at <code>p_sl_val</code> and tightens. They are not additive.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════ LEVEL 3 ═══ -->
+
+<div class="level-header">
+  <div class="level-badge l3">3</div>
+  <div>
+    <div class="level-title">User Level</div>
+    <div class="level-sub">Configured in <code>user_settings.json</code> under <code>risk_limits</code> · Aggregates PnL across <em>all portfolios</em> owned by that user · Evaluated in <code>target_sl_bt.check_global_user_limits()</code></div>
+  </div>
+</div>
+
+<section id="user-params">
+  <h2>User-Level Parameters</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Key</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Max Loss</strong></td><td class="key">max_loss</td><td>Negative value. If aggregate user PnL drops to or below this, <em>all</em> user portfolios are force-squared immediately.</td></tr>
+        <tr><td><strong>Max Profit</strong></td><td class="key">max_profit</td><td>Positive value. If aggregate PnL reaches or exceeds this, all user portfolios are force-squared immediately.</td></tr>
+        <tr><td><strong>Trail Reach</strong></td><td class="key">trail_cfg[0]</td><td>Profit level at which user-level trailing activates.</td></tr>
+        <tr><td><strong>Trail Lock</strong></td><td class="key">trail_cfg[1]</td><td>Minimum profit locked when trailing activates (floor).</td></tr>
+        <tr><td><strong>Trail Every</strong></td><td class="key">trail_cfg[2]</td><td>Profit increment that raises the lock by one step.</td></tr>
+        <tr><td><strong>Trail By</strong></td><td class="key">trail_cfg[3]</td><td>Amount lock is raised per step.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="user-logic">
+  <h2>User-Level Logic</h2>
+  <pre><span class="cm"># Aggregate PnL for this user across all portfolios</span>
+combined_pnl = Σ state["pnl"]["combined"]  <span class="kw">for</span> state owned by uid
+
+<span class="cm"># ── Max Loss ──────────────────────────────────────────────</span>
+<span class="kw">if</span> max_loss != <span class="num">0</span> <span class="kw">and</span> combined_pnl &lt;= max_loss:
+    force_sqoff all user portfolios
+    gst["hit"] = <span class="num">True</span>   <span class="cm"># no further checks today | GLOBAL_MAX_LOSS_HIT</span>
+
+<span class="cm"># ── Max Profit ────────────────────────────────────────────</span>
+<span class="kw">elif</span> max_profit != <span class="num">0</span> <span class="kw">and</span> combined_pnl &gt;= max_profit:
+    force_sqoff all user portfolios
+    gst["hit"] = <span class="num">True</span>                       <span class="cm"># GLOBAL_MAX_PROFIT_HIT</span>
+
+<span class="cm"># ── Profit Trailing ───────────────────────────────────────</span>
+<span class="kw">elif</span> reach &gt; <span class="num">0</span>:
+
+    <span class="cm"># Activate</span>
+    <span class="kw">if not</span> trail_active <span class="kw">and</span> combined_pnl &gt;= reach:
+        trail_active  = <span class="num">True</span>
+        current_lock  = lock
+        anchor_pnl    = reach              <span class="cm"># GLOBAL_TRAIL_ACTIVATED</span>
+
+    <span class="cm"># Active phase</span>
+    <span class="kw">if</span> trail_active:
+        <span class="kw">if</span> combined_pnl &lt;= current_lock:
+            force_sqoff all user portfolios
+            gst["hit"] = <span class="num">True</span>             <span class="cm"># GLOBAL_TRAIL_STOP_HIT</span>
+        <span class="kw">elif</span> every &gt; <span class="num">0</span>:
+            gain = combined_pnl - anchor_pnl
+            <span class="kw">if</span> gain &gt;= every:
+                steps = <span class="fn">int</span>(gain / every)
+                current_lock += steps × trail     <span class="cm"># GLOBAL_TRAIL_UPDATED</span>
+                anchor_pnl   += steps × every</pre>
+</section>
+
+<section id="user-constraints">
+  <h2>User-Level Constraints</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Condition</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><code>max_loss = 0</code></td><td>Max loss check disabled entirely</td></tr>
+        <tr><td><code>max_profit = 0</code></td><td>Max profit check disabled entirely</td></tr>
+        <tr><td><code>reach = 0</code></td><td>Profit trailing disabled</td></tr>
+        <tr><td><code>gst["hit"] = True</code></td><td>No further user-level checks for the rest of the trading day</td></tr>
+        <tr><td><strong>Max Loss + Max Profit both set</strong></td><td>Loss checked first, then profit (<code>if / elif</code>). Only one fires per second.</td></tr>
+        <tr><td><strong>Max Loss/Profit + Profit Trailing simultaneously</strong></td><td>Max Loss/Profit take precedence (<code>if/elif</code> guards). Trailing only runs in the <code>else</code> branch and cannot fire the same second.</td></tr>
+        <tr><td><code>trail_cfg = [0, 0, 0, 0]</code></td><td>All trailing fields zero — trailing disabled; <code>every = 0</code> guard prevents division issues</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- LOG REFERENCE -->
+<section id="logs">
+  <h2>Log Entries Reference</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Log Message</th><th>Level</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>LEG_SL_HIT</code></td><td><span class="log-level leg">Leg</span></td><td>Leg SL triggered (bid_high or ask_low crossed sl_val)</td></tr>
+        <tr><td><code>LEG_TARGET_HIT</code></td><td><span class="log-level leg">Leg</span></td><td>Leg target triggered (bid_low or ask_high crossed tgt_val)</td></tr>
+        <tr><td><code>DELAY_PENDING</code></td><td><span class="log-level leg">Leg</span></td><td>SL Wait active — waiting for confirmation period to elapse</td></tr>
+        <tr><td><code>DELAY_CLEARED</code></td><td><span class="log-level leg">Leg</span></td><td>Condition reversed during SL Wait; delay cancelled</td></tr>
+        <tr><td><code>REEXECUTE_QUEUED</code></td><td><span class="log-level leg">Leg</span></td><td>Leg set to IDLE for immediate market re-entry</td></tr>
+        <tr><td><code>CONCURRENT_REEXEC_QUEUED</code></td><td><span class="log-level leg">Leg</span></td><td>New concurrent leg slot spawned (KeepLegRunning + Re-Execute)</td></tr>
+        <tr><td><code>LEG_REEXEC_LIMIT_REACHED</code></td><td><span class="log-level leg">Leg</span></td><td>Re-Execute count exhausted; re-entry refused</td></tr>
+        <tr><td><code>LEG_TRAIL_SL_UPDATED</code></td><td><span class="log-level leg">Leg</span></td><td>Leg trailing SL tightened one or more steps</td></tr>
+        <tr><td><code>MOVE_SL_TO_COST</code></td><td><span class="log-level leg">Leg</span></td><td>Move SL to Cost applied to a leg (triggered by sibling leg exit)</td></tr>
+        <tr><td><code>TRAIL_SL_UPDATED</code></td><td><span class="log-level portfolio">Portfolio</span></td><td>Portfolio trailing SL tightened one or more steps</td></tr>
+        <tr><td><code>TRAIL_TARGET_ACTIVATED</code></td><td><span class="log-level portfolio">Portfolio</span></td><td>Portfolio trailing target lock activated (profit reached activation level)</td></tr>
+        <tr><td><code>TRAIL_TARGET_UPDATED</code></td><td><span class="log-level portfolio">Portfolio</span></td><td>Portfolio trailing target lock raised one or more steps</td></tr>
+        <tr><td><code>PORTFOLIO_DELAY_PENDING</code></td><td><span class="log-level portfolio">Portfolio</span></td><td>Portfolio SL/Target condition entered delay waiting period</td></tr>
+        <tr><td><code>PORTFOLIO_DELAY_CLEARED</code></td><td><span class="log-level portfolio">Portfolio</span></td><td>Portfolio delay cancelled — condition reversed before delay elapsed</td></tr>
+        <tr><td><code>GLOBAL_MAX_LOSS_HIT</code></td><td><span class="log-level user">User</span></td><td>User aggregate loss limit breached — all user portfolios force-squared</td></tr>
+        <tr><td><code>GLOBAL_MAX_PROFIT_HIT</code></td><td><span class="log-level user">User</span></td><td>User aggregate profit target reached — all user portfolios force-squared</td></tr>
+        <tr><td><code>GLOBAL_TRAIL_ACTIVATED</code></td><td><span class="log-level user">User</span></td><td>User-level profit trailing activated (profit crossed reach level)</td></tr>
+        <tr><td><code>GLOBAL_TRAIL_UPDATED</code></td><td><span class="log-level user">User</span></td><td>User-level trailing profit lock raised one or more steps</td></tr>
+        <tr><td><code>GLOBAL_TRAIL_STOP_HIT</code></td><td><span class="log-level user">User</span></td><td>User-level trailing stop triggered — profit fell to or below locked floor</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('section[id], div[id]');
+  const navLinks = document.querySelectorAll('nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-60px 0px -60% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

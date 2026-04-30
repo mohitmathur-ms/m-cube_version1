@@ -787,8 +787,11 @@
                             <th>Max Profit</th>
                             <th>Max Loss</th>
                             <th>Total Days</th>
+                            <th>Total Trades</th>
                             <th>Win% (Days)</th>
                             <th>Loss% (Days)</th>
+                            <th>Win% (Trades)</th>
+                            <th>Loss% (Trades)</th>
                             <th>Max Winning Streak</th>
                             <th>Max Losing Streak</th>
                             <th>Avg Profit On Win Days</th>
@@ -822,8 +825,11 @@
                             <th>Max Profit</th>
                             <th>Max Loss</th>
                             <th>Total Days</th>
+                            <th>Total Trades</th>
                             <th>Win% (Days)</th>
                             <th>Loss% (Days)</th>
+                            <th>Win% (Trades)</th>
+                            <th>Loss% (Trades)</th>
                             <th>Max Winning Streak</th>
                             <th>Max Losing Streak</th>
                             <th>Avg Profit On Win Days</th>
@@ -1501,6 +1507,14 @@
             let c = 0, pk = 0, mdd = 0;
             pnels.forEach(v => { c += v; if (c > pk) pk = c; const dd = pk - c; if (dd > mdd) mdd = dd; });
 
+            // Trade-level win rate
+            const tradePnls = data.map(r => parseFloat(r.PNL || 0));
+            const totalTrades = tradePnls.length;
+            const tradeWins = tradePnls.filter(v => v > 0).length;
+            const tradeLosses = tradePnls.filter(v => v < 0).length;
+            const tradeWinRate = totalTrades ? (tradeWins / totalTrades * 100) : 0;
+            const tradeLossRate = totalTrades ? (tradeLosses / totalTrades * 100) : 0;
+
             return {
                 totalPnL, avgDay: pnels.length ? totalPnL / pnels.length : 0,
                 maxP, maxL, totalDays: pnels.length,
@@ -1508,7 +1522,8 @@
                 lossP: pnels.length ? (lossDays.length / pnels.length * 100) : 0, lossC: lossDays.length,
                 mw, ml, avgW: winDays.length ? winDays.reduce((a, b) => a + b, 0) / winDays.length : 0,
                 avgL: lossDays.length ? lossDays.reduce((a, b) => a + b, 0) / lossDays.length : 0,
-                mdd
+                mdd,
+                totalTrades, tradeWins, tradeLosses, tradeWinRate, tradeLossRate
             };
         }
 
@@ -1520,8 +1535,11 @@
                 <div class="kpi"><div class="kpi-label">Max Profit</div><div class="kpi-value good">${m.maxP.v.toFixed(2)}</div><div class="kpi-sub">${m.maxP.d}</div></div>
                 <div class="kpi"><div class="kpi-label">Max Loss</div><div class="kpi-value bad">${m.maxL.v.toFixed(2)}</div><div class="kpi-sub">${m.maxL.d}</div></div>
                 <div class="kpi"><div class="kpi-label">Total Days</div><div class="kpi-value">${m.totalDays}</div></div>
-                <div class="kpi"><div class="kpi-label">Win%</div><div class="kpi-value good">${m.winP.toFixed(1)}% (${m.winC})</div></div>
-                <div class="kpi"><div class="kpi-label">Loss%</div><div class="kpi-value bad">${m.lossP.toFixed(1)}% (${m.lossC})</div></div>
+                <div class="kpi"><div class="kpi-label">Total Trades</div><div class="kpi-value">${m.totalTrades}</div></div>
+                <div class="kpi"><div class="kpi-label">Win% (Days)</div><div class="kpi-value good">${m.winP.toFixed(1)}% (${m.winC})</div></div>
+                <div class="kpi"><div class="kpi-label">Win% (Trades)</div><div class="kpi-value good">${m.tradeWinRate.toFixed(1)}% (${m.tradeWins})</div></div>
+                <div class="kpi"><div class="kpi-label">Loss% (Days)</div><div class="kpi-value bad">${m.lossP.toFixed(1)}% (${m.lossC})</div></div>
+                <div class="kpi"><div class="kpi-label">Loss% (Trades)</div><div class="kpi-value bad">${m.tradeLossRate.toFixed(1)}% (${m.tradeLosses})</div></div>
                 <div class="kpi"><div class="kpi-label">Max Win Streak</div><div class="kpi-value good">${m.mw}</div></div>
                 <div class="kpi"><div class="kpi-label">Max Loss Streak</div><div class="kpi-value bad">${m.ml}</div></div>
                 <div class="kpi"><div class="kpi-label">MDD</div><div class="kpi-value bad">${m.mdd.toFixed(2)}</div></div>
@@ -1533,7 +1551,7 @@
             document.getElementById('portfolio-breakdown-tbody').innerHTML = pfs.map(pf => {
                 const d = calculateMetrics(filteredData.filter(r => r['PORTFOLIO NAME'] === pf));
                 const expectancy = (d.winP / 100 * d.avgW) - (d.lossP / 100 * Math.abs(d.avgL));
-                return `<tr><td>${pf}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
+                return `<tr><td>${pf}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td>${d.totalTrades}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td class="profit">${d.tradeWinRate.toFixed(1)}%</td><td class="loss">${d.tradeLossRate.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
             }).join('');
         }
 
@@ -1544,7 +1562,7 @@
                 const d = calculateMetrics(sData);
                 const expectancy = (d.winP / 100 * d.avgW) - (d.lossP / 100 * Math.abs(d.avgL));
                 const pfs = [...new Set(sData.map(r => r['PORTFOLIO NAME']))].join(', ');
-                return `<tr><td style="font-weight:600">${s}</td><td style="font-size:0.7rem">${pfs}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
+                return `<tr><td style="font-weight:600">${s}</td><td style="font-size:0.7rem">${pfs}</td><td class="${d.totalPnL >= 0 ? 'profit' : 'loss'}">${d.totalPnL.toFixed(2)}</td><td>${d.avgDay.toFixed(2)}</td><td class="profit">${d.maxP.v.toFixed(2)}</td><td class="loss">${d.maxL.v.toFixed(2)}</td><td>${d.totalDays}</td><td>${d.totalTrades}</td><td class="profit">${d.winP.toFixed(1)}%</td><td class="loss">${d.lossP.toFixed(1)}%</td><td class="profit">${d.tradeWinRate.toFixed(1)}%</td><td class="loss">${d.tradeLossRate.toFixed(1)}%</td><td>${d.mw}</td><td>${d.ml}</td><td class="profit">${d.avgW.toFixed(2)}</td><td class="loss">${d.avgL.toFixed(2)}</td><td>${(Math.abs(d.avgW / d.avgL) || 0).toFixed(2)}</td><td class="${expectancy >= 0 ? 'profit' : 'loss'}">${expectancy.toFixed(2)}</td><td class="loss">${d.mdd.toFixed(2)}</td></tr>`;
             }).join('');
         }
 

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBO — Parameter Logic Reference</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* file-specific aliases */
+    --green: var(--accent2);
+    --yellow: var(--warn);
+    --red: var(--danger);
+    --purple: #c084fc;
+    --orange: var(--warn);
+    --dim: var(--muted);
+    --th-bg: var(--surface);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:14px; line-height:1.75;
+  }
+  .banner {
+    background:linear-gradient(135deg,#0a1628 0%,#111827 60%,#1a1228 100%);
+    border-bottom:1px solid var(--border);
+    padding:26px 32px 20px;
+  }
+  .banner h1 { font-size:21px; font-weight:700; color:#e6edf3; margin-bottom:5px; }
+  .banner .meta { font-size:12px; color:var(--dim); }
+  .banner .meta span { margin-right:18px; }
+  .badge {
+    display:inline-block; background:#0b3a1f; color:#3fb950;
+    border:1px solid #2ea043; border-radius:12px;
+    font-size:11px; font-weight:700; padding:2px 10px; letter-spacing:.4px;
+    margin-left:8px; vertical-align:middle;
+  }
+  .layout { display:flex; min-height:calc(100vh - 90px); }
+  .sidebar {
+    width:230px; flex-shrink:0;
+    background:var(--surface); border-right:1px solid var(--border);
+    padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .sidebar-title {
+    font-size:10px; font-weight:700; color:var(--dim);
+    text-transform:uppercase; letter-spacing:.8px;
+    padding:0 16px 8px; margin-bottom:4px;
+    border-bottom:1px solid var(--border);
+  }
+  .nav-section { padding:8px 0 0; }
+  .nav-section-label {
+    font-size:10px; font-weight:600; color:var(--dim);
+    text-transform:uppercase; letter-spacing:.6px;
+    padding:6px 16px 2px;
+  }
+  .sidebar a {
+    display:block; padding:5px 16px; font-size:12px;
+    color:var(--dim); text-decoration:none; border-left:2px solid transparent;
+    transition:all .15s;
+  }
+  .sidebar a:hover { color:var(--accent); border-left-color:var(--accent); background:#1a2233; }
+  .page { flex:1; padding:28px 36px 80px; max-width:920px; }
+  h2 { font-size:17px; color:#e6edf3; margin:36px 0 10px; font-weight:600;
+       border-bottom:1px solid var(--border); padding-bottom:6px; }
+  h3 { font-size:14px; color:var(--accent); margin:26px 0 8px; font-weight:600; }
+  h4 { font-size:12px; color:var(--green); margin:14px 0 5px; font-weight:600;
+       text-transform:uppercase; letter-spacing:.5px; }
+  p  { margin:0 0 10px; }
+  hr { border:none; border-top:1px solid var(--border); margin:26px 0; }
+  a  { color:var(--accent); text-decoration:none; }
+  strong { color:#e6edf3; font-weight:600; }
+  em { color:var(--purple); font-style:normal; font-weight:500; }
+  code {
+    background:var(--code-bg); color:#79c0ff;
+    padding:2px 5px; border-radius:4px;
+    font-family:"JetBrains Mono","Fira Code",Consolas,monospace; font-size:12px;
+  }
+  pre {
+    background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+    padding:14px 18px; overflow-x:auto; margin:10px 0 16px; line-height:1.6;
+  }
+  pre code { background:none; padding:0; color:#e2e8f0; font-size:12px; }
+  table { width:100%; border-collapse:collapse; margin:10px 0 18px; font-size:13px; }
+  thead th {
+    background:var(--th-bg); color:var(--accent);
+    padding:8px 12px; text-align:left; border:1px solid var(--border);
+    font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  tbody td { padding:7px 12px; border:1px solid var(--border); vertical-align:top; }
+  tbody tr:nth-child(even) { background:#0f131a; }
+  tbody tr:hover { background:#1c2233; }
+  td.pos { color:var(--green); }
+  td.neg { color:var(--red); }
+  td.dim { color:var(--dim); }
+  ul,ol { padding-left:22px; margin:4px 0 10px; }
+  li { margin:3px 0; }
+  blockquote {
+    border-left:3px solid var(--accent); background:#0d1829;
+    padding:10px 15px; border-radius:0 6px 6px 0;
+    margin:10px 0; color:#79c0ff; font-size:13px;
+  }
+  blockquote.warn {
+    border-left-color:var(--yellow); background:#1f1a0d; color:#d4a843;
+  }
+  blockquote.info {
+    border-left-color:var(--green); background:#0b1f0f; color:#3fb950;
+  }
+  .param-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:18px 20px; margin:18px 0;
+  }
+  .param-header {
+    display:flex; align-items:center; gap:10px; margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+  .param-id {
+    background:#1c2333; color:var(--accent);
+    font-size:12px; font-weight:700; padding:3px 9px; border-radius:4px;
+    font-family:monospace; white-space:nowrap;
+  }
+  .param-name { font-size:15px; font-weight:600; color:#e6edf3; flex:1; }
+  .chip {
+    display:inline-block; font-size:11px; font-weight:700;
+    padding:2px 9px; border-radius:10px; letter-spacing:.3px; white-space:nowrap;
+  }
+  .chip.bool   { background:#0b3a1f; color:#3fb950; border:1px solid #2ea043; }
+  .chip.time   { background:#0d1829; color:#79c0ff; border:1px solid #1f3a5f; }
+  .chip.int    { background:#1f1a0d; color:#d29922; border:1px solid #7d4e00; }
+  .chip.select { background:#1a0d1f; color:#d2a8ff; border:1px solid #6e40c9; }
+  .param-meta { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:12px; color:var(--dim); }
+  .param-meta span strong { color:var(--text); }
+  .phase-flow {
+    display:flex; align-items:center; gap:0; margin:14px 0; flex-wrap:wrap;
+  }
+  .phase {
+    background:var(--th-bg); border:1px solid var(--border);
+    border-radius:6px; padding:7px 14px; font-size:12px; font-weight:600;
+    color:#e6edf3; white-space:nowrap;
+  }
+  .phase.active { background:#0b2a1f; border-color:#2ea043; color:#3fb950; }
+  .arrow { color:var(--dim); font-size:16px; padding:0 8px; }
+  .option-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; margin:10px 0; }
+  .option-item {
+    background:#0f131a; border:1px solid var(--border);
+    border-radius:6px; padding:10px 13px;
+  }
+  .option-label { font-size:12px; font-weight:700; color:var(--purple); margin-bottom:4px; }
+  .option-desc { font-size:12px; color:var(--text); }
+  ::-webkit-scrollbar { width:7px; height:7px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:#30363d; border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:#58a6ff44; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <h1>RBO — Range Breakout Parameter Logic Reference
+    <span class="badge">9 PARAMETERS</span>
+  </h1>
+  <div class="meta">
+    <span>📄 Document: rbo_logics</span>
+    <span>🗓 2026-04-21</span>
+    <span>📁 engine/rbo.py · execution.py · backtester.py · gui/tabs/range_breakout.py</span>
+  </div>
+</div>
+
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="sidebar-title">Navigation</div>
+  <div class="nav-section">
+    <div class="nav-section-label">Overview</div>
+    <a href="#overview">What is RBO</a>
+    <a href="#state-machine">State Machine</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Parameters</div>
+    <a href="#p1">1 · rbo_enabled</a>
+    <a href="#p2">2 · monitoring_start</a>
+    <a href="#p3">3 · monitoring_end</a>
+    <a href="#p4">4 · entry_start</a>
+    <a href="#p5">5 · entry_end</a>
+    <a href="#p6">6 · range_buffer</a>
+    <a href="#p7">7 · entry_at</a>
+    <a href="#p8">8 · monitoring</a>
+    <a href="#p9">9 · cancel_other</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-label">Logic</div>
+    <a href="#idle-flag">Leg Idle Flag</a>
+    <a href="#reentry">Re-Entry Flow</a>
+    <a href="#flow">End-to-End Flow</a>
+    <a href="#validation">Validation Rules</a>
+    <a href="#tested">Tested Configs</a>
+  </div>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════ OVERVIEW ═══════════ -->
+<h2 id="overview">What is RBO</h2>
+<p>The <strong>Range Breakout (RBO)</strong> subsystem replaces standard start-time entry with a two-phase market-structure entry: the engine first builds a price range from the underlying index, then fires entries when the price breaks above or below that range.</p>
+<p>RBO is configured <strong>per portfolio</strong> via the Range BreakOut Settings tab. When enabled, all entry timing is controlled by the <code>RBOManager</code> state machine — the individual legs' own <code>Start Time</code> fields are used only when a leg's <code>Idle=True</code> flag explicitly excludes it from RBO.</p>
+
+<hr>
+
+<!-- ═══════════ STATE MACHINE ═══════════ -->
+<h2 id="state-machine">State Machine</h2>
+<p>Every RBO-enabled portfolio runs an independent 4-phase state machine, reset fresh each trading day:</p>
+
+<div class="phase-flow">
+  <div class="phase">IDLE</div>
+  <span class="arrow">→</span>
+  <div class="phase">MONITORING</div>
+  <span class="arrow">→</span>
+  <div class="phase">ENTRY</div>
+  <span class="arrow">→</span>
+  <div class="phase">DONE</div>
+</div>
+
+<table style="margin-top:14px">
+<thead><tr><th>Phase</th><th>Entry Condition</th><th>What Happens</th><th>Exit Condition</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>IDLE</strong></td>
+  <td>Always at day start</td>
+  <td>Nothing — waiting for monitoring window to open</td>
+  <td><code>current_time ≥ range_monitoring_start</code></td>
+</tr>
+<tr>
+  <td><strong>MONITORING</strong></td>
+  <td>Auto-entered from IDLE</td>
+  <td>Track rolling <code>high = max(bar.high)</code> and <code>low = min(bar.low)</code> every tick</td>
+  <td><code>current_time ≥ range_monitoring_end</code></td>
+</tr>
+<tr>
+  <td><strong>ENTRY</strong></td>
+  <td>Auto-entered from MONITORING</td>
+  <td>Range frozen; detect HIGH/LOW breakouts; set <code>rbo_trigger</code> on eligible legs</td>
+  <td><code>current_time &gt; effective_entry_end</code> <em>or</em> <code>cancel_other</code> fired</td>
+</tr>
+<tr>
+  <td><strong>DONE</strong></td>
+  <td>From ENTRY (timeout or cancel_other)</td>
+  <td>No further breakout checks; re-executions still allowed via <code>execute_trigger</code></td>
+  <td>End of day (state reset next morning)</td>
+</tr>
+</tbody>
+</table>
+
+<blockquote>The range is built from <strong>underlying index OHLC data</strong> (<code>monitoring = "Underlying"</code>). Once <code>range_monitoring_end</code> is reached the high/low snapshot is frozen — intraday moves after that point do not expand the range.</blockquote>
+
+<hr>
+
+<!-- ═══════════ PARAMETERS ═══════════ -->
+<h2>Parameters</h2>
+
+<!-- P1 -->
+<div class="param-card" id="p1">
+  <div class="param-header">
+    <span class="param-id">P1</span>
+    <span class="param-name">rbo_enabled</span>
+    <span class="chip bool">Checkbox</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> false</span>
+    <span><strong>JSON key:</strong> <code>rbo_enabled</code></span>
+    <span><strong>GUI:</strong> "Enable RangeBreakOut" checkbox</span>
+  </div>
+  <p><strong>Master toggle.</strong> When <code>false</code>, the entire RBO state machine is skipped — all legs enter via their own <code>Start Time</code> (standard time-based entry). When <code>true</code>, the portfolio hands entry control to <code>RBOManager</code>.</p>
+  <blockquote class="warn">If <code>rbo_enabled = true</code> but monitoring times are missing or <code>monitoring ≠ "Underlying"</code>, an error is logged and the portfolio falls back to time-based entry for that day.</blockquote>
+</div>
+
+<!-- P2 -->
+<div class="param-card" id="p2">
+  <div class="param-header">
+    <span class="param-id">P2</span>
+    <span class="param-name">range_monitoring_start</span>
+    <span class="chip time">Time HH:mm:ss</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> 09:30:00</span>
+    <span><strong>JSON key:</strong> <code>range_monitoring_start</code></span>
+  </div>
+  <p>The time at which the state machine transitions <strong>IDLE → MONITORING</strong> and begins tracking the daily range. From this point the engine records <code>max(bar.high)</code> and <code>min(bar.low)</code> from every OHLC tick until <code>range_monitoring_end</code>.</p>
+  <blockquote>
+    <strong>Winter time adjustment:</strong> When the trade date falls in the US winter calendar, all RBO times are automatically shifted <code>+1 hour</code> before <code>RBOManager</code> is created. A configured value of <code>09:30:00</code> becomes effective <code>10:30:00</code>, keeping range logic aligned with actual data timestamps.
+  </blockquote>
+</div>
+
+<!-- P3 -->
+<div class="param-card" id="p3">
+  <div class="param-header">
+    <span class="param-id">P3</span>
+    <span class="param-name">range_monitoring_end</span>
+    <span class="chip time">Time HH:mm:ss</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> 10:30:00</span>
+    <span><strong>JSON key:</strong> <code>range_monitoring_end</code></span>
+  </div>
+  <p>The time at which range building stops and the state machine transitions <strong>MONITORING → ENTRY</strong>. At this tick the <code>high</code> and <code>low</code> values are frozen permanently for the day. No further OHLC data changes the range boundaries.</p>
+  <p><strong>GUI sync:</strong> Changing <code>range_monitoring_end</code> in the GUI automatically updates <code>entry_start</code> to match, enforcing the invariant that breakout detection can only begin after the range is fully built.</p>
+</div>
+
+<!-- P4 -->
+<div class="param-card" id="p4">
+  <div class="param-header">
+    <span class="param-id">P4</span>
+    <span class="param-name">entry_start</span>
+    <span class="chip time">Time HH:mm:ss</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> Auto-synced to range_monitoring_end</span>
+    <span><strong>JSON key:</strong> <code>entry_start</code></span>
+  </div>
+  <p>The <strong>earliest time</strong> within the ENTRY phase at which breakout detection is active. If the index breaches the range before <code>entry_start</code>, the breakout is silently ignored. This allows a deliberate quiet gap between range lock and entry eligibility.</p>
+  <p>In practice <code>entry_start</code> is usually set equal to <code>range_monitoring_end</code> (no gap), which is why the GUI auto-syncs them. Set it later only if you want to ignore early breakouts.</p>
+</div>
+
+<!-- P5 -->
+<div class="param-card" id="p5">
+  <div class="param-header">
+    <span class="param-id">P5</span>
+    <span class="param-name">entry_end</span>
+    <span class="chip time">Time HH:mm:ss</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> 16:15:00</span>
+    <span><strong>JSON key:</strong> <code>entry_end</code></span>
+  </div>
+  <p>The <strong>base deadline</strong> for new breakout entries. Once <code>current_time &gt; effective_entry_end</code> with no breakout having fired, the state machine moves to <strong>DONE</strong>.</p>
+  <p><code>entry_end</code> is the <em>base</em> value. The actual effective deadline may be extended by <code>range_buffer</code> before the first side fires, and collapses back to <code>entry_end</code> after the first side fires.</p>
+  <blockquote class="warn">Re-executions (legs re-entering after SL/Target via <code>execute_trigger</code>) are <strong>not</strong> gated by <code>entry_end</code>. They continue up to <code>end_time</code> (portfolio-level 16:15 default).</blockquote>
+</div>
+
+<!-- P6 -->
+<div class="param-card" id="p6">
+  <div class="param-header">
+    <span class="param-id">P6</span>
+    <span class="param-name">range_buffer</span>
+    <span class="chip int">Integer (minutes)</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> 0 (disabled)</span>
+    <span><strong>JSON key:</strong> <code>range_buffer</code></span>
+    <span><strong>GUI label:</strong> "Range Buffer (mins)"</span>
+  </div>
+  <p>Extends the breakout entry window beyond <code>entry_end</code> — but <strong>only until the first side fires</strong>.</p>
+  <h4>Buffer Calculation</h4>
+  <pre><code>effective_entry_end = entry_end + range_buffer  ← while triggered_sides is empty
+effective_entry_end = entry_end                  ← once any side has fired</code></pre>
+  <h4>Buffer Collapse</h4>
+  <p>The moment the first breakout fires (HIGH or LOW), <code>triggered_sides</code> becomes non-empty and <code>effective_entry_end</code> collapses instantly back to the original <code>entry_end</code>. The second direction can only enter if it also breaks out before <code>entry_end</code> — which may already have passed.</p>
+  <h4>Example — buffer=300 min</h4>
+  <table>
+  <thead><tr><th>Time</th><th>Event</th><th>effective_end</th></tr></thead>
+  <tbody>
+  <tr><td>10:30</td><td>Range locked</td><td class="pos">16:00 (11:00 + 300 min)</td></tr>
+  <tr><td>12:30</td><td>HIGH breakout fires → trades execute</td><td class="neg">11:00 (collapses!)</td></tr>
+  <tr><td>12:45</td><td>LOW breakout detected</td><td>12:45 &gt; 11:00 → <strong>BLOCKED</strong></td></tr>
+  </tbody>
+  </table>
+  <blockquote class="info">Buffer collapse confirmed live in RBO_TEST001 on 06-Jan, 08-Jan, 24-Jan via rbo5. After HIGH fired in the buffer window, LOW breakout was dispatched to rbo1/rbo4 but silently blocked for rbo5.</blockquote>
+</div>
+
+<!-- P7 -->
+<div class="param-card" id="p7">
+  <div class="param-header">
+    <span class="param-id">P7</span>
+    <span class="param-name">entry_at</span>
+    <span class="chip select">Dropdown (5 options)</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> Any</span>
+    <span><strong>JSON key:</strong> <code>entry_at</code></span>
+  </div>
+  <p>Controls <strong>which legs execute on which breakout direction</strong>. The rule is evaluated per-leg inside <code>RBOManager.get_legs_to_execute()</code> after each breakout is detected. Only legs with <code>Idle=False</code> and <code>status=IDLE</code> are considered.</p>
+  <div class="option-grid">
+    <div class="option-item">
+      <div class="option-label">Any</div>
+      <div class="option-desc">All non-Idle legs fire on both HIGH and LOW breakouts. Both directions are fully independent.</div>
+    </div>
+    <div class="option-item">
+      <div class="option-label">RangeHigh</div>
+      <div class="option-desc">Legs only fire on a HIGH breakout. LOW breakouts are ignored for this portfolio entirely.</div>
+    </div>
+    <div class="option-item">
+      <div class="option-label">RangeLow</div>
+      <div class="option-desc">Legs only fire on a LOW breakout. HIGH breakouts are ignored.</div>
+    </div>
+    <div class="option-item">
+      <div class="option-label">C_OnHigh_P_OnLow</div>
+      <div class="option-desc">Call legs enter on HIGH breakout; Put legs enter on LOW breakout. Directional: buy bullish when market breaks up, bearish when it breaks down.</div>
+    </div>
+    <div class="option-item">
+      <div class="option-label">P_OnHigh_C_OnLow</div>
+      <div class="option-desc">Put legs enter on HIGH breakout; Call legs enter on LOW breakout. Counter-directional: sell volatility in the breakout direction.</div>
+    </div>
+  </div>
+  <h4>Leg Type Detection</h4>
+  <p>The <code>C/P</code> field on each leg is normalized: <code>"C"</code>, <code>"CE"</code>, <code>"CALL"</code>, <code>"0"</code> → Call. <code>"P"</code>, <code>"PE"</code>, <code>"PUT"</code>, <code>"1"</code> → Put.</p>
+  <table>
+  <thead><tr><th>entry_at</th><th>HIGH breakout</th><th>LOW breakout</th></tr></thead>
+  <tbody>
+  <tr><td><code>Any</code></td><td class="pos">All non-Idle legs</td><td class="pos">All non-Idle legs</td></tr>
+  <tr><td><code>RangeHigh</code></td><td class="pos">All non-Idle legs</td><td class="dim">No legs</td></tr>
+  <tr><td><code>RangeLow</code></td><td class="dim">No legs</td><td class="pos">All non-Idle legs</td></tr>
+  <tr><td><code>C_OnHigh_P_OnLow</code></td><td class="pos">Call legs only</td><td class="pos">Put legs only</td></tr>
+  <tr><td><code>P_OnHigh_C_OnLow</code></td><td class="pos">Put legs only</td><td class="pos">Call legs only</td></tr>
+  </tbody>
+  </table>
+</div>
+
+<!-- P8 -->
+<div class="param-card" id="p8">
+  <div class="param-header">
+    <span class="param-id">P8</span>
+    <span class="param-name">monitoring</span>
+    <span class="chip select">Dropdown (2 options)</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> Underlying</span>
+    <span><strong>JSON key:</strong> <code>monitoring</code></span>
+  </div>
+  <p>Determines the <strong>data source</strong> used to build and track the intraday range.</p>
+  <table>
+  <thead><tr><th>Value</th><th>Behaviour</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><strong>Underlying</strong></td>
+    <td class="pos">Range tracked against the SPY (or configured symbol) index OHLC data loaded from parquet. This is the primary, validated mode.</td>
+  </tr>
+  <tr>
+    <td><strong>Other strategies</strong></td>
+    <td class="neg">Reserved — not yet implemented. Setting this value causes <code>error = "RBO Monitoring must be set to 'Underlying'"</code> and RBO is disabled for the portfolio.</td>
+  </tr>
+  </tbody>
+  </table>
+  <blockquote class="warn">Validation: if <code>monitoring ≠ "Underlying"</code>, the engine logs an error and the portfolio falls back to standard time-based entry for the entire day.</blockquote>
+</div>
+
+<!-- P9 -->
+<div class="param-card" id="p9">
+  <div class="param-header">
+    <span class="param-id">P9</span>
+    <span class="param-name">cancel_other</span>
+    <span class="chip bool">Checkbox</span>
+  </div>
+  <div class="param-meta">
+    <span><strong>Default:</strong> false</span>
+    <span><strong>JSON key:</strong> <code>cancel_other</code></span>
+    <span><strong>GUI label:</strong> "Cancel Other Side if One Executes"</span>
+  </div>
+  <p>Controls whether executing one breakout side <strong>permanently blocks the other side</strong> for the rest of the day.</p>
+  <table>
+  <thead><tr><th>Value</th><th>Behaviour</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><code>true</code></td>
+    <td>After the first breakout executes, <code>RBOManager.mark_executed()</code> sets <code>current_phase = "DONE"</code>. No further breakouts are checked. Maximum 1 entry cluster per portfolio per day.</td>
+  </tr>
+  <tr>
+    <td><code>false</code></td>
+    <td>Both HIGH and LOW sides remain independently eligible. Each side can trigger at most once (enforced by <code>triggered_sides</code>), but both can fire on a dual-breakout day.</td>
+  </tr>
+  </tbody>
+  </table>
+  <blockquote>
+    <strong>Interaction with entry_at:</strong> <code>cancel_other = true</code> with <code>entry_at = "Any"</code> means the first direction to break out wins and the portfolio is done. With <code>entry_at = "RangeHigh"</code> and <code>cancel_other = true</code>, the behaviour is functionally identical to <code>cancel_other = false</code> since only one direction can ever trigger.
+  </blockquote>
+</div>
+
+<hr>
+
+<!-- ═══════════ LEG IDLE FLAG ═══════════ -->
+<h2 id="idle-flag">Leg Idle Flag — RBO Mode Inversion</h2>
+<p>When RBO is active, the <code>Idle</code> checkbox on individual legs has <strong>inverted semantics</strong> compared to non-RBO mode:</p>
+<table>
+<thead><tr><th>RBO State</th><th>Idle = false</th><th>Idle = true</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>RBO enabled</strong></td>
+  <td class="pos">✅ RBO leg — enters on breakout signal (<code>rbo_trigger</code>)</td>
+  <td class="neg">⛔ Excluded from RBO — enters at its own <code>Start Time</code> or via <code>execute_trigger</code></td>
+</tr>
+<tr>
+  <td><strong>RBO disabled</strong></td>
+  <td class="pos">✅ Normal time-based entry at <code>Start Time</code></td>
+  <td class="neg">⏳ Waits for external <code>execute_trigger</code> only (legacy waiting leg)</td>
+</tr>
+</tbody>
+</table>
+<pre><code># execution.py — Idle flag inversion logic
+_rbo_active = state["rbo"].enabled and not state["rbo"].error
+if _rbo_active:
+    is_rbo_leg = not leg.get("Idle", False)   # Idle=False → RBO leg
+else:
+    is_rbo_leg = leg.get("Idle", False)        # Idle=True  → waiting leg (legacy)</code></pre>
+<p><strong>Use case (rbo6):</strong> Legs 1+2 have <code>Idle=False</code> — they enter on breakout. Leg 3 has <code>Idle=True</code> — it enters unconditionally at portfolio start time (09:30 / 10:30 winter). This creates a mixed portfolio: breakout-triggered volatility trade + always-on position.</p>
+
+<hr>
+
+<!-- ═══════════ RE-ENTRY ═══════════ -->
+<h2 id="reentry">Re-Entry After SL/Target (execute_trigger)</h2>
+<p>When a leg exits via SL or Target and has a re-execute action configured, the replacement leg activates with <code>execute_trigger = True</code>. This flag <strong>bypasses the RBO gate entirely</strong> — no <code>rbo_trigger</code> is required. Re-entries are not limited by <code>entry_end</code> and continue up to <code>end_time</code> (portfolio-level 16:15 default).</p>
+<pre><code># execution.py — execute_trigger takes priority over all RBO gates
+if leg.get("execute_trigger"):
+    can_execute = True
+    leg["rbo_trigger"] = False    # execute_trigger overrides rbo gate</code></pre>
+<p>This design allows re-executions to happen deep into the afternoon even when new breakout entries closed at 11:00. The RBO phase (<em>DONE</em>) does not interfere with re-entries.</p>
+
+<hr>
+
+<!-- ═══════════ END-TO-END FLOW ═══════════ -->
+<h2 id="flow">End-to-End Flow (Per Day, Per Portfolio)</h2>
+<pre><code>Day Start
+│
+├─ RBOManager initialised with winter-adjusted times
+│
+├─ IDLE phase
+│   └─ Tick by tick: current_time &lt; range_monitoring_start → nothing
+│
+├─ MONITORING phase  (current_time >= range_monitoring_start)
+│   ├─ Each tick: high = max(high, bar.high)
+│   │             low  = min(low,  bar.low)
+│   └─ At range_monitoring_end: range frozen → transition to ENTRY
+│
+├─ ENTRY phase
+│   ├─ If current_time &lt; entry_start → skip tick
+│   │
+│   ├─ Compute effective deadline:
+│   │   triggered_sides empty?  →  effective_end = entry_end + buffer
+│   │   triggered_sides non-empty? →  effective_end = entry_end
+│   │
+│   ├─ If current_time > effective_end → DONE, return
+│   │
+│   ├─ bar.high > range.high  AND  "HIGH" ∉ triggered_sides?
+│   │   └─ triggered_sides.add("HIGH")
+│   │   └─ log: RBO_BREAKOUT | Type=HIGH | Range=[low, high]
+│   │   └─ get_legs_to_execute("HIGH")
+│   │       └─ filter: status=IDLE, Idle=False, entry_at rule matches leg C/P
+│   │   └─ set rbo_trigger=True + rbo_break_type="HIGH" on eligible legs
+│   │   └─ mark_executed("HIGH")  →  if cancel_other: phase = DONE
+│   │
+│   └─ bar.low  &lt; range.low   AND  "LOW"  ∉ triggered_sides?
+│       └─ (same logic, Type=LOW)
+│
+├─ Leg entry via process_idle_leg_entries()
+│   └─ rbo_trigger=True → can_execute=True
+│   └─ entry_reason_str set to "Entry on HIGH/LOW breakout"
+│   └─ rbo_trigger cleared after leg activates
+│
+└─ DONE / End of Day
+    └─ EOD forced exit of any remaining active legs</code></pre>
+
+<hr>
+
+<!-- ═══════════ VALIDATION ═══════════ -->
+<h2 id="validation">Validation Rules</h2>
+<table>
+<thead><tr><th>Condition</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>rbo_enabled = false</code></td><td>RBO skipped entirely; all legs use standard time-based entry</td></tr>
+<tr><td><code>range_monitoring_start</code> or <code>range_monitoring_end</code> missing</td><td class="neg">Error: "RBO Monitoring times missing" — RBO disabled for this portfolio</td></tr>
+<tr><td><code>monitoring ≠ "Underlying"</code></td><td class="neg">Error: "RBO Monitoring must be set to 'Underlying'" — RBO disabled</td></tr>
+<tr><td><code>range_buffer = 0</code> or empty</td><td>No extension; <code>effective_end = entry_end</code> always</td></tr>
+<tr><td><code>entry_start &gt; range_monitoring_end</code></td><td>Quiet gap — breakouts detected before <code>entry_start</code> are silently ignored</td></tr>
+<tr><td>Both HIGH and LOW break before <code>entry_end</code></td><td>Both fire if <code>cancel_other = false</code>; first one only if <code>cancel_other = true</code></td></tr>
+<tr><td>Each direction can only fire once</td><td>Enforced by <code>triggered_sides</code> set — a direction already in the set is never re-dispatched</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<!-- ═══════════ TESTED CONFIGS ═══════════ -->
+<h2 id="tested">Tested Configurations</h2>
+<p>Six portfolios in RBO_TEST001 / RBO_TEST002 cover every parameter combination:</p>
+<table>
+<thead>
+<tr><th>Portfolio</th><th>entry_at</th><th>cancel_other</th><th>entry_end</th><th>buffer</th><th>Key Behaviour Verified</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>rbo1</strong></td><td>Any</td><td>False</td><td>14:30</td><td>—</td><td class="pos">Both sides fire independently on dual-breakout days</td></tr>
+<tr><td><strong>rbo2</strong></td><td>RangeHigh</td><td>True</td><td>11:00</td><td>300 min</td><td class="pos">HIGH only; buffer extension to 16:00; cancel_other blocks second if any</td></tr>
+<tr><td><strong>rbo3</strong></td><td>RangeLow</td><td>True</td><td>14:30</td><td>—</td><td class="pos">LOW only; inactive on bullish days</td></tr>
+<tr><td><strong>rbo4</strong></td><td>C_OnHigh_P_OnLow</td><td>False</td><td>14:30</td><td>15 min</td><td class="pos">Call/Put routing by direction; 15-min buffer; SL ×2 re-execute</td></tr>
+<tr><td><strong>rbo5</strong></td><td>P_OnHigh_C_OnLow</td><td>False</td><td>11:00</td><td>300 min</td><td class="pos">Buffer <strong>collapse</strong> confirmed (3 days); portfolio re-execute ×3 confirmed (9 days)</td></tr>
+<tr><td><strong>rbo6</strong></td><td>Any</td><td>False</td><td>11:00</td><td>300 min</td><td class="pos">Buffer extension; Idle=True leg enters at start time; unlimited SL+Target re-execute</td></tr>
+</tbody>
+</table>
+
+</div><!-- .page -->
+</div><!-- .layout -->
+</body>
+</html>

@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Legs Parameter Tab – Logic Documentation</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    /* file-specific aliases */
+    --green: var(--accent2);
+    --orange: var(--warn);
+    --red: var(--danger);
+    --tag-blue: rgba(91,124,250,.15);
+    --tag-purple: rgba(167,139,250,.15);
+    --tag-green: rgba(126,214,160,.15);
+    --tag-orange: rgba(247,201,72,.12);
+    --tag-red: rgba(233,96,96,.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 14px;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  nav {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  nav .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  nav .logo h2 { font-size: 13px; color: var(--accent); letter-spacing: .5px; text-transform: uppercase; }
+  nav .logo p { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  nav a {
+    display: block;
+    padding: 7px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  nav a:hover, nav a.active { color: var(--text); border-left-color: var(--accent); background: rgba(79,142,247,.07); }
+  nav .section-label {
+    padding: 14px 20px 4px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+
+  /* Main */
+  main {
+    flex: 1;
+    max-width: 960px;
+    padding: 40px 48px;
+    overflow-x: hidden;
+  }
+
+  /* Page header */
+  .page-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  .page-header h1 { font-size: 26px; font-weight: 700; color: #fff; }
+  .page-header .meta { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; padding: 3px 9px; border-radius: 4px;
+    font-weight: 500;
+  }
+  .badge-blue  { background: var(--tag-blue);   color: #7ab3ff; border: 1px solid #2a4a80; }
+  .badge-purple{ background: var(--tag-purple);  color: #b89cf5; border: 1px solid #4a2f80; }
+  .badge-green { background: var(--tag-green);  color: #5ddba0; border: 1px solid #1f5c40; }
+  .badge-orange{ background: var(--tag-orange); color: #f5c76a; border: 1px solid #5c3a0f; }
+  .badge-red   { background: var(--tag-red);    color: #f07070; border: 1px solid #5c2020; }
+
+  /* Overview box */
+  .overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin-bottom: 36px;
+    font-size: 13.5px;
+    color: #b8c0d8;
+  }
+
+  /* Data flow */
+  .flow-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12.5px;
+    color: #a8c4e8;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.7;
+  }
+
+  /* Parameter cards */
+  .param-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+
+  .param-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .param-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .param-title { font-size: 16px; font-weight: 600; color: #fff; }
+  .param-key {
+    margin-left: auto;
+    font-family: monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    color: var(--orange);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .param-body { padding: 18px 20px; }
+
+  /* Property table */
+  .prop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .prop-table th {
+    text-align: left;
+    padding: 7px 12px;
+    background: var(--code-bg);
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .prop-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .prop-table tr:last-child td { border-bottom: none; }
+  .prop-table td:first-child { color: var(--muted); width: 140px; }
+  .prop-table td:last-child  { color: var(--text); }
+
+  /* Logic text */
+  .logic-text {
+    font-size: 13.5px;
+    color: #c0c8e0;
+    line-height: 1.75;
+  }
+  .logic-text p { margin-bottom: 10px; }
+  .logic-text strong { color: #fff; }
+
+  /* Inline code */
+  code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    color: var(--orange);
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+
+  /* Code block */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12.5px;
+    color: #a8c4e8;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.6;
+    margin: 12px 0;
+  }
+
+  /* Mini table inside logic */
+  .mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 12px 0;
+  }
+  .mini-table th {
+    padding: 7px 12px;
+    background: var(--code-bg);
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .mini-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .mini-table tr:last-child td { border-bottom: none; }
+  .mini-table td:first-child { color: var(--green); font-family: monospace; width: 180px; }
+  .mini-table td:last-child  { color: #c0c8e0; }
+
+  /* Alert / Note box */
+  .note {
+    border-left: 4px solid var(--orange);
+    background: rgba(245,166,35,.07);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #d9b870;
+    margin: 12px 0;
+  }
+  .note strong { color: var(--orange); }
+
+  .warn {
+    border-left: 4px solid var(--red);
+    background: rgba(224,82,82,.07);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #f07070;
+    margin: 12px 0;
+  }
+  .warn strong { color: var(--red); }
+
+  .tip {
+    border-left: 4px solid var(--green);
+    background: rgba(62,207,142,.07);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #80d8a8;
+    margin: 12px 0;
+  }
+  .tip strong { color: var(--green); }
+
+  /* Section headings */
+  h2 { font-size: 19px; font-weight: 700; color: #fff; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 15px; font-weight: 600; color: var(--accent); margin: 20px 0 10px; }
+
+  /* Action grid */
+  .action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 14px 0;
+  }
+  .action-card {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .action-card .action-name {
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--green);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .action-card .action-desc {
+    font-size: 12.5px;
+    color: #9aa0c0;
+    line-height: 1.6;
+  }
+
+  /* Validation list */
+  .val-list { list-style: none; padding: 0; margin: 12px 0; }
+  .val-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    color: #c0c8e0;
+  }
+  .val-list li:last-child { border-bottom: none; }
+  .val-num {
+    min-width: 22px; height: 22px;
+    background: var(--accent2);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Hidden params table */
+  .hidden-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 12px 0;
+  }
+  .hidden-table th {
+    padding: 8px 12px;
+    background: var(--code-bg);
+    color: var(--muted);
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .hidden-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .hidden-table tr:last-child td { border-bottom: none; }
+
+  /* Impl notes section */
+  .impl-note-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .impl-note-header {
+    padding: 12px 18px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .impl-note-body {
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: #c0c8e0;
+    line-height: 1.75;
+  }
+  .impl-note-body p { margin-bottom: 10px; }
+  .impl-note-body p:last-child { margin-bottom: 0; }
+
+  /* Scroll top */
+  .scroll-top {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 38px; height: 38px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(79,142,247,.4);
+    z-index: 100;
+  }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<nav>
+  <div class="logo">
+    <h2>Legs Logic Docs</h2>
+    <p>engine / portfolio.py</p>
+  </div>
+
+  <div class="section-label">Overview</div>
+  <a href="#overview">Overview</a>
+
+  <div class="section-label">Parameters</div>
+  <a href="#p1">1 · ID</a>
+  <a href="#p2">2 · Idle</a>
+  <a href="#p3">3 · BUY/SELL</a>
+  <a href="#p4">4 · C/P</a>
+  <a href="#p5">5 · Lots</a>
+  <a href="#p6">6 · Expiry</a>
+  <a href="#p7">7 · Strike</a>
+  <a href="#p8">8 · Hedge Required</a>
+  <a href="#p9">9 · Wait &amp; Trade</a>
+  <a href="#p10">10 · Target Type</a>
+  <a href="#p11">11 · Target Value</a>
+  <a href="#p12">12 · Stoploss Type</a>
+  <a href="#p13">13 · Stoploss Value</a>
+  <a href="#p14">14 · On Target Action</a>
+  <a href="#p15">15 · On SL Action</a>
+  <a href="#p16">16 · SL Wait</a>
+  <a href="#p17">17 · Start Time</a>
+
+  <div class="section-label">Reference</div>
+  <a href="#hidden">Hidden Params</a>
+  <a href="#dataflow">Data Flow</a>
+  <a href="#impl-notes">Engine Notes</a>
+  <a href="#validation">Validation Rules</a>
+</nav>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<main>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Legs Parameter Tab – Logic Documentation</h1>
+    <div class="meta">
+      <span class="badge badge-blue">tabs/portfolio.py</span>
+      <span class="badge badge-purple">engine/execution.py</span>
+      <span class="badge badge-purple">engine/monitoring.py</span>
+      <span class="badge badge-purple">engine/target_sl.py</span>
+      <span class="badge badge-purple">engine/move_sl.py</span>
+      <span class="badge badge-green">dsl/portfolios.json → legs[]</span>
+      <span class="badge badge-orange">Generated: 2026-04-15 · Reviewed: 2026-04-16</span>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <div class="overview" id="overview">
+    The <strong>Legs</strong> section is the core configuration table inside the Portfolio form. Every portfolio must have at least one leg. Each leg represents a single options contract to be traded (Buy or Sell, Call or Put, at a specific strike and expiry). Parameters control entry timing, exit logic (target/stoploss), and post-exit actions.<br><br>
+    Each leg row is stored as a flat dict in <code>portfolios.json</code> under the <code>legs</code> key. The engine loads this config into runtime state (<code>state["legs"]</code>) and processes it on every market tick.
+  </div>
+
+  <h2>Enabled Parameters</h2>
+
+  <!-- ── 1. ID ── -->
+  <div class="param-card" id="p1">
+    <div class="param-header">
+      <div class="param-num">1</div>
+      <div class="param-title">ID</div>
+      <div class="param-key">"ID"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QTableWidgetItem</code> (read-only)</td></tr>
+        <tr><td>Type</td><td>Integer string (auto-assigned)</td></tr>
+        <tr><td>Default</td><td>Auto-incremented row number</td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Auto-assigned sequential integer when a leg row is added (<code>add_leg_row()</code>). After any deletion, all IDs are reassigned top-to-bottom in <code>delete_leg_row()</code> to keep them contiguous.</p>
+        <p>The engine uses <code>ID</code> as the canonical leg identifier for execution tracking, log messages, order book entries, and cross-leg references (e.g. <code>Execute</code> action pointing to another leg by its ID).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. Idle ── -->
+  <div class="param-card" id="p2">
+    <div class="param-header">
+      <div class="param-num">2</div>
+      <div class="param-title">Idle</div>
+      <div class="param-key">"Idle"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QCheckBox</code></td></tr>
+        <tr><td>Type</td><td>Boolean</td></tr>
+        <tr><td>Default</td><td><code>False</code> (unchecked)</td></tr>
+      </table>
+      <div class="logic-text">
+        <p>When <strong>Idle = True</strong>, the leg does <strong>not</strong> auto-execute at portfolio start time. It sits in <code>status = "IDLE"</code> waiting for one of two triggers:</p>
+        <ul style="margin:8px 0 8px 20px; color:#c0c8e0; font-size:13.5px; line-height:1.75;">
+          <li><strong>RBO Trigger:</strong> A Range Breakout event (<code>rbo_trigger = True</code>) arms this leg for immediate entry.</li>
+          <li><strong>Cross-Portfolio Trigger:</strong> A "Start Other Portfolio" action from another portfolio sets <code>execute_trigger = True</code>, bypassing the Idle gate even in Manual mode.</li>
+          <li><strong>Manual Mode:</strong> Cross-portfolio triggered Idle legs still respect their individual <code>Start Time</code> before entering.</li>
+        </ul>
+        <p>Engine location: <code>process_idle_leg_entries()</code> → <code>is_rbo_leg = leg.get("Idle", False)</code>.</p>
+        <div class="tip"><strong>Validation:</strong> <code>save_portfolio()</code> validates that any <code>ReEntry</code> action referencing a <code>leg_id</code> must point to a leg that has <code>Idle = True</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. BUY/SELL ── -->
+  <div class="param-card" id="p3">
+    <div class="param-header">
+      <div class="param-num">3</div>
+      <div class="param-title">BUY/SELL</div>
+      <div class="param-key">"BUY/SELL"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>BUY</code>, <code>SELL</code></td></tr>
+        <tr><td>Default</td><td><code>SELL</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Sets the trade direction for the leg.</p>
+        <table class="mini-table">
+          <tr><th>Direction</th><th>SL trigger</th><th>Target trigger</th><th>Exit fill</th><th>Entry price</th></tr>
+          <tr>
+            <td>SELL</td>
+            <td><code>bid_high &gt;= sl_val</code></td>
+            <td><code>bid_low &lt;= tgt_val</code></td>
+            <td><code>max(ask_vwap, hit_price)</code></td>
+            <td><code>bid_open → bid_close → close</code></td>
+          </tr>
+          <tr>
+            <td>BUY</td>
+            <td><code>ask_low &lt;= sl_val</code></td>
+            <td><code>ask_high &gt;= tgt_val</code></td>
+            <td><code>max(bid_vwap, hit_price)</code></td>
+            <td><code>ask_open → ask_close → close</code></td>
+          </tr>
+        </table>
+        <div class="note"><strong>Fill price detail:</strong> SL exits — SELL: <code>hit_price = bid_high</code>; BUY: <code>hit_price = ask_low</code>. Target exits — SELL: <code>hit_price = bid_low</code>; BUY: <code>hit_price = ask_high</code>. The <code>max(vwap, hit_price)</code> formula ensures the fill is never worse than the level that triggered the exit.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. C/P ── -->
+  <div class="param-card" id="p4">
+    <div class="param-header">
+      <div class="param-num">4</div>
+      <div class="param-title">C/P (Call / Put)</div>
+      <div class="param-key">"C/P"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>C</code> (Call), <code>P</code> (Put)</td></tr>
+        <tr><td>Default</td><td><code>C</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Specifies the option type. Normalized by <code>normalize_cp()</code>: <code>C / CALL / CE / 0 → 0</code>, <code>P / PUT / PE / 1 → 1</code>. Used to look up the correct option chain quote from the data layer (<code>get_option_quote()</code>). Also determines the hedge leg's option type when <code>Hedge Required</code> is enabled.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Lots ── -->
+  <div class="param-card" id="p5">
+    <div class="param-header">
+      <div class="param-num">5</div>
+      <div class="param-title">Lots</div>
+      <div class="param-key">"Lots"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QSpinBox</code></td></tr>
+        <tr><td>Range</td><td>1 – 999</td></tr>
+        <tr><td>Default</td><td><code>1</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Number of contract lots. Used in PnL calculation:</p>
+        <div class="code-block">pnl = (entry_price - exit_price) × QTY × lots × multiplier   # SELL
+pnl = (exit_price - entry_price) × QTY × lots × multiplier   # BUY</div>
+        <p><code>QTY = 100</code> (standard SPY lot size). <code>multiplier</code> defaults to 1.0. The <code>realized_per_lot</code> metric divides total PnL by <code>lots</code> for normalized reporting.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. Expiry ── -->
+  <div class="param-card" id="p6">
+    <div class="param-header">
+      <div class="param-num">6</div>
+      <div class="param-title">Expiry</div>
+      <div class="param-key">"Expiry"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>0DTE</code>, <code>1DTE</code>, <code>2DTE</code></td></tr>
+        <tr><td>Default</td><td><code>0DTE</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Days-to-expiry of the target option contract. Parsed by <code>normalize_dte()</code> (strips "DTE" suffix → integer). Stored as <code>target_dte</code> on the leg runtime state. Used by <code>get_option_quote()</code> to filter the option chain to contracts expiring in exactly N days.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. Strike ── -->
+  <div class="param-card" id="p7">
+    <div class="param-header">
+      <div class="param-num">7</div>
+      <div class="param-title">Strike</div>
+      <div class="param-key">"Strike"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>ATM+10</code> … <code>ATM</code> … <code>ATM-10</code></td></tr>
+        <tr><td>Default</td><td><code>ATM</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Strike selection relative to ATM at the time of entry.</p>
+        <ul style="margin:8px 0 8px 20px; color:#c0c8e0; font-size:13.5px; line-height:1.75;">
+          <li><code>ATM</code> resolves to the nearest strike to the underlying spot/futures price.</li>
+          <li><code>ATM+N</code> / <code>ATM-N</code> offsets by N strike steps (configured via portfolio-level <code>Strike Step</code>).</li>
+          <li>The <code>Strike Selection</code> mode (<code>Normal</code> or <code>Relative</code>) affects how the offset is applied.</li>
+          <li>On <strong>Re-Execute</strong>, <code>reentry_mode = "same_strike"</code> re-enters at the previously resolved numeric strike instead of re-resolving ATM.</li>
+        </ul>
+        <p>Engine location: <code>process_idle_leg_entries()</code> → <code>safe_strike_key(leg["conf"]["Strike"])</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 8. Hedge Required ── -->
+  <div class="param-card" id="p8">
+    <div class="param-header">
+      <div class="param-num">8</div>
+      <div class="param-title">Hedge Required</div>
+      <div class="param-key">"Hedge Required"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QCheckBox</code></td></tr>
+        <tr><td>Type</td><td>Boolean</td></tr>
+        <tr><td>Default</td><td><code>False</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>When checked, a dynamic hedge leg is automatically placed immediately after this leg's entry:</p>
+        <ol style="margin:8px 0 8px 22px; color:#c0c8e0; font-size:13.5px; line-height:1.9;">
+          <li>Looks up ATM strike via <code>get_atm_strike_fast()</code>.</li>
+          <li>Calls <code>find_hedge_strike()</code> using the Dynamic Hedge tab config.</li>
+          <li>Creates a system-managed hedge leg with ID <code>H_{parent_lid}_{exec_count}</code>.</li>
+          <li>Direction is opposite to parent (<code>BUY→SELL hedge</code>, <code>SELL→BUY hedge</code>), same option type. <code>Hedge Required: False</code> prevents recursive hedging.</li>
+          <li>When the parent exits, the linked hedge leg is simultaneously closed at market price (<code>PARENT EXIT</code>).</li>
+        </ol>
+        <p>Portfolio-level <code>dynamic_hedge["enabled"]</code> is auto-set to <code>True</code> if <strong>any</strong> leg has <code>Hedge Required = True</code>. Max hedge count enforced by <code>state["max_hedge_executions"]</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 9. Wait & Trade ── -->
+  <div class="param-card" id="p9">
+    <div class="param-header">
+      <div class="param-num">9</div>
+      <div class="param-title">Wait &amp; Trade</div>
+      <div class="param-key">"Wait &amp; Trade"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QSpinBox</code></td></tr>
+        <tr><td>Range</td><td>0 – 9999 seconds</td></tr>
+        <tr><td>Default</td><td><code>0</code> (disabled)</td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Deliberate delay between entry condition being met and the actual order placement:</p>
+        <ol style="margin:8px 0 8px 22px; color:#c0c8e0; font-size:13.5px; line-height:1.9;">
+          <li><code>wt_pending = True</code>, <code>wt_trigger_time = curr_dt</code> recorded. <code>WAIT_AND_TRADE_PENDING</code> logged.</li>
+          <li>Leg skips entry while <code>elapsed &lt; wt_delay</code>.</li>
+          <li>Once <code>elapsed &gt;= wt_delay</code>, <code>wt_pending = False</code> and entry proceeds normally.</li>
+        </ol>
+        <p>Setting <code>Wait &amp; Trade = 0</code> disables the delay entirely. Engine location: <code>process_idle_leg_entries()</code> lines 937–955.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 10. Target Type ── -->
+  <div class="param-card" id="p10">
+    <div class="param-header">
+      <div class="param-num">10</div>
+      <div class="param-title">Target Type</div>
+      <div class="param-key">"Target Type"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>None</code>, <code>Premium</code>, <code>AbsolutePremium</code>, <code>Underlying</code></td></tr>
+        <tr><td>Default</td><td><code>None</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Determines how <code>tgt_pending_val</code> is computed at entry time:</p>
+        <table class="mini-table">
+          <tr><th>Mode</th><th>Computation</th></tr>
+          <tr><td>None</td><td>No target. <code>tgt_pending_val = None</code>. Leg exits on SL, time, or portfolio SqOff only.</td></tr>
+          <tr><td>Premium</td><td>With <code>%</code>: <code>tgt = entry × (1 - pct/100)</code> for SELL, <code>entry × (1 + pct/100)</code> for BUY. Plain number: <code>tgt = entry - value</code> for SELL, <code>entry + value</code> for BUY.</td></tr>
+          <tr><td>AbsolutePremium</td><td>Fixed absolute price level. <code>tgt_pending_val = parsed_value</code>.</td></tr>
+          <tr><td>Underlying</td><td>⚠️ <strong>Not implemented at leg level.</strong> Engine has no handler — <code>tgt_pending_val</code> remains <code>None</code>. Use portfolio-level target instead.</td></tr>
+        </table>
+        <div class="note"><strong>Engine code path (execution.py):</strong> <code>AbsolutePremium</code> → fixed value; <code>Premium</code> / <code>PremiumBased</code> → entry-price offset or %; any type containing <code>"Percentage"</code> → percentage-of-entry catch-all; <code>"Underlying"</code> → falls through, no value set.</div>
+        <p>Target evaluated each tick on <code>bid_low</code> (SELL) or <code>ask_high</code> (BUY). Exit fill = <code>max(ask_vwap, bid_low)</code> for SELL or <code>max(bid_vwap, ask_high)</code> for BUY.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 11. Target Value ── -->
+  <div class="param-card" id="p11">
+    <div class="param-header">
+      <div class="param-num">11</div>
+      <div class="param-title">Target Value</div>
+      <div class="param-key">"Target Value"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QTableWidgetItem</code> (editable text)</td></tr>
+        <tr><td>Type</td><td>Numeric string, supports <code>%</code> suffix</td></tr>
+        <tr><td>Default</td><td><code>""</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Numeric parameter for the selected <code>Target Type</code>. Parsed by <code>parse_val()</code> which strips <code>%</code> and converts to float.</p>
+        <ul style="margin:8px 0 8px 20px; color:#c0c8e0; font-size:13.5px; line-height:1.75;">
+          <li><code>"20%"</code> with <code>Premium</code> → exit when premium drops 20% from entry (SELL).</li>
+          <li><code>"5.00"</code> with <code>AbsolutePremium</code> → exit when premium reaches $5.00.</li>
+          <li>Empty or <code>0</code> with non-None type → <code>tgt_pending_val</code> remains <code>None</code> (no target armed).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 12. Stoploss Type ── -->
+  <div class="param-card" id="p12">
+    <div class="param-header">
+      <div class="param-num">12</div>
+      <div class="param-title">Stoploss Type</div>
+      <div class="param-key">"Stoploss Type"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QComboBox</code></td></tr>
+        <tr><td>Options</td><td><code>None</code>, <code>Premium</code>, <code>AbsolutePremium</code>, <code>Underlying</code></td></tr>
+        <tr><td>Default</td><td><code>None</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Mirrors <code>Target Type</code> for the stop-loss direction. <code>sl_pending_val</code> computed at entry:</p>
+        <table class="mini-table">
+          <tr><th>Mode</th><th>Computation</th></tr>
+          <tr><td>None</td><td>No SL. Leg exits on target, time, or portfolio SqOff only.</td></tr>
+          <tr><td>Premium</td><td>With <code>%</code>: <code>sl = entry × (1 + pct/100)</code> for SELL, <code>entry × (1 - pct/100)</code> for BUY. Plain number: <code>sl = entry + value</code> for SELL, <code>entry - value</code> for BUY.</td></tr>
+          <tr><td>AbsolutePremium</td><td>Fixed absolute price level. <code>sl_pending_val = parsed_value</code>.</td></tr>
+          <tr><td>Underlying</td><td>⚠️ <strong>Not implemented at leg level.</strong> <code>sl_pending_val</code> remains <code>None</code>. Use portfolio-level SL instead.</td></tr>
+        </table>
+        <div class="tip"><strong>Alias:</strong> Engine also accepts <code>"PremiumBased"</code> as equivalent to <code>"Premium"</code> (backward compatibility). Any type containing <code>"Percentage"</code> is handled as a percentage-of-entry computation.</div>
+        <p>SL evaluated each tick on <code>bid_high</code> (SELL) or <code>ask_low</code> (BUY). Exit fill = <code>max(ask_vwap, bid_high)</code> for SELL or <code>max(bid_vwap, ask_low)</code> for BUY.</p>
+        <div class="note"><strong>Interaction with Move SL / Trail SL:</strong> <code>sl_pending_val</code> is dynamically modified at runtime by (a) <code>MoveSLManager</code> (Move SL to Cost) and (b) the portfolio-level Trailing SL engine, without touching <code>leg["conf"]</code>. If <code>trail_after_move_sl = True</code>, a per-leg trailing SL is activated after the move-to-cost event (tracked via <code>leg["move_sl_trail_anchor"]</code>).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 13. Stoploss Value ── -->
+  <div class="param-card" id="p13">
+    <div class="param-header">
+      <div class="param-num">13</div>
+      <div class="param-title">Stoploss Value</div>
+      <div class="param-key">"Stoploss Value"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QTableWidgetItem</code> (editable text)</td></tr>
+        <tr><td>Type</td><td>Numeric string, supports <code>%</code> suffix</td></tr>
+        <tr><td>Default</td><td><code>""</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Numeric parameter for the selected <code>Stoploss Type</code>. Same <code>parse_val()</code> parsing as Target Value. A value of <code>0</code> or empty string with a non-None SL type → <code>sl_pending_val</code> remains <code>None</code> (no SL armed).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 14. On Target Action ── -->
+  <div class="param-card" id="p14">
+    <div class="param-header">
+      <div class="param-num">14</div>
+      <div class="param-title">On Target Action</div>
+      <div class="param-key">"On Target Actions"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>LegActionWidget</code> (double-click to open dialog)</td></tr>
+        <tr><td>Type</td><td>List of action dicts</td></tr>
+        <tr><td>Default</td><td><code>[{"type": "SqOff"}]</code></td></tr>
+        <tr><td>Storage key</td><td><code>"On Target Actions"</code> (list) · <code>"On Target Action"</code> (legacy string)</td></tr>
+      </table>
+      <div class="logic-text">
+        <p>One or more actions executed when the leg's target is hit. Available actions:</p>
+        <div class="action-grid">
+          <div class="action-card">
+            <div class="action-name">SqOff</div>
+            <div class="action-desc">Default. Leg is closed (status → <code>CLOSED</code>). PnL realized and recorded.</div>
+          </div>
+          <div class="action-card">
+            <div class="action-name">KeepLegRunning</div>
+            <div class="action-desc">Hit level cleared (<code>tgt_pending_val = None</code>) but leg stays <code>ACTIVE</code>. <strong>Ignored if <code>end_blocked = True</code></strong> — leg closes normally past end_time.</div>
+          </div>
+          <div class="action-card">
+            <div class="action-name">Re-Execute</div>
+            <div class="action-desc">Leg closed and reset to <code>IDLE</code> for re-entry next tick. <strong>Count cap:</strong> <code>count=N</code> → up to N re-executions (N+1 total). Suppressed when <code>exec_count &gt;= (1 + N)</code>.</div>
+          </div>
+          <div class="action-card">
+            <div class="action-name">Execute</div>
+            <div class="action-desc">Sets <code>execute_trigger = True</code> on a specific other leg (by Leg ID), making it enter from <code>IDLE</code> on the next tick. Logs a warning if the target leg is not <code>IDLE</code>.</div>
+          </div>
+          <div class="action-card">
+            <div class="action-name">ReEntry</div>
+            <div class="action-desc">Leg set to <code>REENTRY_WAITING</code>. Waits for premium to return to original <code>entry_price</code> at the same locked numeric strike. Optional count limit (same semantics as Re-Execute).</div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>Stacking rules:</strong><br>
+          • Multiple actions evaluated in order. <code>SqOff</code> in the list is skipped — leg is already closed before the action loop.<br>
+          • <code>KeepLegRunning</code> + <code>Re-Execute</code>/<code>ReEntry</code>: engine cannot reuse the ACTIVE leg. A <strong>new concurrent leg slot</strong> is injected into <code>state["legs"]</code> (keys like <code>"1_re2"</code> or <code>"1_rentry2"</code>), running in parallel with the original.<br>
+          • <code>SqOff</code> takes precedence when <code>global max_leg_executions</code> is hit or <code>end_blocked = True</code>.
+        </div>
+        <p>Engine location: <code>engine/monitoring.py</code> → action dispatch loop lines 651–780.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 15. On SL Action ── -->
+  <div class="param-card" id="p15">
+    <div class="param-header">
+      <div class="param-num">15</div>
+      <div class="param-title">On SL Action</div>
+      <div class="param-key">"On SL Actions"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>LegActionWidget</code> (double-click to open dialog)</td></tr>
+        <tr><td>Type</td><td>List of action dicts</td></tr>
+        <tr><td>Default</td><td><code>[{"type": "SqOff"}]</code></td></tr>
+        <tr><td>Storage key</td><td><code>"On SL Actions"</code> (list) · <code>"On SL Action"</code> (legacy string)</td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Identical structure and action options as <code>On Target Action</code>, but triggered on <code>LEG_SL_HIT</code> events. The <code>is_sl</code> flag passed to <code>get_leg_actions()</code> selects the correct action list.</p>
+        <p>After action dispatch for a SL hit, <code>MoveSLManager.apply()</code> is called if enabled and conditions match:</p>
+        <ul style="margin:8px 0 8px 20px; color:#c0c8e0; font-size:13.5px; line-height:1.75;">
+          <li>On SL hit: <code>move_sl_performed == False</code> OR <code>hit_on_leg == True</code>.</li>
+          <li>On Target hit: <code>tgt_hit_on_leg == True</code>.</li>
+        </ul>
+        <div class="tip">Same concurrent leg slot behavior applies: <code>KeepLegRunning</code> + <code>Re-Execute</code>/<code>ReEntry</code> spawns new parallel leg slots instead of reusing the ACTIVE leg.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 16. SL Wait ── -->
+  <div class="param-card" id="p16">
+    <div class="param-header">
+      <div class="param-num">16</div>
+      <div class="param-title">SL Wait (sec)</div>
+      <div class="param-key">"SL Wait (sec)"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QTableWidgetItem</code> (editable text)</td></tr>
+        <tr><td>Type</td><td>Integer string (seconds)</td></tr>
+        <tr><td>Default</td><td><code>""</code> → treated as <code>0</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Confirmation delay before executing an SL or Target exit, preventing premature exits on brief wicks:</p>
+        <ol style="margin:8px 0 8px 22px; color:#c0c8e0; font-size:13.5px; line-height:1.9;">
+          <li>First tick SL or Target triggers: <code>delay_pending = True</code>, <code>delay_start_time = curr_dt</code>. <code>DELAY_PENDING</code> logged.</li>
+          <li>Leg not exited while <code>elapsed_seconds &lt; sl_wait_sec</code>.</li>
+          <li>If condition <strong>no longer met</strong> (price recovers): <code>delay_pending = False</code>, <code>DELAY_CLEARED</code> logged — exit cancelled.</li>
+          <li>If trigger persists for full duration, exit proceeds at current price.</li>
+        </ol>
+        <div class="note">
+          <strong>Important nuances:</strong><br>
+          • Applies to <strong>both</strong> SL and Target exits (shared delay mechanism).<br>
+          • <code>delay_trigger_reason</code> is locked at step 1 and <strong>not re-evaluated</strong> during the wait. If condition switches mid-delay (SL → Target or vice versa), exit proceeds under the original trigger reason.<br>
+          • Setting to <code>0</code> or empty disables the delay.
+        </div>
+        <p>Engine location: <code>engine/monitoring.py</code> → exit delay handling, lines 454–492.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 17. Start Time ── -->
+  <div class="param-card" id="p17">
+    <div class="param-header">
+      <div class="param-num">17</div>
+      <div class="param-title">Start Time</div>
+      <div class="param-key">"Start Time"</div>
+    </div>
+    <div class="param-body">
+      <table class="prop-table">
+        <tr><th>Property</th><th>Detail</th></tr>
+        <tr><td>Widget</td><td><code>QTimeEdit</code></td></tr>
+        <tr><td>Format</td><td><code>HH:mm:ss</code></td></tr>
+        <tr><td>Default</td><td><code>09:30:00</code></td></tr>
+      </table>
+      <div class="logic-text">
+        <p>Individual leg entry time. For non-Idle legs in <code>Start time</code> execution mode, the engine resolves <code>leg_start</code> from this field (parsed via <code>parse_time_str()</code>). Entry only proceeds when <code>curr_time &gt;= leg_start</code>.</p>
+        <p><strong>Winter Time Adjustment:</strong> If <code>timing["is_winter"] = True</code>, the raw start time is shifted forward by 1 hour via <code>add_one_hour()</code> to align data timestamps with the UI-configured time.</p>
+        <div class="tip"><strong>Validation:</strong> <code>save_portfolio()</code> enforces: <code>Portfolio Start Time ≤ Leg Start Time ≤ Portfolio End Time</code>.</div>
+        <p><strong>Interaction with Idle legs:</strong> Idle legs in Manual execution mode that are cross-portfolio triggered also respect this field — the trigger does not bypass the leg's own start time.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ HIDDEN PARAMS ══════════════════ -->
+  <h2 id="hidden">Hidden / Inactive Parameters</h2>
+
+  <table class="hidden-table">
+    <tr><th>Parameter</th><th>Status</th><th>Notes</th></tr>
+    <tr><td><code>LTP</code></td><td>Hidden (<code>setColumnHidden = True</code>)</td><td>Real-time last-traded price display. Read-only. Used in live mode only.</td></tr>
+    <tr><td><code>Delete</code></td><td>Button widget (not a text column)</td><td>Rendered as <code>QPushButton("✖")</code> in each row.</td></tr>
+  </table>
+
+  <!-- ══════════════════ DATA FLOW ══════════════════ -->
+  <h2 id="dataflow">Data Flow Summary</h2>
+
+  <div class="flow-box">GUI (portfolio.py)
+  └─ collect_legs()
+       └─ saves to portfolios.json → legs[]
+
+Engine (backtester.py: init)
+  └─ legs_state[lid] built from leg conf
+       ├─ status = "IDLE"
+       ├─ target_dte = normalize_dte(Expiry)
+       └─ lots = int(leg["Lots"])
+
+Engine (backtester.py → execution.py) [each tick]
+  └─ process_idle_leg_entries()
+       ├─ checks Idle gate, execute_trigger, rbo_trigger
+       ├─ checks Start Time (+ winter-time shift)
+       ├─ checks Wait &amp; Trade delay
+       ├─ resolves Strike via get_option_quote()
+       ├─ computes sl_pending_val / tgt_pending_val
+       └─ places Hedge if Hedge Required=True
+
+Engine (backtester.py → monitoring.py) [each tick]
+  └─ process_active_legs()
+       ├─ fetches current quote (MTM price)
+       ├─ updates leg min/max PnL and leg_stats
+       ├─ applies leg-level trailing SL (if trail_after_move_sl)
+       ├─ evaluates SL (bid_high / ask_low) and Target (bid_low / ask_high)
+       ├─ applies SL Wait delay if configured
+       └─ on exit: dispatches On SL / On Target Actions
+            ├─ SqOff → CLOSED
+            ├─ KeepLegRunning → clear level, stay ACTIVE
+            │    └─ + Re-Execute/ReEntry → spawn concurrent new leg slot
+            ├─ Re-Execute → reset to IDLE (re-enter next tick)
+            ├─ Execute → set execute_trigger on target leg
+            └─ ReEntry → set REENTRY_WAITING
+
+Engine (backtester.py → execution.py) [each tick]
+  └─ process_reentry_waiting()
+       ├─ monitors REENTRY_WAITING legs for price return to entry_price
+       ├─ "same_strike" mode: cancels if end_time reached without trigger
+       └─ on trigger: status → IDLE + execute_trigger = True</div>
+
+  <!-- ══════════════════ ENGINE IMPL NOTES ══════════════════ -->
+  <h2 id="impl-notes">Engine Implementation Notes</h2>
+
+  <div class="impl-note-card">
+    <div class="impl-note-header">⚠️ &nbsp;<code>Underlying</code> Type at Leg Level — Not Implemented</div>
+    <div class="impl-note-body">
+      <p>The GUI shows <code>Underlying</code> as an option for both <code>Target Type</code> and <code>Stoploss Type</code>. However, <strong>the engine (<code>execution.py</code>) has no handler for this value at the leg level</strong>.</p>
+      <p>The SL/Target computation block only handles: <code>AbsolutePremium</code>, <code>Premium</code> / <code>PremiumBased</code>, and types containing <code>"Percentage"</code>. A plain <code>"Underlying"</code> value falls through all conditions, leaving <code>sl_pending_val</code> / <code>tgt_pending_val</code> as <code>None</code> — effectively no SL or Target is armed.</p>
+      <p><strong>Underlying-based exits are only implemented at the portfolio level</strong> via <code>check_portfolio_sl_tgt()</code> in <code>engine/target_sl.py</code>.</p>
+    </div>
+  </div>
+
+  <div class="impl-note-card">
+    <div class="impl-note-header">Concurrent Leg Slots (KeepLegRunning + Re-Execute / ReEntry)</div>
+    <div class="impl-note-body">
+      <p>When <code>KeepLegRunning</code> is active alongside <code>Re-Execute</code> or <code>ReEntry</code>, the engine cannot reuse the original leg (still ACTIVE). It instead <strong>injects a new leg dict</strong> into <code>state["legs"]</code> with a generated composite key:</p>
+      <div class="code-block">Re-Execute concurrent slot key:  "{lid}_re{exec_count+1}"
+ReEntry   concurrent slot key:  "{lid}_rentry{exec_count+1}"</div>
+      <p>These new slots are picked up in the same tick's idle/reentry processing loops and behave identically to a normal re-execution or re-entry. This allows a leg to keep running AND spawn a fresh position simultaneously.</p>
+    </div>
+  </div>
+
+  <div class="impl-note-card">
+    <div class="impl-note-header">Re-Execute / ReEntry Count Semantics</div>
+    <div class="impl-note-body">
+      <p>The <code>count</code> parameter means <strong>number of allowed re-executions beyond the initial entry</strong>. The engine check is:</p>
+      <div class="code-block">if limit > 0 and leg["exec_count"] >= (1 + limit):
+    # suppressed — log REEXEC_LIMIT_REACHED</div>
+      <p><code>count=2</code> allows: initial entry (<code>exec_count=1</code>) + 2 re-executions (<code>exec_count=2</code>, <code>3</code>). At <code>exec_count=3</code>, further re-executions are blocked.</p>
+    </div>
+  </div>
+
+  <div class="impl-note-card">
+    <div class="impl-note-header">Leg-Level Trailing SL After Move SL to Cost</div>
+    <div class="impl-note-body">
+      <p>If <code>MoveSLManager</code> is enabled with <code>trail_after_move_sl = True</code>, after moving a leg's SL to cost (entry price), the engine sets <code>leg["move_sl_trail_anchor"] = ltp</code>.</p>
+      <p>On subsequent ticks, the engine checks this anchor and reduces <code>sl_pending_val</code> by <code>trail_by</code> for every <code>trail_every</code> gain in leg PnL (using the portfolio-level trailing config). This runs per-leg independently of the portfolio-level trailing SL system.</p>
+    </div>
+  </div>
+
+  <div class="impl-note-card">
+    <div class="impl-note-header"><code>PremiumBased</code> Alias for <code>Premium</code></div>
+    <div class="impl-note-body">
+      <p>The engine accepts <code>"PremiumBased"</code> as a synonym for <code>"Premium"</code> for both SL and Target types:</p>
+      <div class="code-block">elif sl_type in ("Premium", "PremiumBased"):</div>
+      <p>Backward-compatibility alias. The GUI only shows <code>"Premium"</code> but older saved portfolios may contain <code>"PremiumBased"</code>.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════ VALIDATION ══════════════════ -->
+  <h2 id="validation">Parameter Validation Rules (enforced on Save)</h2>
+
+  <ul class="val-list">
+    <li><span class="val-num">1</span><span><strong>Portfolio Name</strong> must not be empty.</span></li>
+    <li><span class="val-num">2</span><span><strong>At least 1 leg</strong> must be present.</span></li>
+    <li><span class="val-num">3</span><span><strong>Portfolio timings:</strong> <code>Start Time ≤ End Time ≤ SqOff Time</code>.</span></li>
+    <li><span class="val-num">4</span><span><strong>Each Leg Start Time:</strong> must satisfy <code>Portfolio Start ≤ Leg Start ≤ Portfolio End</code>.</span></li>
+    <li><span class="val-num">5</span><span><strong>ReEntry action:</strong> target <code>Leg ID</code> must exist in the portfolio AND that leg must have <code>Idle = True</code>.</span></li>
+    <li><span class="val-num">6</span><span><strong>Range Breakout timings</strong> (if enabled): <code>Portfolio Start ≤ RBO Range Start ≤ RBO Range End ≤ Entry Start ≤ Entry End ≤ Portfolio End ≤ SqOff</code>.</span></li>
+    <li><span class="val-num">7</span><span><strong>Execution Mode + Based On:</strong> if mode is not <code>Start time</code> or <code>Manual</code> and <code>Based On = None</code>, <code>Entry Price</code> must be non-zero.</span></li>
+    <li><span class="val-num">8</span><span><strong>Portfolio Target/Stoploss cross-portfolio actions:</strong> referenced portfolio name must exist.</span></li>
+  </ul>
+
+</main>
+</div>
+
+<!-- Scroll to top -->
+<button class="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+
+<script>
+  // Active sidebar link tracking
+  const links = document.querySelectorAll('nav a');
+  const sections = [];
+  links.forEach(a => {
+    const id = a.getAttribute('href').replace('#','');
+    const el = document.getElementById(id);
+    if (el) sections.push({el, a});
+  });
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const match = sections.find(s => s.el === e.target);
+        if (match) match.a.classList.add('active');
+      }
+    });
+  }, {rootMargin: '-20% 0px -70% 0px'});
+
+  sections.forEach(s => obs.observe(s.el));
+</script>
+</body>
+</html>

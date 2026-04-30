@@ -585,6 +585,36 @@ def _extract_slot_from_group_reports(
     total_return_pct = (total_realized / capital) * 100 if capital > 0 else 0.0
     win_rate = (wins / trades * 100) if trades > 0 else 0.0
 
+    # Day-based win percentage — aggregate PnL by calendar date
+    winning_days = 0
+    losing_days = 0
+    total_days = 0
+    win_pct_days = 0.0
+    loss_pct_days = 0.0
+    daily_pnl: dict[str, float] = {}
+    # Use entry time (ts_init) for daily grouping to match the HTML report which
+    # groups by ENTRY TIME.  Fall back to ts_col (close time) if ts_init absent.
+    entry_ts_col = _pick_col(slot_positions, ["ts_init"]) if not slot_positions.empty else None
+    daily_ts_col = entry_ts_col or ts_col
+    if pnl_values and daily_ts_col and not slot_positions.empty:
+        ts_values = slot_positions[daily_ts_col].tolist()
+        for i, pnl_val in enumerate(pnl_values):
+            ts_raw = ts_values[i]
+            try:
+                dt = pd.Timestamp(ts_raw, unit="ns", tz="UTC") if ts_raw is not None and pd.notna(ts_raw) else None
+            except (TypeError, ValueError):
+                try:
+                    dt = pd.Timestamp(ts_raw)
+                except Exception:
+                    dt = None
+            day_key = dt.strftime("%Y-%m-%d") if dt is not None else "unknown"
+            daily_pnl[day_key] = daily_pnl.get(day_key, 0.0) + pnl_val
+        total_days = len(daily_pnl)
+        winning_days = sum(1 for v in daily_pnl.values() if v > 0)
+        losing_days = sum(1 for v in daily_pnl.values() if v < 0)
+        win_pct_days = (winning_days / total_days * 100) if total_days > 0 else 0.0
+        loss_pct_days = (losing_days / total_days * 100) if total_days > 0 else 0.0
+
     # Synthetic equity curve — starting point plus running sum at each close ts.
     # Use the same {"timestamp": iso_str, "balance": float} shape as
     # _build_equity_curve_from_account so _merge_equity_curves can combine
@@ -632,10 +662,16 @@ def _extract_slot_from_group_reports(
         "wins": wins,
         "losses": losses,
         "win_rate": win_rate,
+        "total_days": total_days,
+        "winning_days": winning_days,
+        "losing_days": losing_days,
+        "win_pct_days": win_pct_days,
+        "loss_pct_days": loss_pct_days,
+        "daily_pnl": daily_pnl,
         "max_drawdown": max_dd,
         "equity_curve": balances,
         "equity_curve_ts": equity_curve_ts,
-        "positions_report": slot_positions,
+        "positions_report": positions_report_with_base(slot_positions, fx_resolver),
         "fills_report": slot_fills,
         "account_report": None,  # shared in a group, not per-slot
     }
@@ -1139,6 +1175,11 @@ def _merge_portfolio_results(
             "wins": r["wins"],
             "losses": r["losses"],
             "win_rate": r["win_rate"],
+            "total_days": r.get("total_days", 0),
+            "winning_days": r.get("winning_days", 0),
+            "losing_days": r.get("losing_days", 0),
+            "win_pct_days": r.get("win_pct_days", 0.0),
+            "loss_pct_days": r.get("loss_pct_days", 0.0),
             "trade_pnls": trade_pnls,
             "allocated_capital": capitals.get(slot.slot_id, 0),
             "elapsed_seconds": r.get("elapsed_seconds"),
@@ -1172,6 +1213,20 @@ def _merge_portfolio_results(
     final_balance = portfolio.starting_capital + total_pnl
     total_return_pct = (total_pnl / portfolio.starting_capital) * 100 if portfolio.starting_capital > 0 else 0
     win_rate = (total_wins / total_trades * 100) if total_trades > 0 else 0
+
+    # Portfolio-level day-based win% — merge daily PnLs across all slots
+    portfolio_daily_pnl: dict[str, float] = {}
+    for slot in portfolio.enabled_slots:
+        r = slot_results.get(slot.slot_id)
+        if not r:
+            continue
+        for day_key, pv in r.get("daily_pnl", {}).items():
+            portfolio_daily_pnl[day_key] = portfolio_daily_pnl.get(day_key, 0.0) + pv
+    portfolio_total_days = len(portfolio_daily_pnl)
+    portfolio_winning_days = sum(1 for v in portfolio_daily_pnl.values() if v > 0)
+    portfolio_losing_days = sum(1 for v in portfolio_daily_pnl.values() if v < 0)
+    portfolio_win_pct_days = (portfolio_winning_days / portfolio_total_days * 100) if portfolio_total_days > 0 else 0.0
+    portfolio_loss_pct_days = (portfolio_losing_days / portfolio_total_days * 100) if portfolio_total_days > 0 else 0.0
 
     # Merge DataFrames
     merged_positions = pd.concat(all_positions_reports, ignore_index=True) if all_positions_reports else pd.DataFrame()
@@ -1209,6 +1264,11 @@ def _merge_portfolio_results(
         "wins": total_wins,
         "losses": total_losses,
         "win_rate": win_rate,
+        "total_days": portfolio_total_days,
+        "winning_days": portfolio_winning_days,
+        "losing_days": portfolio_losing_days,
+        "win_pct_days": portfolio_win_pct_days,
+        "loss_pct_days": portfolio_loss_pct_days,
         "max_drawdown": max_dd,
         "equity_curve": equity,
         "equity_curve_ts": equity_curve_ts,
@@ -1708,6 +1768,26 @@ def _extract_results(
 
     win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
 
+    # Day-based win percentage for single-strategy backtest
+    # Use entry time (ts_init) for daily grouping to match the HTML report
+    _daily_pnl: dict[str, float] = {}
+    _daily_ts_col = _pick_col(positions_report, ["ts_init", "ts_closed", "ts_last"]) if positions_report is not None and not positions_report.empty else None
+    _pnl_col = _pick_col(positions_report, ["realized_pnl", "RealizedPnl", "pnl"]) if positions_report is not None and not positions_report.empty else None
+    # _row_pnl_to_base needs the close-time column for FX conversion
+    _close_ts_col = _pick_col(positions_report, ["ts_closed", "ts_last", "ts_init"]) if positions_report is not None and not positions_report.empty else None
+    if _daily_ts_col and _pnl_col and positions_report is not None and not positions_report.empty:
+        for _, row in positions_report.iterrows():
+            pnl_val = _row_pnl_to_base(row, _pnl_col, _close_ts_col, fx_resolver)
+            ts_raw = row.get(_daily_ts_col)
+            dt = _to_utc_ts(ts_raw)
+            day_key = dt.strftime("%Y-%m-%d") if dt is not None else "unknown"
+            _daily_pnl[day_key] = _daily_pnl.get(day_key, 0.0) + pnl_val
+    _total_days = len(_daily_pnl)
+    _winning_days = sum(1 for v in _daily_pnl.values() if v > 0)
+    _losing_days = sum(1 for v in _daily_pnl.values() if v < 0)
+    _win_pct_days = (_winning_days / _total_days * 100) if _total_days > 0 else 0.0
+    _loss_pct_days = (_losing_days / _total_days * 100) if _total_days > 0 else 0.0
+
     # Build timestamped equity curve from account events. The engine emits
     # these in the account's base currency, so no per-event conversion is
     # needed — but the JPY-native unrealized PnL never hit the account, so
@@ -1725,6 +1805,12 @@ def _extract_results(
         "wins": wins,
         "losses": losses,
         "win_rate": win_rate,
+        "total_days": _total_days,
+        "winning_days": _winning_days,
+        "losing_days": _losing_days,
+        "win_pct_days": _win_pct_days,
+        "loss_pct_days": _loss_pct_days,
+        "daily_pnl": _daily_pnl,
         "equity_curve_ts": equity_curve_ts,
         "fills_report": fills_report,
         "positions_report": positions_report_with_base(positions_report, fx_resolver),
