@@ -1761,11 +1761,17 @@ const Portfolio = {
         if (r.report_file) {
             reportBtnHTML = `<a class="btn btn-sm btn-primary" href="/api/reports/${encodeURIComponent(r.report_file)}" download style="margin-right:6px;">&#128196; Download Report</a>`;
         }
+        let warningsHTML = "";
+        if (r.warnings && r.warnings.length) {
+            const items = r.warnings.map(w => `<li><strong>${w.display_name}:</strong> ${w.warning}</li>`).join("");
+            warningsHTML = `<div class="alert alert-warning" style="margin-bottom:12px;padding:8px 12px;font-size:0.85rem;"><strong>&#9888; Warnings:</strong><ul style="margin:4px 0 0 16px;padding:0;">${items}</ul></div>`;
+        }
         let perStratRows = "";
         if (r.per_strategy) {
             for (const [, sr] of Object.entries(r.per_strategy)) {
                 const cls = sr.pnl >= 0 ? "positive" : "negative";
-                perStratRows += `<tr><td>${sr.display_name}</td><td class="${cls}">${App.currency(sr.pnl)}</td><td>${sr.trades}</td><td>${sr.win_rate.toFixed(1)}%</td><td>${(sr.win_pct_days || 0).toFixed(1)}%</td><td>${sr.wins}</td><td>${sr.losses}</td></tr>`;
+                const warnIcon = sr.warning ? ' <span title="' + sr.warning.replace(/"/g, '&quot;') + '" style="cursor:help;color:#e6a817;">&#9888;</span>' : "";
+                perStratRows += `<tr><td>${sr.display_name}${warnIcon}</td><td class="${cls}">${App.currency(sr.pnl)}</td><td>${sr.trades}</td><td>${sr.win_rate.toFixed(1)}%</td><td>${(sr.win_pct_days || 0).toFixed(1)}%</td><td>${sr.wins}</td><td>${sr.losses}</td></tr>`;
             }
         }
         return `<div class="portfolio-results">
@@ -1773,6 +1779,7 @@ const Portfolio = {
                 <span style="font-weight:600; font-size:0.95rem;">Results: ${r.portfolio_name||""}</span>
                 <div>${flagsHTML}${reportBtnHTML}<button class="btn btn-sm btn-primary" onclick="App.navigate('portfolio_tearsheet')">Full Tearsheet</button></div>
             </div>
+            ${warningsHTML}
             <div class="grid-6">
                 ${App.metricHTML("Starting Capital", App.currency(r.starting_capital))}
                 ${App.metricHTML("Final Balance", App.currency(r.final_balance))}

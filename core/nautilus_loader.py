@@ -206,7 +206,7 @@ def load_csv_and_store(
     bid_files = csv_entry.get("bid_files") or []
 
     if side == "MID" and ask_files and bid_files:
-        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
+        df = load_pair_mid(csv_entry, timestamp_column=ts_col, 
                            required_columns=req_cols, delimiter=delimiter)
     elif side == "ASK" and ask_files:
         df = concat_side(ask_files, timestamp_column=ts_col,

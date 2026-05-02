@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Path A &rarr; Path B Migration Guide &mdash; NautilusTrader Backtest API</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #f778ba;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h2 {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .toc ol { padding-left: 1.2rem; }
+  .toc li { margin: 0.3rem 0; }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .toc a:hover { color: var(--accent); }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.55rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.18rem;
+    color: var(--accent3);
+    margin: 1.5rem 0 0.8rem 0;
+  }
+  h4 {
+    font-size: 1rem;
+    color: var(--accent4);
+    margin: 1rem 0 0.4rem 0;
+  }
+  p { margin-bottom: 0.8rem; }
+  strong { color: #f0f6fc; }
+  em { color: var(--accent4); font-style: normal; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent2);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.8rem 0;
+    font-size: 0.84rem;
+    line-height: 1.55;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .keyword { color: var(--accent3); }
+  .function { color: var(--accent); }
+  .string { color: var(--accent2); }
+  .comment { color: var(--text-muted); font-style: italic; }
+  .arrow { color: var(--accent4); }
+  .num { color: var(--accent4); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td {
+    background: var(--table-alt);
+  }
+  td code { font-size: 0.82em; }
+  .insight-box {
+    background: linear-gradient(135deg, #1a2332, #161b22);
+    border-left: 4px solid var(--accent2);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .insight-box strong { color: var(--accent2); }
+  .warn-box {
+    background: linear-gradient(135deg, #2a1f1a, #161b22);
+    border-left: 4px solid var(--accent4);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .warn-box strong { color: var(--accent4); }
+  .file-ref {
+    color: var(--accent4);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85em;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .col-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+  }
+  .col-box h4 {
+    margin-top: 0;
+    margin-bottom: 0.6rem;
+    font-size: 0.92rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-box.path-a h4 { color: var(--accent4); }
+  .col-box.path-b h4 { color: var(--accent2); }
+  .col-box pre {
+    margin: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 0.78rem;
+  }
+  .step-num {
+    display: inline-block;
+    width: 1.6rem;
+    height: 1.6rem;
+    line-height: 1.6rem;
+    text-align: center;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    font-weight: 700;
+    margin-right: 0.5rem;
+    font-size: 0.85rem;
+  }
+  ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.3rem 0; }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+  }
+  .badge-a { background: #3a2a1f; color: #f0883e; }
+  .badge-b { background: #1f3a2a; color: #3fb950; }
+  .footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin: 2rem 0 1rem 0;
+    padding: 1rem;
+  }
+  .footer code { font-size: 0.78em; }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.5rem; }
+    .container { padding: 1rem; }
+    section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Path A &rarr; Path B Migration Guide</h1>
+  <p>What this project does today with <code>BacktestEngine</code> (Path&nbsp;A), and the concrete changes needed to shift to <code>BacktestNode</code> (Path&nbsp;B) &mdash; with line-level references into <code>core/backtest_runner.py</code> and verified against the installed <code>nautilus_trader</code> package.</p>
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#why">Why two paths exist</a></li>
+    <li><a href="#today">What this project does today (Path A)</a>
+      <ul>
+        <li><a href="#today-single">Single-backtest: <code>run_backtest()</code></a></li>
+        <li><a href="#today-slot">Per-slot worker: <code>_run_single_slot()</code></a></li>
+        <li><a href="#today-group">Shared engine: <code>_run_slot_group()</code></a></li>
+        <li><a href="#today-extract">Result extraction: <code>_extract_results()</code></a></li>
+        <li><a href="#today-catalog">Storage: ParquetDataCatalog (already Path-B compatible)</a></li>
+      </ul>
+    </li>
+    <li><a href="#api">Path B Python API &mdash; verified field shapes</a></li>
+    <li><a href="#mapping">API mapping table</a></li>
+    <li><a href="#diff">Concrete code diff: 3 sites to migrate</a></li>
+    <li><a href="#changes">Behavioral changes to be aware of</a></li>
+    <li><a href="#unchanged">Things that stay the same</a></li>
+    <li><a href="#verify">Verification plan</a></li>
+    <li><a href="#tradeoffs">Trade-offs &mdash; should you actually migrate?</a></li>
+  </ol>
+</div>
+
+<!-- =================================================================== -->
+<section id="why">
+  <h2>1. Why two paths exist</h2>
+  <p>NautilusTrader exposes two backtest APIs in Python (mirroring the Rust ones in <code>run_rust_backtest.md</code>):</p>
+  <ul>
+    <li><span class="badge badge-a">Path&nbsp;A</span> &nbsp;<code>BacktestEngine</code> &mdash; low-level. You construct the engine, call <code>add_venue()</code> / <code>add_instrument()</code> / <code>add_data()</code> / <code>add_strategy()</code> by hand, then <code>engine.run()</code>. Bars live in the engine's in-memory buffer.</li>
+    <li><span class="badge badge-b">Path&nbsp;B</span> &nbsp;<code>BacktestNode</code> &mdash; high-level. You describe the run with config dataclasses (<code>BacktestVenueConfig</code>, <code>BacktestDataConfig</code>, <code>BacktestRunConfig</code>) and the node reads from a <code>ParquetDataCatalog</code> on disk, optionally streaming in chunks of N rows.</li>
+  </ul>
+  <p>Both paths run through the <em>same</em> matching engine internals &mdash; <code>BacktestNode</code> just builds a <code>BacktestEngine</code> for each <code>BacktestRunConfig</code> under the hood (<span class="file-ref">venv/Lib/site-packages/nautilus_trader/backtest/node.py:104</span>, <code>self._engines: dict[str, BacktestEngine] = {}</code>). The difference is purely in the wiring layer.</p>
+
+  <div class="insight-box">
+    <strong>Today this project uses Path&nbsp;A.</strong> Verified by greping the codebase: <code>BacktestNode</code> is not imported in any Python source &mdash; only referenced inside static HTML doc files. <code>BacktestEngine</code> is constructed in three sites inside <code>core/backtest_runner.py</code>, all of which run the manual 5-step Path&nbsp;A flow.
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<section id="today">
+  <h2>2. What this project does today (Path A)</h2>
+  <p>Three engine sites, all in <span class="file-ref">core/backtest_runner.py</span>, all following the same 5-step pattern. The Parquet catalog is used as <em>storage only</em>: bars are read into Python lists with <code>catalog.bars(...)</code> and then handed to the engine via <code>engine.add_data(bars)</code>.</p>
+
+  <h3 id="today-single"><code>run_backtest()</code> &mdash; single backtest <span class="file-ref">[line 141]</span></h3>
+  <p>Public entry called by the HTTP layer for one-off &ldquo;run this strategy on this instrument&rdquo; requests. The five Path&nbsp;A steps are visible inline:</p>
+<pre><code><span class="comment"># 1. Build engine</span>
+engine_config = BacktestEngineConfig(
+    trader_id=TraderId(<span class="string">"BACKTESTER-001"</span>),
+    logging=LoggingConfig(bypass_logging=<span class="keyword">True</span>),
+    risk_engine=RiskEngineConfig(bypass=<span class="keyword">True</span>),
+    run_analysis=<span class="keyword">False</span>,
+)
+engine = BacktestEngine(config=engine_config)                  <span class="comment"># line 237</span>
+
+<span class="comment"># 2. Add venue (the simulated exchange)</span>
+engine.add_venue(                                              <span class="comment"># line 241</span>
+    venue=venue,
+    oms_type=OmsType.NETTING,
+    account_type=AccountType.MARGIN,
+    starting_balances=[Money(starting_capital, USD)],
+    base_currency=USD,
+    default_leverage=Decimal(<span class="num">1</span>),
+)
+
+<span class="comment"># 3. Add instrument + load bars from catalog into RAM</span>
+engine.add_instrument(instrument)                              <span class="comment"># line 252</span>
+engine.add_data(bars)                                          <span class="comment"># line 253</span>
+<span class="keyword">del</span> bars                                                   <span class="comment"># free local copy</span>
+
+<span class="comment"># 4. Build + register strategy</span>
+strategy_config = config_class(**config_kwargs)
+strategy = registry_entry[<span class="string">"strategy_class"</span>](strategy_config)
+engine.add_strategy(strategy)                                  <span class="comment"># line 274</span>
+
+<span class="comment"># 5. Run + extract</span>
+engine.run()                                                   <span class="comment"># line 277</span>
+results = _extract_results(engine, starting_capital, fx_resolver)
+engine.dispose()                                               <span class="comment"># line 295</span>
+</code></pre>
+  <p>Bars are pulled from the catalog at <span class="file-ref">line 194-206</span> via the worker-local LRU helper <code>_cached_catalog_bars()</code>, which also handles the FX BID/ASK auto-pairing produced by <code>_pair_bid_ask_bar_type()</code> at <span class="file-ref">line 98-116</span> (a strategy subscribed only to BID won't fill unless ASK is also loaded).</p>
+
+  <h3 id="today-slot"><code>_run_single_slot()</code> &mdash; per-slot portfolio worker <span class="file-ref">[line 355]</span></h3>
+  <p>Same 5-step pattern, run inside a <code>ProcessPoolExecutor</code> worker. Differences:</p>
+  <ul>
+    <li>Wraps strategy in <code>ManagedExitStrategy</code> when SL/TP/trailing or <code>squareoff_time</code> is configured (<span class="file-ref">line 490-499</span>).</li>
+    <li>Adds phase-timing wrappers (<code>_phase</code>) and worker telemetry (RSS, cache hits) to the result dict.</li>
+    <li>Engine wrapped in <code>try/finally</code> to guarantee <code>engine.dispose()</code> on <code>BaseException</code> (<span class="file-ref">line 567-572</span>).</li>
+  </ul>
+
+  <h3 id="today-group"><code>_run_slot_group()</code> &mdash; multiple strategies in one engine <span class="file-ref">[line 718]</span></h3>
+  <p>Activated when <code>_USE_GROUPING=1</code> and two or more slots share <code>(bar_type, start_date, end_date, custom_strategies_dir)</code>. One engine, one venue, one bar load &mdash; <em>N</em> strategies attached in a loop, each with a unique <code>order_id_tag</code> so Nautilus assigns each its own <code>strategy_id</code>:</p>
+<pre><code>engine = BacktestEngine(config=BacktestEngineConfig(
+    trader_id=TraderId(<span class="string">f"GROUP-{group_index:03d}"</span>),
+    ...
+))
+engine.add_venue(
+    venue=venue,
+    oms_type=OmsType.HEDGING,        <span class="comment"># HEDGING, not NETTING &mdash; per-strategy positions tracked independently</span>
+    account_type=AccountType.MARGIN,
+    starting_balances=[Money(total_capital, USD)],
+    ...
+)
+engine.add_instrument(instrument)
+engine.add_data(all_bars)            <span class="comment"># line 827</span>
+
+<span class="keyword">for</span> i, (slot, _capital) <span class="keyword">in</span> enumerate(group):     <span class="comment"># line 833</span>
+    order_tag = <span class="string">f"{group_index:03d}-{i:03d}"</span>
+    strategy = ...                   <span class="comment"># includes order_id_tag=order_tag</span>
+    engine.add_strategy(strategy)    <span class="comment"># line 882</span>
+
+engine.run()                         <span class="comment"># line 885</span>
+</code></pre>
+  <p>Per-slot results are extracted post-run by filtering <code>positions_report</code> on <code>strategy_id</code> at <span class="file-ref">line 894-919</span> via <code>_extract_slot_from_group_reports()</code>.</p>
+
+  <h3 id="today-extract"><code>_extract_results()</code> &mdash; engine API surface used post-run</h3>
+  <p>The result-extraction code reads from these engine APIs &mdash; this is the surface that has to keep working under Path&nbsp;B:</p>
+  <table>
+    <thead><tr><th>Engine API</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>engine.trader.generate_order_fills_report()</code></td><td>per-fill slippage/spread accounting</td></tr>
+      <tr><td><code>engine.trader.generate_positions_report()</code></td><td>round-trip P&amp;L, win/loss, per-trade times</td></tr>
+      <tr><td><code>engine.trader.generate_account_report(venue)</code></td><td>full balance history &rarr; equity curve</td></tr>
+      <tr><td><code>engine.trader.strategies()</code></td><td>resolve strategy_id ordering for grouped runs</td></tr>
+      <tr><td><code>engine.kernel.cache.accounts()</code></td><td>final account state</td></tr>
+      <tr><td><code>engine.kernel.cache.positions()</code></td><td>open positions at run end</td></tr>
+      <tr><td><code>engine.kernel.cache.orders()</code></td><td>order log for diagnostics</td></tr>
+    </tbody>
+  </table>
+  <div class="insight-box"><strong>Important:</strong> all of these are available on engines retrieved from a <code>BacktestNode</code> via <code>node.get_engine(run_id)</code>. The result-extraction layer needs <em>zero</em> changes for Path&nbsp;B &mdash; you just hand it a different engine handle.</div>
+
+  <h3 id="today-catalog">Storage layer &mdash; <code>ParquetDataCatalog</code> already in place</h3>
+  <p>This is the lucky part. Path&nbsp;B's prerequisite is &ldquo;data lives in a Parquet catalog on disk&rdquo; &mdash; and the project <em>already</em> writes its data there via <code>save_to_catalog()</code> at <span class="file-ref">core/nautilus_loader.py:88-123</span>:</p>
+<pre><code>catalog = ParquetDataCatalog(catalog_path)
+catalog.write_data([instrument])    <span class="comment"># write_instruments-equivalent</span>
+catalog.write_data(bars)            <span class="comment"># write_to_parquet-equivalent</span>
+</code></pre>
+  <p>So the storage side requires no work at all. Both paths read the same Parquet files; only the in-memory wiring layer changes.</p>
+</section>
+
+<!-- =================================================================== -->
+<section id="api">
+  <h2>3. Path B Python API &mdash; verified field shapes</h2>
+  <p>All field names and types below come from the installed package: <span class="file-ref">venv/Lib/site-packages/nautilus_trader/backtest/config.py</span> and <span class="file-ref">.../backtest/node.py</span>. Nothing here is invented from generic tutorial material.</p>
+
+  <h3><code>BacktestNode</code> &mdash; the orchestrator <span class="file-ref">[node.py:76]</span></h3>
+<pre><code><span class="keyword">class</span> <span class="function">BacktestNode</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, configs: list[BacktestRunConfig]) <span class="arrow">-&gt;</span> <span class="keyword">None</span>: ...
+    <span class="keyword">def</span> <span class="function">build</span>(self) <span class="arrow">-&gt;</span> <span class="keyword">None</span>: ...                  <span class="comment"># constructs internal engines from configs</span>
+    <span class="keyword">def</span> <span class="function">run</span>(self) <span class="arrow">-&gt;</span> list[BacktestResult]: ...     <span class="comment"># implicit build() if not already built</span>
+    <span class="keyword">def</span> <span class="function">get_engine</span>(self, run_config_id: str) <span class="arrow">-&gt;</span> BacktestEngine | <span class="keyword">None</span>: ...
+    <span class="keyword">def</span> <span class="function">get_engines</span>(self) <span class="arrow">-&gt;</span> list[BacktestEngine]: ...
+    <span class="keyword">def</span> <span class="function">dispose</span>(self): ...
+</code></pre>
+
+  <div class="insight-box"><strong>The key trick for this project:</strong> custom strategies (loaded via <code>importlib</code> from <code>custom_strategies_dir</code>) cannot be expressed as <code>ImportableStrategyConfig</code> &mdash; they're not picklable by string path. So you must call <code>node.build()</code> explicitly, fetch the engine via <code>node.get_engine(run_id)</code>, attach the strategy with <code>engine.add_strategy(strategy)</code>, and only then call <code>node.run()</code>.</div>
+
+  <h3><code>BacktestVenueConfig</code> <span class="file-ref">[config.py:50]</span></h3>
+  <p>Same conceptual fields as the existing <code>engine.add_venue(...)</code> call &mdash; the only meaningful change is <strong><code>starting_balances</code> goes from <code>list[Money]</code> to <code>list[str]</code></strong> because configs need to be msgspec-serializable. Format: <code>"1000000 USD"</code>.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Path A equivalent</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code></td><td><code>str</code></td><td><code>venue=Venue("BINANCE")</code> &rarr; pass <code>"BINANCE"</code></td></tr>
+      <tr><td><code>oms_type</code></td><td><code>OmsType | str</code></td><td>Same enum or string <code>"NETTING"</code> / <code>"HEDGING"</code></td></tr>
+      <tr><td><code>account_type</code></td><td><code>AccountType | str</code></td><td>Same; <code>"MARGIN"</code></td></tr>
+      <tr><td><code>starting_balances</code></td><td><code>list[str]</code> <em>(was Money)</em></td><td><code>["1000000 USD"]</code></td></tr>
+      <tr><td><code>base_currency</code></td><td><code>str | None</code></td><td><code>"USD"</code> instead of <code>USD</code> currency object</td></tr>
+      <tr><td><code>default_leverage</code></td><td><code>float = 1.0</code></td><td>Same; pass <code>1.0</code> instead of <code>Decimal(1)</code></td></tr>
+      <tr><td><code>book_type</code></td><td><code>BookType | str = "L1_MBP"</code></td><td>Default matches what the project would set</td></tr>
+    </tbody>
+  </table>
+  <p>~25 more boolean / model fields exist (<code>fill_model</code>, <code>latency_model</code>, <code>fee_model</code>, <code>reject_stop_orders</code>, etc.) &mdash; all default to sensible values. Only override what the current code overrides.</p>
+
+  <h3><code>BacktestDataConfig</code> <span class="file-ref">[config.py:174]</span></h3>
+  <p>Replaces the manual <code>catalog.bars(...) + engine.add_data(bars)</code> pair. The node reads Parquet files directly via the configured catalog path and streams them when <code>chunk_size</code> is set.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>How we'd populate it</th></tr></thead>
+    <tbody>
+      <tr><td><code>catalog_path</code></td><td><code>str</code></td><td>Same path as today's <code>ParquetDataCatalog(catalog_path)</code></td></tr>
+      <tr><td><code>data_cls</code></td><td><code>str</code></td><td><code>"nautilus_trader.model.data.Bar"</code></td></tr>
+      <tr><td><code>instrument_id</code></td><td><code>InstrumentId | str | None</code></td><td>Optional &mdash; can be omitted if <code>bar_types</code> is supplied</td></tr>
+      <tr><td><code>start_time</code></td><td><code>str | int | None</code></td><td>ISO-8601 string or UNIX nanoseconds</td></tr>
+      <tr><td><code>end_time</code></td><td><code>str | int | None</code></td><td>Same</td></tr>
+      <tr><td><code>bar_types</code></td><td><code>list[str] | None</code></td><td>Primary + paired BID/ASK + extra timeframes &mdash; <strong>this is where <code>_pair_bid_ask_bar_type()</code> output goes</strong></td></tr>
+      <tr><td><code>filter_expr</code></td><td><code>str | None</code></td><td>Optional pyarrow filter expression</td></tr>
+      <tr><td><code>optimize_file_loading</code></td><td><code>bool = False</code></td><td>Set <code>True</code> if catalog has many files per bar type</td></tr>
+    </tbody>
+  </table>
+
+  <h3><code>BacktestRunConfig</code> <span class="file-ref">[config.py:378]</span></h3>
+<pre><code><span class="keyword">class</span> <span class="function">BacktestRunConfig</span>(NautilusConfig, frozen=<span class="keyword">True</span>):
+    venues: list[BacktestVenueConfig]
+    data:   list[BacktestDataConfig]              <span class="comment"># <em>list</em>: multiple data configs per run is supported</span>
+    engine: BacktestEngineConfig | <span class="keyword">None</span> = <span class="keyword">None</span>
+    chunk_size: int | <span class="keyword">None</span> = <span class="keyword">None</span>             <span class="comment"># <em>the streaming knob</em></span>
+    raise_exception:        bool = <span class="keyword">False</span>
+    dispose_on_completion:  bool = <span class="keyword">True</span>
+    start: str | int | <span class="keyword">None</span> = <span class="keyword">None</span>
+    end:   str | int | <span class="keyword">None</span> = <span class="keyword">None</span>
+    data_clients: dict[str, type[LiveDataClientConfig]] | <span class="keyword">None</span> = <span class="keyword">None</span>
+</code></pre>
+  <div class="insight-box"><strong>Streaming gate:</strong> <code>chunk_size=None</code> means &ldquo;load everything at once&rdquo; (behavioral parity with Path&nbsp;A). <code>chunk_size=100_000</code> (or any positive int) enables row-chunked streaming via <code>DataBackendSession(chunk_size=...)</code>. Migrate with <code>None</code> first, tune later.</div>
+
+  <h3>Required imports for Path B</h3>
+<pre><code><span class="keyword">from</span> nautilus_trader.backtest.node <span class="keyword">import</span> BacktestNode
+<span class="keyword">from</span> nautilus_trader.backtest.config <span class="keyword">import</span> (
+    BacktestVenueConfig,
+    BacktestDataConfig,
+    BacktestRunConfig,
+)
+<span class="comment"># BacktestEngineConfig stays the same &mdash; embedded in BacktestRunConfig.engine</span>
+</code></pre>
+</section>
+
+<!-- =================================================================== -->
+<section id="mapping">
+  <h2>4. API mapping table</h2>
+  <p>The lookup-table version of section 3 &mdash; one row per Path&nbsp;A engine call:</p>
+  <table>
+    <thead>
+      <tr>
+        <th width="46%">Path&nbsp;A (current)</th>
+        <th width="54%">Path&nbsp;B target</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>BacktestEngine(config=engine_config)</code></td>
+        <td>Embed <code>engine_config</code> inside <code>BacktestRunConfig.engine</code>; engine is constructed by <code>node.build()</code></td>
+      </tr>
+      <tr>
+        <td><code>engine.add_venue(venue, oms_type, account_type, starting_balances=[Money(N, USD)], base_currency=USD, default_leverage=Decimal(1))</code></td>
+        <td><code>BacktestVenueConfig(name=str(venue), oms_type, account_type, starting_balances=[f"{N} USD"], base_currency="USD", default_leverage=1.0)</code></td>
+      </tr>
+      <tr>
+        <td><code>catalog.bars(bar_types=[...], start, end)</code> then <code>engine.add_data(bars)</code></td>
+        <td><code>BacktestDataConfig(catalog_path, data_cls="nautilus_trader.model.data.Bar", instrument_id, bar_types=[...], start_time, end_time)</code> &mdash; node reads + streams</td>
+      </tr>
+      <tr>
+        <td><code>engine.add_instrument(inst)</code></td>
+        <td>Implicit &mdash; node loads instruments from catalog automatically</td>
+      </tr>
+      <tr>
+        <td><code>engine.add_strategy(strategy)</code></td>
+        <td><code>node.build()</code> &rarr; <code>node.get_engine(run_id).add_strategy(strategy)</code> &rarr; <code>node.run()</code> <em>(custom strategies require this imperative attach)</em></td>
+      </tr>
+      <tr>
+        <td><code>engine.run()</code></td>
+        <td><code>results = node.run()</code> &mdash; engines retained on the node</td>
+      </tr>
+      <tr>
+        <td><code>engine.dispose()</code></td>
+        <td>Handled by <code>BacktestRunConfig.dispose_on_completion=True</code> (default)</td>
+      </tr>
+      <tr>
+        <td>FX BID/ASK auto-pair via <code>_pair_bid_ask_bar_type()</code></td>
+        <td>Same helper &mdash; output feeds <code>BacktestDataConfig.bar_types=[primary, paired_ask, paired_bid, ...extras]</code></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =================================================================== -->
+<section id="diff">
+  <h2>5. Concrete code diff: 3 sites to migrate</h2>
+  <p>Recommended approach: <strong>parallel implementation, gated by <code>_USE_BACKTEST_NODE=1</code></strong>. Don't rip out Path&nbsp;A. The project already uses this pattern for the shared-engine path (<code>_USE_GROUPING</code> at <span class="file-ref">line 1021</span>) &mdash; mirror it.</p>
+
+  <h3><span class="step-num">1</span>Add a shared run-config builder</h3>
+  <p>One helper that all three migration sites can call. Put it near <code>_pair_bid_ask_bar_type</code> in <code>backtest_runner.py</code>.</p>
+<pre><code><span class="keyword">from</span> nautilus_trader.backtest.config <span class="keyword">import</span> (
+    BacktestVenueConfig, BacktestDataConfig, BacktestRunConfig,
+)
+
+<span class="keyword">def</span> <span class="function">_build_run_config</span>(
+    catalog_path: str,
+    instrument_id,
+    bar_type_strs: list[str],          <span class="comment"># primary + paired + extras</span>
+    venue,
+    starting_capital: float,
+    start_date: str | <span class="keyword">None</span>,
+    end_date:   str | <span class="keyword">None</span>,
+    trader_id: str = <span class="string">"BACKTESTER-001"</span>,
+    chunk_size: int | <span class="keyword">None</span> = <span class="keyword">None</span>,    <span class="comment"># None = parity with Path A</span>
+    oms_type: str = <span class="string">"NETTING"</span>,
+    run_id: str = <span class="string">"run-001"</span>,
+) <span class="arrow">-&gt;</span> BacktestRunConfig:
+    venue_cfg = BacktestVenueConfig(
+        name=str(venue),
+        oms_type=oms_type,
+        account_type=<span class="string">"MARGIN"</span>,
+        starting_balances=[<span class="string">f"{starting_capital} USD"</span>],
+        base_currency=<span class="string">"USD"</span>,
+        default_leverage=<span class="num">1.0</span>,
+    )
+    data_cfgs = [
+        BacktestDataConfig(
+            catalog_path=catalog_path,
+            data_cls=<span class="string">"nautilus_trader.model.data.Bar"</span>,
+            instrument_id=str(instrument_id),
+            bar_types=bar_type_strs,
+            start_time=start_date,
+            end_time=end_date,
+        )
+    ]
+    engine_cfg = BacktestEngineConfig(
+        trader_id=TraderId(trader_id),
+        logging=LoggingConfig(bypass_logging=<span class="keyword">True</span>),
+        risk_engine=RiskEngineConfig(bypass=<span class="keyword">True</span>),
+        run_analysis=<span class="keyword">False</span>,
+    )
+    <span class="keyword">return</span> BacktestRunConfig(
+        venues=[venue_cfg],
+        data=data_cfgs,
+        engine=engine_cfg,
+        chunk_size=chunk_size,
+    )
+</code></pre>
+
+  <h3><span class="step-num">2</span>Site 1: <code>run_backtest()</code> &rarr; <code>run_backtest_node()</code></h3>
+  <div class="two-col">
+    <div class="col-box path-a">
+      <h4>Path A &mdash; today, line 237-277</h4>
+<pre><code>engine = BacktestEngine(config=engine_config)
+engine.add_venue(
+    venue=venue,
+    oms_type=OmsType.NETTING,
+    account_type=AccountType.MARGIN,
+    starting_balances=[Money(starting_capital, USD)],
+    base_currency=USD,
+    default_leverage=Decimal(<span class="num">1</span>),
+)
+engine.add_instrument(instrument)
+engine.add_data(bars)
+<span class="keyword">del</span> bars
+
+<span class="comment"># &hellip;build strategy&hellip;</span>
+engine.add_strategy(strategy)
+engine.run()
+
+results = _extract_results(
+    engine, starting_capital, fx_resolver,
+)
+engine.dispose()
+</code></pre>
+    </div>
+    <div class="col-box path-b">
+      <h4>Path B &mdash; new <code>run_backtest_node()</code></h4>
+<pre><code>run_cfg = _build_run_config(
+    catalog_path=catalog_path,
+    instrument_id=instrument_id,
+    bar_type_strs=bar_type_strs + paired_strs,
+    venue=instrument_id.venue,
+    starting_capital=starting_capital,
+    start_date=start_date,
+    end_date=end_date,
+    chunk_size=<span class="keyword">None</span>,   <span class="comment"># None = parity</span>
+)
+node = BacktestNode(configs=[run_cfg])
+node.build()
+engine = node.get_engine(run_cfg.id)
+
+<span class="comment"># &hellip;build strategy&hellip;</span>
+engine.add_strategy(strategy)
+node.run()
+
+results = _extract_results(
+    engine, starting_capital, fx_resolver,
+)
+<span class="comment"># dispose handled by RunConfig default</span>
+</code></pre>
+    </div>
+  </div>
+
+  <h3><span class="step-num">3</span>Site 2: <code>_run_single_slot()</code> &rarr; <code>_run_single_slot_node()</code></h3>
+  <p>Same shape as site 1, plus the existing <code>ManagedExitStrategy</code> wrapping logic at <span class="file-ref">line 485-499</span> stays unchanged &mdash; the strategy is still attached imperatively after <code>node.build()</code>. The phase-timing wrappers (<code>_phase("engine_run", ...)</code>) wrap <code>node.run()</code> instead of <code>engine.run()</code>.</p>
+
+  <h3><span class="step-num">4</span>Site 3: <code>_run_slot_group()</code> &rarr; multi-strategy single-engine via Node</h3>
+  <p>The trickier case: <em>N</em> strategies, one engine. Path&nbsp;B supports it &mdash; build one <code>BacktestRunConfig</code>, call <code>node.build()</code>, then loop:</p>
+<pre><code>run_cfg = _build_run_config(
+    catalog_path=catalog_path,
+    instrument_id=instrument_id,
+    bar_type_strs=[primary] + paired_strs,
+    venue=instrument_id.venue,
+    starting_capital=total_capital,        <span class="comment"># sum of group capitals</span>
+    start_date=start_date,
+    end_date=end_date,
+    trader_id=<span class="string">f"GROUP-{group_index:03d}"</span>,
+    oms_type=<span class="string">"HEDGING"</span>,                  <span class="comment"># preserve current per-strategy position tracking</span>
+)
+node = BacktestNode(configs=[run_cfg])
+node.build()
+engine = node.get_engine(run_cfg.id)
+
+<span class="keyword">for</span> i, (slot, _capital) <span class="keyword">in</span> enumerate(group):
+    order_tag = <span class="string">f"{group_index:03d}-{i:03d}"</span>
+    strategy = ...                         <span class="comment"># build with order_id_tag=order_tag</span>
+    engine.add_strategy(strategy)
+
+node.run()
+
+<span class="comment"># Existing extraction unchanged &mdash; same engine.trader.* / engine.kernel.cache.* APIs</span>
+fills_report     = engine.trader.generate_order_fills_report()
+positions_report = engine.trader.generate_positions_report()
+actual_strategies = engine.trader.strategies()
+</code></pre>
+
+  <h3><span class="step-num">5</span>Wire the env-flag gate at each public entry</h3>
+<pre><code><span class="keyword">def</span> <span class="function">run_backtest</span>(...) <span class="arrow">-&gt;</span> dict:
+    <span class="keyword">if</span> os.environ.get(<span class="string">"_USE_BACKTEST_NODE"</span>) == <span class="string">"1"</span>:
+        <span class="keyword">return</span> run_backtest_node(...)
+    <span class="comment"># &hellip;existing Path A body&hellip;</span>
+</code></pre>
+  <p>Same pattern for the worker entry points <code>_run_single_slot</code> and <code>_run_slot_group</code>. <code>server.py:969</code> and <code>server.py:1174</code> need <em>no</em> changes &mdash; the flag flips the implementation underneath.</p>
+</section>
+
+<!-- =================================================================== -->
+<section id="changes">
+  <h2>6. Behavioral changes to be aware of</h2>
+
+  <div class="warn-box">
+    <strong>Worker-local LRU cache becomes inert.</strong> <code>_cached_catalog_bars()</code> at <span class="file-ref">line 119</span> caches <code>catalog.bars(...)</code> results between slots in the same worker process &mdash; saves ~500&nbsp;ms of parquet read per cache hit. Path&nbsp;B reads via <code>DataBackendSession</code> (Arrow) on every run, so this win disappears for repeat runs of the same <code>(bar_type, range)</code> in one worker. Mostly relevant when running the same portfolio many times back-to-back; for normal one-shot portfolio runs the impact is negligible.
+  </div>
+
+  <div class="warn-box">
+    <strong>Custom strategies must be attached after <code>node.build()</code>.</strong> The project loads strategies via <code>importlib</code> from <code>custom_strategies_dir</code> (<span class="file-ref">core/custom_strategy_loader.py</span>), so they cannot round-trip through <code>ImportableStrategyConfig(strategy_path="pkg.mod:Cls", config=...)</code>. The imperative attach pattern (<code>build()</code> &rarr; <code>get_engine()</code> &rarr; <code>add_strategy()</code> &rarr; <code>run()</code>) is the only viable flow.
+  </div>
+
+  <div class="warn-box">
+    <strong>Money &rarr; string for starting balances.</strong> <code>BacktestVenueConfig.starting_balances: list[str]</code> &mdash; format <code>"1000000 USD"</code>. Don't pass <code>Money(...)</code> objects.
+  </div>
+
+  <div class="warn-box">
+    <strong>Don't double-dispose.</strong> <code>BacktestRunConfig.dispose_on_completion=True</code> (default) means <code>node.run()</code> already disposes engines on completion. Drop the <code>try/finally: engine.dispose()</code> block in the new code paths &mdash; or set <code>dispose_on_completion=False</code> if you need the engine handle alive after <code>node.run()</code> returns (e.g. for additional cache reads).
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<section id="unchanged">
+  <h2>7. Things that stay the same</h2>
+  <ul>
+    <li><strong>HTTP entry points</strong> &mdash; <code>server.py:969</code> calls <code>run_backtest()</code>; <code>server.py:1174</code> calls <code>run_portfolio_backtest()</code>. Both function signatures are preserved; the env flag flips the implementation.</li>
+    <li><strong>ProcessPoolExecutor parallelism</strong> &mdash; one <code>BacktestNode</code> per worker, single run config each. Same blast radius, same scheduling, same <code>_USE_GROUPING</code> behavior.</li>
+    <li><strong>FX BID/ASK auto-pairing</strong> &mdash; <code>_pair_bid_ask_bar_type()</code> stays as-is. Its output is the input to <code>BacktestDataConfig.bar_types</code>.</li>
+    <li><strong>Parquet catalog writer</strong> &mdash; <code>core/nautilus_loader.py</code> needs zero changes. It already writes the format Path&nbsp;B reads.</li>
+    <li><strong><code>_extract_results()</code> and downstream report code</strong> &mdash; all six engine APIs it touches (<code>engine.trader.generate_*</code>, <code>engine.kernel.cache.*</code>) are available on engines retrieved via <code>node.get_engine(run_id)</code>.</li>
+    <li><strong>FX rate resolver</strong> &mdash; <code>FxRateResolver.from_adapter_config(...)</code> reads from the catalog directly, independent of which engine API drove the run.</li>
+    <li><strong>Worker SIGINT handling</strong> &mdash; <code>_worker_init_ignore_sigint</code> stays. <code>node.run()</code> blocks the same way <code>engine.run()</code> does.</li>
+    <li><strong>Runtime history / LPT scheduling</strong> &mdash; pure metadata, untouched.</li>
+  </ul>
+</section>
+
+<!-- =================================================================== -->
+<section id="verify">
+  <h2>8. Verification plan</h2>
+  <ol>
+    <li><strong>Pick a representative portfolio</strong> &mdash; ideally 2&ndash;3 slots covering both crypto-LAST (no pairing) and FX-MID (BID/ASK auto-pair exercised). Use an existing one from <code>portfolios/</code>.</li>
+    <li><strong>Run with <code>_USE_BACKTEST_NODE</code> unset</strong> (current Path&nbsp;A). Capture <code>account_report</code>, <code>fills_report</code>, <code>positions_report</code> for each slot to JSON.</li>
+    <li><strong>Run with <code>_USE_BACKTEST_NODE=1, chunk_size=None</code></strong>. Diff against step 2 &mdash; <strong>expect bit-exact match</strong> on all three reports. Same matching engine internals, same data, just a different wiring layer. Any divergence here is a bug in the migration.</li>
+    <li><strong>Run with <code>_USE_BACKTEST_NODE=1, chunk_size=100_000</code></strong>. Diff again &mdash; expect a match modulo floating-point noise (chunked accumulation can shift the last few sig-figs of running PnL).</li>
+    <li><strong>Sanity-check via the browser</strong> &mdash; hit <code>/api/backtest/run-stream</code> and <code>/api/backtest/run-backtest-api</code> with the flag set. The HTTP response shape must be identical.</li>
+    <li><strong>Spot-check shared-engine path</strong> &mdash; flip <code>_USE_GROUPING=1</code> alongside <code>_USE_BACKTEST_NODE=1</code> and confirm grouped runs still produce the same per-slot results.</li>
+    <li><strong>Profile</strong> &mdash; with <code>_PROFILE_PHASES=1</code>, compare <code>phase_times</code> across paths. Expected: similar <code>engine_run</code>; <code>bars_load</code> is replaced by node-internal data load, time should be comparable; cache hits drop to zero (expected).</li>
+  </ol>
+  <p>Once steps 3 and 5 produce parity for one portfolio, expand to the regression set &mdash; 5&ndash;10 portfolios across asset classes &mdash; before flipping the default.</p>
+</section>
+
+<!-- =================================================================== -->
+<section id="tradeoffs">
+  <h2>9. Trade-offs &mdash; should you actually migrate?</h2>
+
+  <h3>Pros of Path B</h3>
+  <ul>
+    <li><strong>Memory ceiling.</strong> <code>chunk_size</code> caps peak in-memory bars regardless of date range. Year of 1-minute FX bars is ~75&nbsp;MB per side; loading 5 years of MID + ASK + BID is ~1&nbsp;GB per slot. Streaming makes that flat.</li>
+    <li><strong>Configs are serializable.</strong> <code>BacktestRunConfig</code> is a frozen msgspec dataclass &mdash; you can dump/load it, log it, replay it, store it next to the result file. Easier to reproduce a run from the config alone.</li>
+    <li><strong>Less manual wiring.</strong> Venue, instrument loading, and data attachment are all derived from the config &mdash; less surface to bug-fix.</li>
+  </ul>
+
+  <h3>Cons / things to weigh</h3>
+  <ul>
+    <li><strong>The current code is already memory-conscious.</strong> <code>del bars</code> after <code>add_data</code> at <span class="file-ref">line 254</span> and <span class="file-ref">line 469</span>; worker-local LRU. If you're not hitting RAM pressure today, the streaming win is theoretical.</li>
+    <li><strong>Cache regression for repeated runs.</strong> See section 6 &mdash; the LRU cache that currently saves ~500&nbsp;ms per repeated <code>(bar_type, range)</code> read inside one worker process becomes inert.</li>
+    <li><strong>Migration cost is real.</strong> Three engine sites + result-extraction wiring + verification across portfolios. Probably 1&ndash;2 days of focused work plus a soak window before flipping the default.</li>
+    <li><strong>The shared-engine path needs care.</strong> The <code>_run_slot_group</code> migration is the most fiddly piece &mdash; works fine via imperative <code>add_strategy</code> after <code>node.build()</code>, but is the highest-risk change.</li>
+  </ul>
+
+  <div class="insight-box">
+    <strong>Recommendation:</strong> migrate <em>only</em> if (a) you're hitting memory ceilings on long-range backtests, or (b) you specifically want serializable run configs for reproducibility/replay. Otherwise the existing Path&nbsp;A code is functionally equivalent, well-instrumented, and already production-tested in this codebase. If you do migrate, do it gated &mdash; <code>_USE_BACKTEST_NODE=1</code> &mdash; validate parity on real portfolios, then flip the default and remove the dead code in a follow-up.
+  </div>
+</section>
+
+<div class="footer">
+  <p>Verified against:
+    <code>core/backtest_runner.py</code> (lines 14, 98, 119, 141, 194, 237-277, 355, 449, 485, 567, 718, 833, 894, 950, 1021, 1673),
+    <code>core/nautilus_loader.py</code> (lines 88-123),
+    <code>venv/Lib/site-packages/nautilus_trader/backtest/node.py</code> (lines 76-160),
+    <code>venv/Lib/site-packages/nautilus_trader/backtest/config.py</code> (lines 50-427).
+  </p>
+</div>
+
+</div>
+
+</body>
+</html>

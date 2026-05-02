@@ -95,18 +95,25 @@ def _group_slots(
     return list(groups.values())
 
 
-def _pair_bid_ask_bar_type(bt_str: str) -> str | None:
-    """Return the opposite-side bar type string, or None if not BID/ASK.
+def _pair_bid_ask_bar_type(bt_str: str) -> list[str]:
+    """Return additional bar type strings needed for realistic fills.
 
     Nautilus's matching engine needs both quote sides to fill FX market
     orders. A strategy subscribed only to BID sees no fills unless ASK is
-    also loaded (and vice versa). MID/LAST bar types don't need a pair.
+    also loaded (and vice versa). MID slots need both ASK and BID so the
+    engine can fill at real spread prices instead of the midpoint.
+    LAST bar types don't need a pair.
     """
     if "-BID-" in bt_str:
-        return bt_str.replace("-BID-", "-ASK-", 1)
+        return [bt_str.replace("-BID-", "-ASK-", 1)]
     if "-ASK-" in bt_str:
-        return bt_str.replace("-ASK-", "-BID-", 1)
-    return None
+        return [bt_str.replace("-ASK-", "-BID-", 1)]
+    if "-MID-" in bt_str:
+        return [
+            bt_str.replace("-MID-", "-ASK-", 1),
+            bt_str.replace("-MID-", "-BID-", 1),
+        ]
+    return []
 
 
 @functools.lru_cache(maxsize=4)
@@ -176,13 +183,28 @@ def run_backtest(
     else:
         bar_type_strs = list(bar_type_str)
 
+    # Auto-pair: for each user-supplied bar type, also load its ASK/BID
+    # counterpart(s) so the matching engine can fill at real spread prices.
+    paired_strs: list[str] = []
+    for bt in bar_type_strs:
+        paired_strs.extend(_pair_bid_ask_bar_type(bt))
+
     # Route through the worker-local LRU so a second strategy on the same
     # (instrument, date range) inside the same worker skips the parquet read.
     catalog = ParquetDataCatalog(catalog_path)
     bars = []
-    for bt_str in bar_type_strs:
-        cached = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
+    missing_pairs: list[str] = []
+    for bt_str in bar_type_strs + paired_strs:
+        try:
+            cached = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
+        except Exception:
+            cached = []
+            if bt_str in paired_strs:
+                missing_pairs.append(bt_str)
+        if not cached and bt_str in paired_strs:
+            missing_pairs.append(bt_str)
         bars.extend(cached)
+    missing_pairs = list(dict.fromkeys(missing_pairs))
 
     if not bars:
         date_info = f" in range {start_date or 'start'} to {end_date or 'end'}"
@@ -264,6 +286,11 @@ def run_backtest(
     # Extract results
     results = _extract_results(engine, starting_capital, fx_resolver)
 
+    if missing_pairs:
+        results["warning"] = (
+            f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
+            f"Fills will use MID prices — spread cost is not reflected in results."
+        )
 
     engine.dispose()
 
@@ -372,24 +399,28 @@ def _run_single_slot(
     with _phase("instruments_scan", phase_times):
         instrument_map = {inst.id: inst for inst in catalog.instruments()}
     with _phase("bars_load", phase_times):
-        # Load the slot's primary bar type + its BID/ASK pair if one exists.
+        # Load the slot's primary bar type + its BID/ASK pair(s) if any exist.
         # Nautilus's matching engine needs the opposite quote side to fill FX
-        # market orders. For MID/LAST slots _pair_bid_ask_bar_type returns None
-        # and we load a single bar type as before.
+        # market orders. MID slots load both ASK and BID so the engine fills
+        # at real spread prices instead of the midpoint.
         bar_type_strs_to_load = [slot.bar_type_str]
-        pair = _pair_bid_ask_bar_type(slot.bar_type_str)
-        if pair is not None:
-            bar_type_strs_to_load.append(pair)
+        paired_strs = _pair_bid_ask_bar_type(slot.bar_type_str)
+        bar_type_strs_to_load.extend(paired_strs)
 
         all_bars = []
+        missing_pairs: list[str] = []
         for bt_str in bar_type_strs_to_load:
             try:
                 cached = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
             except Exception:
-                # Paired side absent from catalog is fine — primary-side failure
-                # falls through to the empty-bars check below.
                 cached = []
+                if bt_str in paired_strs:
+                    missing_pairs.append(bt_str)
+            if not cached and bt_str in paired_strs:
+                missing_pairs.append(bt_str)
             all_bars.extend(cached)
+        # De-duplicate in case both except and empty-check fire for the same str
+        missing_pairs = list(dict.fromkeys(missing_pairs))
 
     if not all_bars:
         raise ValueError(
@@ -510,6 +541,13 @@ def _run_single_slot(
         results["allocated_capital"] = capital
         results["elapsed_seconds"] = round(_time.time() - _t_slot_start, 3)
         results["worker_pid"] = os.getpid()
+
+        # Warn if paired ASK/BID data was unavailable — fills will use MID prices
+        if missing_pairs:
+            results["warning"] = (
+                f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
+                f"Fills will use MID prices — spread cost is not reflected in results."
+            )
 
         # Per-worker cache + RSS telemetry. Helps decide whether the LRU is
         # earning its keep on a given workload, and whether per-worker memory
@@ -734,16 +772,21 @@ def _run_slot_group(
         # BID/ASK auto-pair (same as _run_single_slot): Nautilus's matching
         # engine needs the opposite quote side to fill FX market orders.
         bar_type_strs_to_load = [primary_bar_type_str]
-        pair = _pair_bid_ask_bar_type(primary_bar_type_str)
-        if pair is not None:
-            bar_type_strs_to_load.append(pair)
+        paired_strs = _pair_bid_ask_bar_type(primary_bar_type_str)
+        bar_type_strs_to_load.extend(paired_strs)
         all_bars = []
+        missing_pairs: list[str] = []
         for bt_str in bar_type_strs_to_load:
             try:
                 cached = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
             except Exception:
                 cached = []
+                if bt_str in paired_strs:
+                    missing_pairs.append(bt_str)
+            if not cached and bt_str in paired_strs:
+                missing_pairs.append(bt_str)
             all_bars.extend(cached)
+        missing_pairs = list(dict.fromkeys(missing_pairs))
 
     if not all_bars:
         raise ValueError(
@@ -897,6 +940,12 @@ def _run_slot_group(
                     r["worker_rss_mb"] = round(_psutil.Process(os.getpid()).memory_info().rss / 1e6, 1)
                 except Exception:
                     r["worker_rss_mb"] = None
+
+                if missing_pairs:
+                    r["warning"] = (
+                        f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
+                        f"Fills will use MID prices — spread cost is not reflected in results."
+                    )
 
                 slot_results.append(r)
     finally:
@@ -1188,6 +1237,7 @@ def _merge_portfolio_results(
             "cache_misses": r.get("cache_misses"),
             "cache_currsize": r.get("cache_currsize"),
             "worker_rss_mb": r.get("worker_rss_mb"),
+            "warning": r.get("warning"),
         }
 
     # Merge equity curves — sum balances at each timestamp
@@ -1283,6 +1333,10 @@ def _merge_portfolio_results(
         "slot_to_strategy_id": slot_to_strategy_id,
         "slot_to_trader_id": slot_to_trader_id,
         "errors": errors,
+        "warnings": [
+            {"slot_id": sid, "display_name": info.get("display_name", sid), "warning": info["warning"]}
+            for sid, info in per_strategy.items() if info.get("warning")
+        ],
     }
 
 

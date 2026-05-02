@@ -684,6 +684,7 @@ def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
         "win_pct_days": results.get("win_pct_days", 0.0),
         "loss_pct_days": results.get("loss_pct_days", 0.0),
         "equity_curve_ts": results.get("equity_curve_ts", []),
+        "warning": results.get("warning"),
     }
 
     # Convert reports to lists of dicts. Skip the full DataFrame copy + per-column

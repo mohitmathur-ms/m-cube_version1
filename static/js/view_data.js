@@ -21,6 +21,12 @@ const ViewData = {
             <p class="page-subtitle">Explore your loaded market data with tables and interactive charts.</p>
 
             <div class="form-row" style="align-items: flex-end;">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Venue</label>
+                    <select id="view-venue" class="form-control" onchange="ViewData.onVenueChange()">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
                 <div class="form-group" style="flex: 2;">
                     <label class="form-label">Select Instrument / Bar Type</label>
                     <select id="view-bar-type" class="form-control" onchange="ViewData.onBarTypeChange()">
@@ -51,27 +57,83 @@ const ViewData = {
         try {
             const data = await App.api("/api/data/bar_types");
             const select = document.getElementById("view-bar-type");
+            const venueSelect = document.getElementById("view-venue");
 
             if (!data.bar_types || data.bar_types.length === 0) {
                 select.innerHTML = '<option value="">No data available</option>';
+                if (venueSelect) venueSelect.innerHTML = '<option value="">No data</option>';
                 document.getElementById("view-content").innerHTML =
                     '<div class="alert alert-info">No bar data in catalog. Go to <strong>Load Data</strong> first.</div>';
                 return;
             }
 
+            this.allBarTypes = data.bar_types;
             this.barTypeDetails = data.bar_type_details || {};
-            // Render the same compact label that the Portfolio editor uses
-            // (e.g. "EURUSD(ASK).FOREX_MS") instead of the raw BarType
-            // string. The full bar-type stays as the option's value so
-            // every downstream call is unchanged.
-            select.innerHTML = data.bar_types.map(bt =>
-                `<option value="${bt}">${App.barTypeLabel(bt)}</option>`
-            ).join("");
 
-            this.onBarTypeChange();
+            // Populate the venue dropdown from the unique venue tokens in catalog.
+            const venues = new Set();
+            for (const bt of this.allBarTypes) {
+                const v = this.venueOf(bt);
+                if (v) venues.add(v);
+            }
+            const sortedVenues = Array.from(venues).sort();
+            // Default venue: pick the one Load Data left selected if it still exists,
+            // otherwise show all.
+            const fromLoad = (App.state && App.state.selectedVenue) || "";
+            this.selectedVenue = (fromLoad && sortedVenues.includes(fromLoad)) ? fromLoad : "";
+
+            venueSelect.innerHTML =
+                `<option value="" ${!this.selectedVenue ? "selected" : ""}>All Venues</option>`
+                + sortedVenues.map(v =>
+                    `<option value="${v}" ${this.selectedVenue === v ? "selected" : ""}>${v}</option>`
+                ).join("");
+
+            this.renderBarTypeOptions();
         } catch (e) {
             App.toast("Failed to load bar types: " + e.message, "error");
         }
+    },
+
+    /** Extract the venue token from a bar type like "BTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL". */
+    venueOf(barType) {
+        const inst = String(barType).split("-")[0] || "";
+        const dotIdx = inst.indexOf(".");
+        return dotIdx > 0 ? inst.substring(dotIdx + 1) : "";
+    },
+
+    onVenueChange() {
+        const sel = document.getElementById("view-venue");
+        this.selectedVenue = sel ? sel.value : "";
+        this.renderBarTypeOptions();
+    },
+
+    /** Populate the bar-type select with whatever matches the active venue filter. */
+    renderBarTypeOptions() {
+        const select = document.getElementById("view-bar-type");
+        if (!select) return;
+
+        const all = this.allBarTypes || [];
+        const filtered = this.selectedVenue
+            ? all.filter(bt => this.venueOf(bt) === this.selectedVenue)
+            : all;
+
+        if (filtered.length === 0) {
+            select.innerHTML = '<option value="">No instruments for this venue</option>';
+            this.currentBarType = "";
+            document.getElementById("view-content").innerHTML =
+                '<div class="alert alert-warning">No instruments available for the selected venue.</div>';
+            return;
+        }
+
+        // Render the same compact label that the Portfolio editor uses
+        // (e.g. "EURUSD(ASK).FOREX_MS") instead of the raw BarType
+        // string. The full bar-type stays as the option's value so
+        // every downstream call is unchanged.
+        select.innerHTML = filtered.map(bt =>
+            `<option value="${bt}">${App.barTypeLabel(bt)}</option>`
+        ).join("");
+
+        this.onBarTypeChange();
     },
 
     /** Pick a reasonable default window for a newly-selected bar type.

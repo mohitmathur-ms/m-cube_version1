@@ -82,16 +82,25 @@ const Backtest = {
         }
 
         // Instrument checkboxes with per-instrument date range
-        // Filter instruments by selected venue from Load Data page
-        const venue = App.state.selectedVenue || "";
+        // Venue filter — built from the bar types in catalog, lets the user
+        // restrict the instrument list (and therefore the backtest) to one venue.
+        const allVenues = this.extractVenues();
+        if (this.selectedVenue === undefined) {
+            const fromLoad = App.state.selectedVenue || "";
+            this.selectedVenue = (fromLoad && allVenues.includes(fromLoad)) ? fromLoad : "";
+        } else if (this.selectedVenue && !allVenues.includes(this.selectedVenue)) {
+            this.selectedVenue = "";
+        }
+
+        const venue = this.selectedVenue;
         this.filteredBarTypes = venue
-            ? this.barTypes.filter(bt => bt.toUpperCase().includes(`.${venue.toUpperCase()}`))
+            ? this.barTypes.filter(bt => this.venueOf(bt) === venue)
             : this.barTypes;
 
-        // Fallback: if no instruments match the venue, show all
-        if (this.filteredBarTypes.length === 0) {
-            this.filteredBarTypes = this.barTypes;
-        }
+        const venueOptions = `<option value="" ${!venue ? "selected" : ""}>All Venues</option>`
+            + allVenues.map(v =>
+                `<option value="${v}" ${venue === v ? "selected" : ""}>${v}</option>`
+            ).join("");
 
         const instrumentList = this.filteredBarTypes.map(bt => {
             const sid = this.safeId(bt);
@@ -129,8 +138,16 @@ const Backtest = {
             <h2 class="section-title">Configuration</h2>
 
             <div class="form-group">
+                <label class="form-label">Venue</label>
+                <select id="bt-venue-select" class="form-control" onchange="Backtest.onVenueChange()" style="max-width: 320px;">
+                    ${venueOptions}
+                </select>
+                <p class="section-caption">Only instruments from the selected venue can be backtested.</p>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Select Instruments</label>
-                <p class="section-caption">Showing instruments for venue: <strong>${venue || "ALL"}</strong> (change on Load Data page).</p>
+                <p class="section-caption">${this.filteredBarTypes.length} instrument(s) available for venue: <strong>${venue || "All Venues"}</strong>.</p>
                 <input type="text" id="inst-search" class="form-control" placeholder="Search instruments..."
                        oninput="Backtest.filterInstruments()" style="margin-bottom: 8px;">
                 <div style="margin-bottom: 8px;">
@@ -138,7 +155,7 @@ const Backtest = {
                     <button class="btn btn-sm" onclick="Backtest.selectAllInstruments(false)">Deselect All</button>
                 </div>
                 <div id="instrument-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
-                    ${instrumentList}
+                    ${this.filteredBarTypes.length > 0 ? instrumentList : '<div class="alert alert-warning" style="margin:0;">No instruments found for this venue.</div>'}
                 </div>
             </div>
 
@@ -191,6 +208,31 @@ const Backtest = {
 
         this.updateStrategySelection();
         this.loadGuidelines();
+    },
+
+    /** Extract the venue token from a bar type like "BTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL". */
+    venueOf(barType) {
+        const inst = String(barType).split("-")[0] || "";
+        const dotIdx = inst.indexOf(".");
+        return dotIdx > 0 ? inst.substring(dotIdx + 1) : "";
+    },
+
+    /** Sorted unique list of venues across the loaded bar types. */
+    extractVenues() {
+        const set = new Set();
+        for (const bt of this.barTypes || []) {
+            const v = this.venueOf(bt);
+            if (v) set.add(v);
+        }
+        return Array.from(set).sort();
+    },
+
+    onVenueChange() {
+        const sel = document.getElementById("bt-venue-select");
+        this.selectedVenue = sel ? sel.value : "";
+        const saved = this.saveFormState();
+        this.renderSetup();
+        this.restoreFormState(saved);
     },
 
     toggleInstrumentDates(sid) {
@@ -787,11 +829,19 @@ const Backtest = {
                 : "all data";
 
             // Comparison table for this instrument
+            // Spread warnings for strategies using MID bars without ASK/BID data
+            const spreadWarnings = stratNames.filter(n => strategies[n].warning).map(n => strategies[n].warning);
+            let spreadWarnHTML = "";
+            if (spreadWarnings.length > 0) {
+                spreadWarnHTML = `<div class="alert alert-warning" style="margin:8px 0;padding:8px 12px;font-size:0.85rem;"><strong>&#9888;</strong> ${spreadWarnings.join(" ")}</div>`;
+            }
+
             const rows = stratNames.map(name => {
                 const r = strategies[name];
                 const pnlClass = r.total_pnl >= 0 ? "positive" : "negative";
+                const warnIcon = r.warning ? ` <span title="${r.warning.replace(/"/g, '&quot;')}" style="cursor:help;color:#e6a817;">&#9888;</span>` : "";
                 return `<tr>
-                    <td><strong>${name}</strong></td>
+                    <td><strong>${name}</strong>${warnIcon}</td>
                     <td>${App.currency(r.starting_capital)}</td>
                     <td>${App.currency(r.final_balance)}</td>
                     <td class="${pnlClass}">${App.currency(r.total_pnl)}</td>
@@ -888,6 +938,7 @@ const Backtest = {
                     <h3 style="margin: 0 0 4px; color: var(--accent);">${label}</h3>
                     <p class="section-caption" style="margin: 0 0 16px;">Date range: ${dateStr} | Strategies: ${stratNames.join(", ")}</p>
 
+                    ${spreadWarnHTML}
                     <div class="table-container comparison-table">
                         <table>
                             <thead>

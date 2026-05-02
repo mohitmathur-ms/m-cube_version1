@@ -1,0 +1,153 @@
+{
+  "name": "Portfolio 5",
+  "description": "",
+  "created_at": "2026-05-01T04:47:02.245657+00:00",
+  "updated_at": "2026-05-01T04:47:02.245985+00:00",
+  "starting_capital": 100000,
+  "max_loss": null,
+  "max_profit": null,
+  "allocation_mode": "equal",
+  "start_date": null,
+  "end_date": null,
+  "squareoff_time": null,
+  "squareoff_tz": null,
+  "slots": [
+    {
+      "slot_id": "smomfkir81",
+      "strategy_name": "4 Moving Averages",
+      "strategy_params": {
+        "ma1_period": 5,
+        "ma2_period": 10,
+        "ma3_period": 20,
+        "ma4_period": 50,
+        "use_ema": false
+      },
+      "bar_type_str": "BTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL",
+      "trade_size": 1,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "none",
+        "stop_loss_value": 0,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "none",
+        "target_value": 0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
+      },
+      "enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
+    },
+    {
+      "slot_id": "smomfklcx2",
+      "strategy_name": "4 Moving Averages",
+      "strategy_params": {
+        "ma1_period": 5,
+        "ma2_period": 10,
+        "ma3_period": 20,
+        "ma4_period": 50,
+        "use_ema": false
+      },
+      "bar_type_str": "LTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL",
+      "trade_size": 1,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "none",
+        "stop_loss_value": 0,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "none",
+        "target_value": 0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
+      },
+      "enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
+    },
+    {
+      "slot_id": "smomfkmf03",
+      "strategy_name": "4 Moving Averages",
+      "strategy_params": {
+        "ma1_period": 5,
+        "ma2_period": 10,
+        "ma3_period": 20,
+        "ma4_period": 50,
+        "use_ema": false
+      },
+      "bar_type_str": "XRPUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL",
+      "trade_size": 1,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "none",
+        "stop_loss_value": 0,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "none",
+        "target_value": 0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
+      },
+      "enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
+    },
+    {
+      "slot_id": "smomfkmxc4",
+      "strategy_name": "EMA Cross",
+      "strategy_params": {
+        "fast_ema_period": 10,
+        "slow_ema_period": 20
+      },
+      "bar_type_str": "BTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL",
+      "trade_size": 1,
+      "allocation_pct": 0,
+      "exit_config": {
+        "stop_loss_type": "none",
+        "stop_loss_value": 0,
+        "trailing_sl_step": 0,
+        "trailing_sl_offset": 0,
+        "target_type": "none",
+        "target_value": 0,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "close",
+        "on_target_action": "close",
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
+      },
+      "enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
+    }
+  ]
+}
