@@ -123,6 +123,12 @@ class ManagedExitStrategy(Strategy):
         self._rbo_range_low: float | None = None
         self._rbo_triggered_sides: set[str] = set()  # subset of {"HIGH","LOW"}
         self._rbo_last_day_ns: int | None = None
+        # Per spec P9: when cancel_other_side fires, phase moves to DONE
+        # *after* the breakout has executed — i.e. legs still get to enter on
+        # the breakout bar itself. We defer the transition by one bar via
+        # this flag so _check_entries (which runs after _rbo_step on the same
+        # bar) still sees phase==ENTRY and allows the entry through.
+        self._rbo_pending_done: bool = False
 
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
@@ -235,7 +241,15 @@ class ManagedExitStrategy(Strategy):
             self._rbo_range_high = None
             self._rbo_range_low = None
             self._rbo_triggered_sides = set()
+            self._rbo_pending_done = False
             self._rbo_last_day_ns = bar_day_ns
+
+        # Pending DONE transition from a previous bar's cancel_other_side fire.
+        # Apply at the *start* of this bar so the phase has already advanced
+        # before the rest of the state machine runs.
+        if self._rbo_pending_done:
+            self._rbo_phase = "DONE"
+            self._rbo_pending_done = False
 
         tod_sec = (bar.ts_event % self._NANOS_PER_DAY) // 1_000_000_000
 
@@ -284,7 +298,10 @@ class ManagedExitStrategy(Strategy):
             ):
                 self._rbo_triggered_sides.add("HIGH")
                 if cfg.rbo_cancel_other_side:
-                    self._rbo_phase = "DONE"
+                    # Per spec P9: phase moves to DONE *after* the breakout
+                    # executes — defer to the next bar so this bar's
+                    # _check_entries can still let the strategy enter.
+                    self._rbo_pending_done = True
                     return
 
             # LOW breakout
@@ -296,7 +313,7 @@ class ManagedExitStrategy(Strategy):
             ):
                 self._rbo_triggered_sides.add("LOW")
                 if cfg.rbo_cancel_other_side:
-                    self._rbo_phase = "DONE"
+                    self._rbo_pending_done = True
                     return
 
     def _rbo_allows_entry(self) -> bool:
