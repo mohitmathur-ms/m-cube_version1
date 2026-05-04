@@ -6,12 +6,17 @@ Loads data from the ParquetDataCatalog, runs a selected strategy, and returns re
 
 from __future__ import annotations
 
+import dataclasses
 from decimal import Decimal
 from pathlib import Path
 
 import pandas as pd
 
 from nautilus_trader.backtest.engine import BacktestEngine
+from nautilus_trader.backtest.node import BacktestNode
+from nautilus_trader.backtest.config import BacktestVenueConfig
+from nautilus_trader.backtest.config import BacktestDataConfig
+from nautilus_trader.backtest.config import BacktestRunConfig
 from nautilus_trader.config import BacktestEngineConfig
 from nautilus_trader.config import LoggingConfig
 from nautilus_trader.model import TraderId
@@ -116,6 +121,492 @@ def _pair_bid_ask_bar_type(bt_str: str) -> list[str]:
     return []
 
 
+_DAY_NAME_TO_WEEKDAY = {
+    "MON": 0, "MONDAY": 0,
+    "TUE": 1, "TUESDAY": 1,
+    "WED": 2, "WEDNESDAY": 2,
+    "THU": 3, "THURSDAY": 3,
+    "FRI": 4, "FRIDAY": 4,
+    "SAT": 5, "SATURDAY": 5,
+    "SUN": 6, "SUNDAY": 6,
+}
+
+
+def _allowed_weekdays(run_on_days) -> set | None:
+    """Resolve a portfolio's run_on_days into a set of weekday integers.
+
+    Returns None when no filter should apply (input is None — meaning
+    "all 7 days are fine"). Returns a set of int weekdays (0=Mon..6=Sun)
+    when the filter is active. Returns an empty set when the input is
+    a non-None list whose entries don't match any known day name —
+    callers should treat that as "no days are allowed" and short-circuit.
+    """
+    if run_on_days is None:
+        return None
+    if not isinstance(run_on_days, (list, tuple, set)):
+        return None
+    allowed: set = set()
+    for day in run_on_days:
+        if not isinstance(day, str):
+            continue
+        wd = _DAY_NAME_TO_WEEKDAY.get(day.strip().upper())
+        if wd is not None:
+            allowed.add(wd)
+    return allowed
+
+
+# 1970-01-01 (UNIX epoch) was a Thursday — Python weekday() = 3.
+_NANOS_PER_DAY = 86_400_000_000_000
+_EPOCH_WEEKDAY = 3
+
+
+def _filter_bars_by_weekday(bars: list, allowed_weekdays: set | None) -> tuple[list, int]:
+    """Drop bars whose UTC weekday isn't in allowed_weekdays.
+
+    Returns (kept_bars, dropped_count). When allowed_weekdays is None,
+    returns the input list unchanged with dropped=0. Uses an integer
+    modulo on ts_event nanoseconds to avoid the per-bar pandas-timestamp
+    cost — for a year of 1-min FX bars that's the difference between a
+    20 ms filter and a 2 second filter.
+    """
+    if allowed_weekdays is None:
+        return bars, 0
+    if not allowed_weekdays:
+        return [], len(bars)
+    if not bars:
+        return bars, 0
+
+    kept = []
+    for bar in bars:
+        days = bar.ts_event // _NANOS_PER_DAY
+        weekday = (_EPOCH_WEEKDAY + days) % 7
+        if weekday in allowed_weekdays:
+            kept.append(bar)
+    return kept, len(bars) - len(kept)
+
+
+_NANOS_PER_MINUTE = 60_000_000_000
+
+
+def _hhmm_to_minute(s: str | None) -> int | None:
+    """Parse a 'HH:MM' or 'HH:MM:SS' string into a minute-of-day integer.
+
+    Returns None for None/empty/malformed input. Doesn't raise — bad input
+    just disables that endpoint of the filter. Range is 0..1439 inclusive.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    parts = s.strip().split(":")
+    if len(parts) < 2:
+        return None
+    try:
+        h = int(parts[0])
+        m = int(parts[1])
+    except ValueError:
+        return None
+    if not (0 <= h <= 23) or not (0 <= m <= 59):
+        return None
+    return h * 60 + m
+
+
+def _is_intraday_bar_type(bt_str: str) -> bool:
+    """Return True if the bar type is intraday granularity (minute / hour / second).
+
+    Bar type format: ``INSTRUMENT.VENUE-N-AGGREGATION-PRICE-SOURCE``
+    e.g. ``BTCUSD.BINANCE-1-DAY-LAST-EXTERNAL`` -> DAY (not intraday)
+         ``EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL`` -> MINUTE (intraday)
+
+    The intra-day entry window (entry_start_time / entry_end_time) only
+    makes sense for intraday bars — daily/weekly/monthly bars have a single
+    ts_event per period (typically 00:00 UTC of the period start) which would
+    be unconditionally inside or outside any HH:MM window. Applying the filter
+    to daily bars on an equity-hours window (e.g. 09:30..16:15) drops every
+    bar.
+    """
+    if not bt_str:
+        return False
+    upper = bt_str.upper()
+    return ("-SECOND-" in upper) or ("-MINUTE-" in upper) or ("-HOUR-" in upper)
+
+
+def _filter_bars_by_time_of_day(
+    bars: list,
+    start_hhmm: str | None,
+    end_hhmm: str | None,
+) -> tuple[list, int]:
+    """Drop bars whose UTC time-of-day falls outside [start_hhmm, end_hhmm].
+
+    Both endpoints are inclusive. Either may be None — in which case that
+    side of the window is unbounded (start=00:00 or end=23:59 effectively).
+    When both are None, returns input unchanged.
+
+    Window is in UTC. To use a non-UTC window, the caller would convert
+    bar timestamps first; we don't pull pandas in here for the same
+    perf reason as ``_filter_bars_by_weekday``.
+
+    Returns (kept_bars, dropped_count).
+    """
+    start_min = _hhmm_to_minute(start_hhmm)
+    end_min = _hhmm_to_minute(end_hhmm)
+    if start_min is None and end_min is None:
+        return bars, 0
+    if not bars:
+        return bars, 0
+
+    # Normalize unbounded sides to full-day extremes
+    lo = start_min if start_min is not None else 0
+    hi = end_min if end_min is not None else (24 * 60 - 1)
+
+    if lo > hi:
+        # Inverted window (e.g. start=22:00, end=02:00) — treat as wrap-around
+        # i.e. keep bars in [lo, 24*60) ∪ [0, hi].
+        kept = []
+        for bar in bars:
+            intra = (bar.ts_event % _NANOS_PER_DAY) // _NANOS_PER_MINUTE
+            if intra >= lo or intra <= hi:
+                kept.append(bar)
+        return kept, len(bars) - len(kept)
+
+    kept = []
+    for bar in bars:
+        intra = (bar.ts_event % _NANOS_PER_DAY) // _NANOS_PER_MINUTE
+        if lo <= intra <= hi:
+            kept.append(bar)
+    return kept, len(bars) - len(kept)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Path B (BacktestNode) helpers — opt-in via _USE_BACKTEST_NODE=1.
+# See nautilus_path_a_to_path_b_migration.html for the full design rationale.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _path_b_active() -> bool:
+    """True when the env flag opting into the BacktestNode pipeline is set."""
+    import os
+    return os.environ.get("_USE_BACKTEST_NODE") == "1"
+
+
+def _sec_to_hms(sec: int) -> str:
+    """Seconds-of-day → HH:MM:SS. Inverse of _hms_to_sec."""
+    sec = max(0, min(86399, int(sec)))
+    return f"{sec // 3600:02d}:{(sec // 60) % 60:02d}:{sec % 60:02d}"
+
+
+def _chunk_data_configs_for_path_b(
+    catalog_path: str,
+    instrument_id_str: str,
+    bar_type_strs: list[str],
+    start_date: str,
+    end_date: str,
+    entry_start_time: str | None,
+    entry_end_time: str | None,
+    run_on_days: list | None,
+    rbo_settings: "_RBOSettings | None" = None,
+) -> list[BacktestDataConfig]:
+    """One BacktestDataConfig per allowed day, bounded by the entry window.
+
+    The Nautilus high-level API takes ``BacktestRunConfig.data`` as a list of
+    ``BacktestDataConfig`` entries, each with its own ``start_time``/``end_time``.
+    By emitting one entry per allowed (day, bar_type) we can express both
+    ``run_on_days`` (skip excluded weekdays) and the recurring intraday
+    ``entry_start_time``/``entry_end_time`` window — neither of which a single
+    contiguous data config can represent.
+
+    All days are walked in UTC. Excluded weekdays are dropped. For each
+    included day, ``start_time`` becomes ``YYYY-MM-DDTHH:MM:SS+00:00`` using
+    the entry window endpoints (defaulting to 00:00:00 .. 23:59:59.999999
+    when one side is unbounded).
+
+    When ``rbo_settings`` is provided, the per-day window is widened to the
+    union of the existing entry window and ``[monitoring_start, entry_end +
+    buffer]`` so the in-strategy RBO state machine sees the bars it needs to
+    build the range and detect breakouts.
+
+    Days with no catalog data are silently skipped by Nautilus — no need to
+    pre-filter. ``ValueError`` is raised only if the filter combination
+    yields zero configs (e.g. entry window with start > end).
+    """
+    allowed_weekdays = _allowed_weekdays(run_on_days)
+    if allowed_weekdays is not None and not allowed_weekdays:
+        raise ValueError(
+            "Chunked Path B yielded zero data configs — run_on_days excludes "
+            "every weekday."
+        )
+
+    win_start = entry_start_time or "00:00:00"
+    win_end = entry_end_time or "23:59:59.999999"
+
+    if rbo_settings is not None:
+        # Widen to cover the RBO load needs: monitoring window at the start,
+        # entry_end + buffer at the tail. Take the union with whatever
+        # entry_window the user already set (which we only narrow further
+        # never expand). Times are seconds-of-day; convert and string-compare.
+        cur_start_sec = _hms_to_sec(win_start)
+        cur_end_sec = _hms_to_sec(win_end.split(".")[0])  # strip fractional sec
+        new_start_sec = min(cur_start_sec, rbo_settings.monitoring_start_sec)
+        new_end_sec = max(
+            cur_end_sec,
+            rbo_settings.entry_end_sec + rbo_settings.range_buffer_sec,
+        )
+        win_start = _sec_to_hms(new_start_sec)
+        win_end = _sec_to_hms(new_end_sec)
+
+    start = pd.Timestamp(start_date, tz="UTC").normalize()
+    end = pd.Timestamp(end_date, tz="UTC").normalize()
+
+    configs: list[BacktestDataConfig] = []
+    cur = start
+    one_day = pd.Timedelta(days=1)
+    while cur <= end:
+        if allowed_weekdays is None or cur.weekday() in allowed_weekdays:
+            day_str = cur.strftime("%Y-%m-%d")
+            configs.append(BacktestDataConfig(
+                catalog_path=catalog_path,
+                data_cls="nautilus_trader.model.data:Bar",
+                instrument_id=instrument_id_str,
+                bar_types=bar_type_strs,
+                start_time=f"{day_str}T{win_start}+00:00",
+                end_time=f"{day_str}T{win_end}+00:00",
+            ))
+        cur = cur + one_day
+
+    if not configs:
+        raise ValueError(
+            "Chunked Path B yielded zero data configs — check start/end dates."
+        )
+    return configs
+
+
+def _build_run_config(
+    catalog_path: str,
+    instrument_id,
+    bar_type_strs: list[str],
+    venue,
+    starting_capital: float,
+    start_date: str | None,
+    end_date: str | None,
+    trader_id: str = "BACKTESTER-001",
+    chunk_size: int | None = None,
+    oms_type: str = "NETTING",
+    entry_start_time: str | None = None,
+    entry_end_time: str | None = None,
+    run_on_days: list | None = None,
+    rbo_settings: "_RBOSettings | None" = None,
+) -> BacktestRunConfig:
+    """Build the three Nautilus config dataclasses and bundle them.
+
+    Single source of the Path B venue/data/engine wiring. Used by all three
+    node-based variants (run_backtest_node, _run_single_slot_node,
+    _run_slot_group_node) so the configs stay consistent across sites.
+
+    When ``run_on_days`` is set, OR an entry window is set on an intraday bar
+    type, this function emits one ``BacktestDataConfig`` per allowed day via
+    ``_chunk_data_configs_for_path_b`` to honour the filter. Otherwise it
+    emits a single contiguous data config for bit-exact parity with Path A.
+
+    Notes on the Path A → Path B mapping:
+      - ``starting_balances`` is ``list[str]`` not ``list[Money]`` (configs are
+        msgspec-serialisable).
+      - ``base_currency`` is a string ``"USD"`` not the Currency object.
+      - ``default_leverage`` is a float ``1.0`` not ``Decimal(1)``.
+      - The instrument is loaded from the catalog automatically — no explicit
+        ``add_instrument`` call required.
+      - ``chunk_size=None`` keeps Path B in load-everything-at-once mode for
+        bit-exact parity with Path A. Pass an int (e.g. 100_000) once you've
+        verified parity to opt into row-chunked streaming.
+    """
+    venue_cfg = BacktestVenueConfig(
+        name=str(venue),
+        oms_type=oms_type,
+        account_type="MARGIN",
+        starting_balances=[f"{starting_capital} USD"],
+        base_currency="USD",
+        default_leverage=1.0,
+    )
+
+    has_run_on_days = run_on_days is not None
+    has_entry_window = bool(entry_start_time) or bool(entry_end_time)
+    primary_bt = bar_type_strs[0] if bar_type_strs else None
+    # Entry window is a no-op for non-intraday bars (ts_event is at midnight),
+    # so don't bother chunking by it in that case. run_on_days is still
+    # load-bearing on daily bars and forces chunking regardless.
+    entry_window_effective = has_entry_window and (
+        primary_bt is None or _is_intraday_bar_type(primary_bt)
+    )
+    needs_chunking = has_run_on_days or entry_window_effective
+
+    if needs_chunking:
+        if not start_date or not end_date:
+            raise ValueError(
+                "Path B chunking requires concrete start_date and end_date "
+                "to enumerate allowed days."
+            )
+        data_cfgs = _chunk_data_configs_for_path_b(
+            catalog_path=catalog_path,
+            instrument_id_str=str(instrument_id),
+            bar_type_strs=bar_type_strs,
+            start_date=start_date,
+            end_date=end_date,
+            entry_start_time=entry_start_time if entry_window_effective else None,
+            entry_end_time=entry_end_time if entry_window_effective else None,
+            run_on_days=run_on_days,
+            rbo_settings=rbo_settings,
+        )
+    else:
+        data_cfgs = [BacktestDataConfig(
+            catalog_path=catalog_path,
+            # Nautilus resolves data_cls via path.rsplit(":", 1) — must use
+            # "module.path:ClassName" format. A dot before the class name
+            # raises ValueError("not enough values to unpack") in node.build().
+            data_cls="nautilus_trader.model.data:Bar",
+            instrument_id=str(instrument_id),
+            bar_types=bar_type_strs,
+            start_time=start_date,
+            end_time=end_date,
+        )]
+
+    from nautilus_trader.config import RiskEngineConfig
+    engine_cfg = BacktestEngineConfig(
+        trader_id=TraderId(trader_id),
+        logging=LoggingConfig(bypass_logging=True),
+        risk_engine=RiskEngineConfig(bypass=True),
+        run_analysis=False,
+    )
+    return BacktestRunConfig(
+        venues=[venue_cfg],
+        data=data_cfgs,
+        engine=engine_cfg,
+        chunk_size=chunk_size,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RBO (Range Breakout) — portfolio-level breakout-gated entry.
+# Spec: 5. Logics/rbo_logics.html. Wired through ManagedExitStrategy: each
+# slot's strategy maintains its own per-day state machine over its own bar
+# type (the spec's "monitoring = Underlying"). Path-A and Path-B both run
+# unchanged — RBO is applied at strategy-build time, not engine-build time.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclasses.dataclass(frozen=True)
+class _RBOSettings:
+    """Validated, time-parsed RBO configuration ready for ManagedExitStrategy.
+
+    All HH:MM:SS portfolio fields are pre-converted to seconds-of-day so the
+    strategy's hot path on every bar is integer comparisons only — no string
+    parsing per tick.
+    """
+    monitoring_start_sec: int
+    monitoring_end_sec: int
+    entry_start_sec: int
+    entry_end_sec: int
+    range_buffer_sec: int  # rbo_range_buffer minutes → seconds
+    entry_at: str  # "Any" / "RangeHigh" / "RangeLow" — already-downgraded
+    cancel_other_side: bool
+
+
+def _hms_to_sec(hms: str) -> int:
+    """HH:MM[:SS] → seconds-of-day. ValueError on malformed input — fail loud."""
+    parts = hms.split(":")
+    h = int(parts[0])
+    m = int(parts[1]) if len(parts) > 1 else 0
+    s = int(parts[2]) if len(parts) > 2 else 0
+    return h * 3600 + m * 60 + s
+
+
+def _resolve_rbo(portfolio) -> tuple[_RBOSettings | None, str | None]:
+    """Validate portfolio.rbo_* fields per rbo_logics.html.
+
+    Returns (settings, message):
+      - (None, None)           → RBO disabled, no error.
+      - (None, error_message)  → RBO requested but invalid; caller falls back
+                                 to standard time-based entry per spec.
+      - (settings, None)       → Valid; ready to wire into ManagedExitConfig.
+      - (settings, warning)    → Valid but with a downgrade — e.g. options-only
+                                 entry_at value silently coerced to "Any" for
+                                 FX/crypto (spec assumes options).
+    """
+    if not getattr(portfolio, "rbo_enabled", False):
+        return None, None
+
+    if not portfolio.range_monitoring_start or not portfolio.range_monitoring_end:
+        return None, "RBO Monitoring times missing"
+
+    if portfolio.rbo_monitoring != "Underlying":
+        return None, "RBO Monitoring must be set to 'Underlying'"
+
+    entry_at = portfolio.rbo_entry_at or "Any"
+    warning: str | None = None
+    if entry_at in ("C_OnHigh_P_OnLow", "P_OnHigh_C_OnLow"):
+        warning = (
+            f"rbo_entry_at='{entry_at}' is options-only; downgraded to 'Any' "
+            f"for FX/crypto. (Spec rbo_logics.html P7 — Call/Put routing has "
+            f"no analogue without options legs.)"
+        )
+        entry_at = "Any"
+    elif entry_at not in ("Any", "RangeHigh", "RangeLow"):
+        return None, f"Invalid rbo_entry_at: '{entry_at}'"
+
+    # Per spec P4: rbo_entry_start defaults to range_monitoring_end (no quiet gap).
+    entry_start = portfolio.rbo_entry_start or portfolio.range_monitoring_end
+    entry_end = portfolio.rbo_entry_end or "16:15:00"
+
+    return _RBOSettings(
+        monitoring_start_sec=_hms_to_sec(portfolio.range_monitoring_start),
+        monitoring_end_sec=_hms_to_sec(portfolio.range_monitoring_end),
+        entry_start_sec=_hms_to_sec(entry_start),
+        entry_end_sec=_hms_to_sec(entry_end),
+        range_buffer_sec=int(portfolio.rbo_range_buffer or 0) * 60,
+        entry_at=entry_at,
+        cancel_other_side=bool(portfolio.rbo_cancel_other_side),
+    ), warning
+
+
+def _path_b_supports_filters(
+    run_on_days: list | None,
+    entry_start_time: str | None,
+    entry_end_time: str | None,
+    bar_type_str: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> bool:
+    """True when the configured filters can be honoured under Path B.
+
+    Three regimes:
+
+    1. **No filters** (no run_on_days, no entry window) → Path B is trivially
+       fine — single contiguous BacktestDataConfig.
+    2. **Entry window only, on a non-intraday bar type** → window is a runtime
+       no-op (daily/weekly bars have ts_event at midnight; see
+       ``_is_intraday_bar_type``), so still single contiguous, still fine.
+    3. **Any other filter combination** → ``_build_run_config`` honours the
+       filter by emitting one BacktestDataConfig per allowed day (see
+       ``_chunk_data_configs_for_path_b``). That requires concrete
+       ``start_date`` and ``end_date`` to enumerate days; without them we
+       fall back to Path A.
+
+    When this returns False, callers must fall back to Path A so the run
+    remains correct rather than silently ignoring user-configured filters.
+    """
+    has_run_on_days = run_on_days is not None
+    has_entry_window = bool(entry_start_time) or bool(entry_end_time)
+
+    if not has_run_on_days and not has_entry_window:
+        return True
+
+    if (
+        not has_run_on_days
+        and has_entry_window
+        and bar_type_str
+        and not _is_intraday_bar_type(bar_type_str)
+    ):
+        return True
+
+    # Need to chunk; chunking enumerates days, so we need bounds.
+    return bool(start_date) and bool(end_date)
+
+
 @functools.lru_cache(maxsize=4)
 def _cached_catalog_bars(catalog_path: str, bt_str: str, start_iso: str | None, end_iso: str | None):
     """Worker-local bar cache.
@@ -136,6 +627,93 @@ def _cached_catalog_bars(catalog_path: str, bt_str: str, start_iso: str | None, 
         pd.Timestamp(end_iso, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
     ) if end_iso else None
     return catalog.bars(bar_types=[bt_str], start=start_arg, end=end_arg)
+
+
+def run_backtest_node(
+    catalog_path: str,
+    bar_type_str: str | list[str],
+    strategy_name: str,
+    strategy_params: dict,
+    trade_size: float = 0.01,
+    starting_capital: float = 100_000.0,
+    registry: dict | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict:
+    """Path B (BacktestNode) variant of run_backtest.
+
+    Public surface is identical to run_backtest. The engine is constructed
+    by ``BacktestNode`` from a ``BacktestRunConfig`` instead of being wired
+    by hand. After ``node.build()`` we attach the strategy imperatively (the
+    same line as Path A) because custom strategies loaded via importlib
+    aren't ``ImportableStrategyConfig``-friendly.
+
+    Result extraction is unchanged — engines retrieved from the node expose
+    the same ``trader.generate_*`` and ``kernel.cache.*`` APIs as engines
+    constructed directly.
+    """
+    # Normalize bar types and auto-pair BID/ASK like Path A does
+    if isinstance(bar_type_str, str):
+        bar_type_strs = [bar_type_str]
+    else:
+        bar_type_strs = list(bar_type_str)
+    paired_strs: list[str] = []
+    for bt in bar_type_strs:
+        paired_strs.extend(_pair_bid_ask_bar_type(bt))
+    all_bar_types = bar_type_strs + paired_strs
+
+    primary_bar_type = BarType.from_str(bar_type_strs[0])
+    instrument_id = primary_bar_type.instrument_id
+    extra_bar_types = [BarType.from_str(bt) for bt in bar_type_strs[1:]] or None
+
+    # Build the run config and node
+    run_cfg = _build_run_config(
+        catalog_path=catalog_path,
+        instrument_id=instrument_id,
+        bar_type_strs=all_bar_types,
+        venue=instrument_id.venue,
+        starting_capital=starting_capital,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    node = BacktestNode(configs=[run_cfg])
+    # build() constructs the engine and (if catalog has the data) loads
+    # instruments from it. After this we can fetch the engine handle.
+    node.build()
+    engine = node.get_engine(run_cfg.id)
+    if engine is None:
+        raise RuntimeError(
+            f"BacktestNode.get_engine({run_cfg.id!r}) returned None — "
+            f"catalog at {catalog_path!r} may be missing data for "
+            f"{instrument_id} in range {start_date}..{end_date}"
+        )
+
+    # Build + attach strategy (identical to Path A from this point)
+    registry_entry = (registry or STRATEGY_REGISTRY)[strategy_name]
+    config_class = registry_entry["config_class"]
+    config_kwargs = {
+        "instrument_id": instrument_id,
+        "bar_type": primary_bar_type,
+        "trade_size": Decimal(str(trade_size)),
+        **strategy_params,
+    }
+    if extra_bar_types and _config_supports_extra_bar_types(config_class):
+        config_kwargs["extra_bar_types"] = extra_bar_types
+    strategy_config = config_class(**config_kwargs)
+    strategy = registry_entry["strategy_class"](strategy_config)
+    engine.add_strategy(strategy)
+
+    # Run via the node — dispose_on_completion=True (default) cleans up.
+    node.run()
+
+    # Result extraction uses the engine handle directly. The node still
+    # holds a reference until disposed, so the engine's reports/cache are
+    # still accessible here.
+    adapter_cfg = load_adapter_config_for_bar_type(bar_type_strs[0])
+    fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
+    results = _extract_results(engine, starting_capital, fx_resolver)
+
+    return results
 
 
 def run_backtest(
@@ -177,6 +755,21 @@ def run_backtest(
     dict
         Results including trades, account info, and performance metrics.
     """
+    # Path B opt-in. Single backtests have no run_on_days / entry_window
+    # filters at this signature, so the route to Path B is unconditional.
+    if _path_b_active():
+        return run_backtest_node(
+            catalog_path=catalog_path,
+            bar_type_str=bar_type_str,
+            strategy_name=strategy_name,
+            strategy_params=strategy_params,
+            trade_size=trade_size,
+            starting_capital=starting_capital,
+            registry=registry,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     # Normalize to list
     if isinstance(bar_type_str, str):
         bar_type_strs = [bar_type_str]
@@ -352,6 +945,195 @@ def _worker_init_ignore_sigint() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
+def _run_single_slot_node(
+    catalog_path: str,
+    slot: StrategySlotConfig,
+    capital: float,
+    custom_strategies_dir: str | None,
+    slot_index: int,
+    default_start_date: str | None = None,
+    default_end_date: str | None = None,
+    default_squareoff_time: str | None = None,
+    default_squareoff_tz: str | None = None,
+    default_run_on_days: list | None = None,
+    default_entry_start_time: str | None = None,
+    default_entry_end_time: str | None = None,
+    default_rbo_settings: "_RBOSettings | None" = None,
+) -> dict:
+    """Path B variant of _run_single_slot.
+
+    The signature mirrors Path A's so this is a drop-in for ProcessPoolExecutor.
+    Only the engine construction layer changes — strategy building, exit-config
+    wrapping, phase timing, and result extraction are identical to Path A.
+
+    Filters (run_on_days, entry window) are NOT applied here. The caller
+    (the gate at the top of _run_single_slot) is responsible for routing to
+    Path A when filters are configured.
+    """
+    import os
+    import time as _time
+    _t_slot_start = _time.time()
+
+    phase_times: dict | None = {} if os.environ.get("_PROFILE_PHASES") == "1" else None
+
+    with _phase("registry_load", phase_times):
+        if custom_strategies_dir:
+            from core.custom_strategy_loader import get_merged_registry
+            registry, _ = get_merged_registry(Path(custom_strategies_dir))
+        else:
+            registry = STRATEGY_REGISTRY
+
+    # Resolve date range — slot-level override beats portfolio default.
+    start_date = slot.start_date or default_start_date
+    end_date = slot.end_date or default_end_date
+
+    # Compute the same auto-paired bar type list Path A would use.
+    bar_type_strs_to_load = [slot.bar_type_str]
+    paired_strs = _pair_bid_ask_bar_type(slot.bar_type_str)
+    bar_type_strs_to_load.extend(paired_strs)
+
+    # Detect missing paired data up-front (Path A learned this from the
+    # catalog read; we have to peek at the catalog ourselves to surface
+    # the warning, since BacktestDataConfig silently ignores missing files).
+    missing_pairs: list[str] = []
+    catalog = ParquetDataCatalog(catalog_path)
+    for bt_str in paired_strs:
+        try:
+            sample = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
+        except Exception:
+            sample = []
+        if not sample:
+            missing_pairs.append(bt_str)
+    missing_pairs = list(dict.fromkeys(missing_pairs))
+
+    primary_bt = BarType.from_str(slot.bar_type_str)
+    instrument_id = primary_bt.instrument_id
+
+    # Resolve effective squareoff (same priority chain as Path A)
+    eff_squareoff_time = (
+        slot.exit_config.squareoff_time
+        or slot.squareoff_time
+        or default_squareoff_time
+    )
+    eff_squareoff_tz = (
+        slot.exit_config.squareoff_tz
+        or slot.squareoff_tz
+        or default_squareoff_tz
+    )
+
+    node = None
+    try:
+        with _phase("engine_build", phase_times):
+            run_cfg = _build_run_config(
+                catalog_path=catalog_path,
+                instrument_id=instrument_id,
+                bar_type_strs=bar_type_strs_to_load,
+                venue=instrument_id.venue,
+                starting_capital=capital,
+                start_date=start_date,
+                end_date=end_date,
+                trader_id=f"SLOT-{slot_index:03d}",
+                entry_start_time=default_entry_start_time,
+                entry_end_time=default_entry_end_time,
+                run_on_days=default_run_on_days,
+                rbo_settings=default_rbo_settings,
+            )
+            node = BacktestNode(configs=[run_cfg])
+            node.build()
+            engine = node.get_engine(run_cfg.id)
+            if engine is None:
+                raise ValueError(
+                    f"BacktestNode failed to build an engine for {slot.bar_type_str} "
+                    f"in range {start_date or 'start'}..{end_date or 'end'}"
+                )
+
+        with _phase("strategy_build", phase_times):
+            # RBO needs ManagedExitStrategy (state machine lives there) — force
+            # the wrapped path even if the slot has no exit-management or
+            # squareoff configured. Otherwise the raw signal class would run
+            # ungated, defeating the point of enabling RBO.
+            if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                managed_config = config_from_exit(
+                    exit_config=slot.exit_config,
+                    signal_name=slot.strategy_name,
+                    signal_params=slot.strategy_params,
+                    instrument_id=instrument_id,
+                    bar_type=primary_bt,
+                    trade_size=slot.trade_size,
+                    squareoff_time=eff_squareoff_time,
+                    squareoff_tz=eff_squareoff_tz,
+                    rbo_settings=default_rbo_settings,
+                )
+                strategy = ManagedExitStrategy(managed_config)
+            else:
+                if slot.strategy_name not in registry:
+                    raise ValueError(f"Unknown strategy: {slot.strategy_name}")
+                registry_entry = registry[slot.strategy_name]
+                config_class = registry_entry["config_class"]
+                valid_param_keys = set(registry_entry["params"].keys())
+                filtered_params = {k: v for k, v in slot.strategy_params.items() if k in valid_param_keys}
+                config_kwargs = {
+                    "instrument_id": instrument_id,
+                    "bar_type": primary_bt,
+                    "trade_size": Decimal(str(slot.trade_size)),
+                    **filtered_params,
+                }
+                strategy_config = config_class(**config_kwargs)
+                strategy = registry_entry["strategy_class"](strategy_config)
+
+            engine.add_strategy(strategy)
+
+        with _phase("engine_run", phase_times):
+            node.run()
+
+        with _phase("fx_resolver_build", phase_times):
+            adapter_cfg = load_adapter_config_for_bar_type(slot.bar_type_str)
+            fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
+
+        with _phase("extract_results", phase_times):
+            results = _extract_results(engine, capital, fx_resolver)
+
+        # Slot metadata + telemetry (mirrors Path A)
+        results["slot_id"] = slot.slot_id
+        results["display_name"] = slot.display_name
+        results["strategy_name"] = slot.strategy_name
+        results["bar_type"] = slot.bar_type_str
+        results["allocated_capital"] = capital
+        results["elapsed_seconds"] = round(_time.time() - _t_slot_start, 3)
+        results["worker_pid"] = os.getpid()
+        results["path_b"] = True
+
+        if missing_pairs:
+            results["warning"] = (
+                f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
+                f"Fills will use MID prices — spread cost is not reflected in results."
+            )
+
+        ci = _cached_catalog_bars.cache_info()
+        results["cache_hits"] = ci.hits
+        results["cache_misses"] = ci.misses
+        results["cache_currsize"] = ci.currsize
+        try:
+            import psutil as _psutil
+            results["worker_rss_mb"] = round(_psutil.Process(os.getpid()).memory_info().rss / 1e6, 1)
+        except Exception:
+            results["worker_rss_mb"] = None
+
+        if phase_times is not None:
+            results["phase_times"] = {k: round(v, 4) for k, v in phase_times.items()}
+    finally:
+        # Default dispose_on_completion=True already disposes engines after
+        # node.run(). Explicit dispose() here is defensive against early
+        # exits before run() (e.g. exception during strategy build).
+        if node is not None:
+            try:
+                node.dispose()
+            except BaseException:
+                pass
+
+    return results
+
+
 def _run_single_slot(
     catalog_path: str,
     slot: StrategySlotConfig,
@@ -362,6 +1144,10 @@ def _run_single_slot(
     default_end_date: str | None = None,
     default_squareoff_time: str | None = None,
     default_squareoff_tz: str | None = None,
+    default_run_on_days: list | None = None,
+    default_entry_start_time: str | None = None,
+    default_entry_end_time: str | None = None,
+    default_rbo_settings: "_RBOSettings | None" = None,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -369,6 +1155,34 @@ def _run_single_slot(
     Rebuilds the merged registry inside the worker because custom strategy
     classes loaded via importlib are not picklable across processes.
     """
+    # Path B opt-in. The gate now allows Path B for run_on_days / intraday
+    # entry-window filters too — _build_run_config honours them by emitting
+    # one BacktestDataConfig per allowed day. Slot-level dates win over
+    # portfolio defaults (matches Path A's resolution at line ~1085).
+    _gate_start_date = slot.start_date or default_start_date
+    _gate_end_date = slot.end_date or default_end_date
+    if _path_b_active() and _path_b_supports_filters(
+        default_run_on_days, default_entry_start_time, default_entry_end_time,
+        bar_type_str=slot.bar_type_str,
+        start_date=_gate_start_date,
+        end_date=_gate_end_date,
+    ):
+        return _run_single_slot_node(
+            catalog_path=catalog_path,
+            slot=slot,
+            capital=capital,
+            custom_strategies_dir=custom_strategies_dir,
+            slot_index=slot_index,
+            default_start_date=default_start_date,
+            default_end_date=default_end_date,
+            default_squareoff_time=default_squareoff_time,
+            default_squareoff_tz=default_squareoff_tz,
+            default_run_on_days=default_run_on_days,
+            default_entry_start_time=default_entry_start_time,
+            default_entry_end_time=default_entry_end_time,
+            default_rbo_settings=default_rbo_settings,
+        )
+
     import os
     import time as _time
     _t_slot_start = _time.time()
@@ -422,10 +1236,44 @@ def _run_single_slot(
         # De-duplicate in case both except and empty-check fire for the same str
         missing_pairs = list(dict.fromkeys(missing_pairs))
 
-    if not all_bars:
-        raise ValueError(
-            f"No bars in date range {start_date or 'start'}..{end_date or 'end'} for {slot.bar_type_str}"
+    # Day-of-week filter (portfolio.run_on_days). Applied after loading so
+    # the LRU cache stays per-(bar_type, range) and isn't fragmented by the
+    # day filter. None = no filter; empty set = portfolio explicitly disabled
+    # all weekdays for this slot.
+    allowed_weekdays = _allowed_weekdays(default_run_on_days)
+    bars_filtered_by_run_on_days = 0
+    with _phase("run_on_days_filter", phase_times):
+        all_bars, bars_filtered_by_run_on_days = _filter_bars_by_weekday(
+            all_bars, allowed_weekdays
         )
+
+    # Intra-day entry window (portfolio.entry_start_time / .entry_end_time).
+    # Both endpoints UTC and inclusive. Either may be None for unbounded.
+    # Skipped for non-intraday bar types (daily/weekly/monthly) since their
+    # ts_event is at the period start — applying an HH:MM window to daily
+    # bars would unconditionally drop every bar.
+    bars_filtered_by_entry_window = 0
+    entry_window_skipped_reason: str | None = None
+    with _phase("entry_window_filter", phase_times):
+        if (default_entry_start_time or default_entry_end_time) and not _is_intraday_bar_type(slot.bar_type_str):
+            entry_window_skipped_reason = (
+                f"bar type {slot.bar_type_str} is not intraday — entry window ignored"
+            )
+        else:
+            all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
+                all_bars, default_entry_start_time, default_entry_end_time
+            )
+
+    if not all_bars:
+        msg = f"No bars in date range {start_date or 'start'}..{end_date or 'end'} for {slot.bar_type_str}"
+        extra = []
+        if bars_filtered_by_run_on_days:
+            extra.append(f"run_on_days dropped {bars_filtered_by_run_on_days}")
+        if bars_filtered_by_entry_window:
+            extra.append(f"entry window dropped {bars_filtered_by_entry_window}")
+        if extra:
+            msg += f" (after filters: {'; '.join(extra)})"
+        raise ValueError(msg)
 
     primary_bt = BarType.from_str(slot.bar_type_str)
     instrument_id = primary_bt.instrument_id
@@ -484,10 +1332,12 @@ def _run_single_slot(
 
         with _phase("strategy_build", phase_times):
             reg = registry
-            # ManagedExitStrategy is required when SL/TP/trailing OR squareoff is
-            # set — squareoff alone (no SL/TP) still needs the wrapper because the
-            # raw strategy classes don't know how to time-close.
-            if slot.exit_config.has_exit_management() or eff_squareoff_time:
+            # ManagedExitStrategy is required when SL/TP/trailing OR squareoff
+            # is set, OR when RBO is active — squareoff alone (no SL/TP) needs
+            # the wrapper because raw strategy classes don't know how to
+            # time-close, and RBO needs it because the gate state machine
+            # lives there.
+            if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                 managed_config = config_from_exit(
                     exit_config=slot.exit_config,
                     signal_name=slot.strategy_name,
@@ -495,6 +1345,7 @@ def _run_single_slot(
                     instrument_id=instrument_id,
                     bar_type=primary_bt,
                     trade_size=slot.trade_size,
+                    rbo_settings=default_rbo_settings,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
                 )
@@ -548,6 +1399,24 @@ def _run_single_slot(
                 f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
                 f"Fills will use MID prices — spread cost is not reflected in results."
             )
+
+        # Surface day-of-week filter telemetry so users can see the rule
+        # actually applied. ``run_on_days`` is None when no filter was set.
+        if default_run_on_days is not None:
+            results["run_on_days"] = list(default_run_on_days)
+            results["bars_filtered_by_run_on_days"] = bars_filtered_by_run_on_days
+
+        # Surface intra-day entry-window telemetry, same pattern as above.
+        if default_entry_start_time or default_entry_end_time:
+            results["entry_start_time"] = default_entry_start_time
+            results["entry_end_time"] = default_entry_end_time
+            results["bars_filtered_by_entry_window"] = bars_filtered_by_entry_window
+            if entry_window_skipped_reason:
+                results["entry_window_skipped"] = entry_window_skipped_reason
+                # Append to existing warning if there is one, otherwise create.
+                _existing = results.get("warning")
+                _add = f"Entry window not applied: {entry_window_skipped_reason}."
+                results["warning"] = f"{_existing} {_add}" if _existing else _add
 
         # Per-worker cache + RSS telemetry. Helps decide whether the LRU is
         # earning its keep on a given workload, and whether per-worker memory
@@ -618,10 +1487,15 @@ def _extract_slot_from_group_reports(
     trades = len(pnl_values)
     wins = sum(1 for p in pnl_values if p > 0)
     losses = sum(1 for p in pnl_values if p < 0)
+    flat_trades = max(trades - wins - losses, 0)
     total_realized = float(sum(pnl_values))
     final_balance = capital + total_realized
     total_return_pct = (total_realized / capital) * 100 if capital > 0 else 0.0
     win_rate = (wins / trades * 100) if trades > 0 else 0.0
+    # Decisive win rate excludes flat (zero-PnL) trades from the denominator.
+    # See _extract_results for rationale.
+    _decisive_n = wins + losses
+    decisive_win_rate = (wins / _decisive_n * 100) if _decisive_n > 0 else None
 
     # Day-based win percentage — aggregate PnL by calendar date
     winning_days = 0
@@ -699,7 +1573,9 @@ def _extract_slot_from_group_reports(
         "trades": trades,
         "wins": wins,
         "losses": losses,
+        "flat_trades": flat_trades,
         "win_rate": win_rate,
+        "decisive_win_rate": decisive_win_rate,
         "total_days": total_days,
         "winning_days": winning_days,
         "losing_days": losing_days,
@@ -715,6 +1591,216 @@ def _extract_slot_from_group_reports(
     }
 
 
+def _run_slot_group_node(
+    catalog_path: str,
+    group: list,
+    custom_strategies_dir: str | None,
+    group_index: int,
+    default_start_date: str | None = None,
+    default_end_date: str | None = None,
+    default_squareoff_time: str | None = None,
+    default_squareoff_tz: str | None = None,
+    default_run_on_days: list | None = None,
+    default_entry_start_time: str | None = None,
+    default_entry_end_time: str | None = None,
+    default_rbo_settings: "_RBOSettings | None" = None,
+) -> list[dict]:
+    """Path B variant of _run_slot_group.
+
+    All slots in the group share one ``BacktestNode`` / one engine. Each slot's
+    strategy is attached imperatively after ``node.build()`` with its own
+    ``order_id_tag`` so positions stay distinguishable in the post-run reports.
+
+    Like _run_single_slot_node, this skips run_on_days / entry-window filters
+    — the caller is responsible for routing to Path A when those are set.
+    """
+    import os
+    import time as _time
+    _t_group_start = _time.time()
+
+    phase_times: dict | None = {} if os.environ.get("_PROFILE_PHASES") == "1" else None
+
+    if not group:
+        return []
+
+    primary_slot = group[0][0]
+    primary_bar_type_str = primary_slot.bar_type_str
+    start_date = primary_slot.start_date or default_start_date
+    end_date = primary_slot.end_date or default_end_date
+
+    with _phase("registry_load", phase_times):
+        if custom_strategies_dir:
+            from core.custom_strategy_loader import get_merged_registry
+            registry, _ = get_merged_registry(Path(custom_strategies_dir))
+        else:
+            registry = STRATEGY_REGISTRY
+
+    # Auto-pair BID/ASK and detect missing pairs (same surface as Path A so
+    # each slot result still gets a clear warning when fills will use MID).
+    bar_type_strs_to_load = [primary_bar_type_str]
+    paired_strs = _pair_bid_ask_bar_type(primary_bar_type_str)
+    bar_type_strs_to_load.extend(paired_strs)
+
+    missing_pairs: list[str] = []
+    for bt_str in paired_strs:
+        try:
+            sample = _cached_catalog_bars(catalog_path, bt_str, start_date, end_date)
+        except Exception:
+            sample = []
+        if not sample:
+            missing_pairs.append(bt_str)
+    missing_pairs = list(dict.fromkeys(missing_pairs))
+
+    primary_bt = BarType.from_str(primary_bar_type_str)
+    instrument_id = primary_bt.instrument_id
+    total_capital = float(sum(capital for _, capital in group))
+
+    node = None
+    expected_tags: list[str] = []
+    try:
+        with _phase("engine_build", phase_times):
+            run_cfg = _build_run_config(
+                catalog_path=catalog_path,
+                instrument_id=instrument_id,
+                bar_type_strs=bar_type_strs_to_load,
+                venue=instrument_id.venue,
+                starting_capital=total_capital,
+                start_date=start_date,
+                end_date=end_date,
+                trader_id=f"GROUP-{group_index:03d}",
+                oms_type="HEDGING",  # see _run_slot_group for rationale
+                entry_start_time=default_entry_start_time,
+                entry_end_time=default_entry_end_time,
+                run_on_days=default_run_on_days,
+                rbo_settings=default_rbo_settings,
+            )
+            node = BacktestNode(configs=[run_cfg])
+            node.build()
+            engine = node.get_engine(run_cfg.id)
+            if engine is None:
+                raise ValueError(
+                    f"BacktestNode failed to build a group engine for "
+                    f"{primary_bar_type_str} in range "
+                    f"{start_date or 'start'}..{end_date or 'end'}"
+                )
+
+        with _phase("strategy_build", phase_times):
+            for i, (slot, _capital) in enumerate(group):
+                order_tag = f"{group_index:03d}-{i:03d}"
+                expected_tags.append(order_tag)
+
+                eff_squareoff_time = (
+                    slot.exit_config.squareoff_time
+                    or slot.squareoff_time
+                    or default_squareoff_time
+                )
+                eff_squareoff_tz = (
+                    slot.exit_config.squareoff_tz
+                    or slot.squareoff_tz
+                    or default_squareoff_tz
+                )
+
+                if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                    managed_config = config_from_exit(
+                        exit_config=slot.exit_config,
+                        signal_name=slot.strategy_name,
+                        signal_params=slot.strategy_params,
+                        instrument_id=instrument_id,
+                        bar_type=primary_bt,
+                        trade_size=slot.trade_size,
+                        order_id_tag=order_tag,
+                        squareoff_time=eff_squareoff_time,
+                        squareoff_tz=eff_squareoff_tz,
+                        rbo_settings=default_rbo_settings,
+                    )
+                    strategy = ManagedExitStrategy(managed_config)
+                else:
+                    if slot.strategy_name not in registry:
+                        raise ValueError(f"Unknown strategy: {slot.strategy_name}")
+                    registry_entry = registry[slot.strategy_name]
+                    config_class = registry_entry["config_class"]
+                    valid_param_keys = set(registry_entry["params"].keys())
+                    filtered_params = {k: v for k, v in slot.strategy_params.items() if k in valid_param_keys}
+                    config_kwargs = {
+                        "instrument_id": instrument_id,
+                        "bar_type": primary_bt,
+                        "trade_size": Decimal(str(slot.trade_size)),
+                        "order_id_tag": order_tag,
+                        **filtered_params,
+                    }
+                    strategy_config = config_class(**config_kwargs)
+                    strategy = registry_entry["strategy_class"](strategy_config)
+
+                engine.add_strategy(strategy)
+
+        with _phase("engine_run", phase_times):
+            node.run()
+
+        with _phase("fx_resolver_build", phase_times):
+            adapter_cfg = load_adapter_config_for_bar_type(primary_bar_type_str)
+            fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
+
+        with _phase("extract_results", phase_times):
+            fills_report = None
+            try:
+                fills_report = engine.trader.generate_order_fills_report()
+            except Exception:
+                pass
+            positions_report = None
+            try:
+                positions_report = engine.trader.generate_positions_report()
+            except Exception:
+                pass
+
+            actual_strategies = engine.trader.strategies()
+            actual_strategy_ids = [str(s.id) for s in actual_strategies]
+
+            slot_results: list[dict] = []
+            group_elapsed = round(_time.time() - _t_group_start, 3)
+            for i, (slot, capital) in enumerate(group):
+                strategy_id = (
+                    actual_strategy_ids[i] if i < len(actual_strategy_ids)
+                    else f"ManagedExitStrategy-{expected_tags[i]}"
+                )
+                r = _extract_slot_from_group_reports(
+                    positions_report, fills_report, strategy_id, slot, capital, fx_resolver,
+                )
+                r["elapsed_seconds"] = group_elapsed
+                r["worker_pid"] = os.getpid()
+                r["group_index"] = group_index
+                r["group_size"] = len(group)
+                r["group_strategy_id"] = strategy_id
+                r["path_b"] = True
+                if phase_times is not None:
+                    r["phase_times"] = {k: round(v, 4) for k, v in phase_times.items()}
+
+                ci = _cached_catalog_bars.cache_info()
+                r["cache_hits"] = ci.hits
+                r["cache_misses"] = ci.misses
+                r["cache_currsize"] = ci.currsize
+                try:
+                    import psutil as _psutil
+                    r["worker_rss_mb"] = round(_psutil.Process(os.getpid()).memory_info().rss / 1e6, 1)
+                except Exception:
+                    r["worker_rss_mb"] = None
+
+                if missing_pairs:
+                    r["warning"] = (
+                        f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
+                        f"Fills will use MID prices — spread cost is not reflected in results."
+                    )
+
+                slot_results.append(r)
+    finally:
+        if node is not None:
+            try:
+                node.dispose()
+            except BaseException:
+                pass
+
+    return slot_results
+
+
 def _run_slot_group(
     catalog_path: str,
     group: list,
@@ -724,6 +1810,10 @@ def _run_slot_group(
     default_end_date: str | None = None,
     default_squareoff_time: str | None = None,
     default_squareoff_tz: str | None = None,
+    default_run_on_days: list | None = None,
+    default_entry_start_time: str | None = None,
+    default_entry_end_time: str | None = None,
+    default_rbo_settings: "_RBOSettings | None" = None,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -740,6 +1830,35 @@ def _run_slot_group(
     Size-1 groups are allowed but callers are free to short-circuit to
     ``_run_single_slot`` for that case.
     """
+    # Path B opt-in. Group's primary bar_type and date range are shared
+    # across all slots by construction (groups are formed by
+    # (bar_type, date_range)), so it's safe to use the primary slot's values
+    # for both the non-intraday exemption and the chunking date bounds.
+    _primary_slot = group[0][0] if group else None
+    _group_primary_bar_type = _primary_slot.bar_type_str if _primary_slot else None
+    _gate_start_date = (_primary_slot.start_date if _primary_slot else None) or default_start_date
+    _gate_end_date = (_primary_slot.end_date if _primary_slot else None) or default_end_date
+    if _path_b_active() and _path_b_supports_filters(
+        default_run_on_days, default_entry_start_time, default_entry_end_time,
+        bar_type_str=_group_primary_bar_type,
+        start_date=_gate_start_date,
+        end_date=_gate_end_date,
+    ):
+        return _run_slot_group_node(
+            catalog_path=catalog_path,
+            group=group,
+            custom_strategies_dir=custom_strategies_dir,
+            group_index=group_index,
+            default_start_date=default_start_date,
+            default_end_date=default_end_date,
+            default_squareoff_time=default_squareoff_time,
+            default_squareoff_tz=default_squareoff_tz,
+            default_run_on_days=default_run_on_days,
+            default_entry_start_time=default_entry_start_time,
+            default_entry_end_time=default_entry_end_time,
+            default_rbo_settings=default_rbo_settings,
+        )
+
     import os
     import time as _time
     _t_group_start = _time.time()
@@ -788,11 +1907,42 @@ def _run_slot_group(
             all_bars.extend(cached)
         missing_pairs = list(dict.fromkeys(missing_pairs))
 
+    # Day-of-week filter mirroring _run_single_slot. Applied per-group rather
+    # than per-slot because all slots in the group share the same bars.
+    allowed_weekdays = _allowed_weekdays(default_run_on_days)
+    bars_filtered_by_run_on_days = 0
+    with _phase("run_on_days_filter", phase_times):
+        all_bars, bars_filtered_by_run_on_days = _filter_bars_by_weekday(
+            all_bars, allowed_weekdays
+        )
+
+    # Intra-day entry window filter (mirrors _run_single_slot). Skipped when
+    # the group's primary bar type is non-intraday (daily/weekly/monthly).
+    bars_filtered_by_entry_window = 0
+    entry_window_skipped_reason: str | None = None
+    with _phase("entry_window_filter", phase_times):
+        if (default_entry_start_time or default_entry_end_time) and not _is_intraday_bar_type(primary_bar_type_str):
+            entry_window_skipped_reason = (
+                f"bar type {primary_bar_type_str} is not intraday — entry window ignored"
+            )
+        else:
+            all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
+                all_bars, default_entry_start_time, default_entry_end_time
+            )
+
     if not all_bars:
-        raise ValueError(
+        msg = (
             f"No bars in date range {start_date or 'start'}..{end_date or 'end'} "
             f"for group primary bar_type {primary_bar_type_str}"
         )
+        extra = []
+        if bars_filtered_by_run_on_days:
+            extra.append(f"run_on_days dropped {bars_filtered_by_run_on_days}")
+        if bars_filtered_by_entry_window:
+            extra.append(f"entry window dropped {bars_filtered_by_entry_window}")
+        if extra:
+            msg += f" (after filters: {'; '.join(extra)})"
+        raise ValueError(msg)
 
     primary_bt = BarType.from_str(primary_bar_type_str)
     instrument_id = primary_bt.instrument_id
@@ -852,7 +2002,7 @@ def _run_slot_group(
                     or default_squareoff_tz
                 )
 
-                if slot.exit_config.has_exit_management() or eff_squareoff_time:
+                if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
                         signal_name=slot.strategy_name,
@@ -863,6 +2013,7 @@ def _run_slot_group(
                         order_id_tag=order_tag,
                         squareoff_time=eff_squareoff_time,
                         squareoff_tz=eff_squareoff_tz,
+                        rbo_settings=default_rbo_settings,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -947,6 +2098,20 @@ def _run_slot_group(
                         f"Fills will use MID prices — spread cost is not reflected in results."
                     )
 
+                if default_run_on_days is not None:
+                    r["run_on_days"] = list(default_run_on_days)
+                    r["bars_filtered_by_run_on_days"] = bars_filtered_by_run_on_days
+
+                if default_entry_start_time or default_entry_end_time:
+                    r["entry_start_time"] = default_entry_start_time
+                    r["entry_end_time"] = default_entry_end_time
+                    r["bars_filtered_by_entry_window"] = bars_filtered_by_entry_window
+                    if entry_window_skipped_reason:
+                        r["entry_window_skipped"] = entry_window_skipped_reason
+                        _existing = r.get("warning")
+                        _add = f"Entry window not applied: {entry_window_skipped_reason}."
+                        r["warning"] = f"{_existing} {_add}" if _existing else _add
+
                 slot_results.append(r)
     finally:
         if engine is not None:
@@ -977,6 +2142,17 @@ def run_portfolio_backtest(
 
     if not enabled_slots:
         raise ValueError("No enabled strategy slots in portfolio")
+
+    # Resolve RBO once at the orchestrator. Failures fall back to standard
+    # time-based entry per spec (rbo_logics.html validation rules); we surface
+    # the message via print so it shows up in worker output even when the
+    # caller doesn't pipe a logger.
+    rbo_settings, rbo_msg = _resolve_rbo(portfolio)
+    if rbo_msg:
+        if rbo_settings is None:
+            print(f"[RBO] disabled: {rbo_msg}")
+        else:
+            print(f"[RBO] warning: {rbo_msg}")
 
     # Calculate capital allocation per slot
     n = len(enabled_slots)
@@ -1070,6 +2246,10 @@ def run_portfolio_backtest(
                         default_end_date=portfolio.end_date,
                         default_squareoff_time=portfolio.squareoff_time,
                         default_squareoff_tz=portfolio.squareoff_tz,
+                        default_run_on_days=portfolio.run_on_days,
+                        default_entry_start_time=portfolio.entry_start_time,
+                        default_entry_end_time=portfolio.entry_end_time,
+                        default_rbo_settings=rbo_settings,
                     )
                     futures[future] = ("single", [slot])
                 else:
@@ -1083,6 +2263,10 @@ def run_portfolio_backtest(
                         default_end_date=portfolio.end_date,
                         default_squareoff_time=portfolio.squareoff_time,
                         default_squareoff_tz=portfolio.squareoff_tz,
+                        default_run_on_days=portfolio.run_on_days,
+                        default_entry_start_time=portfolio.entry_start_time,
+                        default_entry_end_time=portfolio.entry_end_time,
+                        default_rbo_settings=rbo_settings,
                     )
                     futures[future] = ("group", [slot for slot, _cap in group])
         else:
@@ -1098,6 +2282,10 @@ def run_portfolio_backtest(
                     default_end_date=portfolio.end_date,
                     default_squareoff_time=portfolio.squareoff_time,
                     default_squareoff_tz=portfolio.squareoff_tz,
+                    default_run_on_days=portfolio.run_on_days,
+                    default_entry_start_time=portfolio.entry_start_time,
+                    default_entry_end_time=portfolio.entry_end_time,
+                    default_rbo_settings=rbo_settings,
                 )
                 futures[future] = ("single", [slot])
 
@@ -1173,6 +2361,7 @@ def _merge_portfolio_results(
     total_trades = 0
     total_wins = 0
     total_losses = 0
+    total_flat = 0
     all_positions_reports = []
     all_fills_reports = []
 
@@ -1188,6 +2377,7 @@ def _merge_portfolio_results(
         total_trades += r["total_trades"]
         total_wins += r["wins"]
         total_losses += r["losses"]
+        total_flat += r.get("flat_trades", max(r["total_trades"] - r["wins"] - r["losses"], 0))
 
         # Collect reports for merging
         if r.get("positions_report") is not None and not r["positions_report"].empty:
@@ -1223,7 +2413,9 @@ def _merge_portfolio_results(
             "trades": r["total_trades"],
             "wins": r["wins"],
             "losses": r["losses"],
+            "flat_trades": r.get("flat_trades", max(r["total_trades"] - r["wins"] - r["losses"], 0)),
             "win_rate": r["win_rate"],
+            "decisive_win_rate": r.get("decisive_win_rate"),
             "total_days": r.get("total_days", 0),
             "winning_days": r.get("winning_days", 0),
             "losing_days": r.get("losing_days", 0),
@@ -1238,6 +2430,10 @@ def _merge_portfolio_results(
             "cache_currsize": r.get("cache_currsize"),
             "worker_rss_mb": r.get("worker_rss_mb"),
             "warning": r.get("warning"),
+            # True when this slot ran via BacktestNode (Path B). Falsy means
+            # the slot stayed on Path A — either because _USE_BACKTEST_NODE
+            # wasn't set, or the gate auto-fell-back due to filter config.
+            "path_b": bool(r.get("path_b")),
         }
 
     # Merge equity curves — sum balances at each timestamp
@@ -1263,6 +2459,11 @@ def _merge_portfolio_results(
     final_balance = portfolio.starting_capital + total_pnl
     total_return_pct = (total_pnl / portfolio.starting_capital) * 100 if portfolio.starting_capital > 0 else 0
     win_rate = (total_wins / total_trades * 100) if total_trades > 0 else 0
+    # Decisive win rate excludes flat trades (P&L rounded to zero) — see
+    # _extract_results for rationale. ``None`` when no decisive trades exist
+    # so the UI can distinguish "0% decisive" from "no signal yet".
+    _decisive_n = total_wins + total_losses
+    decisive_win_rate = (total_wins / _decisive_n * 100) if _decisive_n > 0 else None
 
     # Portfolio-level day-based win% — merge daily PnLs across all slots
     portfolio_daily_pnl: dict[str, float] = {}
@@ -1305,6 +2506,23 @@ def _merge_portfolio_results(
             if len(tids) > 0:
                 slot_to_trader_id[slot.slot_id] = str(tids[0])
 
+    # Portfolio-level Path B summary. "all" when every slot ran on Path B,
+    # "none" when every slot stayed on Path A, "mixed" when some did and some
+    # didn't (e.g. one slot had a filter that triggered Path A fallback).
+    _slot_path_b_flags = [
+        bool(r.get("path_b"))
+        for r in slot_results.values()
+        if r is not None
+    ]
+    if not _slot_path_b_flags:
+        path_b_summary = "none"
+    elif all(_slot_path_b_flags):
+        path_b_summary = "all"
+    elif any(_slot_path_b_flags):
+        path_b_summary = "mixed"
+    else:
+        path_b_summary = "none"
+
     return {
         "starting_capital": portfolio.starting_capital,
         "final_balance": final_balance,
@@ -1313,7 +2531,10 @@ def _merge_portfolio_results(
         "total_trades": total_trades,
         "wins": total_wins,
         "losses": total_losses,
+        "flat_trades": total_flat,
         "win_rate": win_rate,
+        "decisive_win_rate": decisive_win_rate,
+        "path_b": path_b_summary,  # "all" | "mixed" | "none"
         "total_days": portfolio_total_days,
         "winning_days": portfolio_winning_days,
         "losing_days": portfolio_losing_days,
@@ -1820,7 +3041,20 @@ def _extract_results(
         elif total_pnl < 0:
             losses = 1
 
+    # ``flat_trades`` are closed positions whose realized P&L rounds to zero in
+    # the account base currency. They are real trades — entry + exit both
+    # filled — but the price moved by less than the sub-cent precision can
+    # represent (or not at all). Surfacing this separately prevents the
+    # "12,052 trades, 339 wins, 180 losses" confusion where the simple win
+    # rate (wins / total) penalises the strategy for trades that didn't lose.
+    flat_trades = max(total_trades - wins - losses, 0)
     win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+    # ``decisive_win_rate`` excludes flat trades from the denominator. Useful
+    # when most trades are flat (e.g. a too-small trade_size relative to bar
+    # noise) — gives the meaningful "of the trades that produced P&L, what
+    # fraction were wins?" figure.
+    _decisive_n = wins + losses
+    decisive_win_rate = (wins / _decisive_n * 100) if _decisive_n > 0 else None
 
     # Day-based win percentage for single-strategy backtest
     # Use entry time (ts_init) for daily grouping to match the HTML report
@@ -1858,7 +3092,9 @@ def _extract_results(
         "total_trades": total_trades,
         "wins": wins,
         "losses": losses,
+        "flat_trades": flat_trades,
         "win_rate": win_rate,
+        "decisive_win_rate": decisive_win_rate,
         "total_days": _total_days,
         "winning_days": _winning_days,
         "losing_days": _losing_days,

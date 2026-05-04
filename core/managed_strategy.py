@@ -69,6 +69,19 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     squareoff_minute: int = _SQUAREOFF_DISABLED
     squareoff_tz: str = "UTC"
 
+    # Range Breakout (RBO). All in seconds-of-day UTC; 0 / -1 / "" → disabled.
+    # When ``rbo_enabled``, fresh entries are gated by a per-day breakout
+    # state machine (see _rbo_step). Spec: 5. Logics/rbo_logics.html.
+    # Re-entries (re_execution_count > 0) bypass the gate per spec.
+    rbo_enabled: bool = False
+    rbo_monitoring_start_sec: int = 0
+    rbo_monitoring_end_sec: int = 0
+    rbo_entry_start_sec: int = 0
+    rbo_entry_end_sec: int = 0
+    rbo_range_buffer_sec: int = 0
+    rbo_entry_at: str = "Any"  # "Any" / "RangeHigh" / "RangeLow"
+    rbo_cancel_other_side: bool = False
+
 
 class ManagedExitStrategy(Strategy):
     """On each bar: check exits first (SL, TP, trailing, target lock, SL wait), then entries."""
@@ -101,6 +114,15 @@ class ManagedExitStrategy(Strategy):
         # Date (in squareoff_tz) on which we've already squared off. Blocks
         # re-entries until the calendar flips. None until first squareoff fires.
         self._squareoff_done_date: date | None = None
+
+        # RBO state machine. Spec: 5. Logics/rbo_logics.html.
+        # All times are seconds-of-day UTC; resets every UTC day.
+        self._rbo_enabled = bool(config.rbo_enabled)
+        self._rbo_phase: str = "IDLE"  # IDLE / MONITORING / ENTRY / DONE
+        self._rbo_range_high: float | None = None
+        self._rbo_range_low: float | None = None
+        self._rbo_triggered_sides: set[str] = set()  # subset of {"HIGH","LOW"}
+        self._rbo_last_day_ns: int | None = None
 
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
@@ -139,6 +161,12 @@ class ManagedExitStrategy(Strategy):
         self.subscribe_bars(self.config.bar_type)
 
     def on_bar(self, bar: Bar) -> None:
+        # RBO state runs every bar, even before indicators warm up — the
+        # range-monitoring window can start before the indicator gets enough
+        # bars, and we still need to track high/low through that period.
+        if self._rbo_enabled:
+            self._rbo_step(bar)
+
         if not self.indicators_initialized():
             return
 
@@ -181,6 +209,106 @@ class ManagedExitStrategy(Strategy):
             self._check_exits(close, is_long, is_short)
         else:
             self._check_entries(close, is_flat, is_long, is_short)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # RBO (Range Breakout) — per-day state machine.
+    # Spec: 5. Logics/rbo_logics.html. Phases IDLE → MONITORING → ENTRY →
+    # DONE, reset every UTC day. Range built from the slot's own bar OHLC
+    # (spec P8 "Underlying"). Fresh entries are blocked outside an active
+    # breakout side; re-entries bypass entirely (handled in _check_entries).
+    # ─────────────────────────────────────────────────────────────────────
+
+    _NANOS_PER_DAY = 86_400_000_000_000
+
+    def _rbo_step(self, bar: Bar) -> None:
+        """Advance the RBO day state machine by one bar.
+
+        Cheap path: a few integer comparisons and at most two float updates.
+        Called every bar when ``rbo_enabled``, regardless of indicator warmup
+        (we still need to track the monitoring window during warmup).
+        """
+        # Day rollover. ts_event is UTC nanoseconds; the floor-divide trick
+        # avoids any datetime construction in the hot path.
+        bar_day_ns = bar.ts_event - (bar.ts_event % self._NANOS_PER_DAY)
+        if self._rbo_last_day_ns != bar_day_ns:
+            self._rbo_phase = "IDLE"
+            self._rbo_range_high = None
+            self._rbo_range_low = None
+            self._rbo_triggered_sides = set()
+            self._rbo_last_day_ns = bar_day_ns
+
+        tod_sec = (bar.ts_event % self._NANOS_PER_DAY) // 1_000_000_000
+
+        cfg = self.config
+
+        # IDLE → MONITORING when monitoring window opens.
+        if self._rbo_phase == "IDLE":
+            if tod_sec >= cfg.rbo_monitoring_start_sec:
+                self._rbo_phase = "MONITORING"
+
+        # MONITORING: roll the high/low. Transition to ENTRY when window closes.
+        # The transition check happens BEFORE returning so a single bar that
+        # straddles monitoring_end still contributes to the range, then the
+        # state advances — matching the spec's "at range_monitoring_end the
+        # values are frozen" semantics.
+        if self._rbo_phase == "MONITORING":
+            high = float(bar.high)
+            low = float(bar.low)
+            self._rbo_range_high = high if self._rbo_range_high is None else max(self._rbo_range_high, high)
+            self._rbo_range_low = low if self._rbo_range_low is None else min(self._rbo_range_low, low)
+            if tod_sec >= cfg.rbo_monitoring_end_sec:
+                self._rbo_phase = "ENTRY"
+
+        # ENTRY: detect breakouts. Buffer collapses to entry_end the moment
+        # the first side fires (spec P6).
+        if self._rbo_phase == "ENTRY":
+            effective_end = cfg.rbo_entry_end_sec + (
+                cfg.rbo_range_buffer_sec if not self._rbo_triggered_sides else 0
+            )
+            if tod_sec > effective_end:
+                self._rbo_phase = "DONE"
+                return
+
+            if tod_sec < cfg.rbo_entry_start_sec:
+                return  # quiet gap between range freeze and entry-start
+
+            high = float(bar.high)
+            low = float(bar.low)
+
+            # HIGH breakout
+            if (
+                "HIGH" not in self._rbo_triggered_sides
+                and self._rbo_range_high is not None
+                and high > self._rbo_range_high
+                and cfg.rbo_entry_at in ("Any", "RangeHigh")
+            ):
+                self._rbo_triggered_sides.add("HIGH")
+                if cfg.rbo_cancel_other_side:
+                    self._rbo_phase = "DONE"
+                    return
+
+            # LOW breakout
+            if (
+                "LOW" not in self._rbo_triggered_sides
+                and self._rbo_range_low is not None
+                and low < self._rbo_range_low
+                and cfg.rbo_entry_at in ("Any", "RangeLow")
+            ):
+                self._rbo_triggered_sides.add("LOW")
+                if cfg.rbo_cancel_other_side:
+                    self._rbo_phase = "DONE"
+                    return
+
+    def _rbo_allows_entry(self) -> bool:
+        """Per-bar gate for fresh entries.
+
+        True only during ENTRY phase with at least one breakout side fired.
+        DONE phase blocks all fresh entries (cancel_other_side or past the
+        effective deadline). IDLE/MONITORING phases obviously block.
+        """
+        if self._rbo_phase != "ENTRY":
+            return False
+        return bool(self._rbo_triggered_sides)
 
     def _force_squareoff(self) -> None:
         """Squareoff exit: close position without triggering re_execute/reverse."""
@@ -274,6 +402,17 @@ class ManagedExitStrategy(Strategy):
             self._set_exit_levels(side)
 
     def _check_entries(self, close: float, is_flat: bool, is_long: bool, is_short: bool) -> None:
+        # RBO entry gate. Spec rbo_logics.html: re-entries (execute_trigger,
+        # i.e. our re_execution_count > 0) bypass the gate so they can fire
+        # past entry_end up to portfolio squareoff_time. Fresh entries
+        # (re_execution_count == 0) require an active breakout side.
+        if (
+            self._rbo_enabled
+            and self.re_execution_count == 0
+            and not self._rbo_allows_entry()
+        ):
+            return
+
         signal_entry = SIGNAL_REGISTRY.get(self.config.signal_name)
         if not signal_entry:
             return
@@ -369,7 +508,8 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      instrument_id, bar_type, trade_size,
                      order_id_tag: str | None = None,
                      squareoff_time: str | None = None,
-                     squareoff_tz: str | None = None) -> ManagedExitConfig:
+                     squareoff_tz: str | None = None,
+                     rbo_settings=None) -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
 
     ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
@@ -381,6 +521,10 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     portfolio→slot→leg priority result (see core.models.resolve_squareoff).
     Resolution stays out of this function so the runner can audit/log the
     effective value before engine build.
+
+    ``rbo_settings`` is the ``_RBOSettings`` dataclass (or ``None``) returned
+    by ``core.backtest_runner._resolve_rbo``; when provided it switches on the
+    per-day RBO state machine inside the strategy. Spec: rbo_logics.html.
     """
     kwargs = dict(
         instrument_id=instrument_id,
@@ -405,4 +549,15 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     )
     if order_id_tag is not None:
         kwargs["order_id_tag"] = order_id_tag
+    if rbo_settings is not None:
+        kwargs.update(
+            rbo_enabled=True,
+            rbo_monitoring_start_sec=rbo_settings.monitoring_start_sec,
+            rbo_monitoring_end_sec=rbo_settings.monitoring_end_sec,
+            rbo_entry_start_sec=rbo_settings.entry_start_sec,
+            rbo_entry_end_sec=rbo_settings.entry_end_sec,
+            rbo_range_buffer_sec=rbo_settings.range_buffer_sec,
+            rbo_entry_at=rbo_settings.entry_at,
+            rbo_cancel_other_side=rbo_settings.cancel_other_side,
+        )
     return ManagedExitConfig(**kwargs)

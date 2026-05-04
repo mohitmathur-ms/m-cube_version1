@@ -7,6 +7,7 @@ Includes JSON serialization helpers for saving/loading portfolios.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -109,6 +110,44 @@ class PortfolioConfig:
     # Portfolio-level default square-off time. Slot or leg level can override.
     squareoff_time: Optional[str] = None  # "HH:MM"
     squareoff_tz: Optional[str] = None    # IANA name, e.g. "America/New_York"
+    # Day-of-week filter for backtest. None / empty list means all 7 days allowed.
+    # Values: subset of ["MON","TUE","WED","THU","FRI","SAT","SUN"] (case-insensitive,
+    # full names like "Monday" also accepted). When set, bars on excluded weekdays
+    # are dropped before the engine sees them, so trades cannot fire on those days.
+    # Weekday is computed from each bar's UTC ts_event.
+    run_on_days: Optional[list[str]] = None
+    # Intra-day entry window. Both endpoints in HH:MM format, UTC.
+    # When either is set, bars outside [entry_start_time, entry_end_time] are
+    # dropped before the engine sees them. Caveat: bars dropped at the tail
+    # mean the strategy can't process exits past entry_end_time, so set
+    # ``squareoff_time`` to the same time as ``entry_end_time`` if you need
+    # forced closes at end-of-window.
+    entry_start_time: Optional[str] = None  # "HH:MM" UTC, e.g. "09:30"
+    entry_end_time: Optional[str] = None    # "HH:MM" UTC, e.g. "16:00"
+
+    # Range Breakout (RBO). When rbo_enabled, the entry timing for all enabled
+    # slots is gated by a per-day state machine: range is built during
+    # [range_monitoring_start, range_monitoring_end], frozen at the end of
+    # that window, then breakouts above/below the range during
+    # [rbo_entry_start, rbo_entry_end] arm strategy entries. Spec:
+    # 5. Logics/rbo_logics.html. All times are HH:MM:SS UTC. range_buffer is
+    # an integer number of MINUTES (NOT a price buffer) — extends entry_end
+    # only until the first side fires, then collapses back per spec P6.
+    rbo_enabled: bool = False
+    range_monitoring_start: Optional[str] = None  # P2
+    range_monitoring_end: Optional[str] = None    # P3 (UI auto-syncs rbo_entry_start to this)
+    rbo_entry_start: Optional[str] = None         # P4
+    rbo_entry_end: Optional[str] = None           # P5
+    rbo_range_buffer: int = 0                     # P6 — minutes
+    # P7. Backend-validated values: "Any" / "RangeHigh" / "RangeLow".
+    # Options-only values "C_OnHigh_P_OnLow" / "P_OnHigh_C_OnLow" are silently
+    # downgraded to "Any" with a warning log when used on FX/crypto.
+    rbo_entry_at: str = "Any"
+    # P8. Only "Underlying" is implemented; other values disable RBO with an
+    # error log per spec validation rules.
+    rbo_monitoring: str = "Underlying"
+    rbo_cancel_other_side: bool = False           # P9
+
     slots: list[StrategySlotConfig] = field(default_factory=list)
 
     def add_slot(self, slot: StrategySlotConfig) -> None:
@@ -145,14 +184,33 @@ def portfolio_to_dict(config: PortfolioConfig) -> dict:
     return asdict(config)
 
 
+def _filter_known_fields(data: dict, dataclass_type) -> dict:
+    """Return only the keys in ``data`` that are fields of ``dataclass_type``.
+
+    Defensive against schema drift in either direction: a UI that sends new
+    fields the server doesn't know about gets a clean, ignore-the-extras load
+    instead of a TypeError; an older payload missing newer fields gets the
+    dataclass defaults filled in. Avoids the brittle `Class(**raw_data)` that
+    crashes on the first mismatch.
+    """
+    known = {f.name for f in dataclasses.fields(dataclass_type)}
+    return {k: v for k, v in data.items() if k in known}
+
+
 def portfolio_from_dict(data: dict) -> PortfolioConfig:
+    # Don't mutate the caller's dict.
+    data = dict(data)
     slots_data = data.pop("slots", [])
     slots = []
-    for slot_data in slots_data:
-        exit_data = slot_data.pop("exit_config", {})
-        exit_config = ExitConfig(**exit_data)
-        slots.append(StrategySlotConfig(exit_config=exit_config, **slot_data))
-    return PortfolioConfig(slots=slots, **data)
+    for raw_slot in slots_data:
+        slot_data = dict(raw_slot)
+        exit_data = slot_data.pop("exit_config", {}) or {}
+        exit_config = ExitConfig(**_filter_known_fields(exit_data, ExitConfig))
+        slots.append(StrategySlotConfig(
+            exit_config=exit_config,
+            **_filter_known_fields(slot_data, StrategySlotConfig),
+        ))
+    return PortfolioConfig(slots=slots, **_filter_known_fields(data, PortfolioConfig))
 
 
 def save_portfolio(config: PortfolioConfig, directory: str = "portfolios") -> Path:

@@ -396,7 +396,22 @@ const Portfolio = {
         this._editingIsNew = isNew;
         const pf = this.portfolios[pfIndex];
         const title = "Create / Edit Portfolio";
-        const ui = pf._ui || {};
+        // Hydrate the UI scratchpad from persisted model fields so that
+        // editing an existing portfolio shows the previously-saved values.
+        // RBO is the first feature with backend-wired persistence, so seed
+        // _ui from the persisted rbo_* fields here. The form template still
+        // reads from `ui.*`, so no template-side changes are needed.
+        pf._ui = pf._ui || {};
+        if (pf.rbo_enabled !== undefined) pf._ui.rbo_enabled = pf.rbo_enabled;
+        if (pf.range_monitoring_start) pf._ui.range_monitoring_start = pf.range_monitoring_start;
+        if (pf.range_monitoring_end) pf._ui.range_monitoring_end = pf.range_monitoring_end;
+        if (pf.rbo_entry_start) pf._ui.entry_start = pf.rbo_entry_start;
+        if (pf.rbo_entry_end) pf._ui.entry_end = pf.rbo_entry_end;
+        if (pf.rbo_range_buffer !== undefined) pf._ui.range_buffer = pf.rbo_range_buffer;
+        if (pf.rbo_entry_at) pf._ui.entry_at = pf.rbo_entry_at;
+        if (pf.rbo_monitoring) pf._ui.monitoring = pf.rbo_monitoring;
+        if (pf.rbo_cancel_other_side !== undefined) pf._ui.cancel_other = pf.rbo_cancel_other_side;
+        const ui = pf._ui;
 
         // Strategy tags summary
         const stratTags = [...new Set((pf.slots || []).map(s => s.strategy_name))];
@@ -507,23 +522,23 @@ const Portfolio = {
             <!-- Execution Parameters Tab -->
             <div class="pf-tab-content" id="pf-tab-pf-exec">
                 <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:260px;">
-                        <legend>Execution Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:260px;" title="Live-trading-only fields. Backtest ignores these.">
+                        <legend>Execution Settings (live only)</legend>
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Product</span>
                             <select class="form-control" id="pf-m-product" style="flex:1;">
                                 <option value="MIS" ${(ui.product||'MIS')==='MIS'?'selected':''}>MIS</option>
                                 <option value="NRML" ${ui.product==='NRML'?'selected':''}>NRML</option>
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Strategy Tag</span>
                             <select class="form-control" id="pf-m-strattag" style="flex:1;">
                                 <option value="Default" ${(ui.strategy_tag||'Default')==='Default'?'selected':''}>Default</option>
                                 ${stratTags.map(t => `<option value="${t}" ${ui.strategy_tag===t?'selected':''}>${t}</option>`).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">If One or More Leg Fail</span>
                             <select class="form-control" id="pf-m-legfail" style="flex:1;">
                                 <option value="KeepPlacedLegs" ${(ui.on_leg_fail||'KeepPlacedLegs')==='KeepPlacedLegs'?'selected':''}>KeepPlacedLegs</option>
@@ -531,9 +546,9 @@ const Portfolio = {
                             </select>
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:260px;">
-                        <legend>Execution Mode</legend>
-                        <div class="pf-field-row pf-ui-only">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:260px;" title="Options-trading reference pricing. Backtest uses bar data directly and ignores these.">
+                        <legend>Execution Mode (options/live only)</legend>
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label wide">Portfolio Execution Mode</span>
                             <select class="form-control" id="pf-m-execmode" style="flex:1;" onchange="Portfolio._onExecModeChange()">
                                 <option value="Start time" ${(ui.execution_mode||'Start time')==='Start time'?'selected':''}>Start time</option>
@@ -543,7 +558,7 @@ const Portfolio = {
                                 <option value="CombinedPremiumCrossOver" ${ui.execution_mode==='CombinedPremiumCrossOver'?'selected':''}>CombinedPremiumCrossOver</option>
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only" id="pf-row-basedon" style="display:${['Start time','Manual'].includes(ui.execution_mode||'Start time')?'none':'flex'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-basedon" style="display:${['Start time','Manual'].includes(ui.execution_mode||'Start time')?'none':'flex'};">
                             <span class="pf-field-label wide">Based On</span>
                             <select class="form-control" id="pf-m-basedon" style="flex:1;" onchange="Portfolio._onBasedOnChange()">
                                 <option value="None" ${(ui.based_on||'None')==='None'?'selected':''}>None</option>
@@ -551,25 +566,25 @@ const Portfolio = {
                                 <option value="StartTime" ${ui.based_on==='StartTime'?'selected':''}>StartTime</option>
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only" id="pf-row-entryprice" style="display:${(ui.based_on||'None')==='None'&&!['Start time','Manual'].includes(ui.execution_mode||'Start time')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-entryprice" style="display:${(ui.based_on||'None')==='None'&&!['Start time','Manual'].includes(ui.execution_mode||'Start time')?'flex':'none'};">
                             <span class="pf-field-label wide">Entry Price</span>
                             <input type="number" class="form-control" id="pf-m-entryprice" value="${ui.entry_price||0}" step="0.01" min="0" style="flex:1;">
                         </div>
-                        <div class="pf-field-row pf-ui-only" id="pf-row-rounding" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-rounding" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
                             <span class="pf-field-label wide">Rounding Value</span>
                             <input type="number" class="form-control" id="pf-m-rounding" value="${ui.rounding_value||0}" step="0.5" min="0" style="flex:1;">
                         </div>
-                        <div class="pf-field-row pf-ui-only" id="pf-row-adjustprice" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-adjustprice" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
                             <span class="pf-field-label wide">Adjust Price</span>
                             <input type="text" class="form-control" id="pf-m-adjustprice" value="${ui.adjust_price||''}" placeholder="e.g. +10, -5%" style="flex:1;">
                         </div>
                     </fieldset>
                 </div>
-                <fieldset class="pf-fieldset pf-ui-only">
+                <fieldset class="pf-fieldset">
                     <legend>Timing</legend>
                     <div style="display:flex; gap:14px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:200px;">
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Run On Days</span>
                                 <select class="form-control" id="pf-m-runondays" style="flex:1;" onchange="Portfolio._onRunOnDaysChange()">
                                     <option value="All Days" ${(ui.run_on_days||'All Days')==='All Days'?'selected':''}>All Days</option>
@@ -587,21 +602,21 @@ const Portfolio = {
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row" title="Intra-day entry window start (UTC). Bars before this time are dropped from the backtest.">
                                 <span class="pf-field-label">Start Time</span>
                                 <input type="time" class="form-control" id="pf-m-starttime" value="${ui.start_time||'09:30:00'}" step="1" style="flex:1;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row" title="Intra-day entry window end (UTC). Bars after this time are dropped from the backtest.">
                                 <span class="pf-field-label">End Time</span>
                                 <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time||'16:15:00'}" step="1" style="flex:1;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row pf-live-only" title="Live-only. Backtest uses the SqOff Time on the Timing tab (portfolio.squareoff_time).">
                                 <span class="pf-field-label">SqOff Time</span>
                                 <input type="time" class="form-control" id="pf-m-sqofftime-exec" value="${ui.sqoff_time_exec||'16:15:00'}" step="1" style="flex:1;">
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <span class="pf-field-label">Start Day</span>
                                 <select class="form-control" id="pf-m-startday" style="flex:1;">
                                     <option value="Before Expiry" ${(ui.start_day||'Before Expiry')==='Before Expiry'?'selected':''}>Before Expiry</option>
@@ -610,12 +625,12 @@ const Portfolio = {
                                 </select>
                                 <input type="number" class="form-control" id="pf-m-startdayoff" value="${ui.start_day_offset||1}" min="0" step="1" style="width:50px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <span class="pf-field-label">SqOff Day</span>
                                 <input type="number" class="form-control" id="pf-m-sqoffday" value="${ui.sqoff_day||0}" min="0" step="1" style="width:60px;">
                                 <span style="font-size:0.72rem; color:var(--text-muted); margin-left:4px;">(~before expiry)</span>
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <label style="font-size:0.75rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
                                     <input type="checkbox" id="pf-m-holiday" ${ui.holiday_handling?'checked':''}>
                                     If Holiday, Use Previous Day for Start &nbsp;Next Day for SqOff, Else no Entry
@@ -627,56 +642,63 @@ const Portfolio = {
                 </fieldset>
             </div>
 
-            <!-- Range BreakOut Tab (UI-only) -->
+            <!-- Range BreakOut Tab. Backend-wired for FX/crypto. Two values
+                 inside the "Entry At" dropdown remain options-only and are
+                 marked with the .pf-live-only (gray) class to signal that
+                 they are accepted by the schema but downgraded to "Any" by
+                 the backend (see core.backtest_runner._resolve_rbo). -->
             <div class="pf-tab-content" id="pf-tab-pf-rangebrk" style="display:none;">
                 <div style="margin-bottom:10px;">
-                    <label class="pf-ui-only" style="font-size:0.84rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <label style="font-size:0.84rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
                         <input type="checkbox" id="pf-m-rbo-enabled" ${ui.rbo_enabled?'checked':''}>
                         Enable RangeBreakOut
                     </label>
                 </div>
-                <fieldset class="pf-fieldset pf-ui-only">
+                <fieldset class="pf-fieldset">
                     <legend>Range BreakOut Settings</legend>
                     <div style="display:flex; gap:14px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:220px;">
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Range Monitoring Start Time</span>
                                 <input type="time" class="form-control" id="pf-m-rbo-monstart" value="${ui.range_monitoring_start||'09:30:00'}" step="1" style="width:110px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Range Monitoring End Time</span>
                                 <input type="time" class="form-control" id="pf-m-rbo-monend" value="${ui.range_monitoring_end||'10:30:00'}" step="1" style="width:110px;"
                                     onchange="document.getElementById('pf-m-rbo-entrystart').value=this.value">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Entry Start Time</span>
                                 <input type="time" class="form-control" id="pf-m-rbo-entrystart" value="${ui.entry_start||ui.range_monitoring_end||'10:30:00'}" step="1" style="width:110px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Entry End Time</span>
                                 <input type="time" class="form-control" id="pf-m-rbo-entryend" value="${ui.entry_end||'16:15:00'}" step="1" style="width:110px;">
                             </div>
                         </div>
                         <div style="flex:1; min-width:220px;">
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row" title="C_OnHigh_P_OnLow / P_OnHigh_C_OnLow are options-only — silently downgraded to 'Any' for FX/crypto by the backend.">
                                 <span class="pf-field-label">Entry At</span>
                                 <select class="form-control" id="pf-m-rbo-entryat" style="flex:1;">
-                                    ${["Any","RangeHigh","RangeLow","C_OnHigh_P_OnLow","P_OnHigh_C_OnLow"].map(o =>
-                                        `<option value="${o}" ${(ui.entry_at||'Any')===o?'selected':''}>${o}</option>`
-                                    ).join("")}
+                                    ${["Any","RangeHigh","RangeLow","C_OnHigh_P_OnLow","P_OnHigh_C_OnLow"].map(o => {
+                                        const isOptionsOnly = (o === "C_OnHigh_P_OnLow" || o === "P_OnHigh_C_OnLow");
+                                        const cls = isOptionsOnly ? 'pf-live-only' : '';
+                                        const label = isOptionsOnly ? `${o} (options only)` : o;
+                                        return `<option value="${o}" class="${cls}" ${(ui.entry_at||'Any')===o?'selected':''}>${label}</option>`;
+                                    }).join("")}
                                 </select>
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <span class="pf-field-label">Range Buffer (mins)</span>
                                 <input type="number" class="form-control" id="pf-m-rbo-buffer" value="${ui.range_buffer||0}" min="0" step="1" placeholder="e.g. 5" style="width:90px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row" title="Other monitoring sources are options-specific and not yet implemented (spec rbo_logics.html P8).">
                                 <span class="pf-field-label">Monitoring</span>
                                 <select class="form-control" id="pf-m-rbo-monitoring" style="flex:1;">
                                     <option value="Underlying" selected>Underlying</option>
                                 </select>
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <label style="font-size:0.8rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                     <input type="checkbox" id="pf-m-rbo-cancelother" ${ui.cancel_other?'checked':''}>
                                     Cancel Other Side if One Executes
@@ -1292,14 +1314,36 @@ const Portfolio = {
         // Timing (execution-level)
         pf._ui.run_on_days = document.getElementById("pf-m-runondays")?.value || "All Days";
         pf._ui.selected_days = [...document.querySelectorAll(".pf-custom-day:checked")].map(el => el.value);
+        // Wire UI dropdown → backend `pf.run_on_days` list. Backend treats null
+        // as "no filter" (all 7 days). Presets expand to a list; Custom uses
+        // the explicit checkbox selection. Backend `_allowed_weekdays` helper
+        // accepts any case and any 3-letter or full day name.
+        if (pf._ui.run_on_days === "Custom") {
+            pf.run_on_days = pf._ui.selected_days.length ? pf._ui.selected_days : null;
+        } else if (pf._ui.run_on_days === "Mon - Fri") {
+            pf.run_on_days = ["Mon","Tue","Wed","Thu","Fri"];
+        } else if (pf._ui.run_on_days === "Mon - Thu") {
+            pf.run_on_days = ["Mon","Tue","Wed","Thu"];
+        } else {
+            pf.run_on_days = null;
+        }
         pf._ui.start_time = document.getElementById("pf-m-starttime")?.value || "09:30:00";
         pf._ui.end_time = document.getElementById("pf-m-endtime")?.value || "16:15:00";
         pf._ui.sqoff_time_exec = document.getElementById("pf-m-sqofftime-exec")?.value || "16:15:00";
+        // Wire UI dropdown -> backend `pf.entry_start_time` / `pf.entry_end_time`.
+        // Backend treats null/empty as "unbounded" on that side. Empty string ->
+        // null so an explicitly cleared field doesn't act as 00:00 / 23:59.
+        pf.entry_start_time = pf._ui.start_time && pf._ui.start_time !== "00:00:00"
+            ? pf._ui.start_time : null;
+        pf.entry_end_time = pf._ui.end_time && pf._ui.end_time !== "23:59:59"
+            ? pf._ui.end_time : null;
         pf._ui.start_day = document.getElementById("pf-m-startday")?.value || "Before Expiry";
         pf._ui.start_day_offset = parseInt(document.getElementById("pf-m-startdayoff")?.value) || 1;
         pf._ui.sqoff_day = parseInt(document.getElementById("pf-m-sqoffday")?.value) || 0;
         pf._ui.holiday_handling = document.getElementById("pf-m-holiday")?.checked || false;
-        // Range BreakOut
+        // Range BreakOut. Mirror values to both _ui (in-memory UI scratchpad)
+        // AND pf.<model_field> so the strip-before-POST below preserves them
+        // for the server. Field names on pf match PortfolioConfig in models.py.
         pf._ui.rbo_enabled = document.getElementById("pf-m-rbo-enabled")?.checked || false;
         pf._ui.range_monitoring_start = document.getElementById("pf-m-rbo-monstart")?.value || "09:30:00";
         pf._ui.range_monitoring_end = document.getElementById("pf-m-rbo-monend")?.value || "10:30:00";
@@ -1309,6 +1353,16 @@ const Portfolio = {
         pf._ui.range_buffer = parseInt(document.getElementById("pf-m-rbo-buffer")?.value) || 0;
         pf._ui.monitoring = document.getElementById("pf-m-rbo-monitoring")?.value || "Underlying";
         pf._ui.cancel_other = document.getElementById("pf-m-rbo-cancelother")?.checked || false;
+        // Persisted copies for the backend
+        pf.rbo_enabled = pf._ui.rbo_enabled;
+        pf.range_monitoring_start = pf._ui.range_monitoring_start;
+        pf.range_monitoring_end = pf._ui.range_monitoring_end;
+        pf.rbo_entry_start = pf._ui.entry_start;
+        pf.rbo_entry_end = pf._ui.entry_end;
+        pf.rbo_range_buffer = pf._ui.range_buffer;
+        pf.rbo_entry_at = pf._ui.entry_at;
+        pf.rbo_monitoring = pf._ui.monitoring;
+        pf.rbo_cancel_other_side = pf._ui.cancel_other;
         // Dynamic Hedge
         pf._ui.hedge_type = document.getElementById("pf-m-dh-type")?.value || "PremiumBased";
         pf._ui.sqoff_leg_on = document.getElementById("pf-m-dh-sqoff")?.value || "LegSqOff";
@@ -1771,12 +1825,35 @@ const Portfolio = {
             for (const [, sr] of Object.entries(r.per_strategy)) {
                 const cls = sr.pnl >= 0 ? "positive" : "negative";
                 const warnIcon = sr.warning ? ' <span title="' + sr.warning.replace(/"/g, '&quot;') + '" style="cursor:help;color:#e6a817;">&#9888;</span>' : "";
-                perStratRows += `<tr><td>${sr.display_name}${warnIcon}</td><td class="${cls}">${App.currency(sr.pnl)}</td><td>${sr.trades}</td><td>${sr.win_rate.toFixed(1)}%</td><td>${(sr.win_pct_days || 0).toFixed(1)}%</td><td>${sr.wins}</td><td>${sr.losses}</td></tr>`;
+                const flatCount = sr.flat_trades != null ? sr.flat_trades : Math.max((sr.trades || 0) - (sr.wins || 0) - (sr.losses || 0), 0);
+                const decisiveStr = sr.decisive_win_rate != null ? sr.decisive_win_rate.toFixed(1) + "%" : "&mdash;";
+                perStratRows += `<tr><td>${sr.display_name}${warnIcon}</td><td class="${cls}">${App.currency(sr.pnl)}</td><td>${sr.trades}</td><td>${sr.win_rate.toFixed(1)}%</td><td title="Wins / (Wins + Losses) — flat trades excluded">${decisiveStr}</td><td>${(sr.win_pct_days || 0).toFixed(1)}%</td><td>${sr.wins}</td><td>${sr.losses}</td><td title="Trades whose P&L rounded to zero (price didn't move enough relative to trade size)">${flatCount}</td></tr>`;
             }
+        }
+        // Flat / decisive metrics — fall back to client-side derivation if a
+        // legacy backend (pre-this-session) returns the result without them.
+        const flatTrades = r.flat_trades != null
+            ? r.flat_trades
+            : Math.max((r.total_trades || 0) - (r.wins || 0) - (r.losses || 0), 0);
+        const decisiveStr = r.decisive_win_rate != null
+            ? r.decisive_win_rate.toFixed(1) + "%"
+            : "&mdash;";
+        // Path indicator — visible badge so users can tell at a glance
+        // which engine path actually executed. Three states:
+        //   "all"   -> green "Path B" badge (BacktestNode used for every slot)
+        //   "mixed" -> yellow "Path B (partial)" badge (some slots fell back)
+        //   "none"  -> gray "Path A" badge (default; nothing to highlight)
+        let pathBadge = "";
+        if (r.path_b === "all") {
+            pathBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#1f3a2a;color:#3fb950;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin-right:8px;" title="All slots ran via BacktestNode (Path B)">Path B</span>';
+        } else if (r.path_b === "mixed") {
+            pathBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#3a2a1f;color:#f0883e;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin-right:8px;" title="Some slots ran on Path B; others fell back to Path A (filters configured)">Path B (partial)</span>';
+        } else if (r.path_b === "none") {
+            pathBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#2a2a2a;color:#aaa;font-size:0.72rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin-right:8px;" title="All slots ran on Path A (default; BacktestEngine direct wiring)">Path A</span>';
         }
         return `<div class="portfolio-results">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <span style="font-weight:600; font-size:0.95rem;">Results: ${r.portfolio_name||""}</span>
+                <span style="font-weight:600; font-size:0.95rem;">${pathBadge}Results: ${r.portfolio_name||""}</span>
                 <div>${flagsHTML}${reportBtnHTML}<button class="btn btn-sm btn-primary" onclick="App.navigate('portfolio_tearsheet')">Full Tearsheet</button></div>
             </div>
             ${warningsHTML}
@@ -1785,11 +1862,13 @@ const Portfolio = {
                 ${App.metricHTML("Final Balance", App.currency(r.final_balance))}
                 ${App.metricHTML("Total P&L", App.currency(r.total_pnl), r.total_return_pct)}
                 ${App.metricHTML("Total Trades", r.total_trades)}
+                ${App.metricHTML(`Flat Trades <span title="Trades whose P&L rounded to zero — usually means trade_size is small relative to bar moves" style="cursor:help;color:#888;">&#9432;</span>`, flatTrades)}
                 ${App.metricHTML("Win Rate (Trades)", r.win_rate.toFixed(1) + "%")}
+                ${App.metricHTML(`Decisive Win Rate <span title="Wins / (Wins + Losses) — excludes flat trades. Often more meaningful than the raw win rate when many trades are flat." style="cursor:help;color:#888;">&#9432;</span>`, decisiveStr)}
                 ${App.metricHTML("Win% (Days)", (r.win_pct_days || 0).toFixed(1) + "%")}
                 ${App.metricHTML("Max Drawdown", r.max_drawdown.toFixed(2) + "%")}
             </div>
-            ${perStratRows ? `<div class="table-container" style="margin-top:12px;"><table><thead><tr><th>Strategy</th><th>P&L</th><th>Trades</th><th>Win Rate (Trades)</th><th>Win% (Days)</th><th>Wins</th><th>Losses</th></tr></thead><tbody>${perStratRows}</tbody></table></div>` : ""}
+            ${perStratRows ? `<div class="table-container" style="margin-top:12px;"><table><thead><tr><th>Strategy</th><th>P&L</th><th>Trades</th><th>Win Rate (Trades)</th><th title="Wins / (Wins + Losses)">Decisive Win Rate</th><th>Win% (Days)</th><th>Wins</th><th>Losses</th><th title="P&L rounded to zero">Flat</th></tr></thead><tbody>${perStratRows}</tbody></table></div>` : ""}
         </div>`;
     },
 };

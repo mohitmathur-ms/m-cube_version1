@@ -1180,6 +1180,38 @@ span.negative { color: var(--danger); }
     background: #fff0f0 !important;
 }
 
+/* ─── Live-trading-only fields (don't apply to backtest) ───────────────── */
+/* Visually muted gray to signal "this field is real but only matters in live  */
+/* trading — backtests will ignore it regardless of value". Distinct from      */
+/* pf-ui-only (red = should be wired) so users know the difference at a glance.*/
+.pf-live-only {
+    background: #f5f5f5 !important;
+    opacity: 0.75;
+}
+.pf-live-only select,
+.pf-live-only input {
+    background: #f5f5f5 !important;
+    color: #777;
+}
+.pf-fieldset.pf-live-only {
+    border-color: #cfcfcf;
+}
+.pf-fieldset.pf-live-only legend {
+    color: #888;
+}
+.pf-field-row.pf-live-only .pf-field-label {
+    color: #888;
+}
+.pf-top-field.pf-live-only {
+    background: #f5f5f5;
+    border-radius: 3px;
+    padding: 2px 4px;
+}
+.pf-top-field.pf-live-only .form-control,
+.pf-top-field.pf-live-only input[type="checkbox"] {
+    background: #f5f5f5 !important;
+}
+
 /* ─── Inline Leg Table ──────────────────────────────────────────────────── */
 .leg-inline-table {
     width: 100%;

@@ -1512,8 +1512,15 @@
             const totalTrades = tradePnls.length;
             const tradeWins = tradePnls.filter(v => v > 0).length;
             const tradeLosses = tradePnls.filter(v => v < 0).length;
+            // Flat trades = P&L rounded to exactly zero. Common when trade_size
+            // is small relative to bar moves (e.g. trade_size=1 on EURUSD).
+            const tradeFlat = totalTrades - tradeWins - tradeLosses;
             const tradeWinRate = totalTrades ? (tradeWins / totalTrades * 100) : 0;
             const tradeLossRate = totalTrades ? (tradeLosses / totalTrades * 100) : 0;
+            // Decisive win rate excludes flat trades from the denominator -
+            // the meaningful "of trades that produced P&L, how many won?".
+            const decisiveN = tradeWins + tradeLosses;
+            const decisiveWinRate = decisiveN ? (tradeWins / decisiveN * 100) : null;
 
             return {
                 totalPnL, avgDay: pnels.length ? totalPnL / pnels.length : 0,
@@ -1523,7 +1530,8 @@
                 mw, ml, avgW: winDays.length ? winDays.reduce((a, b) => a + b, 0) / winDays.length : 0,
                 avgL: lossDays.length ? lossDays.reduce((a, b) => a + b, 0) / lossDays.length : 0,
                 mdd,
-                totalTrades, tradeWins, tradeLosses, tradeWinRate, tradeLossRate
+                totalTrades, tradeWins, tradeLosses, tradeFlat,
+                tradeWinRate, tradeLossRate, decisiveWinRate
             };
         }
 
@@ -1536,8 +1544,10 @@
                 <div class="kpi"><div class="kpi-label">Max Loss</div><div class="kpi-value bad">${m.maxL.v.toFixed(2)}</div><div class="kpi-sub">${m.maxL.d}</div></div>
                 <div class="kpi"><div class="kpi-label">Total Days</div><div class="kpi-value">${m.totalDays}</div></div>
                 <div class="kpi"><div class="kpi-label">Total Trades</div><div class="kpi-value">${m.totalTrades}</div></div>
+                <div class="kpi" title="Trades whose P&L rounded to zero (often means trade_size is small relative to bar moves)"><div class="kpi-label">Flat Trades</div><div class="kpi-value">${m.tradeFlat}</div></div>
                 <div class="kpi"><div class="kpi-label">Win% (Days)</div><div class="kpi-value good">${m.winP.toFixed(1)}% (${m.winC})</div></div>
                 <div class="kpi"><div class="kpi-label">Win% (Trades)</div><div class="kpi-value good">${m.tradeWinRate.toFixed(1)}% (${m.tradeWins})</div></div>
+                <div class="kpi" title="Wins / (Wins + Losses) - excludes flat trades. Often more meaningful when many trades are flat."><div class="kpi-label">Decisive Win%</div><div class="kpi-value good">${m.decisiveWinRate != null ? m.decisiveWinRate.toFixed(1) + '%' : '—'}</div></div>
                 <div class="kpi"><div class="kpi-label">Loss% (Days)</div><div class="kpi-value bad">${m.lossP.toFixed(1)}% (${m.lossC})</div></div>
                 <div class="kpi"><div class="kpi-label">Loss% (Trades)</div><div class="kpi-value bad">${m.tradeLossRate.toFixed(1)}% (${m.tradeLosses})</div></div>
                 <div class="kpi"><div class="kpi-label">Max Win Streak</div><div class="kpi-value good">${m.mw}</div></div>
