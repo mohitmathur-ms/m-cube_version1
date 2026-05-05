@@ -35,11 +35,214 @@ const App = {
     _logCount: 0,
     _logCollapsed: false,
 
-    /** Initialize the app */
-    init() {
+    /** Initialize the app.
+     *
+     *  First step is the user-picker gate: every API call carries an
+     *  X-User-Id header (see this.api), so we MUST resolve the active
+     *  user before any module renders. If localStorage already has one,
+     *  we trust it and continue; otherwise we show a blocking picker.
+     */
+    async init() {
         this.bindNavigation();
-        this.log("System initialized", "MESSAGE", "SYSTEM");
+        await this._ensureUserSelected();
+        await this._refreshCurrentUser();
+        this._renderUserChip();
+        this.log(`Signed in as ${this.getUserAlias() || this.getUserId()}`, "MESSAGE", "SYSTEM");
         this.navigate("dashboard");
+    },
+
+    // ─── User identity (X-User-Id, no auth) ───────────────────────────────
+
+    /** Cached user list from /api/users/list (refreshed by the picker). */
+    _userCache: null,
+
+    /** Cached active-user row from /api/users/me. Includes multiplier and
+     *  allowed_instruments — surfaced read-only in the header chip so the
+     *  user can see what the server will apply to their orders. */
+    _currentUser: null,
+
+    /** Refresh ``_currentUser`` from /api/users/me. Direct fetch (NOT
+     *  this.api) so we can call it during init before the rest of the
+     *  router boots. Failures degrade gracefully — the chip falls back
+     *  to alias-only. */
+    async _refreshCurrentUser() {
+        try {
+            const res = await fetch("/api/users/me", { headers: this.userHeaders() });
+            const data = await res.json().catch(() => ({}));
+            if (data && data.user_id) {
+                this._currentUser = data;
+            }
+        } catch (_e) { /* non-fatal */ }
+    },
+
+    /** Get the active user_id from localStorage, or null. */
+    getUserId() {
+        try { return localStorage.getItem("user_id") || null; } catch { return null; }
+    },
+
+    /** Get the active user's display alias, falling back to user_id. */
+    getUserAlias() {
+        const uid = this.getUserId();
+        if (!uid) return null;
+        const entry = (this._userCache || []).find(u => u.user_id === uid);
+        return entry ? (entry.alias || uid) : uid;
+    },
+
+    /** Block until a user_id is in localStorage, prompting if needed.
+     *  Called once on init; the "Switch user" link calls _showUserPicker
+     *  directly to re-prompt without going through the rest of init.
+     */
+    async _ensureUserSelected() {
+        // Fetch the user list once so the picker can render. Direct fetch
+        // (NOT this.api) because the api wrapper would loop on missing
+        // header — we're explicitly bootstrapping that header.
+        try {
+            const res = await fetch("/api/users/list");
+            const data = await res.json().catch(() => ({}));
+            this._userCache = Array.isArray(data.users) ? data.users : [];
+        } catch (_e) {
+            this._userCache = [];
+        }
+        const stored = this.getUserId();
+        const known = stored && this._userCache.some(u => u.user_id === stored);
+        if (known) return;
+        // Stored id no longer exists in the registry → clear and re-prompt.
+        if (stored && !known) {
+            try { localStorage.removeItem("user_id"); } catch {}
+        }
+        await this._showUserPicker(/*allowCancel*/ false);
+    },
+
+    /** Render the user chip inside the header bar (next to Catalog Path).
+     *  Shows alias + multiplier + allowed_instruments summary read-only.
+     *  Click opens the picker for switching; editing multiplier or allowlist
+     *  is admin-only (see adapter_admin Users page on port 5001).
+     */
+    _renderUserChip() {
+        const host = document.querySelector(".header-settings") || document.body;
+        let chip = document.getElementById("user-chip");
+        if (!chip) {
+            chip = document.createElement("button");
+            chip.id = "user-chip";
+            chip.type = "button";
+            // Match .header-settings input styling so the chip reads as part
+            // of the header rather than a floater. Larger gap accommodates
+            // the multiplier/allowlist meta strip.
+            chip.style.cssText = "margin-left:12px; padding:4px 10px; font-size:0.78rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); cursor:pointer; display:inline-flex; align-items:center; gap:8px; max-width:520px;";
+            chip.onclick = () => this._showUserPicker(true);
+            host.appendChild(chip);
+        }
+
+        const u = this._currentUser || {};
+        const alias = (u.alias || this.getUserAlias() || "—");
+        const multiplier = (u.multiplier !== undefined ? Number(u.multiplier) : null);
+        const multStr = multiplier !== null ? `×${multiplier}` : "";
+        const allowed = u.allowed_instruments;
+
+        // Allowlist summary: null/undefined → "All", short list → joined,
+        // long list → first two + count. Keeps the header compact while the
+        // tooltip still carries the full list.
+        let allowedStr;
+        if (!Array.isArray(allowed)) {
+            allowedStr = "All";
+        } else if (allowed.length === 0) {
+            allowedStr = "(none)";
+        } else if (allowed.length <= 3) {
+            allowedStr = allowed.join(", ");
+        } else {
+            allowedStr = `${allowed.slice(0, 2).join(", ")} +${allowed.length - 2}`;
+        }
+
+        // Tooltip with the full picture for users who want detail.
+        const fullAllowed = Array.isArray(allowed)
+            ? (allowed.length ? allowed.join(", ") : "(none — cannot save any portfolio)")
+            : "All instruments";
+        chip.title = `User: ${alias}\nMultiplier: ${multStr || "(unknown)"}\nAllowed instruments: ${fullAllowed}\n(read-only — admin edits via :5001)\n\nClick to switch user`;
+
+        const sep = `<span style="color:var(--border-color);">|</span>`;
+        chip.innerHTML = `
+            <span aria-hidden="true">&#128100;</span>
+            <strong>${this._htmlEscape(alias)}</strong>
+            ${multStr ? `${sep}<span style="color:var(--text-secondary);" title="Order-quantity multiplier">${multStr}</span>` : ""}
+            ${sep}<span style="color:var(--text-secondary);" title="Allowed instruments">${this._htmlEscape(allowedStr)}</span>
+            ${sep}<span style="color:var(--text-secondary); font-weight:400;">(switch)</span>
+        `;
+    },
+
+    /** Show a blocking modal listing known users. Resolves once a user
+     *  is picked. ``allowCancel`` decides whether the dialog can be
+     *  dismissed without picking — false on first-load, true when
+     *  switching (where the existing identity is still valid). */
+    _showUserPicker(allowCancel) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement("div");
+            overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:2000; display:flex; align-items:center; justify-content:center;";
+            const modal = document.createElement("div");
+            // Use the project's light-theme tokens so the modal matches
+            // the rest of the UI (was hard-coded dark before — clashed).
+            modal.style.cssText = "background:var(--bg-primary, #fff); color:var(--text-primary, #1f2937); padding:24px; border-radius:var(--radius-md, 8px); min-width:360px; max-width:520px; box-shadow:var(--shadow-lg, 0 10px 30px rgba(0,0,0,0.15)); border:1px solid var(--border-color, #e5e7eb);";
+
+            const users = this._userCache || [];
+            const optsHtml = users.map(u =>
+                `<option value="${this._htmlEscape(u.user_id)}">${this._htmlEscape(u.alias || u.user_id)} (${this._htmlEscape(u.user_id)})</option>`
+            ).join("");
+
+            const current = this.getUserId() || (users[0] && users[0].user_id) || "";
+            modal.innerHTML = `
+                <h3 style="margin-top:0; color:var(--text-primary);">Choose user</h3>
+                <p style="color:var(--text-secondary, #6b7280); font-size:0.85rem;">
+                    Identity-only — no password. The picked id goes into every
+                    API call as <code>X-User-Id</code>. Use only in trusted environments.
+                </p>
+                <select id="user-picker-select" class="form-control" style="width:100%; margin-bottom:14px;">
+                    ${optsHtml || '<option value="">(no users — admin must seed config/users.json)</option>'}
+                </select>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    ${allowCancel ? '<button class="btn btn-secondary" id="user-picker-cancel">Cancel</button>' : ""}
+                    <button class="btn btn-primary" id="user-picker-ok" ${users.length ? "" : "disabled"}>Continue</button>
+                </div>`;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const sel = modal.querySelector("#user-picker-select");
+            if (current) sel.value = current;
+            modal.querySelector("#user-picker-ok").onclick = async () => {
+                const picked = sel.value;
+                if (!picked) return;
+                try { localStorage.setItem("user_id", picked); } catch {}
+                document.body.removeChild(overlay);
+                // Refresh the active-user row so the chip reflects the new
+                // multiplier / allowed_instruments before the next render.
+                await this._refreshCurrentUser();
+                this._renderUserChip();
+                // Drop cached responses since they were keyed implicitly
+                // to the previous user.
+                this.invalidateCache && this.invalidateCache();
+                resolve(picked);
+            };
+            const cancelBtn = modal.querySelector("#user-picker-cancel");
+            if (cancelBtn) cancelBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                resolve(this.getUserId());
+            };
+        });
+    },
+
+    _htmlEscape(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        }[c]));
+    },
+
+    /** Build headers for an API call with the X-User-Id injected. Exposed
+     *  so direct fetch() callers (streaming endpoints, file uploads —
+     *  see backtest.js, portfolio.js) can use the same identity rule. */
+    userHeaders(extra = {}) {
+        const uid = this.getUserId();
+        const h = { ...extra };
+        if (uid) h["X-User-Id"] = uid;
+        return h;
     },
 
     /** Bind sidebar navigation clicks */
@@ -164,10 +367,16 @@ const App = {
         const timer = timeoutMs > 0 ? setTimeout(() => ac.abort(), timeoutMs) : null;
         if (!keepalive) this._pendingAborters.add(ac);
         try {
+            // Identity header is injected on every API call. Callers that
+            // pass a `headers` option in `rest` can override it (rare —
+            // mostly for tests).
+            const baseHeaders = { "Content-Type": "application/json", ...this.userHeaders() };
+            const mergedHeaders = rest.headers ? { ...baseHeaders, ...rest.headers } : baseHeaders;
+            const { headers: _hdr, ...restNoHeaders } = rest;
             const response = await fetch(endpoint, {
-                headers: { "Content-Type": "application/json" },
+                headers: mergedHeaders,
                 signal: ac.signal,
-                ...rest,
+                ...restNoHeaders,
             });
             if (!response.ok) {
                 const error = await response.json().catch(() => ({ error: response.statusText }));

@@ -82,6 +82,32 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     rbo_entry_at: str = "Any"  # "Any" / "RangeHigh" / "RangeLow"
     rbo_cancel_other_side: bool = False
 
+    # Other Settings (slot-level adaptation of portfolio-level spec).
+    # Spec: 5. Logics/Other_Settings_Logic.html.
+    delay_between_legs_sec: int = 0
+    on_sl_action_on: str = "OnSL_N_Trailing_Both"
+    on_target_action_on: str = "OnTarget_N_Trailing_Both"
+
+    # Move SL to Cost (per-slot adaptation of spec §3).
+    # Spec: 5. Logics/portfolio_sl_tgt.html.
+    # When move_sl_enabled, after move_sl_safety_sec seconds in-position and
+    # the position is in profit, raise current_sl to entry_price. Optionally
+    # skip on long positions (no_buy_legs adaptation). When move_sl_trail_after
+    # is set, the existing trailing-SL ratchet is suppressed until move-to-cost
+    # has fired at least once for the current position.
+    move_sl_enabled: bool = False
+    move_sl_safety_sec: int = 0
+    move_sl_action: str = "Move Only for Profitable Legs"
+    move_sl_trail_after: bool = False
+    move_sl_no_buy_legs: bool = False
+
+    # ReExecute Tab P1 (spec: 5. Logics/ReExecute_Logics.html).
+    # When True, suppresses the configured re_execute action when the SL
+    # that just fired was previously raised to entry_price by Move SL to
+    # Cost (i.e. _move_sl_fired_this_position is True at exit time). The
+    # action downgrades to plain "close" — position stays flat; no re-entry.
+    no_reexec_sl_cost: bool = False
+
 
 class ManagedExitStrategy(Strategy):
     """On each bar: check exits first (SL, TP, trailing, target lock, SL wait), then entries."""
@@ -130,6 +156,27 @@ class ManagedExitStrategy(Strategy):
         # bar) still sees phase==ENTRY and allows the entry through.
         self._rbo_pending_done: bool = False
 
+        # Other Settings state.
+        # _was_trailed: True once current_sl has been moved by trailing or
+        # target-lock logic. Drives on_sl_action_on filter classification.
+        # Resets when a new entry fills (so each trade's was_trailed is fresh).
+        self._was_trailed: bool = False
+        # _reentry_blocked_until_ns: re-execution delay timestamp (UTC ns).
+        # When set, _check_entries skips fresh entries until bar.ts_event > this.
+        # Cleared after the next entry actually fires.
+        self._reentry_blocked_until_ns: int = 0
+        # Updated at the top of on_bar so _handle_exit can stamp delay timers
+        # without threading bar through every call.
+        self._current_bar_ts_ns: int = 0
+
+        # Move SL to Cost state (spec §3, per-slot adaptation).
+        # _entry_filled_at_ns: bar.ts_event of the bar when the entry filled.
+        # safety_sec is measured against this. Reset on each new entry.
+        # _move_sl_fired_this_position: tracks whether move-to-cost has fired
+        # for the current position; gates the trail_after suppression.
+        self._entry_filled_at_ns: int = 0
+        self._move_sl_fired_this_position: bool = False
+
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
         if self.instrument is None:
@@ -167,6 +214,12 @@ class ManagedExitStrategy(Strategy):
         self.subscribe_bars(self.config.bar_type)
 
     def on_bar(self, bar: Bar) -> None:
+        # Cache the current bar's timestamp so _handle_exit can stamp
+        # _reentry_blocked_until_ns without us having to thread `bar` through
+        # every call site. on_order_filled also reads it for the re-entry
+        # delay starting point.
+        self._current_bar_ts_ns = bar.ts_event
+
         # RBO state runs every bar, even before indicators warm up — the
         # range-monitoring window can start before the indicator gets enough
         # bars, and we still need to track high/low through that period.
@@ -349,25 +402,67 @@ class ManagedExitStrategy(Strategy):
         if profit_pct > self.highest_profit:
             self.highest_profit = profit_pct
 
-        # Target locking
+        # Move SL to Cost (spec §3, per-slot adaptation). When enabled and
+        # the position has been open for at least safety_sec AND is currently
+        # in profit, raise current_sl to entry_price (locking in breakeven).
+        # Skipped on long positions when no_buy_legs is set. Action variant
+        # "Move SL for All Legs Despite Loss/Profit" raises SL even when not
+        # in profit (which immediately closes the trade — same as spec).
+        if self.config.move_sl_enabled and not self._move_sl_fired_this_position:
+            elapsed_ns = self._current_bar_ts_ns - self._entry_filled_at_ns
+            safety_ns = int(self.config.move_sl_safety_sec) * 1_000_000_000
+            if elapsed_ns >= safety_ns:
+                # no_buy_legs adapted: skip move-to-cost on LONG positions.
+                skip = self.config.move_sl_no_buy_legs and is_long
+                if not skip:
+                    in_profit = profit_pct > 0
+                    move_all = self.config.move_sl_action == "Move SL for All Legs Despite Loss/Profit"
+                    if in_profit or move_all:
+                        new_sl = self.entry_price
+                        # Only raise (long) / lower (short) — never relax.
+                        if is_long and new_sl > self.current_sl:
+                            self.current_sl = new_sl
+                            self._was_trailed = True
+                            self._move_sl_fired_this_position = True
+                        elif is_short and (self.current_sl == 0 or new_sl < self.current_sl):
+                            self.current_sl = new_sl
+                            self._was_trailed = True
+                            self._move_sl_fired_this_position = True
+
+        # Target locking. When triggered, raises (long) or lowers (short)
+        # current_sl to the target_lock_minimum. Sets _was_trailed for the
+        # on_sl_action_on filter — a hit on the locked level is classified as
+        # trailing SL per Other_Settings_Logic.html spec.
         if self.config.target_lock_trigger > 0 and self.config.target_lock_minimum > 0:
             if self.highest_profit >= self.config.target_lock_trigger:
                 lock_sl = self._compute_sl_price(is_long, self.config.target_lock_minimum)
                 if is_long and lock_sl > self.current_sl:
                     self.current_sl = lock_sl
+                    self._was_trailed = True
                 elif is_short and (self.current_sl == 0 or lock_sl < self.current_sl):
                     self.current_sl = lock_sl
+                    self._was_trailed = True
 
-        # Trailing SL
-        if self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
+        # Trailing SL — same was_trailed semantics as target lock. Per spec
+        # §3.4 (move_sl_trail_after), trailing is gated until move-to-cost
+        # has fired at least once for the current position.
+        if (
+            self.config.move_sl_trail_after
+            and self.config.move_sl_enabled
+            and not self._move_sl_fired_this_position
+        ):
+            pass  # trailing suppressed
+        elif self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
             steps = int(self.highest_profit / self.config.trailing_sl_step)
             if steps > 0:
                 trail_offset = steps * self.config.trailing_sl_offset
                 trail_sl = self._compute_sl_price(is_long, trail_offset)
                 if is_long and trail_sl > self.current_sl:
                     self.current_sl = trail_sl
+                    self._was_trailed = True
                 elif is_short and (self.current_sl == 0 or trail_sl < self.current_sl):
                     self.current_sl = trail_sl
+                    self._was_trailed = True
 
         # Check SL hit
         sl_hit = False
@@ -402,6 +497,38 @@ class ManagedExitStrategy(Strategy):
     def _handle_exit(self, exit_type: str, was_long: bool) -> None:
         action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
 
+        # Apply on_sl_action_on / on_target_action_on filter per
+        # Other_Settings_Logic.html. "Suppression" downgrades the configured
+        # action to plain "close" — position is already squared off, just
+        # don't fire re_execute or reverse follow-up.
+        if exit_type == "sl":
+            filter_cfg = self.config.on_sl_action_on
+            if filter_cfg == "OnSL_Only" and self._was_trailed:
+                # SL was trailed; OnSL_Only suppresses the action.
+                action = "close"
+            elif filter_cfg == "OnSL_Trailing_Only" and not self._was_trailed:
+                # SL was the fixed initial value; OnSL_Trailing_Only suppresses.
+                action = "close"
+
+            # ReExecute_Logics.html P1: suppress re_execute when SL was
+            # previously raised to entry by Move SL to Cost. Position is
+            # already breakeven; allowing re-execute would re-open exposure.
+            if (
+                self.config.no_reexec_sl_cost
+                and self._move_sl_fired_this_position
+                and action == "re_execute"
+            ):
+                action = "close"
+        else:  # exit_type == "tp"
+            filter_cfg = self.config.on_target_action_on
+            # Note for FX/crypto: we have no "trailing target" exit path
+            # distinct from fixed TP (target_lock raises SL → routes through
+            # the SL exit path). So OnTarget_Only behaves identically to
+            # OnTarget_N_Trailing_Both, and OnTarget_Trailing_Only ALWAYS
+            # suppresses (every TP exit is fixed). Documented in spec adapter.
+            if filter_cfg == "OnTarget_Trailing_Only":
+                action = "close"
+
         # Flag the upcoming fill as a close — otherwise on_order_filled would
         # set position_side to the opposite side (SELL closing a LONG would
         # incorrectly mark us as SHORT) and get us stuck in an impossible state.
@@ -412,6 +539,15 @@ class ManagedExitStrategy(Strategy):
         if action == "re_execute":
             if self.re_execution_count < self.config.max_re_executions:
                 self.re_execution_count += 1
+                # Arm the slot-level re-execution delay (Other Settings spec
+                # §2). Counts from the current bar's timestamp; _check_entries
+                # checks this before allowing the fresh entry on subsequent
+                # bars. delay_between_legs_sec=0 (default) → no block.
+                if self.config.delay_between_legs_sec > 0:
+                    self._reentry_blocked_until_ns = (
+                        self._current_bar_ts_ns
+                        + int(self.config.delay_between_legs_sec) * 1_000_000_000
+                    )
                 # Allow re-entry on next signal
         elif action == "reverse":
             side = OrderSide.SELL if was_long else OrderSide.BUY
@@ -419,6 +555,16 @@ class ManagedExitStrategy(Strategy):
             self._set_exit_levels(side)
 
     def _check_entries(self, close: float, is_flat: bool, is_long: bool, is_short: bool) -> None:
+        # Other Settings — re-execution delay. Per spec §2: after a re_execute
+        # action fires, block subsequent entries until the configured delay
+        # has elapsed. Re-execution sets _reentry_blocked_until_ns to the
+        # bar's ts_event + delay; we skip until the current bar passes that.
+        if (
+            self._reentry_blocked_until_ns > 0
+            and self._current_bar_ts_ns < self._reentry_blocked_until_ns
+        ):
+            return
+
         # RBO entry gate. Spec rbo_logics.html: re-entries (execute_trigger,
         # i.e. our re_execution_count > 0) bypass the gate so they can fire
         # past entry_end up to portfolio squareoff_time. Fresh entries
@@ -464,6 +610,16 @@ class ManagedExitStrategy(Strategy):
         self.entry_price = float(event.last_px)
         self.highest_profit = 0.0
         self.sl_wait_count = 0
+        # Fresh trade — reset the trailed flag so on_sl_action_on classifies
+        # this trade's eventual SL hit independently of the prior trade.
+        self._was_trailed = False
+        # Clear the re-entry delay block — once a re-entry actually fires,
+        # the timer's job is done.
+        self._reentry_blocked_until_ns = 0
+        # Move SL to Cost: stamp the entry timestamp for safety_sec timing,
+        # and reset the per-position fire flag.
+        self._entry_filled_at_ns = self._current_bar_ts_ns
+        self._move_sl_fired_this_position = False
 
         is_buy = event.order_side == OrderSide.BUY
         self.position_side = "LONG" if is_buy else "SHORT"
@@ -526,7 +682,9 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      order_id_tag: str | None = None,
                      squareoff_time: str | None = None,
                      squareoff_tz: str | None = None,
-                     rbo_settings=None) -> ManagedExitConfig:
+                     rbo_settings=None,
+                     other_settings=None,
+                     move_sl_settings=None) -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
 
     ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
@@ -577,4 +735,22 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
             rbo_entry_at=rbo_settings.entry_at,
             rbo_cancel_other_side=rbo_settings.cancel_other_side,
         )
+    if other_settings is not None:
+        kwargs.update(
+            delay_between_legs_sec=other_settings.delay_between_legs_sec,
+            on_sl_action_on=other_settings.on_sl_action_on,
+            on_target_action_on=other_settings.on_target_action_on,
+        )
+    if move_sl_settings is not None:
+        # no_reexec_sl_cost (ReExecute_Logics.html P1) is wired regardless of
+        # move_sl_enabled — it's a no-op until Move SL fires anyway.
+        kwargs["no_reexec_sl_cost"] = bool(move_sl_settings.no_reexec_sl_cost)
+        if move_sl_settings.enabled:
+            kwargs.update(
+                move_sl_enabled=True,
+                move_sl_safety_sec=move_sl_settings.safety_sec,
+                move_sl_action=move_sl_settings.action,
+                move_sl_trail_after=move_sl_settings.trail_after,
+                move_sl_no_buy_legs=move_sl_settings.no_buy_legs,
+            )
     return ManagedExitConfig(**kwargs)

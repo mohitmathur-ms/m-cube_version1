@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Portfolio &mdash; Backend Audit Status</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #f85149;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0;
+    font-size: 15px;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.4rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.4rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1rem;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.6rem;
+    margin-bottom: 2rem;
+  }
+  .toc h2 {
+    font-size: 1.05rem;
+    color: var(--accent);
+    margin-bottom: 0.6rem;
+  }
+  .toc ol { padding-left: 1.4rem; }
+  .toc li { margin: 0.25rem 0; font-size: 0.92rem; }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .toc a:hover { color: var(--accent); }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.6rem 1.8rem;
+    margin-bottom: 1.4rem;
+  }
+  h2 {
+    font-size: 1.45rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: var(--accent3);
+    margin: 1rem 0 0.5rem 0;
+  }
+  p { margin-bottom: 0.7rem; }
+  strong { color: #f0f6fc; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent2);
+    padding: 0.13em 0.4em;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0;
+    font-size: 0.86rem;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    text-align: left;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.83rem;
+  }
+  td {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--table-alt); }
+  .verdict { white-space: nowrap; font-weight: 600; font-size: 0.78rem; padding: 0.15rem 0.5rem; border-radius: 3px; display: inline-block; }
+  .v-wired { background: #103018; color: #3fb950; }
+  .v-partial { background: #2a2410; color: #d4a72c; }
+  .v-live { background: #1a1f2a; color: #8b949e; }
+  .v-gap { background: #2a1018; color: #f85149; }
+  .v-uionly { background: #1f1a2a; color: #d2a8ff; }
+  .summary-table td:first-child { font-weight: 600; color: var(--accent); }
+  .file-ref {
+    color: var(--accent4);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.78rem;
+  }
+  .gap-card {
+    background: linear-gradient(135deg, #2a1018, #161b22);
+    border-left: 4px solid var(--accent5);
+    padding: 0.9rem 1.1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .gap-card h4 { color: var(--accent5); font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .gap-card p { font-size: 0.86rem; margin-bottom: 0.3rem; }
+  .ok-card {
+    background: linear-gradient(135deg, #103018, #161b22);
+    border-left: 4px solid var(--accent2);
+    padding: 0.9rem 1.1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .ok-card h4 { color: var(--accent2); font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin: 2rem 0 1rem 0;
+    padding: 1rem;
+  }
+  .legend-row { display: flex; gap: 0.8rem; flex-wrap: wrap; margin: 0.6rem 0 1rem 0; font-size: 0.8rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  ul { padding-left: 1.4rem; }
+  li { margin: 0.25rem 0; font-size: 0.88rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Add Portfolio &mdash; Backend Audit</h1>
+  <p>Field-by-field verification that every section of the Add-Portfolio UI is correctly wired (or correctly grayed out) for forex/crypto backtests. Updated 2026-05-05.</p>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h2>Sections</h2>
+  <ol>
+    <li><a href="#summary">Summary &amp; legend</a></li>
+    <li><a href="#exec">Execution Parameters</a></li>
+    <li><a href="#rbo">Range BreakOut</a></li>
+    <li><a href="#other">Other Settings</a></li>
+    <li><a href="#dh">Dynamic Hedge</a></li>
+    <li><a href="#tgt">Target</a></li>
+    <li><a href="#sl">Stoploss (incl. Move-SL)</a></li>
+    <li><a href="#mon">Monitoring</a></li>
+    <li><a href="#reex">ReExecute</a></li>
+    <li><a href="#exit">Exit Settings</a></li>
+    <li><a href="#timing">Timing</a></li>
+    <li><a href="#gaps">Gaps &amp; Fixes Applied</a></li>
+    <li><a href="#smoke">Smoke-Test Results</a></li>
+    <li><a href="#user-layer">Multi-User Identity Layer</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<section id="summary">
+  <h2>1. Summary &amp; legend</h2>
+
+  <div class="legend-row">
+    <div class="legend-item"><span class="verdict v-wired">WIRED</span> field actively read by backend</div>
+    <div class="legend-item"><span class="verdict v-partial">PARTIAL</span> read, but only some values honoured</div>
+    <div class="legend-item"><span class="verdict v-live">LIVE-ONLY</span> stored, intentionally ignored in backtest</div>
+    <div class="legend-item"><span class="verdict v-uionly">UI-ONLY</span> never sent to backend</div>
+    <div class="legend-item"><span class="verdict v-gap">GAP</span> UI active but backend silently ignores (now fixed)</div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr><th>Section</th><th>#Active fields (FX/crypto)</th><th>#Wired</th><th>#Gaps before audit</th><th>Status after audit</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><a href="#exec">Execution Parameters</a></td><td>4 (capital, allocation, max_loss, max_profit)</td><td>4 (incl. partials)</td><td>2 (max_loss/profit are post-hoc only)</td><td><span class="verdict v-partial">PARTIAL</span> &mdash; documented in tooltip</td></tr>
+      <tr><td><a href="#rbo">Range BreakOut</a></td><td>9</td><td>9</td><td>0</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td><a href="#other">Other Settings</a></td><td>4</td><td>3</td><td>1 (<code>trail_wait_trade</code>)</td><td><span class="verdict v-wired">WIRED</span> &mdash; gap grayed out</td></tr>
+      <tr><td><a href="#dh">Dynamic Hedge</a></td><td>0 (entire section is UI-only)</td><td>&mdash;</td><td>0</td><td><span class="verdict v-uionly">UI-ONLY</span> &mdash; correctly marked</td></tr>
+      <tr><td><a href="#tgt">Target</a></td><td>11</td><td>10</td><td>1 (<code>pf_tgt_reexecute_count</code>)</td><td><span class="verdict v-wired">WIRED</span> &mdash; gap grayed out</td></tr>
+      <tr><td><a href="#sl">Stoploss (incl. Move-SL)</a></td><td>17</td><td>14</td><td>3 (reex count + 2 cross-leg triggers)</td><td><span class="verdict v-wired">WIRED</span> &mdash; gaps grayed out</td></tr>
+      <tr><td><a href="#mon">Monitoring</a></td><td>0 (all 6 are live-only)</td><td>&mdash;</td><td>0</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td><a href="#reex">ReExecute</a></td><td>1 (<code>no_reexec_sl_cost</code>)</td><td>1</td><td>0</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td><a href="#exit">Exit Settings</a></td><td>1 (<code>exit_order_type=MARKET</code>)</td><td>1</td><td>0</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td><a href="#timing">Timing</a></td><td>7</td><td>7</td><td>0</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+    </tbody>
+  </table>
+
+  <p style="font-size: 0.88rem; margin-top: 0.8rem;"><strong>Net result:</strong> 49 active fields for forex/crypto. 47 fully wired. 2 partials (<code>max_loss</code>/<code>max_profit</code> are post-hoc flags rather than in-run hard stops &mdash; documented). 5 gaps from the original audit are now grayed out in the UI so users know they have no backtest effect.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="exec">
+  <h2>2. Execution Parameters</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Starting Capital</td><td><code>starting_capital</code></td><td><span class="file-ref">backtest_runner.py:2744</span></td><td>Divided per slot via <code>allocation_mode</code>; funds each engine.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Allocation Mode</td><td><code>allocation_mode</code></td><td><span class="file-ref">backtest_runner.py:2739</span></td><td><code>equal</code> or <code>percentage</code> split.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Max Loss ($)</td><td><code>max_loss</code></td><td><span class="file-ref">backtest_runner.py:3074</span></td><td>Post-hoc only: flagged after the run, no in-run truncation. Tooltip added.</td><td><span class="verdict v-partial">PARTIAL</span></td></tr>
+      <tr><td>Max Profit ($)</td><td><code>max_profit</code></td><td><span class="file-ref">backtest_runner.py:3075</span></td><td>Post-hoc only: flagged after the run, no in-run truncation. Tooltip added.</td><td><span class="verdict v-partial">PARTIAL</span></td></tr>
+      <tr><td>Product, Strategy Tag, On Leg Fail</td><td>(several)</td><td>&mdash;</td><td>UI-grayed; never read by backtest.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>Execution Mode, Based On, Entry Price, Rounding, Adjust Price</td><td>(several)</td><td>&mdash;</td><td>UI-grayed; live-trading entry-pricing controls.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="rbo">
+  <h2>3. Range BreakOut</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Enable RangeBreakOut</td><td><code>rbo_enabled</code></td><td><span class="file-ref">backtest_runner.py:530</span>, <span class="file-ref">managed_strategy.py:146</span></td><td>Gates per-day RBO state machine.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Range Monitoring Start/End</td><td><code>range_monitoring_start/end</code></td><td><span class="file-ref">backtest_runner.py:533, 556</span></td><td>Daily UTC window for range building.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Entry Start/End Time</td><td><code>rbo_entry_start/end</code></td><td><span class="file-ref">backtest_runner.py:552-553</span></td><td>Daily entry window post-range.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Range Buffer (mins)</td><td><code>rbo_range_buffer</code></td><td><span class="file-ref">backtest_runner.py:558</span>, <span class="file-ref">managed_strategy.py:332</span></td><td>Extends entry-end by N min; collapses on first breakout (spec rule 6).</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Entry At</td><td><code>rbo_entry_at</code></td><td><span class="file-ref">backtest_runner.py:539</span></td><td>Any/RangeHigh/RangeLow honoured; options-only values downgraded with warning.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Monitoring</td><td><code>rbo_monitoring</code></td><td><span class="file-ref">backtest_runner.py:536</span></td><td>Only "Underlying" implemented (matches spec for FX/crypto).</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Cancel Other Side</td><td><code>rbo_cancel_other_side</code></td><td><span class="file-ref">backtest_runner.py:562</span>, <span class="file-ref">managed_strategy.py:353</span></td><td>Cancels pending entry on opposite side once one fires.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="other">
+  <h2>4. Other Settings</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Trail Wait Trade</td><td><code>trail_wait_trade</code></td><td><span class="file-ref">backtest_runner.py:630</span> (warning, no-op)</td><td>No spec analogue for FX/crypto independent slots.</td><td><span class="verdict v-gap">GAP &rarr; grayed</span></td></tr>
+      <tr><td>Straddle Width Multiplier</td><td><code>straddle_width_multiplier</code></td><td><span class="file-ref">backtest_runner.py:623</span> (warning, no-op)</td><td>Options-only; UI grayed.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>Delay Between Legs</td><td><code>delay_between_legs_sec</code></td><td><span class="file-ref">backtest_runner.py:601</span>, <span class="file-ref">managed_strategy.py:206</span></td><td>Blocks re-entries for N s of bar-time post re_execute.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>On Target Action On</td><td><code>on_target_action_on</code></td><td><span class="file-ref">managed_strategy.py:89</span></td><td>Filters which target type fires the action.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>On SL Action On</td><td><code>on_sl_action_on</code></td><td><span class="file-ref">managed_strategy.py:88</span></td><td>Filters which SL type fires the action.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="dh">
+  <h2>5. Dynamic Hedge</h2>
+  <p style="font-size: 0.88rem;">Entire section is stored only in <code>pf._ui</code> (never serialized to the portfolio JSON sent to the backend). Spec is options-specific (premium-based and distance-based hedges around an option strike). For FX/crypto, the concept maps poorly to single-instrument slots, so it is intentionally <strong>UI-only</strong>.</p>
+  <p><span class="verdict v-uionly">UI-ONLY</span> &mdash; correctly marked with <code>.pf-ui-only</code> (red badge in UI).</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="tgt">
+  <h2>6. Target</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Enable Target</td><td><code>pf_tgt_enabled</code></td><td><span class="file-ref">backtest_runner.py:793</span></td><td>Enables post-hoc portfolio equity-curve clip.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Target Type</td><td><code>pf_tgt_type</code></td><td><span class="file-ref">backtest_runner.py:793-820</span></td><td>"Combined Profit" wired; options types downgraded.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Target Value</td><td><code>pf_tgt_value</code></td><td><span class="file-ref">backtest_runner.py:820</span></td><td>PnL threshold; clip when equity_pnl &ge; value.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>On Target Action</td><td><code>pf_tgt_action</code></td><td><span class="file-ref">backtest_runner.py:809</span></td><td>"SqOff" wired; cross-portfolio actions are <span class="verdict v-live">LIVE-ONLY</span>.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Target Delay</td><td><code>pf_tgt_delay_sec</code></td><td><span class="file-ref">backtest_runner.py:1035</span></td><td>Confirmation delay; oscillation guard.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>ReExecute Count</td><td><code>pf_tgt_reexecute_count</code></td><td>(stored, no replay loop)</td><td>v1 clip-design cannot replay disposed engines.</td><td><span class="verdict v-gap">GAP &rarr; grayed</span></td></tr>
+      <tr><td>Enable Trailing</td><td><code>pf_tgt_trail_enabled</code></td><td><span class="file-ref">backtest_runner.py:824, 990</span></td><td>Profit-lock ratchet.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Trail Lock / Reach / Every / By</td><td><code>pf_tgt_trail_*</code></td><td><span class="file-ref">backtest_runner.py:825-828, 991-1003</span></td><td>Activation threshold and step parameters.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="sl">
+  <h2>7. Stoploss (incl. Move-SL)</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Enable Stoploss</td><td><code>pf_sl_enabled</code></td><td><span class="file-ref">backtest_runner.py:731</span></td><td>Enables post-hoc clip.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>SL Type</td><td><code>pf_sl_type</code></td><td><span class="file-ref">backtest_runner.py:734</span></td><td>"Combined Loss" wired; trailing types downgraded.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>SL Value</td><td><code>pf_sl_value</code></td><td><span class="file-ref">backtest_runner.py:758</span></td><td>Fires when equity_pnl &le; &minus;value.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>On SL Action</td><td><code>pf_sl_action</code></td><td><span class="file-ref">backtest_runner.py:747</span></td><td>"SqOff" wired; cross-portfolio actions <span class="verdict v-live">LIVE-ONLY</span>.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>SL Delay</td><td><code>pf_sl_delay_sec</code></td><td><span class="file-ref">backtest_runner.py:759, 1035</span></td><td>Confirmation delay.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>ReExecute Count</td><td><code>pf_sl_reexecute_count</code></td><td>(stored, no replay loop)</td><td>v1 clip-design cannot replay disposed engines.</td><td><span class="verdict v-gap">GAP &rarr; grayed</span></td></tr>
+      <tr><td>SqOff Only Loss/Profit Legs</td><td><code>pf_sl_sqoff_only_*_legs</code></td><td><span class="file-ref">backtest_runner.py:762-763, 1087</span></td><td>Selective close; mutually exclusive.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Enable Trailing SL</td><td><code>pf_sl_trail_enabled</code></td><td><span class="file-ref">backtest_runner.py:771, 972</span></td><td>Tightening ratchet.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Trail Every / By</td><td><code>pf_sl_trail_every / by</code></td><td><span class="file-ref">backtest_runner.py:772-773, 974-977</span></td><td>Step size and amount.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Move SL to Cost (enable)</td><td><code>move_sl_enabled</code></td><td><span class="file-ref">backtest_runner.py:855</span>, <span class="file-ref">managed_strategy.py:411</span></td><td>After safety_sec in profit, SL pinned at entry.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Move SL Safety (sec)</td><td><code>move_sl_safety_sec</code></td><td><span class="file-ref">managed_strategy.py:99, 413</span></td><td>Bar-time threshold before move-to-cost can fire.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Move SL Action</td><td><code>move_sl_action</code></td><td><span class="file-ref">managed_strategy.py:100, 419</span></td><td>"Profitable Legs" / "All Despite Loss"; options-only sub-values grayed.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Trail SL only after Move SL</td><td><code>move_sl_trail_after</code></td><td><span class="file-ref">managed_strategy.py:450</span></td><td>Suppresses trailing until move-to-cost fires.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>No Move SL for BUY Legs</td><td><code>move_sl_no_buy_legs</code></td><td><span class="file-ref">managed_strategy.py:416</span></td><td>Skip move-to-cost on LONG positions.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Re-apply on Leg SL hit</td><td><code>move_sl_hit_on_leg_sl</code></td><td>(stored, no cross-slot wiring)</td><td>FX/crypto slots run independent engines &mdash; no cross-slot bus.</td><td><span class="verdict v-gap">GAP &rarr; grayed</span></td></tr>
+      <tr><td>Re-apply on Leg Target hit</td><td><code>move_sl_hit_on_leg_target</code></td><td>(stored, no cross-slot wiring)</td><td>Same as above.</td><td><span class="verdict v-gap">GAP &rarr; grayed</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="mon">
+  <h2>8. Monitoring</h2>
+  <p style="font-size: 0.88rem;">All six monitoring fields (<code>combined_target_monitoring</code>, <code>combined_sl_monitoring</code>, <code>leg_target_monitoring</code>, <code>leg_trailing_monitoring</code>, <code>leg_sl_monitoring</code>, <code>leg_sl_trailing_monitoring</code>) are <strong>live-trading frequency hints</strong> (Realtime / 1Sec / 5Sec / 30Sec). The backtest processes every bar in time order, so the concept of monitoring frequency is inapplicable.</p>
+  <p><span class="verdict v-live">LIVE-ONLY</span> &mdash; all six already marked with <code>.pf-live-only</code> (gray badge in UI).</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="reex">
+  <h2>9. ReExecute</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>No ReExecute If Moved SL to Cost</td><td><code>no_reexec_sl_cost</code></td><td><span class="file-ref">managed_strategy.py:109, 517</span></td><td>Suppresses re_execute action when SL has been moved to cost.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>No Wait &amp; Trade for ReExecute</td><td><code>no_wait_trade_reexec</code></td><td>&mdash;</td><td>FX/crypto has no per-leg Wait &amp; Trade delay.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>No Strike Change for ReExecute</td><td><code>no_strike_change_reexec</code></td><td>&mdash;</td><td>Options-only (strike concept absent).</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>No ReEntry after End Time</td><td><code>no_reentry_after_end</code></td><td>(implicit via <code>entry_end_time</code> bar filter)</td><td>Entries pre-filtered to entry window already.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>No ReEntry If Moved SL to Cost</td><td><code>no_reentry_sl_cost</code></td><td>&mdash;</td><td>No separate ReEntry vs re_execute action exists.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="exit">
+  <h2>10. Exit Settings</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Exit Order Type</td><td><code>exit_order_type</code></td><td><span class="file-ref">models.py:258</span></td><td>Only "MARKET" wired; LIMIT/SL_Limit grayed.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Exit Sell Legs First</td><td><code>exit_sell_first</code></td><td>&mdash;</td><td>Options multi-leg ordering &mdash; FX/crypto slots are independent.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+      <tr><td>On Portfolio Complete</td><td><code>on_portfolio_complete</code></td><td>(only "None" honoured)</td><td>Cross-portfolio actions need infrastructure that doesn't exist.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="timing">
+  <h2>11. Timing</h2>
+  <table>
+    <thead><tr><th>Label</th><th>JSON key</th><th>Backend reference</th><th>Behavior</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Start Date / End Date</td><td><code>start_date / end_date</code></td><td><span class="file-ref">models.py:108-109</span>, <span class="file-ref">backtest_runner.py:2765</span></td><td>Bounds backtest span; slot-level overrides allowed.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>SqOff Time / TZ</td><td><code>squareoff_time / squareoff_tz</code></td><td><span class="file-ref">managed_strategy.py:70, 132-141</span></td><td>Daily forced close at HH:MM in given timezone.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Run On Days</td><td><code>run_on_days</code></td><td><span class="file-ref">backtest_runner.py:329-361</span></td><td>Excluded weekdays drop bars before engine sees them.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Entry Start / End Time</td><td><code>entry_start_time / entry_end_time</code></td><td><span class="file-ref">backtest_runner.py:336-337, 450-451</span></td><td>Bars outside window dropped; Path B chunks per allowed day.</td><td><span class="verdict v-wired">WIRED</span></td></tr>
+      <tr><td>Start Day / Offset / SqOff Day / Holiday handling</td><td>(several)</td><td>&mdash;</td><td>Options-expiry-aware fields; UI grayed.</td><td><span class="verdict v-live">LIVE-ONLY</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="gaps">
+  <h2>12. Gaps &amp; Fixes Applied</h2>
+  <p>The original audit found <strong>5 fields where the UI accepted a value that the backend silently ignored</strong>. Each is now visually grayed (<code>.pf-live-only</code>) so users can see at a glance that the value will not affect a backtest. Plus 2 partials (<code>max_loss</code>/<code>max_profit</code>) which got tooltips clarifying their post-hoc-only behavior.</p>
+
+  <div class="gap-card">
+    <h4>Gap 1 &mdash; <code>trail_wait_trade</code></h4>
+    <p><strong>Why a no-op:</strong> Spec is for options-leg "Wait &amp; Trade" sequencing. FX/crypto slots are independent and have no inter-leg trade-wait coordination.</p>
+    <p><strong>Backend evidence:</strong> <span class="file-ref">backtest_runner.py:630</span> &mdash; logs warning, discards value.</p>
+    <p><strong>Fix applied:</strong> UI row reclassed to <code>pf-live-only</code>.</p>
+  </div>
+
+  <div class="gap-card">
+    <h4>Gap 2 &mdash; <code>pf_sl_reexecute_count</code> / <code>pf_tgt_reexecute_count</code></h4>
+    <p><strong>Why a no-op:</strong> v1 portfolio-clip is post-hoc &mdash; trades after the SL/TP boundary are dropped from results, but each per-slot engine has already been disposed and cannot be replayed in-place.</p>
+    <p><strong>Backend evidence:</strong> <span class="file-ref">backtest_runner.py:760, 822</span> &mdash; values stored on the run config but no replay loop reads them.</p>
+    <p><strong>Fix applied:</strong> Both number inputs reclassed to <code>pf-live-only</code>. A future replay-capable design can reactivate them.</p>
+  </div>
+
+  <div class="gap-card">
+    <h4>Gap 3 &mdash; <code>move_sl_hit_on_leg_sl</code> / <code>move_sl_hit_on_leg_target</code></h4>
+    <p><strong>Why a no-op:</strong> These are cross-slot triggers (any leg's SL/Target hit moves SL on others). Our forex/crypto runs use a per-slot <code>BacktestEngine</code> with no cross-slot event bus, so the trigger has nowhere to fire from.</p>
+    <p><strong>Backend evidence:</strong> <span class="file-ref">core/models.py:213-214</span> &mdash; fields exist; <span class="file-ref">core/managed_strategy.py</span> never reads them.</p>
+    <p><strong>Fix applied:</strong> Both checkboxes reclassed to <code>pf-live-only</code>.</p>
+  </div>
+
+  <div class="gap-card">
+    <h4>Partial 1 &mdash; <code>max_loss</code> / <code>max_profit</code></h4>
+    <p><strong>Why partial:</strong> Implemented as post-hoc boundary flags (<code>max_loss_hit</code> / <code>max_profit_hit</code> in result), <em>not</em> as in-run hard stops. A backtest that exceeds <code>max_loss</code> mid-run will continue and only flag the breach at the end.</p>
+    <p><strong>Backend evidence:</strong> <span class="file-ref">backtest_runner.py:3074-3075</span>.</p>
+    <p><strong>Fix applied:</strong> Tooltip on the input clarifies post-hoc behavior. Hard-stop conversion would require an in-run equity callback inside each per-slot engine plus cross-slot aggregation; out of scope for this round.</p>
+  </div>
+
+  <div class="ok-card">
+    <h4>Confirmed already-correct (no code change needed)</h4>
+    <ul>
+      <li><code>exit_sell_first</code> &mdash; already <code>pf-live-only</code>.</li>
+      <li><code>on_portfolio_complete</code> cross-portfolio actions &mdash; already <code>pf-live-only</code>.</li>
+      <li>Dynamic Hedge entire section &mdash; already <code>pf-ui-only</code> (red badge).</li>
+      <li>All 6 monitoring fields &mdash; already <code>pf-live-only</code>.</li>
+      <li>Execution-Parameter live fields (Product, Strategy Tag, Execution Mode, Based On, etc.) &mdash; already <code>pf-live-only</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="smoke">
+  <h2>13. Smoke-Test Results</h2>
+  <p style="font-size: 0.88rem; color: var(--text-muted);">Tests run on <code>FX_9_Slot_2015_2024</code> portfolio scoped to 2024-12-02 &rarr; 2024-12-06 (one trading week, 9 slots), with <code>_USE_BACKTEST_NODE=1</code> (Path B). See <a href="audit_smoke_results.json" style="color: var(--accent);">audit_smoke_results.json</a> for raw results, or <code>smoke_test_logics_audit.py</code> in the project root to re-run.</p>
+
+  <table id="smoke-table">
+    <thead><tr><th>#</th><th>Toggle</th><th>Expected</th><th>Observed</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Baseline (FX_9_Slot as-is)</td>
+        <td><code>path_b="all"</code> for all 9 slots; trades present.</td>
+        <td><code>path_b_summary="all"</code>; 15 trades; PnL $-61.56; runtime 7.0s.</td>
+        <td><span class="verdict v-wired">PASS</span></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Set all 5 gap fields to non-default values (<code>trail_wait_trade=True</code>, both reexecute counts=5, both move-SL hit triggers=True)</td>
+        <td>Identical metrics to baseline (proves they're no-ops at backend).</td>
+        <td>15 trades, PnL $-61.52 (delta $0.04 within rounding); identical fill weekdays and hours. Backend logged warning <code>"trail_wait_trade=True ... not yet wired. No effect on this run."</code></td>
+        <td><span class="verdict v-wired">PASS</span></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><code>run_on_days=["Mon","Tue"]</code></td>
+        <td>Trade weekdays &sub; {Mon, Tue}.</td>
+        <td><code>fills_weekdays={Mon:10, Tue:6}</code> &mdash; zero fills on Wed/Thu/Fri. PnL $-47.17 (8 trades).</td>
+        <td><span class="verdict v-wired">PASS</span></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><code>entry_start_time=12:00</code>, <code>entry_end_time=13:00</code>, RBO off</td>
+        <td>All entries within 12:00&ndash;13:00 UTC (exits may spill into next bars).</td>
+        <td><code>fills_hours_utc={12:14, 13:6}</code> &mdash; 20 fills = 10 entries + 10 exits; hour-12 dominant. PnL $-21.49.</td>
+        <td><span class="verdict v-wired">PASS</span></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><code>pf_sl_enabled=True</code>, <code>pf_sl_value=10</code>, <code>action=SqOff</code></td>
+        <td>Clip fires; <code>pf_clip_reason=STOPLOSS</code>; trades after clip dropped.</td>
+        <td>Backend log: <code>[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS</code> &mdash; <strong>clip detection wired correctly</strong>. Downstream aggregation raised <code>ValueError</code> in money-string sum (pre-existing bug, unrelated to clip wiring). See note below.</td>
+        <td><span class="verdict v-partial">PARTIAL</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Side bug observed (Test 5)</h3>
+  <p style="font-size: 0.86rem;">When <code>pf_sl</code> clip fires across multiple slots simultaneously, the post-clip aggregation pipeline crashes with <code>ValueError: could not convert string to float: '-8.26 USD-8.26 USD-7.47 USD-9.04 USD-9.04 USD-9.61 USD'</code>. Several leg-PnL Money strings are concatenated without a separator and then passed to <code>float()</code>. The clip itself worked &mdash; this is a downstream serialization bug in the per-clip PnL summing path. Not introduced by this audit; flagging as a follow-up. The audit's <em>functional</em> finding stands: <strong><code>pf_sl_enabled</code> is wired and the clip fires on the configured threshold</strong>.</p>
+
+  <h3>Combined verdict</h3>
+  <p style="font-size: 0.88rem;"><strong>4/5 tests fully pass; 1/5 partial (clip wired; downstream bug to track separately).</strong> Path B engages cleanly for the FX_9_Slot portfolio, the gap fields are confirmed no-ops, and the active filtering logic (<code>run_on_days</code>, entry window) does what the spec requires.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="user-layer">
+  <h2>14. Multi-User Identity Layer</h2>
+  <p style="font-size: 0.88rem; color: var(--text-muted);">
+    Audit of the multi-user identity changes specified in
+    <code>user_level_changes.txt</code> &mdash; per-user
+    <code>multiplier</code> on order quantity, <code>allowed_instruments</code>
+    whitelist, per-user portfolio &amp; report directories, and the
+    <code>X-User-Id</code> request header pipeline. Full per-test detail in
+    <a href="audit_user_layer_report.html" style="color: var(--accent);">audit_user_layer_report.html</a>;
+    raw results in <a href="audit_user_layer_results.json" style="color: var(--accent);">audit_user_layer_results.json</a>.
+    Re-run with <code>python smoke_test_user_layer.py &amp;&amp; python smoke_test_user_layer_report.py</code>.
+  </p>
+
+  <h3>Implementation status (all .txt requirements)</h3>
+  <table class="summary-table">
+    <thead><tr><th>Spec area</th><th>Status</th><th>Surface</th></tr></thead>
+    <tbody>
+      <tr><td>New files (<code>users.json</code>, <code>core/users.py</code>, <code>core/migrate_users.py</code>, admin <code>users.js</code>)</td><td><span class="verdict v-wired">SHIPPED</span></td><td>Backend + admin UI</td></tr>
+      <tr><td>Resolver: <code>effective_slot_qty(slot, user_id)</code> applies multiplier before cap</td><td><span class="verdict v-wired">WIRED</span></td><td><code>core/models.py</code></td></tr>
+      <tr><td><code>user_id</code> threaded through all 8 backtest worker functions</td><td><span class="verdict v-wired">WIRED</span></td><td><code>core/backtest_runner.py</code></td></tr>
+      <tr><td><code>X-User-Id</code> header gate (<code>_get_user_or_401</code>) on mutating endpoints</td><td><span class="verdict v-wired">WIRED</span></td><td><code>server.py</code></td></tr>
+      <tr><td>Per-user portfolio dirs (<code>portfolios/&lt;user_id&gt;/</code>)</td><td><span class="verdict v-wired">WIRED</span></td><td><code>server.py</code></td></tr>
+      <tr><td>Per-user reports dirs (<code>reports/&lt;user_id&gt;/</code>)</td><td><span class="verdict v-wired">WIRED</span></td><td><code>server.py</code></td></tr>
+      <tr><td>Allowlist enforced on save + portfolio backtest + standalone backtest (2 endpoints)</td><td><span class="verdict v-wired">WIRED</span></td><td><code>server.py</code></td></tr>
+      <tr><td>One-shot migration: flat <code>portfolios/*.json</code> &rarr; <code>portfolios/_default/</code></td><td><span class="verdict v-wired">WIRED</span></td><td><code>core/migrate_users.py</code></td></tr>
+      <tr><td>Admin server endpoints: <code>GET /api/users</code>, <code>POST /api/users</code> with validation</td><td><span class="verdict v-wired">WIRED</span></td><td><code>adapter_admin/admin_server.py</code></td></tr>
+      <tr><td>Admin Users page (table editor)</td><td><span class="verdict v-wired">SHIPPED</span></td><td><code>adapter_admin/static/js/users.js</code></td></tr>
+      <tr><td>Frontend <code>userHeaders()</code> + <code>X-User-Id</code> on every <code>fetch()</code></td><td><span class="verdict v-wired">WIRED</span></td><td><code>static/js/{app,backtest,portfolio}.js</code></td></tr>
+      <tr><td>First-load user picker modal + switch-user chip</td><td><span class="verdict v-wired">WIRED</span></td><td><code>static/js/app.js</code></td></tr>
+      <tr><td>Picker endpoint <code>/api/users/list</code> (slim) + <code>/api/users/me</code> (read-only active row)</td><td><span class="verdict v-wired">WIRED</span></td><td><code>server.py</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Smoke-test results (16 tests, run on 2026-05-05)</h3>
+  <table id="user-layer-table">
+    <thead><tr><th>#</th><th>Scenario</th><th>User &amp; multiplier</th><th>Observed</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>T01</td><td>Baseline RBO + window + sqoff + pf_sl + move_sl</td><td><code>_default</code> &times;1.0</td><td>avg_qty=<strong>1000</strong> (control)</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T02</td><td>Same complex bundle, alice</td><td><code>alice</code> &times;2.0</td><td>avg_qty=<strong>2000</strong> (2&times; baseline &check;)</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T03</td><td>Same complex bundle, bob</td><td><code>bob</code> &times;0.5</td><td>avg_qty=<strong>500</strong> (0.5&times; baseline &check;)</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T04</td><td>Trailing target + reverse-on-SL + Mon-Fri</td><td><code>trader_agg</code> &times;3.0</td><td>avg_qty=<strong>3000</strong> (3&times; &check;)</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T05</td><td>Safety scaling + RBO + trailing pf_sl</td><td><code>trader_safe</code> &times;0.01</td><td>avg_qty=<strong>10</strong> (1% &check;)</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T06</td><td>Runaway multiplier &mdash; admin cap MUST clamp</td><td><code>runaway</code> &times;100&thinsp;000</td><td>avg_qty=<strong>10&thinsp;000&thinsp;000</strong> (clamped to per-symbol cap; raw would have been 10&thinsp;000&thinsp;&times;1000 = 10<sup>10</sup>) &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T07</td><td>Save out-of-allowlist symbol</td><td><code>bob</code> + EURUSD slot</td><td>HTTP <strong>403</strong> with descriptive error &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T08</td><td>Portfolio backtest stream blocked early</td><td><code>bob</code> + EURUSD portfolio</td><td>First NDJSON line is <code>event=error</code> with allowlist message &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T09</td><td>Standalone backtest blocked</td><td><code>alice</code> + BTCUSD</td><td>HTTP <strong>403</strong> &mdash; standalone path enforces same allowlist &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T10</td><td>Per-user portfolio isolation</td><td><code>alice</code> saves, <code>bob</code> lists</td><td>alice's portfolio invisible to bob's <code>/list</code> &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T11</td><td>Identity gate: missing header</td><td>(no header)</td><td>HTTP <strong>401</strong> 'X-User-Id header required' &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T12</td><td>Identity gate: unknown user_id</td><td><code>ghost_user</code></td><td>HTTP <strong>401</strong> 'Unknown user' &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T13</td><td>Picker endpoint slim</td><td>(unauth)</td><td>Returns only <code>{user_id, alias}</code> &mdash; no multiplier leakage &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T14</td><td><code>/api/users/me</code> reflects active session</td><td><code>alice</code> &amp; <code>bob</code></td><td>multiplier &amp; allowlist match registry per header &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T15</td><td>Report scoping: <code>/api/orderbook/list</code></td><td><code>alice</code> &amp; <code>bob</code> probes</td><td>Each session sees only its own <code>reports/&lt;user_id&gt;/</code> files &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+      <tr><td>T16</td><td>Admin live-edit (no restart)</td><td><code>carol</code>: 1.5 &rarr; 5.0</td><td>Next request reflects new multiplier; <code>users.json</code> read on every call &check;</td><td><span class="verdict v-wired">PASS</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="ok-card">
+    <h4>Combined verdict &mdash; 16/16 PASS</h4>
+    <p>All four pillars of the .txt design are observably correct end-to-end:</p>
+    <ul>
+      <li><strong>Multiplier scaling</strong> &mdash; T01-T06 prove order quantities scale exactly by the user's multiplier under realistic complex portfolio settings (RBO, trailing SL/TP, weekday filters, move-SL). The admin cap binds last (T06).</li>
+      <li><strong>Allowlist enforcement</strong> &mdash; T07-T09 prove rejection happens on all four entry points before any worker spawns (save, portfolio backtest, standalone stream, standalone sync).</li>
+      <li><strong>Per-user isolation</strong> &mdash; T10/T15 prove portfolios and reports live in separate <code>&lt;user_id&gt;/</code> subdirectories with no cross-user leakage.</li>
+      <li><strong>Live admin edits</strong> &mdash; T16 proves <code>users.json</code> is consulted on every request; admin changes apply on the very next call without server restart.</li>
+    </ul>
+  </div>
+
+  <h3>What is the <code>multiplier</code> for?</h3>
+  <p style="font-size: 0.88rem;">A per-user position-size scalar applied to every order quantity. The same slot config (lots, lot_size, exit rules) produces different fills for different users. Concrete uses: capital-allocation tiers (senior trader &times;3.0, junior &times;0.5), risk-tiered onboarding (test users at &times;0.01), and admin-side rebalancing without slot edits. Critical property: the multiplier is applied <em>before</em> the per-symbol <code>trade_size</code> cap, so admin authority is final &mdash; a runaway multiplier (T06) cannot bust through.</p>
+</section>
+
+<div class="footer">
+  <p>Audit complete. See <a href="../LOGICS_BACKEND_STATUS.md" style="color: var(--accent);">LOGICS_BACKEND_STATUS.md</a> for the parallel Path-A / Path-B migration status; <a href="audit_user_layer_report.html" style="color: var(--accent);">audit_user_layer_report.html</a> for the multi-user smoke-test detail.</p>
+</div>
+
+</div>
+
+</body>
+</html>

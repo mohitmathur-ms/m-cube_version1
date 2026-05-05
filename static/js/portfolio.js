@@ -411,6 +411,57 @@ const Portfolio = {
         if (pf.rbo_entry_at) pf._ui.entry_at = pf.rbo_entry_at;
         if (pf.rbo_monitoring) pf._ui.monitoring = pf.rbo_monitoring;
         if (pf.rbo_cancel_other_side !== undefined) pf._ui.cancel_other = pf.rbo_cancel_other_side;
+        // Other Settings hydration
+        if (pf.delay_between_legs_sec !== undefined) pf._ui.delay_between_legs = pf.delay_between_legs_sec;
+        if (pf.on_sl_action_on) pf._ui.on_sl_action_on = pf.on_sl_action_on;
+        if (pf.on_target_action_on) pf._ui.on_target_action_on = pf.on_target_action_on;
+        if (pf.straddle_width_multiplier !== undefined) pf._ui.straddle_width_multiplier = pf.straddle_width_multiplier;
+        if (pf.trail_wait_trade !== undefined) pf._ui.trail_wait_trade = pf.trail_wait_trade;
+        // Portfolio-level Target & Stoploss hydration
+        if (pf.pf_tgt_enabled !== undefined) pf._ui.target_enabled = pf.pf_tgt_enabled;
+        if (pf.pf_tgt_type) pf._ui.target_type = pf.pf_tgt_type;
+        if (pf.pf_tgt_value !== undefined) pf._ui.target_value = pf.pf_tgt_value;
+        if (pf.pf_tgt_action) pf._ui.on_target = pf.pf_tgt_action;
+        if (pf.pf_tgt_delay_sec !== undefined) pf._ui.target_delay = pf.pf_tgt_delay_sec;
+        if (pf.pf_tgt_reexecute_count !== undefined) pf._ui.target_reexecute_count = pf.pf_tgt_reexecute_count;
+        if (pf.pf_tgt_trail_enabled !== undefined) pf._ui.trail_target_enabled = pf.pf_tgt_trail_enabled;
+        if (pf.pf_tgt_trail_lock_min_profit !== undefined) pf._ui.trail_lock_min_profit = pf.pf_tgt_trail_lock_min_profit;
+        if (pf.pf_tgt_trail_when_profit_reach !== undefined) pf._ui.trail_when_profit_reach = pf.pf_tgt_trail_when_profit_reach;
+        if (pf.pf_tgt_trail_every !== undefined) pf._ui.trail_every = pf.pf_tgt_trail_every;
+        if (pf.pf_tgt_trail_by !== undefined) pf._ui.trail_by = pf.pf_tgt_trail_by;
+        if (pf.pf_sl_enabled !== undefined) pf._ui.sl_enabled = pf.pf_sl_enabled;
+        if (pf.pf_sl_type) pf._ui.sl_type = pf.pf_sl_type;
+        if (pf.pf_sl_value !== undefined) pf._ui.sl_value = pf.pf_sl_value;
+        if (pf.pf_sl_action) pf._ui.on_sl_action = pf.pf_sl_action;
+        if (pf.pf_sl_delay_sec !== undefined) pf._ui.sl_delay = pf.pf_sl_delay_sec;
+        if (pf.pf_sl_reexecute_count !== undefined) pf._ui.sl_reexecute_count = pf.pf_sl_reexecute_count;
+        if (pf.pf_sl_sqoff_only_loss_legs !== undefined) pf._ui.sqoff_loss_legs = pf.pf_sl_sqoff_only_loss_legs;
+        if (pf.pf_sl_sqoff_only_profit_legs !== undefined) pf._ui.sqoff_profit_legs = pf.pf_sl_sqoff_only_profit_legs;
+        if (pf.pf_sl_trail_enabled !== undefined) pf._ui.trail_sl_enabled = pf.pf_sl_trail_enabled;
+        if (pf.pf_sl_trail_every !== undefined) pf._ui.trail_sl_every = pf.pf_sl_trail_every;
+        if (pf.pf_sl_trail_by !== undefined) pf._ui.trail_sl_by = pf.pf_sl_trail_by;
+        if (pf.move_sl_enabled !== undefined) pf._ui.move_sl_enabled = pf.move_sl_enabled;
+        if (pf.move_sl_safety_sec !== undefined) pf._ui.move_sl_safety_seconds = pf.move_sl_safety_sec;
+        if (pf.move_sl_action) pf._ui.move_sl_action = pf.move_sl_action;
+        if (pf.move_sl_trail_after !== undefined) pf._ui.trail_after_move_sl = pf.move_sl_trail_after;
+        if (pf.move_sl_no_buy_legs !== undefined) pf._ui.no_move_buy_legs = pf.move_sl_no_buy_legs;
+        if (pf.move_sl_hit_on_leg_sl !== undefined) pf._ui.hit_on_leg_sl = pf.move_sl_hit_on_leg_sl;
+        if (pf.move_sl_hit_on_leg_target !== undefined) pf._ui.hit_on_leg_target = pf.move_sl_hit_on_leg_target;
+        // Monitoring + ReExecute + Exit Settings hydration
+        if (pf.leg_target_monitoring) pf._ui.leg_target_monitoring = pf.leg_target_monitoring;
+        if (pf.leg_trailing_monitoring) pf._ui.leg_trailing_monitoring = pf.leg_trailing_monitoring;
+        if (pf.leg_sl_monitoring) pf._ui.leg_sl_monitoring = pf.leg_sl_monitoring;
+        if (pf.leg_sl_trailing_monitoring) pf._ui.leg_sl_trailing_monitoring = pf.leg_sl_trailing_monitoring;
+        if (pf.combined_target_monitoring) pf._ui.combined_target_monitoring = pf.combined_target_monitoring;
+        if (pf.combined_sl_monitoring) pf._ui.combined_sl_monitoring = pf.combined_sl_monitoring;
+        if (pf.no_reexec_sl_cost !== undefined) pf._ui.no_reexec_sl_cost = pf.no_reexec_sl_cost;
+        if (pf.no_wait_trade_reexec !== undefined) pf._ui.no_wait_trade_reexec = pf.no_wait_trade_reexec;
+        if (pf.no_strike_change_reexec !== undefined) pf._ui.no_strike_change_reexec = pf.no_strike_change_reexec;
+        if (pf.no_reentry_after_end !== undefined) pf._ui.no_reentry_after_end = pf.no_reentry_after_end;
+        if (pf.no_reentry_sl_cost !== undefined) pf._ui.no_reentry_sl_cost = pf.no_reentry_sl_cost;
+        if (pf.exit_order_type) pf._ui.exit_order_type = pf.exit_order_type;
+        if (pf.exit_sell_first !== undefined) pf._ui.exit_sell_first = pf.exit_sell_first;
+        if (pf.on_portfolio_complete) pf._ui.on_portfolio_complete = pf.on_portfolio_complete;
         const ui = pf._ui;
 
         // Strategy tags summary
@@ -440,7 +491,7 @@ const Portfolio = {
                     <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
                     <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
                     <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.trade_size || 1}" min="1"></td>
+                    <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
                     <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
                     <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
                     <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;">${tpTypeOpts}</select></td>
@@ -494,7 +545,7 @@ const Portfolio = {
                         <th style="width:36px;">Idle</th>
                         <th>Strategy</th>
                         <th>Instrument</th>
-                        <th style="width:62px;">Size</th>
+                        <th style="width:62px;">Lots</th>
                         <th>Stop Loss</th>
                         <th style="width:56px;">SL Val</th>
                         <th>Target</th>
@@ -756,48 +807,52 @@ const Portfolio = {
                 </fieldset>
             </div>
 
-            <!-- Monitoring Tab (UI-only) -->
+            <!-- Monitoring Tab. All 6 fields are evaluation-frequency
+                 settings (Realtime / MinuteClose / Interval) for live
+                 monitoring; backtest processes every bar in order so there
+                 is no analogue. Stored on the schema for round-trip; marked
+                 gray to indicate live-only. -->
             <div class="pf-tab-content" id="pf-tab-pf-monitoring" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap;">
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:180px;">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:180px;" title="Live-only: monitoring frequency settings have no analogue in backtest (every bar is processed in order).">
                         <legend>Leg Target Monitoring</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Target</span>
                             <select class="form-control" id="pf-m-mon-legtgt" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_target_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Trailing</span>
                             <select class="form-control" id="pf-m-mon-legtrail" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_trailing_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
                             </select>
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:180px;">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:180px;" title="Live-only.">
                         <legend>Leg Stoploss Monitoring</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">SL</span>
                             <select class="form-control" id="pf-m-mon-legsl" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Trailing</span>
                             <select class="form-control" id="pf-m-mon-legsltrail" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_trailing_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
                             </select>
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:200px;">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:200px;" title="Live-only.">
                         <legend>Combined Target SL Monitoring</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Target Monitoring</span>
                             <select class="form-control" id="pf-m-mon-combtgt" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.combined_target_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">SL Monitoring</span>
                             <select class="form-control" id="pf-m-mon-combsl" style="flex:1;">
                                 ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.combined_sl_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
@@ -807,35 +862,38 @@ const Portfolio = {
                 </div>
             </div>
 
-            <!-- ReExecute Tab (UI-only) -->
+            <!-- ReExecute Tab. P1 (No ReExecute If Moved SL to Cost) is
+                 wired for FX/crypto via ManagedExitStrategy._handle_exit
+                 suppression. Other 4 are stored for round-trip but no-op
+                 or options-only. Spec: 5. Logics/ReExecute_Logics.html. -->
             <div class="pf-tab-content" id="pf-tab-pf-reexecute" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap;">
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:280px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:280px;">
                         <legend>ReExecute Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="P1: when SL was previously raised to entry by Move SL to Cost, suppress re_execute action and treat as plain close.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-reex-noslcost" ${ui.no_reexec_sl_cost?'checked':''}> No ReExecute If Moved SL to Cost
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only" title="No-op for FX/crypto: we have no per-leg 'Wait & Trade' pre-entry delay concept (spec is options-leg-specific). Stored for round-trip.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-reex-nowait" ${ui.no_wait_trade_reexec?'checked':''}> No Wait &amp; Trade for ReExecute
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only" title="Options-only: strikes (ATM, ATM±N) don't exist for FX/crypto.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-reex-nostrike" ${ui.no_strike_change_reexec?'checked':''}> No Strike Change for ReExecute
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only" title="Effectively always-on for FX/crypto: entry_end_time pre-filters bars; re-executions can't fire past it. Stored for round-trip.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-reex-noend" ${ui.no_reentry_after_end?'checked':''}> No ReEntry/ReExecute after Portfolio End Time
                             </label>
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:280px;">
+                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:280px;" title="No-op for FX/crypto: we don't have a separate ReEntry concept that waits for price recovery. P1 (No ReExecute If Moved SL to Cost) covers our use case.">
                         <legend>ReEntry Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-reex-noreentry" ${(ui.no_reentry_sl_cost!==false)?'checked':''}> No ReEntry If Moved SL to Cost
                             </label>
@@ -844,32 +902,41 @@ const Portfolio = {
                 </div>
             </div>
 
-            <!-- Other Settings Tab -->
+            <!-- Other Settings Tab. Backend-wired for FX/crypto:
+                 delay_between_legs_sec, on_sl_action_on, on_target_action_on.
+                 Straddle Width Multiplier is options-only → marked gray.
+                 Trail Wait Trade has no spec → kept red with tooltip.
+                 OnTarget_Trailing_Only is effectively suppress-all on
+                 FX/crypto (no trailing-target distinct from fixed TP);
+                 marked gray as a sub-value with tooltip. -->
             <div class="pf-tab-content" id="pf-tab-pf-other" style="display:none;">
                 <fieldset class="pf-fieldset">
                     <legend>Other Settings</legend>
-                    <div class="pf-field-row pf-ui-only">
+                    <div class="pf-field-row pf-live-only" title="Live-only: options-leg Wait & Trade sequencing. FX/crypto slots are independent — backtest stores but ignores this value.">
                         <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                             <input type="checkbox" id="pf-m-other-trailwait" ${ui.trail_wait_trade?'checked':''}> Trail Wait Trade
                         </label>
                     </div>
-                    <div class="pf-field-row pf-ui-only">
+                    <div class="pf-field-row pf-live-only" title="Options-only: ATM CE+PE premium-based strike override. Not applicable for FX/crypto. Stored but ignored by the backend.">
                         <span class="pf-field-label">Straddle Width Multiplier</span>
                         <input type="number" class="form-control" id="pf-m-other-swm" value="${ui.straddle_width_multiplier||0}" step="0.01" style="flex:1;">
                     </div>
-                    <div class="pf-field-row pf-ui-only">
+                    <div class="pf-field-row" title="Slot-level adaptation of the spec's portfolio-level delay. After a slot's SL/TP triggers re_execute, blocks re-entries on that slot for N seconds of bar time. 0 = no delay.">
                         <span class="pf-field-label">Delay Between Legs in Sec.</span>
                         <input type="number" class="form-control" id="pf-m-other-legdelay" value="${ui.delay_between_legs||0}" min="0" step="1" style="flex:1;">
                     </div>
-                    <div class="pf-field-row pf-ui-only">
+                    <div class="pf-field-row" title="Filters which target type fires the configured action. Note: FX/crypto has no trailing-target distinct from fixed TP, so OnTarget_Trailing_Only suppresses every TP exit.">
                         <span class="pf-field-label">On Target Action On</span>
                         <select class="form-control" id="pf-m-other-tgtaction" style="flex:1;">
-                            ${["OnTarget_N_Trailing_Both","OnTarget_Only","OnTarget_Trailing_Only"].map(o =>
-                                `<option value="${o}" ${(ui.on_target_action_on||'OnTarget_N_Trailing_Both')===o?'selected':''}>${o}</option>`
-                            ).join("")}
+                            ${["OnTarget_N_Trailing_Both","OnTarget_Only","OnTarget_Trailing_Only"].map(o => {
+                                const isOptionsOnly = (o === "OnTarget_Trailing_Only");
+                                const cls = isOptionsOnly ? 'pf-live-only' : '';
+                                const label = isOptionsOnly ? `${o} (no effect on FX/crypto — suppresses all)` : o;
+                                return `<option value="${o}" class="${cls}" ${(ui.on_target_action_on||'OnTarget_N_Trailing_Both')===o?'selected':''}>${label}</option>`;
+                            }).join("")}
                         </select>
                     </div>
-                    <div class="pf-field-row pf-ui-only">
+                    <div class="pf-field-row" title="Filters which SL type fires the configured action. OnSL_Only fires only on the fixed initial SL; OnSL_Trailing_Only fires only after a trailing/lock movement; OnSL_N_Trailing_Both fires on either.">
                         <span class="pf-field-label">On SL Action On</span>
                         <select class="form-control" id="pf-m-other-slaction" style="flex:1;">
                             ${["OnSL_N_Trailing_Both","OnSL_Only","OnSL_Trailing_Only"].map(o =>
@@ -882,76 +949,82 @@ const Portfolio = {
                         <span class="pf-field-label">Description / Remarks</span>
                         <input type="text" class="form-control" id="pf-m-desc" value="${pf.description || ''}" placeholder="Optional remarks" style="flex:1;">
                     </div>
-                    <div class="pf-field-row">
+                    <div class="pf-field-row" title="Post-hoc only: the backtest flags max_loss_hit in the result if total P&L breaches this value, but does NOT truncate trades mid-run. A run that exceeds this limit at hour 3 still completes through hour N.">
                         <span class="pf-field-label">Max Loss ($)</span>
                         <input type="number" class="form-control" id="pf-m-maxloss" value="${pf.max_loss || ''}" min="0" style="width:140px;">
                     </div>
-                    <div class="pf-field-row">
+                    <div class="pf-field-row" title="Post-hoc only: the backtest flags max_profit_hit in the result if total P&L breaches this value, but does NOT truncate trades mid-run.">
                         <span class="pf-field-label">Max Profit ($)</span>
                         <input type="number" class="form-control" id="pf-m-maxprofit" value="${pf.max_profit || ''}" min="0" style="width:140px;">
                     </div>
                 </fieldset>
             </div>
 
-            <!-- Target Tab -->
+            <!-- Target Tab. Backend-wired for FX/crypto via post-hoc clip
+                 in core.backtest_runner._apply_portfolio_clip. Spec:
+                 5. Logics/portfolio_sl_tgt.html §4-§5. Options-only Type
+                 values and cross-portfolio Action values are marked gray
+                 (pf-live-only) inside the dropdowns. -->
             <div class="pf-tab-content" id="pf-tab-pf-target" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap;">
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:260px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
                         <legend>Target Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-tgt-enabled" ${ui.target_enabled?'checked':''}> Enable Target
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
                             <span class="pf-field-label">Target Type</span>
                             <select class="form-control" id="pf-m-tgt-type" style="flex:1;">
-                                ${["Combined Profit","Combined Premium","Absolute Combined Premium","Underlying Movement"].map(o =>
-                                    `<option value="${o}" ${(ui.target_type||'Combined Profit')===o?'selected':''}>${o}</option>`
-                                ).join("")}
+                                ${["Combined Profit","Combined Premium","Absolute Combined Premium","Underlying Movement"].map(o => {
+                                    const opt = o !== "Combined Profit";
+                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.target_type||'Combined Profit')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
+                                }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Target Value</span>
                             <input type="number" class="form-control" id="pf-m-tgt-value" value="${ui.target_value||0}" step="0.01" min="0" style="width:110px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On Target</span>
                             <select class="form-control" id="pf-m-tgt-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o =>
-                                    `<option value="${o}" ${(ui.on_target||'SqOff')===o?'selected':''}>${o}</option>`
-                                ).join("")}
+                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
+                                    const opt = (o!=="SqOff" && o!=="ReExecute");
+                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_target||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
+                                }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Confirmation delay before clip — condition must hold for N seconds. If equity recovers, the pending clip is cancelled (oscillation guard).">
                             <span class="pf-field-label">Delay (sec)</span>
                             <input type="number" class="form-control" id="pf-m-tgt-delay" value="${ui.target_delay||0}" min="0" step="1" style="width:70px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count (0 = Unlimited)</span>
                             <input type="number" class="form-control" id="pf-m-tgt-reexcount" value="${ui.target_reexecute_count||0}" min="0" step="1" style="width:70px;">
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:260px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
                         <legend>Trailing Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-tgt-trail-enabled" ${ui.trail_target_enabled?'checked':''}> Enable Trailing
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Lock Minimum Profit</span>
                             <input type="number" class="form-control" id="pf-m-tgt-trail-lock" value="${ui.trail_lock_min_profit||0}" step="0.01" min="0" style="width:90px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">When Profit reach</span>
                             <input type="number" class="form-control" id="pf-m-tgt-trail-reach" value="${ui.trail_when_profit_reach||0}" step="0.01" min="0" style="width:90px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">For Every Increase By</span>
                             <input type="number" class="form-control" id="pf-m-tgt-trail-every" value="${ui.trail_every||0}" step="0.01" min="0" style="width:90px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Trail Profit By</span>
                             <input type="number" class="form-control" id="pf-m-tgt-trail-by" value="${ui.trail_by||0}" step="0.01" min="0" style="width:90px;">
                         </div>
@@ -959,104 +1032,110 @@ const Portfolio = {
                 </div>
             </div>
 
-            <!-- Stoploss Tab -->
+            <!-- Stoploss Tab. Backend-wired for FX/crypto via post-hoc clip
+                 (Combined Loss + Trailing SL) and per-slot wiring (Move SL
+                 to Cost). Spec: 5. Logics/portfolio_sl_tgt.html §1-§3.
+                 Options-only sub-values inside dropdowns are marked gray. -->
             <div class="pf-tab-content" id="pf-tab-pf-stoploss" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap;">
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:240px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:240px;">
                         <legend>Stoploss Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-sl-enabled" ${ui.sl_enabled?'checked':''}> Enable Stoploss
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
                             <span class="pf-field-label">Type</span>
                             <select class="form-control" id="pf-m-sl-type" style="flex:1;">
-                                ${["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"].map(o =>
-                                    `<option value="${o}" ${(ui.sl_type||'Combined Loss')===o?'selected':''}>${o}</option>`
-                                ).join("")}
+                                ${["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"].map(o => {
+                                    const opt = o !== "Combined Loss";
+                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.sl_type||'Combined Loss')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
+                                }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Value</span>
                             <input type="number" class="form-control" id="pf-m-sl-value" value="${ui.sl_value||0}" step="0.01" min="0" style="width:110px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On SL Action</span>
                             <select class="form-control" id="pf-m-sl-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o =>
-                                    `<option value="${o}" ${(ui.on_sl_action||'SqOff')===o?'selected':''}>${o}</option>`
-                                ).join("")}
+                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
+                                    const opt = (o!=="SqOff" && o!=="ReExecute");
+                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_sl_action||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
+                                }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="Confirmation delay (spec §1.6) — clip only when condition holds for N seconds. Recovery cancels.">
                             <span class="pf-field-label">Delay (sec)</span>
                             <input type="number" class="form-control" id="pf-m-sl-delay" value="${ui.sl_delay||0}" min="0" step="1" style="width:70px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count</span>
                             <input type="number" class="form-control" id="pf-m-sl-reexcount" value="${ui.sl_reexecute_count||0}" min="0" step="1" style="width:70px;">
                         </div>
                         <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light);">
-                            <div style="font-size:0.78rem; font-weight:600; color:#c44; margin-bottom:6px;">On SL Hit — Selective SqOff</div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="At clip-point, only close slots matching the filter; the others continue running.">On SL Hit — Selective SqOff</div>
+                            <div class="pf-field-row">
                                 <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
                                     <input type="checkbox" id="pf-m-sl-sqoff-loss" ${ui.sqoff_loss_legs?'checked':''}> SqOff Only Loss Making Legs
                                 </label>
                             </div>
-                            <div class="pf-field-row pf-ui-only">
+                            <div class="pf-field-row">
                                 <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
                                     <input type="checkbox" id="pf-m-sl-sqoff-profit" ${ui.sqoff_profit_legs?'checked':''}> SqOff Only Profit Making Legs
                                 </label>
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:200px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:200px;">
                         <legend>Trailing SL Settings</legend>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
                                 <input type="checkbox" id="pf-m-sl-trail-enabled" ${ui.trail_sl_enabled?'checked':''}> Enable Trailing SL
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">For Every Profit of</span>
                             <input type="number" class="form-control" id="pf-m-sl-trail-every" value="${ui.trail_sl_every||0}" step="0.01" min="0" style="width:90px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Tighten SL By</span>
                             <input type="number" class="form-control" id="pf-m-sl-trail-by" value="${ui.trail_sl_by||0}" step="0.01" min="0" style="width:90px;">
                         </div>
                     </fieldset>
-                    <fieldset class="pf-fieldset pf-ui-only" style="flex:1; min-width:240px;">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:240px;">
                         <legend>Move SL to Cost</legend>
-                        <div class="pf-field-row pf-ui-only">
-                            <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <div class="pf-field-row">
+                            <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;" title="Per-slot adaptation: each slot raises ITS OWN SL to entry once safety_seconds have passed and position is in profit.">
                                 <input type="checkbox" id="pf-m-sl-move-enabled" ${ui.move_sl_enabled?'checked':''}> Enable Move SL to Cost
                             </label>
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row">
                             <span class="pf-field-label">Safety Seconds</span>
                             <input type="number" class="form-control" id="pf-m-sl-move-safety" value="${ui.move_sl_safety_seconds||0}" min="0" step="1" style="width:70px;">
                         </div>
-                        <div class="pf-field-row pf-ui-only">
+                        <div class="pf-field-row" title="LTP+Buffer variant is options-only — uses bid/ask LTP plus a small buffer; not standard for FX/crypto fills.">
                             <span class="pf-field-label">Move SL Action</span>
                             <select class="form-control" id="pf-m-sl-move-action" style="flex:1;">
-                                ${["Move Only for Profitable Legs","Move SL for All Legs Despite Loss / Profit","Move SL to LTP + Buffer for Loss Making Legs"].map(o =>
-                                    `<option value="${o}" ${(ui.move_sl_action||'Move Only for Profitable Legs')===o?'selected':''}>${o}</option>`
-                                ).join("")}
+                                ${["Move Only for Profitable Legs","Move SL for All Legs Despite Loss / Profit","Move SL to LTP + Buffer for Loss Making Legs"].map(o => {
+                                    const opt = o.includes("LTP");
+                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.move_sl_action||'Move Only for Profitable Legs')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
+                                }).join("")}
                             </select>
                         </div>
                         <div style="margin-top:8px;">
-                            <label class="pf-field-row pf-ui-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Suppress trailing-SL ratchet until move-to-cost has fired at least once for the current position.">
                                 <input type="checkbox" id="pf-m-sl-move-trail" ${ui.trail_after_move_sl?'checked':''}> Trail SL only after Move SL to Cost
                             </label>
-                            <label class="pf-field-row pf-ui-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Adapted for FX/crypto: skip Move SL to Cost on slots whose position is LONG.">
                                 <input type="checkbox" id="pf-m-sl-move-nobuy" ${ui.no_move_buy_legs?'checked':''}> No Move SL for BUY Legs
                             </label>
-                            <label class="pf-field-row pf-ui-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                            <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
                                 <input type="checkbox" id="pf-m-sl-move-hitsl" ${ui.hit_on_leg_sl?'checked':''}> Re-apply on every Leg SL hit
                             </label>
-                            <label class="pf-field-row pf-ui-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                            <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
                                 <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target?'checked':''}> Re-apply on every Leg Target hit *
                             </label>
                         </div>
@@ -1093,26 +1172,33 @@ const Portfolio = {
                 </fieldset>
             </div>
 
-            <!-- Exit Settings Tab -->
+            <!-- Exit Settings Tab. Spec: 5. Logics/Exit_Settings_Logics.html.
+                 MARKET is the implicit default in our engine (Nautilus fills
+                 exits at market). Limit/SL_Limit are not implemented (spec
+                 confirms even for options). Exit Sell Legs First is options-
+                 only (multi-leg ordering). On Portfolio Complete cross-
+                 portfolio actions need infrastructure that doesn't exist. -->
             <div class="pf-tab-content" id="pf-tab-pf-exit" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
                     <div style="flex:1; min-width:260px;">
-                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Exit Order Type</div>
-                        <select class="form-control pf-ui-only" id="pf-m-exit-ordertype" style="width:100%; margin-bottom:12px;">
-                            ${["MARKET","Limit","SL_Limit"].map(o =>
-                                `<option value="${o}" ${(ui.exit_order_type||'MARKET')===o?'selected':''}>${o}</option>`
-                            ).join("")}
+                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="Only MARKET is implemented; Limit/SL_Limit are not yet wired (spec confirms this even for options).">Exit Order Type</div>
+                        <select class="form-control" id="pf-m-exit-ordertype" style="width:100%; margin-bottom:12px;">
+                            ${["MARKET","Limit","SL_Limit"].map(o => {
+                                const opt = o !== "MARKET";
+                                return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.exit_order_type||'MARKET')===o?'selected':''}>${o}${opt?' (not implemented)':''}</option>`;
+                            }).join("")}
                         </select>
-                        <label class="pf-ui-only" style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <label class="pf-live-only" style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;" title="Options-only multi-leg ordering (close SELL straddle legs first to reduce delta). FX/crypto slots are independent.">
                             <input type="checkbox" id="pf-m-exit-sellfirst" ${(ui.exit_sell_first!==false)?'checked':''}> Exit Sell Legs First
                         </label>
                     </div>
                     <div style="flex:1; min-width:300px;">
-                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">On Portfolio Complete (Not Applicable on Manual SqOff)</div>
-                        <select class="form-control pf-ui-only" id="pf-m-exit-oncomplete" style="width:100%;">
-                            ${["None","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio"].map(o =>
-                                `<option value="${o}" ${(ui.on_portfolio_complete||'None')===o?'selected':''}>${o}</option>`
-                            ).join("")}
+                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="Cross-portfolio actions need an event-bus that doesn't exist. Only 'None' is wired today.">On Portfolio Complete (Not Applicable on Manual SqOff)</div>
+                        <select class="form-control" id="pf-m-exit-oncomplete" style="width:100%;">
+                            ${["None","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio"].map(o => {
+                                const opt = o !== "None";
+                                return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_portfolio_complete||'None')===o?'selected':''}>${o}${opt?' (cross-portfolio, not implemented)':''}</option>`;
+                            }).join("")}
                         </select>
                     </div>
                 </div>
@@ -1202,7 +1288,11 @@ const Portfolio = {
                 }
             }
             if (inst) slot.bar_type_str = inst.value;
-            if (size) slot.trade_size = parseFloat(size.value) || 1;
+            if (size) {
+                slot.lots = parseFloat(size.value);
+                if (!Number.isFinite(slot.lots) || slot.lots <= 0) slot.lots = 1;
+                delete slot.trade_size;
+            }
             if (enabled) slot.enabled = enabled.checked;
             if (!slot.exit_config) slot.exit_config = {};
             if (sltype) slot.exit_config.stop_loss_type = sltype.value;
@@ -1235,7 +1325,7 @@ const Portfolio = {
             <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
             <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
             <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
-            <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.trade_size || 1}" min="1"></td>
+            <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
             <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
             <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
             <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;">${tpTypeOpts}</select></td>
@@ -1402,6 +1492,38 @@ const Portfolio = {
         pf._ui.hit_on_leg_target = document.getElementById("pf-m-sl-move-hittgt")?.checked || false;
         pf._ui.sqoff_loss_legs = document.getElementById("pf-m-sl-sqoff-loss")?.checked || false;
         pf._ui.sqoff_profit_legs = document.getElementById("pf-m-sl-sqoff-profit")?.checked || false;
+        // Persisted copies for the backend (Target tab + Stoploss tab).
+        // Field names on pf match PortfolioConfig in models.py. Spec:
+        // 5. Logics/portfolio_sl_tgt.html.
+        pf.pf_tgt_enabled = pf._ui.target_enabled;
+        pf.pf_tgt_type = pf._ui.target_type;
+        pf.pf_tgt_value = pf._ui.target_value;
+        pf.pf_tgt_action = pf._ui.on_target;
+        pf.pf_tgt_delay_sec = pf._ui.target_delay;
+        pf.pf_tgt_reexecute_count = pf._ui.target_reexecute_count;
+        pf.pf_tgt_trail_enabled = pf._ui.trail_target_enabled;
+        pf.pf_tgt_trail_lock_min_profit = pf._ui.trail_lock_min_profit;
+        pf.pf_tgt_trail_when_profit_reach = pf._ui.trail_when_profit_reach;
+        pf.pf_tgt_trail_every = pf._ui.trail_every;
+        pf.pf_tgt_trail_by = pf._ui.trail_by;
+        pf.pf_sl_enabled = pf._ui.sl_enabled;
+        pf.pf_sl_type = pf._ui.sl_type;
+        pf.pf_sl_value = pf._ui.sl_value;
+        pf.pf_sl_action = pf._ui.on_sl_action;
+        pf.pf_sl_delay_sec = pf._ui.sl_delay;
+        pf.pf_sl_reexecute_count = pf._ui.sl_reexecute_count;
+        pf.pf_sl_sqoff_only_loss_legs = pf._ui.sqoff_loss_legs;
+        pf.pf_sl_sqoff_only_profit_legs = pf._ui.sqoff_profit_legs;
+        pf.pf_sl_trail_enabled = pf._ui.trail_sl_enabled;
+        pf.pf_sl_trail_every = pf._ui.trail_sl_every;
+        pf.pf_sl_trail_by = pf._ui.trail_sl_by;
+        pf.move_sl_enabled = pf._ui.move_sl_enabled;
+        pf.move_sl_safety_sec = pf._ui.move_sl_safety_seconds;
+        pf.move_sl_action = pf._ui.move_sl_action;
+        pf.move_sl_trail_after = pf._ui.trail_after_move_sl;
+        pf.move_sl_no_buy_legs = pf._ui.no_move_buy_legs;
+        pf.move_sl_hit_on_leg_sl = pf._ui.hit_on_leg_sl;
+        pf.move_sl_hit_on_leg_target = pf._ui.hit_on_leg_target;
         // Monitoring
         pf._ui.leg_target_monitoring = document.getElementById("pf-m-mon-legtgt")?.value || "Realtime";
         pf._ui.leg_trailing_monitoring = document.getElementById("pf-m-mon-legtrail")?.value || "Realtime";
@@ -1419,12 +1541,39 @@ const Portfolio = {
         pf._ui.exit_order_type = document.getElementById("pf-m-exit-ordertype")?.value || "MARKET";
         pf._ui.exit_sell_first = document.getElementById("pf-m-exit-sellfirst")?.checked ?? true;
         pf._ui.on_portfolio_complete = document.getElementById("pf-m-exit-oncomplete")?.value || "None";
-        // Other Settings
+        // Persisted copies for the backend (Monitoring + ReExecute + Exit Settings).
+        // Field names on pf match PortfolioConfig in models.py. Only
+        // no_reexec_sl_cost has runtime effect (FX/crypto adaptation of
+        // ReExecute_Logics.html P1); the rest are stored for round-trip and
+        // either no-op for FX/crypto or marked options-only in the UI.
+        pf.leg_target_monitoring = pf._ui.leg_target_monitoring;
+        pf.leg_trailing_monitoring = pf._ui.leg_trailing_monitoring;
+        pf.leg_sl_monitoring = pf._ui.leg_sl_monitoring;
+        pf.leg_sl_trailing_monitoring = pf._ui.leg_sl_trailing_monitoring;
+        pf.combined_target_monitoring = pf._ui.combined_target_monitoring;
+        pf.combined_sl_monitoring = pf._ui.combined_sl_monitoring;
+        pf.no_reexec_sl_cost = pf._ui.no_reexec_sl_cost;
+        pf.no_wait_trade_reexec = pf._ui.no_wait_trade_reexec;
+        pf.no_strike_change_reexec = pf._ui.no_strike_change_reexec;
+        pf.no_reentry_after_end = pf._ui.no_reentry_after_end;
+        pf.no_reentry_sl_cost = pf._ui.no_reentry_sl_cost;
+        pf.exit_order_type = pf._ui.exit_order_type;
+        pf.exit_sell_first = pf._ui.exit_sell_first;
+        pf.on_portfolio_complete = pf._ui.on_portfolio_complete;
+        // Other Settings. Mirror to both _ui (UI scratchpad) AND pf.<model_field>
+        // so the strip-before-POST below preserves them for the server. Field
+        // names on pf match PortfolioConfig in models.py.
         pf._ui.trail_wait_trade = document.getElementById("pf-m-other-trailwait")?.checked || false;
         pf._ui.straddle_width_multiplier = parseFloat(document.getElementById("pf-m-other-swm")?.value) || 0;
         pf._ui.delay_between_legs = parseInt(document.getElementById("pf-m-other-legdelay")?.value) || 0;
         pf._ui.on_target_action_on = document.getElementById("pf-m-other-tgtaction")?.value || "OnTarget_N_Trailing_Both";
         pf._ui.on_sl_action_on = document.getElementById("pf-m-other-slaction")?.value || "OnSL_N_Trailing_Both";
+        // Persisted copies for the backend
+        pf.trail_wait_trade = pf._ui.trail_wait_trade;
+        pf.straddle_width_multiplier = pf._ui.straddle_width_multiplier;
+        pf.delay_between_legs_sec = pf._ui.delay_between_legs;
+        pf.on_target_action_on = pf._ui.on_target_action_on;
+        pf.on_sl_action_on = pf._ui.on_sl_action_on;
 
         // Strip UI-only fields before sending to server
         const cleanPf = JSON.parse(JSON.stringify(pf));
@@ -1466,7 +1615,7 @@ const Portfolio = {
         pf.slots.push({
             slot_id: "s" + Date.now().toString(36) + this.slotCounter,
             strategy_name: firstStrat, strategy_params: defaultParams,
-            bar_type_str: this.barTypes[0] || "", trade_size: 1, allocation_pct: 0,
+            bar_type_str: this.barTypes[0] || "", lots: 1, allocation_pct: 0,
             exit_config: { stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
                 target_type: "none", target_value: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
                 max_re_executions: 0, squareoff_time: null, squareoff_tz: null },
@@ -1518,8 +1667,8 @@ const Portfolio = {
                     <select class="form-control" id="leg-m-instrument" style="font-size:0.82rem; padding:5px 8px;">${barOpts}</select>
                 </div>
                 <div style="flex:0.7; min-width:70px;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">SIZE</div>
-                    <input type="number" class="form-control" id="leg-m-size" value="${slot.trade_size || 1}" min="1" style="font-size:0.82rem; padding:5px 8px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">LOTS</div>
+                    <input type="number" class="form-control" id="leg-m-size" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any" style="font-size:0.82rem; padding:5px 8px;">
                 </div>
                 <div style="flex:0.7; min-width:70px;">
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">ALLOC %</div>
@@ -1620,7 +1769,9 @@ const Portfolio = {
 
         slot.strategy_name = document.getElementById("leg-m-strategy").value;
         slot.bar_type_str = document.getElementById("leg-m-instrument").value;
-        slot.trade_size = parseFloat(document.getElementById("leg-m-size").value) || 1;
+        const lotsInput = parseFloat(document.getElementById("leg-m-size").value);
+        slot.lots = (Number.isFinite(lotsInput) && lotsInput > 0) ? lotsInput : 1;
+        delete slot.trade_size;
         slot.allocation_pct = parseFloat(document.getElementById("leg-m-alloc").value) || 0;
 
         // Read params
@@ -1753,7 +1904,8 @@ const Portfolio = {
 
         try {
             const response = await fetch("/api/portfolios/backtest", {
-                method: "POST", headers: { "Content-Type": "application/json" },
+                method: "POST",
+                headers: App.userHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ portfolio: cleanPf }),
             });
             const reader = response.body.getReader();
@@ -1811,6 +1963,22 @@ const Portfolio = {
         let flagsHTML = "";
         if (r.max_loss_hit) flagsHTML += '<span class="badge badge-danger">Max Loss Hit</span> ';
         if (r.max_profit_hit) flagsHTML += '<span class="badge badge-success">Max Profit Hit</span> ';
+        // Portfolio-level Stoploss/Target post-hoc clip badges. r.pf_clip_ts
+        // is non-null only when the configured Combined SL/Target threshold
+        // crossed during the run. Reason ∈ {STOPLOSS,STOPLOSS_TRAIL,TARGET,TARGET_TRAIL}.
+        if (r.pf_clip_reason) {
+            const isSL = r.pf_clip_reason.startsWith("STOPLOSS");
+            const cls = isSL ? "badge-danger" : "badge-success";
+            const label = {
+                "STOPLOSS": "Combined SL Hit",
+                "STOPLOSS_TRAIL": "Trail SL Hit",
+                "TARGET": "Combined Target Hit",
+                "TARGET_TRAIL": "Trail Target Hit",
+            }[r.pf_clip_reason] || r.pf_clip_reason;
+            const tsLabel = r.pf_clip_ts ? ` @ ${r.pf_clip_ts.slice(11,19)}` : "";
+            const reexec = r.pf_would_reexecute ? " (would re-execute)" : "";
+            flagsHTML += `<span class="badge ${cls}">${label}${tsLabel}${reexec}</span> `;
+        }
         let reportBtnHTML = "";
         if (r.report_file) {
             reportBtnHTML = `<a class="btn btn-sm btn-primary" href="/api/reports/${encodeURIComponent(r.report_file)}" download style="margin-right:6px;">&#128196; Download Report</a>`;

@@ -31,6 +31,17 @@ from custom_adapter_loader import (
 )
 
 PROJECT_DIR = Path(__file__).resolve().parent
+# core.users lives at the repo root, not under adapter_admin/. Add the repo
+# root to sys.path so we can reuse the same registry helpers as server.py.
+_REPO_ROOT = PROJECT_DIR.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from core.users import (
+    load_users as _load_users,
+    save_users as _save_users,
+    validate_registry_payload as _validate_registry_payload,
+)
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
@@ -716,6 +727,40 @@ def download_template():
 def adapter_guidelines():
     """Return adapter guidelines as markdown."""
     return jsonify({"guidelines": get_adapter_guidelines()})
+
+
+# ─── Users API (multi-user identity layer) ────────────────────────────────
+# Reads/writes config/users.json. The full registry (user_id, alias,
+# multiplier, allowed_instruments) is admin-only — the main server only
+# exposes a public-safe slim list at /api/users/list.
+
+@app.route("/api/users")
+def get_users():
+    """Return the full users registry — admin-only view."""
+    return jsonify(_load_users())
+
+
+@app.route("/api/users", methods=["POST"])
+def post_users():
+    """Replace the users registry. Validates before writing.
+
+    Same shape as the GET response. Validation enforces slug-safe ids,
+    positive multipliers, well-formed allowlists, and no duplicates so the
+    on-disk file always satisfies our resolver invariants.
+    """
+    payload = request.json
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    # Preserve the existing _meta block if the client didn't send one.
+    if "_meta" not in payload:
+        existing = _load_users()
+        if isinstance(existing, dict) and "_meta" in existing:
+            payload["_meta"] = existing["_meta"]
+    ok, err = _validate_registry_payload(payload)
+    if not ok:
+        return jsonify({"error": err}), 400
+    _save_users(payload)
+    return jsonify({"success": True, "users": payload.get("users", [])})
 
 
 # ─── Main ──────────────────────────────────────────────────────────────────

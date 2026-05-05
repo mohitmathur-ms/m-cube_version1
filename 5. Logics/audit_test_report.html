@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add Portfolio &mdash; Smoke Test Report</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent2: #3fb950; --accent3: #d2a8ff;
+    --accent4: #f0883e; --accent5: #f85149;
+    --code-bg: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.55; font-size: 14px; }
+  .header { background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border); padding: 2rem; text-align: center; }
+  .header h1 { font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; }
+  .header p { color: var(--text-muted); font-size: 0.9rem; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.6rem; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
+  h2 { color: var(--accent); font-size: 1.3rem; margin-bottom: 0.7rem;
+    padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { color: var(--accent3); font-size: 1.05rem; margin: 0.8rem 0 0.4rem; }
+  h4 { color: var(--accent4); font-size: 0.85rem; margin: 0.6rem 0 0.3rem;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  code { background: var(--code-bg); color: var(--accent2); padding: 0.1em 0.35em;
+    border-radius: 3px; font-size: 0.85em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 0.6rem; overflow-x: auto; font-size: 0.78rem; }
+  .stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+  .stat-card { flex: 1 1 140px; background: var(--code-bg); border-radius: 6px;
+    border: 1px solid var(--border); padding: 0.8rem 1rem; text-align: center; }
+  .stat-card .num { font-size: 1.7rem; font-weight: 700; color: var(--accent); }
+  .stat-card.pass .num { color: var(--accent2); }
+  .stat-card.fail .num { color: var(--accent5); }
+  .stat-card.err .num { color: var(--accent4); }
+  .stat-card .label { font-size: 0.75rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+  .test-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 0.9rem; overflow: hidden; }
+  .test-header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1rem;
+    background: var(--code-bg); border-bottom: 1px solid var(--border); }
+  .test-id { font-family: monospace; font-weight: 700; color: var(--accent);
+    font-size: 0.95rem; flex: 0 0 auto; }
+  .test-name { flex: 1 1 auto; font-size: 0.92rem; }
+  .verdict { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+    flex: 0 0 auto; }
+  .v-pass { background: #103018; color: var(--accent2); }
+  .v-fail { background: #2a1018; color: var(--accent5); }
+  .v-error { background: #2a2410; color: var(--accent4); }
+  .test-body { padding: 0.9rem 1rem;
+    display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 0.9rem; }
+  .test-section { font-size: 0.85rem; }
+  .test-section ul.params { padding-left: 1.1rem; }
+  .test-section ul.params li { margin: 0.15rem 0; font-size: 0.8rem; }
+  .test-section .expected { font-style: italic; color: var(--text-muted); }
+  .obs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .obs-table td { padding: 0.25rem 0.5rem; border-top: 1px solid var(--border);
+    vertical-align: top; }
+  .obs-table td:first-child { color: var(--text-muted); width: 35%; font-weight: 500; }
+  .obs-table .pos { color: var(--accent2); font-weight: 600; }
+  .obs-table .neg { color: var(--accent5); font-weight: 600; }
+  .obs-table .zero { color: var(--text-muted); }
+  .flag { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; margin-right: 0.25rem; }
+  .flag-loss { background: #2a1018; color: var(--accent5); }
+  .flag-profit { background: #103018; color: var(--accent2); }
+  .err-text { color: var(--accent5); font-size: 0.85rem; }
+  .ok-text { color: var(--accent2); font-size: 0.9rem; }
+  .err-card { background: linear-gradient(135deg, #2a1018, #161b22);
+    border-left: 3px solid var(--accent5); border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1rem; margin-bottom: 0.7rem; }
+  .err-card h4 { color: var(--accent5); }
+  .warnings { margin-top: 0.5rem; font-size: 0.78rem; }
+  .warnings summary { color: var(--accent4); cursor: pointer; }
+  .warnings ul { padding-left: 1.4rem; margin-top: 0.3rem; }
+  .warnings li { color: var(--text-muted); font-family: monospace; font-size: 0.75rem; }
+  details { margin-top: 0.4rem; }
+  details summary { cursor: pointer; color: var(--text-muted); font-size: 0.78rem; }
+  @media (max-width: 900px) {
+    .test-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Add Portfolio &mdash; Smoke Test Report</h1>
+  <p>16 backtest variants on FX_9_Slot, week of 2024-12-02 .. 2024-12-06. Generated 2026-05-05 11:28:27.</p>
+</div>
+
+<div class="container">
+
+<section>
+  <h2>Summary</h2>
+  <div class="stat-row">
+    <div class="stat-card"><div class="num">16</div><div class="label">Total tests</div></div>
+    <div class="stat-card pass"><div class="num">16</div><div class="label">Pass</div></div>
+    <div class="stat-card fail"><div class="num">0</div><div class="label">Fail</div></div>
+    <div class="stat-card err"><div class="num">0</div><div class="label">Error</div></div>
+  </div>
+  <p style="font-size: 0.86rem; color: var(--text-muted);">All tests run on the same FX_9_Slot portfolio (2024-12-02 .. 2024-12-06, 9 slots, EURUSD/GBPUSD/USDJPY x EMA Cross/RSI/Bollinger). Each test mutates a deep copy of the baseline portfolio config, runs <code>run_portfolio_backtest()</code> in-process, and captures fills, PnL, and any portfolio clip events.</p>
+</section>
+
+<section>
+  <h2>Per-test details</h2>
+  
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T01</span>
+            <span class="test-name">Conservative day trader (RBO + tight window + squareoff + pf_sl + move_sl)</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_enabled</code>: <code>true</code></li><li><code>rbo_entry_at</code>: <code>&quot;Any&quot;</code></li><li><code>rbo_cancel_other_side</code>: <code>true</code></li><li><code>range_monitoring</code>: <code>&quot;09:00-10:00&quot;</code></li><li><code>entry_window</code>: <code>&quot;10:00-15:00&quot;</code></li><li><code>squareoff</code>: <code>&quot;15:30 UTC&quot;</code></li><li><code>delay_between_legs_sec</code>: <code>120</code></li><li><code>pf_sl_value</code>: <code>50.0</code></li><li><code>move_sl_safety_sec</code>: <code>600</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Path B; entries 10:00-15:00; closes by 15:30; pf_sl may fire if cumulative loss exceeds $50</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-55.91</td></tr><tr><td>Trades</td><td>24 (W:0 / L:39)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:18, Tue:14, Wed:13</code></td></tr><tr><td>Fill hours UTC</td><td><code>10h:26, 11h:5, 12h:14</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-04T11:05:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Runtime</td><td>6.5s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T02</span>
+            <span class="test-name">Aggressive scalper (RBO Any, both directions, no leg delay)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_entry_at</code>: <code>&quot;Any&quot;</code></li><li><code>rbo_cancel_other_side</code>: <code>false</code></li><li><code>rbo_range_buffer</code>: <code>15</code></li><li><code>delay_between_legs_sec</code>: <code>0</code></li><li><code>run_on_days</code>: <code>[&quot;Mon-Fri&quot;]</code></li><li><code>squareoff</code>: <code>&quot;22:00 UTC&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Higher trade count than T01 (no cancel_other_side, no leg delay)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-76.46</td></tr><tr><td>Trades</td><td>16 (W:2 / L:14)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:15, Tue:2, Wed:4, Thu:5, Fri:6</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:15, 12h:2, 13h:3, 14h:3, 15h:2, 16h:7</code></td></tr><tr><td>Runtime</td><td>6.1s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T03</span>
+            <span class="test-name">Defensive grid (pf_sl + trailing pf_sl + move_sl trail_after + leg delay + Mon/Wed/Fri only)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>pf_sl_value</code>: <code>80.0</code></li><li><code>pf_sl_trail_every</code>: <code>20</code></li><li><code>pf_sl_trail_by</code>: <code>10</code></li><li><code>move_sl_safety_sec</code>: <code>300</code></li><li><code>move_sl_trail_after</code>: <code>true</code></li><li><code>delay_between_legs_sec</code>: <code>180</code></li><li><code>run_on_days</code>: <code>[&quot;Mon&quot;, &quot;Wed&quot;, &quot;Fri&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Trades only on Mon/Wed/Fri; trailing SL ratchets without firing $80 threshold</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-36.30</td></tr><tr><td>Trades</td><td>15 (W:0 / L:15)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:11, Wed:9, Fri:10</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:29, 16h:1</code></td></tr><tr><td>Runtime</td><td>5.0s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T04</span>
+            <span class="test-name">Profit lock chaser (pf_tgt + trailing target + pf_sl backstop + Tue-Thu only)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>pf_tgt_value</code>: <code>30.0</code></li><li><code>trail_lock_min_profit</code>: <code>15</code></li><li><code>trail_when_reach</code>: <code>20</code></li><li><code>trail_every</code>: <code>10</code></li><li><code>trail_by</code>: <code>5</code></li><li><code>pf_sl_value</code>: <code>60.0</code></li><li><code>run_on_days</code>: <code>[&quot;Tue&quot;, &quot;Wed&quot;, &quot;Thu&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Trades only Tue/Wed/Thu; profit-lock activates at +$20 if reached</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-18.45</td></tr><tr><td>Trades</td><td>10 (W:4 / L:6)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Tue:4, Wed:8, Thu:8</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:9, 12h:1, 13h:2, 16h:8</code></td></tr><tr><td>Runtime</td><td>5.4s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T05</span>
+            <span class="test-name">Asia session (05:00-10:00 entry, 11:00 squareoff, Mon-Thu, pf_sl=$40, RBO off)</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>entry_start_time</code>: <code>&quot;05:00:00&quot;</code></li><li><code>entry_end_time</code>: <code>&quot;10:00:00&quot;</code></li><li><code>squareoff</code>: <code>&quot;11:00 UTC&quot;</code></li><li><code>run_on_days</code>: <code>[&quot;Mon-Thu&quot;]</code></li><li><code>pf_sl_value</code>: <code>40.0</code></li><li><code>rbo_enabled</code>: <code>false</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Entries 05:00-10:00 UTC; closes 11:00; no Friday trades</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-53.13</td></tr><tr><td>Trades</td><td>12 (W:1 / L:11)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:9, Tue:3, Wed:3, Thu:2</code></td></tr><tr><td>Fill hours UTC</td><td><code>5h:11, 7h:2, 8h:1, 9h:3</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-05T05:42:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Runtime</td><td>5.9s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T06</span>
+            <span class="test-name">Trend follower (RBO RangeHigh + 5min leg delay + move_sl trail_after + no_reexec_sl_cost)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_entry_at</code>: <code>&quot;RangeHigh&quot;</code></li><li><code>rbo_range_buffer</code>: <code>10</code></li><li><code>range_monitoring</code>: <code>&quot;09:00-10:30&quot;</code></li><li><code>rbo_entry</code>: <code>&quot;10:30-16:00&quot;</code></li><li><code>delay_between_legs_sec</code>: <code>300</code></li><li><code>move_sl_safety_sec</code>: <code>600</code></li><li><code>move_sl_trail_after</code>: <code>true</code></li><li><code>no_reexec_sl_cost</code>: <code>true</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Upward breakouts only; SL pin via move_sl; no re_execute after move_sl</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-48.10</td></tr><tr><td>Trades</td><td>24 (W:2 / L:22)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:11, Tue:5, Wed:7, Thu:11, Fri:14</code></td></tr><tr><td>Fill hours UTC</td><td><code>9h:2, 10h:14, 11h:20, 12h:6, 13h:6</code></td></tr><tr><td>Runtime</td><td>7.3s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T07</span>
+            <span class="test-name">Mean reversion (RBO RangeLow + pf_sl=$30 + pf_tgt=$20 + percentage alloc + OnSL_Only)</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_entry_at</code>: <code>&quot;RangeLow&quot;</code></li><li><code>pf_sl_value</code>: <code>30.0</code></li><li><code>pf_tgt_value</code>: <code>20.0</code></li><li><code>allocation_mode</code>: <code>&quot;percentage&quot;</code></li><li><code>first_3_slots</code>: <code>&quot;30% each&quot;</code></li><li><code>on_sl_action_on</code>: <code>&quot;OnSL_Only&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Downward breakouts only; clip on $30 loss or $20 profit</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-47.14</td></tr><tr><td>Trades</td><td>8 (W:4 / L:10)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:12</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:3, 12h:5, 15h:2, 16h:2</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-02T16:21:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Runtime</td><td>7.4s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T08</span>
+            <span class="test-name">Risk-averse (tight pf_sl + trail + move_sl + max_loss + squareoff + narrow window)</span>
+            <span class="verdict v-pass">PASS (max_loss flag fired as expected)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>pf_sl_value</code>: <code>25.0</code></li><li><code>trail_every</code>: <code>10</code></li><li><code>trail_by</code>: <code>5</code></li><li><code>move_sl_safety_sec</code>: <code>240</code></li><li><code>max_loss</code>: <code>30</code></li><li><code>max_profit</code>: <code>50</code></li><li><code>squareoff</code>: <code>&quot;15:00 UTC&quot;</code></li><li><code>entry_window</code>: <code>&quot;10:00-14:00&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Tight pf_sl ($25) likely fires; max_loss flag if total &gt; $30</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-26.03</td></tr><tr><td>Trades</td><td>10 (W:1 / L:26)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:12, Tue:4, Wed:4</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:17, 13h:2, 15h:1</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-04T11:31:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Boundary flags</td><td><span class='flag flag-loss'>max_loss_hit</span></td></tr><tr><td>Runtime</td><td>7.2s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T09</span>
+            <span class="test-name">High-frequency (RBO off + 09:30-23:59 window + delay=0 + percentage alloc 25/25/25/8.3...)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_enabled</code>: <code>false</code></li><li><code>entry_window</code>: <code>&quot;09:30-23:59&quot;</code></li><li><code>delay_between_legs_sec</code>: <code>0</code></li><li><code>allocation_mode</code>: <code>&quot;percentage&quot;</code></li><li><code>first_3_slots</code>: <code>&quot;25%&quot;</code></li><li><code>rest</code>: <code>&quot;~4.2%&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Higher trade count than baseline (wider entry window, no leg delay)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-15.77</td></tr><tr><td>Trades</td><td>14 (W:7 / L:7)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:13, Tue:2, Wed:4, Thu:2, Fri:7</code></td></tr><tr><td>Fill hours UTC</td><td><code>9h:10, 10h:2, 11h:1, 13h:4, 14h:1, 15h:2, 16h:2, 18h:1, 19h:2, 21h:3</code></td></tr><tr><td>Runtime</td><td>8.2s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T10</span>
+            <span class="test-name">Weekly cycle (Mon-Thu + 11:00-16:00 entry + trailing pf_sl + 17:00 squareoff)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>run_on_days</code>: <code>[&quot;Mon-Thu&quot;]</code></li><li><code>entry_window</code>: <code>&quot;11:00-16:00&quot;</code></li><li><code>pf_sl_value</code>: <code>70.0</code></li><li><code>trail_every</code>: <code>15</code></li><li><code>trail_by</code>: <code>8</code></li><li><code>squareoff</code>: <code>&quot;17:00 UTC&quot;</code></li><li><code>rbo_enabled</code>: <code>false</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">No Fri trades; trailing pf_sl ratchets</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-56.99</td></tr><tr><td>Trades</td><td>16 (W:6 / L:10)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:13, Tue:5, Wed:4, Thu:10</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:17, 13h:2, 14h:5, 15h:2, 16h:6</code></td></tr><tr><td>Runtime</td><td>6.2s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T11</span>
+            <span class="test-name">Both SL &amp; Target with trailing both + move_sl</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>pf_sl_value</code>: <code>50.0</code></li><li><code>pf_sl_trail</code>: <code>&quot;15/8&quot;</code></li><li><code>pf_tgt_value</code>: <code>40.0</code></li><li><code>pf_tgt_trail</code>: <code>&quot;lock=20 reach=30 every=10 by=5&quot;</code></li><li><code>move_sl_safety_sec</code>: <code>180</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Both SL and target trailing run; move_sl pins entry SL after 3min</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-59.02</td></tr><tr><td>Trades</td><td>25 (W:0 / L:25)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:11, Tue:4, Wed:9, Thu:16, Fri:5</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:36, 12h:8, 16h:1</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-06T11:06:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Runtime</td><td>7.0s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T12</span>
+            <span class="test-name">Path A combo (env=0; same scenario should run as on Path B)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>_USE_BACKTEST_NODE</code>: <code>&quot;0&quot;</code></li><li><code>pf_sl_value</code>: <code>50.0</code></li><li><code>pf_tgt_value</code>: <code>40.0</code></li><li><code>run_on_days</code>: <code>[&quot;Mon&quot;, &quot;Tue&quot;, &quot;Wed&quot;]</code></li><li><code>entry_window</code>: <code>&quot;10:00-14:00&quot;</code></li><li><code>squareoff</code>: <code>&quot;14:30 UTC&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">path_b_summary == &quot;none&quot;; path A handles all settings same as Path B</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-42.83</td></tr><tr><td>Trades</td><td>10 (W:2 / L:8)</td></tr><tr><td>path_b</td><td><code>none</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:6, Tue:6, Wed:8</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:10, 12h:2, 13h:2, 14h:6</code></td></tr><tr><td>Runtime</td><td>5.2s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T13</span>
+            <span class="test-name">Edge: very tight settings (pf_sl=$15 + 1h window + 1min move_sl safety)</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>pf_sl_value</code>: <code>15.0</code></li><li><code>entry_window</code>: <code>&quot;11:30-12:30&quot;</code></li><li><code>move_sl_safety_sec</code>: <code>60</code></li><li><code>delay_between_legs_sec</code>: <code>60</code></li><li><code>rbo_enabled</code>: <code>false</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">pf_sl likely fires (tight $15 threshold); may trip Money-string bug</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-29.52</td></tr><tr><td>Trades</td><td>10 (W:1 / L:45)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:15</code></td></tr><tr><td>Fill hours UTC</td><td><code>11h:15</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-02T11:59:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Runtime</td><td>6.2s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T14</span>
+            <span class="test-name">Edge: zero filters (no RBO, no day filter, 24h window, no clips)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo_enabled</code>: <code>false</code></li><li><code>run_on_days</code>: <code>null</code></li><li><code>entry_window</code>: <code>&quot;00:00-23:59&quot;</code></li><li><code>squareoff</code>: <code>null</code></li><li><code>pf_sl_enabled</code>: <code>false</code></li><li><code>pf_tgt_enabled</code>: <code>false</code></li><li><code>move_sl_enabled</code>: <code>false</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Maximum trade count; no clips or boundary flags</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-103.27</td></tr><tr><td>Trades</td><td>18 (W:2 / L:16)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:13, Tue:4, Wed:6, Thu:2, Fri:11</code></td></tr><tr><td>Fill hours UTC</td><td><code>0h:9, 4h:3, 8h:1, 10h:1, 11h:1, 13h:3, 14h:4, 15h:2, 16h:3, 17h:1, 19h:2, 21h:6</code></td></tr><tr><td>Runtime</td><td>9.3s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T15</span>
+            <span class="test-name">Edge: weekend-only run_on_days (no FX market data on Sat/Sun)</span>
+            <span class="verdict v-pass">PASS (0 trades on weekend filter)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>run_on_days</code>: <code>[&quot;Sat&quot;, &quot;Sun&quot;]</code></li><li><code>pf_sl_value</code>: <code>20.0</code></li><li><code>rbo_enabled</code>: <code>false</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">Zero trades (no FX data on weekends); run completes without error</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='zero'>$0.00</td></tr><tr><td>Trades</td><td>0 (W:0 / L:0)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Runtime</td><td>4.1s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T16</span>
+            <span class="test-name">Stress test: every active setting on with realistic values</span>
+            <span class="verdict v-pass">PASS (clip=STOPLOSS, max_loss_hit)</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters set</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;Any cancel=T buf=30&quot;</code></li><li><code>run_on_days</code>: <code>[&quot;Mon&quot;, &quot;Wed&quot;, &quot;Fri&quot;]</code></li><li><code>entry_window</code>: <code>&quot;10:00-15:00&quot;</code></li><li><code>squareoff</code>: <code>&quot;16:00 UTC&quot;</code></li><li><code>delay_between_legs_sec</code>: <code>120</code></li><li><code>pf_sl</code>: <code>&quot;$40 trail 15/8&quot;</code></li><li><code>pf_tgt</code>: <code>&quot;$25 trail lock=10 reach=20&quot;</code></li><li><code>move_sl_safety</code>: <code>300</code></li><li><code>move_sl_trail_after</code>: <code>true</code></li><li><code>no_reexec_sl_cost</code>: <code>true</code></li><li><code>max_loss</code>: <code>50</code></li><li><code>on_sl_action_on</code>: <code>&quot;OnSL_Only&quot;</code></li><li><code>on_target_action_on</code>: <code>&quot;OnTarget_Only&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected behavior</h4>
+              <p class="expected">All gates active; trades only Mon/Wed/Fri 10-15 UTC; clip on $40 loss or $25 profit; closes by 16:00</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>Total PnL</td><td class='neg'>$-40.42</td></tr><tr><td>Trades</td><td>17 (W:0 / L:25)</td></tr><tr><td>path_b</td><td><code>all</code></td></tr><tr><td>Slot count</td><td>9</td></tr><tr><td>Fill weekdays</td><td><code>Mon:18, Wed:16</code></td></tr><tr><td>Fill hours UTC</td><td><code>10h:20, 11h:6, 12h:8</code></td></tr><tr><td>pf_clip</td><td><code>STOPLOSS</code> @ <code>2024-12-04T11:59:00+00:00</code> &rarr; <code>SqOff</code></td></tr><tr><td>Clipped slots</td><td><code>fx_eur_ema, fx_eur_rsi, fx_eur_bb, fx_gbp_ema, fx_gbp_rsi, fx_gbp_bb, fx_jpy_ema, fx_jpy_rsi, fx_jpy_bb</code></td></tr><tr><td>Boundary flags</td><td><span class='flag flag-loss'>max_loss_hit</span></td></tr><tr><td>Runtime</td><td>6.1s</td></tr></table>
+            </div>
+          </div>
+        </div>
+        
+</section>
+
+<section id='errors'><h2>Errors observed and how to resolve</h2><p class='ok-text'>No errors observed across the 16 tests. Every run completed without raising.</p></section>
+
+</div>
+</body>
+</html>

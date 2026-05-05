@@ -64,7 +64,14 @@ class StrategySlotConfig:
     strategy_name: str = "EMA Cross"
     strategy_params: dict = field(default_factory=dict)
     bar_type_str: str = ""
-    trade_size: float = 1.0
+    # Sizing multiplier (number of contracts). Combined with the instrument's
+    # admin-configured lot_size at order-submit time:
+    #   order_qty = min(instrument.lot_size × slot.lots, instrument.trade_size_cap)
+    # FX example: lot_size=100_000 (one standard lot), lots=0.01 → 1000 base ccy.
+    # Older portfolio JSON used a single ``trade_size`` field that conflated lot
+    # size and multiplier; ``portfolio_from_dict`` migrates those values
+    # automatically (see _migrate_legacy_trade_size).
+    lots: float = 1.0
     allocation_pct: float = 0.0  # Capital allocation percentage (used when mode is "percentage")
     exit_config: ExitConfig = field(default_factory=ExitConfig)
     enabled: bool = True
@@ -148,6 +155,128 @@ class PortfolioConfig:
     rbo_monitoring: str = "Underlying"
     rbo_cancel_other_side: bool = False           # P9
 
+    # Other Settings tab. Spec: 5. Logics/Other_Settings_Logic.html.
+    # delay_between_legs_sec: post-re-execution delay. Spec defines this at
+    #   PORTFOLIO level (after a portfolio SL/TP triggers ReExecute). Our
+    #   slot-independent architecture has no portfolio-level SL/TP that fires
+    #   re-execution, so we apply this at the SLOT level: after a slot's own
+    #   SL/TP triggers re_execute (per ExitConfig.on_sl_action / .on_target_action
+    #   = "re_execute"), block the next entry on that slot until N seconds of
+    #   bar-time have elapsed. Default 0 = no delay (matches spec).
+    delay_between_legs_sec: int = 0
+    # on_sl_action_on / on_target_action_on: filter that decides whether the
+    # configured exit action fires when the SL/TP hit was the FIXED level vs
+    # a TRAILING level that was moved by trailing_sl_step / target_lock.
+    # Spec semantics defined for portfolio-level SL/TP; we adapt at slot
+    # level using a was_trailed flag in ManagedExitStrategy.
+    #   Values: "OnSL_N_Trailing_Both" (default — fire on any SL hit),
+    #           "OnSL_Only" (suppress action when SL was trailed),
+    #           "OnSL_Trailing_Only" (suppress action when SL was the fixed
+    #            initial value). Same shape for on_target_action_on with
+    #           "OnTarget_*" prefixes.
+    # Note: OnTarget_Trailing_Only is effectively suppress-all on FX/crypto
+    # because we have no trailing-target concept distinct from fixed TP
+    # (target_lock exits route through SL path, not TP path).
+    on_sl_action_on: str = "OnSL_N_Trailing_Both"
+    on_target_action_on: str = "OnTarget_N_Trailing_Both"
+    # Stored but UNUSED for FX/crypto — both are options-specific (Straddle)
+    # or spec-missing (Trail Wait Trade). Kept on the schema so user-saved
+    # values survive round-trips for when these features land.
+    straddle_width_multiplier: float = 0.0
+    trail_wait_trade: bool = False
+
+    # Portfolio-level Stoploss & Target. Spec: 5. Logics/portfolio_sl_tgt.html.
+    # Applied post-hoc in _merge_portfolio_results via _apply_portfolio_clip:
+    # the unified equity curve is walked in time order, fixed/trailing SL & TP
+    # are evaluated each tick (spec §8 evaluation order), and trades after the
+    # clip timestamp are dropped from the merged outputs. All values are raw
+    # PnL amounts (positive numbers; SL fires at PnL ≤ −value, TP at PnL ≥
+    # value). Defaults all "off" — feature is opt-in via the *_enabled flags.
+    # Type fields accept only the universal value for FX/crypto; options-only
+    # values (Combined Premium, Underlying Movement, etc.) are silently
+    # downgraded with a warning by _resolve_pf_stoploss / _resolve_pf_target.
+
+    # ── Stoploss Settings (spec §1) ──
+    pf_sl_enabled: bool = False
+    pf_sl_type: str = "Combined Loss"  # only universal value for FX/crypto
+    pf_sl_value: float = 0.0
+    pf_sl_action: str = "SqOff"        # SqOff | ReExecute (others options-only)
+    pf_sl_delay_sec: int = 0
+    pf_sl_reexecute_count: int = 0     # 0 = unlimited per spec §1.7
+    pf_sl_sqoff_only_loss_legs: bool = False    # spec §1.9
+    pf_sl_sqoff_only_profit_legs: bool = False  # spec §1.10 (mutually exclusive with above)
+
+    # ── Trailing SL Settings (spec §2) ──
+    pf_sl_trail_enabled: bool = False
+    pf_sl_trail_every: float = 0.0  # ratchet step in PnL
+    pf_sl_trail_by: float = 0.0     # SL tightens by this per step
+
+    # ── Move SL to Cost (spec §3) — applied per-slot via ManagedExitStrategy ──
+    move_sl_enabled: bool = False
+    move_sl_safety_sec: int = 0
+    move_sl_action: str = "Move Only for Profitable Legs"
+    move_sl_trail_after: bool = False
+    move_sl_no_buy_legs: bool = False  # adapted: skip move-to-cost on LONG positions
+    move_sl_hit_on_leg_sl: bool = False     # cross-slot trigger applied post-hoc
+    move_sl_hit_on_leg_target: bool = False # same shape, on any slot's target
+
+    # ── Target Settings (spec §4) ──
+    pf_tgt_enabled: bool = False
+    pf_tgt_type: str = "Combined Profit"  # only universal value for FX/crypto
+    pf_tgt_value: float = 0.0
+    pf_tgt_action: str = "SqOff"
+    pf_tgt_delay_sec: int = 0
+    pf_tgt_reexecute_count: int = 0  # 0 = unlimited
+
+    # ── Trailing Target Settings (spec §5) ──
+    pf_tgt_trail_enabled: bool = False
+    pf_tgt_trail_lock_min_profit: float = 0.0
+    pf_tgt_trail_when_profit_reach: float = 0.0
+    pf_tgt_trail_every: float = 0.0
+    pf_tgt_trail_by: float = 0.0
+
+    # ── ReExecute Tab (spec: 5. Logics/ReExecute_Logics.html) ──
+    # P1 (no_reexec_sl_cost): WIRED for FX/crypto. When True, suppresses
+    #   re_execute action when the slot's SL was previously raised to entry
+    #   via Move SL to Cost (current_position._move_sl_fired_this_position).
+    # P2 (no_wait_trade_reexec): no-op for FX/crypto — we have no per-leg
+    #   "Wait & Trade" pre-entry delay concept. Stored for round-trip only.
+    # P3 (no_strike_change_reexec): options-only — strikes (ATM, ATM±N)
+    #   don't exist for FX/crypto. Stored, marked gray in UI.
+    # P4 (no_reentry_after_end): effectively always-on in our system —
+    #   entry_end_time pre-filters bars; re-executions can't fire past it.
+    #   Stored for round-trip; tooltip explains.
+    # P5 (no_reentry_sl_cost): no-op — we don't have a separate ReEntry
+    #   action that waits for price recovery (P1 covers our use case).
+    no_reexec_sl_cost: bool = False
+    no_wait_trade_reexec: bool = False
+    no_strike_change_reexec: bool = False
+    no_reentry_after_end: bool = False
+    no_reentry_sl_cost: bool = True  # spec default ON
+
+    # ── Exit Settings Tab (spec: 5. Logics/Exit_Settings_Logics.html) ──
+    # exit_order_type: only "MARKET" is implemented (spec confirms even for
+    #   options). "Limit" / "SL_Limit" are not implemented; spec blocks them
+    #   at portfolio save in the original engine.
+    # exit_sell_first: options-only multi-leg ordering (close SELL legs
+    #   before BUY legs to reduce delta). FX/crypto slots are independent.
+    # on_portfolio_complete: only "None" is wired. The 3 cross-portfolio
+    #   actions need cross-portfolio infrastructure that doesn't exist.
+    exit_order_type: str = "MARKET"
+    exit_sell_first: bool = True
+    on_portfolio_complete: str = "None"
+
+    # ── Monitoring Tab (no spec doc found in 5. Logics/) ──
+    # All 6 fields are evaluation-frequency settings (Realtime / MinuteClose
+    # / Interval) for live-trading monitoring; backtest processes every bar
+    # in order so there's no analogue. Stored for round-trip only.
+    leg_target_monitoring: str = "Realtime"
+    leg_trailing_monitoring: str = "Realtime"
+    leg_sl_monitoring: str = "Realtime"
+    leg_sl_trailing_monitoring: str = "Realtime"
+    combined_target_monitoring: str = "Realtime"
+    combined_sl_monitoring: str = "Realtime"
+
     slots: list[StrategySlotConfig] = field(default_factory=list)
 
     def add_slot(self, slot: StrategySlotConfig) -> None:
@@ -197,6 +326,38 @@ def _filter_known_fields(data: dict, dataclass_type) -> dict:
     return {k: v for k, v in data.items() if k in known}
 
 
+def _migrate_legacy_trade_size(slot_data: dict) -> None:
+    """Translate the deprecated slot-level ``trade_size`` into ``lots``.
+
+    Older portfolio JSON had a single ``trade_size`` field on each slot that
+    conflated the instrument's lot size with the user's multiplier (e.g.
+    ``trade_size: 1000`` on an FX slot meant "1000 base-currency units").
+    The new model has admin-configured ``lot_size`` on the instrument and
+    user-configured ``lots`` on the slot, so ``order_qty = lot_size × lots``.
+
+    To preserve the exact order quantity of legacy portfolios, derive
+    ``lots = trade_size / lot_size`` (where lot_size comes from the venue
+    config for the slot's symbol). When the venue config is missing or has no
+    entry for this symbol, lot_size defaults to 1, so ``lots = trade_size`` —
+    which gives the same per-bar quantity the legacy code path produced.
+    Mutates ``slot_data`` in place. No-op when ``trade_size`` is absent or
+    ``lots`` is already set explicitly.
+    """
+    if "trade_size" not in slot_data or "lots" in slot_data:
+        slot_data.pop("trade_size", None)
+        return
+    legacy = slot_data.pop("trade_size")
+    # Local import keeps models.py free of a top-level core.venue_config
+    # dependency (avoids a circular import path during test collection).
+    try:
+        from core.venue_config import load_instrument_config_for_bar_type
+        inst_cfg = load_instrument_config_for_bar_type(slot_data.get("bar_type_str", "")) or {}
+    except Exception:
+        inst_cfg = {}
+    lot_size = float(inst_cfg.get("lot_size") or 1) or 1.0
+    slot_data["lots"] = float(legacy) / lot_size
+
+
 def portfolio_from_dict(data: dict) -> PortfolioConfig:
     # Don't mutate the caller's dict.
     data = dict(data)
@@ -204,6 +365,7 @@ def portfolio_from_dict(data: dict) -> PortfolioConfig:
     slots = []
     for raw_slot in slots_data:
         slot_data = dict(raw_slot)
+        _migrate_legacy_trade_size(slot_data)
         exit_data = slot_data.pop("exit_config", {}) or {}
         exit_config = ExitConfig(**_filter_known_fields(exit_data, ExitConfig))
         slots.append(StrategySlotConfig(
@@ -211,6 +373,54 @@ def portfolio_from_dict(data: dict) -> PortfolioConfig:
             **_filter_known_fields(slot_data, StrategySlotConfig),
         ))
     return PortfolioConfig(slots=slots, **_filter_known_fields(data, PortfolioConfig))
+
+
+def effective_slot_qty(
+    slot: "StrategySlotConfig",
+    user_id: Optional[str] = None,
+) -> float:
+    """Compute the runtime order quantity for a slot.
+
+    Resolves
+    ``min(instrument.lot_size × slot.lots × user.multiplier,
+    instrument.trade_size_cap)`` by reading the per-symbol admin config
+    from the slot's ``bar_type_str`` and the per-user multiplier from
+    ``config/users.json``.
+
+    When the venue/symbol has no config entry, lot_size defaults to 1 (so
+    the raw quantity is just ``slot.lots × multiplier``) and the cap is
+    unbounded. When ``user_id`` is None or unknown, multiplier defaults to
+    1.0 so legacy single-user call paths behave identically.
+
+    This is the single place that materializes the four sizing tiers
+    (admin-instrument lot_size, admin-instrument trade_size cap, user-slot
+    lots, per-user multiplier) into one number. ``backtest_runner`` calls
+    it when constructing each strategy's runtime config, so strategies
+    themselves only ever see a final pre-resolved quantity.
+
+    **Cap order matters.** The user multiplier is applied BEFORE the
+    admin cap so the cap is a true hard ceiling — a runaway multiplier
+    can't bust through. Documented as a deliberate authority boundary:
+    admin policy wins over user preference.
+    """
+    try:
+        from core.venue_config import load_instrument_config_for_bar_type
+        inst_cfg = load_instrument_config_for_bar_type(slot.bar_type_str) or {}
+    except Exception:
+        inst_cfg = {}
+    try:
+        from core.users import get_multiplier
+        multiplier = get_multiplier(user_id)
+    except Exception:
+        multiplier = 1.0
+    lot_size = float(inst_cfg.get("lot_size") or 1) or 1.0
+    raw = float(slot.lots) * lot_size * multiplier
+    cap_raw = inst_cfg.get("trade_size")
+    if cap_raw:
+        cap = float(cap_raw)
+        if cap > 0:
+            return min(raw, cap)
+    return raw
 
 
 def save_portfolio(config: PortfolioConfig, directory: str = "portfolios") -> Path:

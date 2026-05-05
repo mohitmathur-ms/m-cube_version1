@@ -353,6 +353,7 @@ const Backtest = {
         try {
             const response = await fetch("/api/custom_strategies/upload", {
                 method: "POST",
+                headers: App.userHeaders(),
                 body: formData,
             });
 
@@ -603,7 +604,7 @@ const Backtest = {
         try {
             const response = await fetch("/api/backtest/run-stream", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: App.userHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({
                     instruments,
                     starting_capital: capital,

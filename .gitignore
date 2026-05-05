@@ -19,6 +19,7 @@ reports/benchmark_*.json
 
 # Local runtime state
 .runtime_history.json
+.claude/scheduled_tasks.lock
 
 # One-off test/stress scripts (April 2026 session)
 run_test_april23.py

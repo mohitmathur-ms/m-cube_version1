@@ -1,0 +1,209 @@
+# Plan: Multi-user identity layer (Option B)
+
+## Context
+
+The system today has zero notion of users — one set of portfolios, one sizing config, no identity at any layer. The user wants multiple traders to "play along" on different instruments from separate machines, with a central admin that:
+
+- defines each user (alias, user_id),
+- assigns a per-user **multiplier** that scales effective trade size,
+- restricts each user to an **allowed_instruments** list.
+
+Users picked **identity-only, no security**: every request carries an `X-User-Id` header — no passwords, no sessions. This is appropriate for trusted internal teams; anyone on the network can spoof, and we'll document that. Total scope: ~1–2 days, contained.
+
+The end goal: each user runs the same Flask app from their own machine, hits a shared backend, sees only their own portfolios, has their effective trade size scaled by their personal multiplier (on top of the admin's per-instrument policy), and is rejected when they try to add an instrument outside their allowlist. The admin manages all users from the existing admin panel (port 5001).
+
+## Design overview
+
+### Identity flow
+
+```
+Browser (alice's machine)              Server
+─────────────────────────              ──────────────────────────
+On first load:                         GET /api/users/list →
+  GET /api/users/list                    [{user_id, alias}, ...]
+  Show picker → user clicks "alice"
+  localStorage["user_id"] = "alice"
+
+On every API call:
+  fetch(url, { headers: {              Validate header against
+    "X-User-Id": "alice"                config/users.json
+  }})                                   →  401 if missing/unknown
+                                        →  Inject user object into
+                                            request context
+                                        →  Scope state by user_id
+```
+
+### Effective trade size — final formula
+
+```
+qty = lots × lot_size × resolved_trade_size × user_multiplier
+                         │                     │
+                         └─ slot override or  └─ from users.json,
+                            admin default,       defaults to 1.0
+                            clamped by admin
+                            max_size LAST
+```
+
+**Cap order matters**: apply user_multiplier first, then admin `max_size` clamp. This makes the admin cap a true hard ceiling — a malicious or mistaken multiplier can't bust through.
+
+## Data model
+
+### `config/users.json` (new, admin-managed)
+
+```json
+{
+  "_meta": {
+    "description": "Identity-only user registry. The X-User-Id header on each API call must match a user_id here. No auth/security — for trusted environments.",
+    "schema_version": 1
+  },
+  "users": [
+    {
+      "user_id": "alice",
+      "alias": "Alice — FX Desk",
+      "multiplier": 1.0,
+      "allowed_instruments": ["EURUSD", "GBPUSD", "USDJPY"]
+    },
+    {
+      "user_id": "bob",
+      "alias": "Bob — Crypto Desk",
+      "multiplier": 0.5,
+      "allowed_instruments": null
+    }
+  ]
+}
+```
+
+- `user_id`: URL-safe `[a-z0-9_-]{1,32}` (used as path component)
+- `multiplier`: `> 0`. Defaults to `1.0` if omitted or invalid
+- `allowed_instruments`: `null` = all instruments; `list[str]` = whitelist of bare symbols (`"EURUSD"`, not full bar_type strings)
+
+### State partitioning
+
+| Resource | Today | After |
+|---|---|---|
+| `portfolios/*.json` | Flat | `portfolios/<user_id>/*.json` |
+| `reports/*.csv` | Flat | `reports/<user_id>/*.csv` |
+| `config/instrument_sizing.json` | Shared | **Stay shared** (admin policy) |
+| `catalog/` (market data) | Shared | **Stay shared** (read-only data) |
+| `custom_strategies/` | Shared | **Stay shared** (admin-uploaded) |
+| `custom_adapters/`, `adapters_config/`, `data_formats/` | Shared | **Stay shared** (admin-managed) |
+| `.runtime_history.json` | Shared | **Stay shared** (system-wide perf telemetry) |
+
+Migration: one-shot script moves existing flat `portfolios/*.json` → `portfolios/_default/*.json` and seeds a `_default` user, so legacy data is reachable on day one without admin setup.
+
+## Files to create
+
+| File | Purpose |
+|---|---|
+| `config/users.json` | Seed registry with one `_default` user. |
+| `core/users.py` | `load_users`, `save_users`, `get_user(user_id)`, `validate_user_id`, `list_users`. Mirrors the layout of [`core/instrument_sizing.py`](m-cube_version1/core/instrument_sizing.py) — same load-on-every-call pattern, no cache. |
+| `core/migrate_users.py` (one-shot) | Detect flat `portfolios/*.json` and move them under `portfolios/_default/`. Idempotent. Run automatically on server startup if needed. |
+| `adapter_admin/static/js/users.js` | Admin UI page mirroring [`sizing_defaults.js`](m-cube_version1/adapter_admin/static/js/sizing_defaults.js): table with user_id, alias, multiplier, allowed_instruments (multi-select from known symbols), add/delete/save. |
+
+## Files to modify
+
+### Backend
+
+| File | Change |
+|---|---|
+| [`core/instrument_sizing.py`](m-cube_version1/core/instrument_sizing.py) `resolve_trade_size` (line 109) | Add `user_id: Optional[str] = None` param. After resolving slot/admin trade_size: multiply by `user.multiplier` (default 1.0 when None or unknown), then apply `max_size` clamp last. |
+| [`core/models.py`](m-cube_version1/core/models.py) `effective_trade_size` (line 177) | Add `user_id: Optional[str] = None` and forward to `resolve_trade_size`. Backwards compatible — current call sites that pass nothing get `multiplier=1.0`. |
+| [`core/backtest_runner.py`](m-cube_version1/core/backtest_runner.py) | At the 8 call sites of `effective_trade_size(slot)` (lines 1062, 1078, 1347, 1365, 1710, 1727, 2012, 2031), pass the user_id threaded through `run_portfolio_backtest`. Add `user_id: Optional[str] = None` to that function's signature. |
+| [`server.py`](m-cube_version1/server.py) | (1) Add `_get_user_or_401(request)` helper that reads `X-User-Id`, looks up via `core.users.get_user`, returns dict or aborts 401. (2) Wrap **all 4 portfolio CRUD endpoints** (lines 1059, 1070, 1082, 1094) with it; use `portfolios/<user_id>/` as the dir. (3) Wrap **portfolio backtest endpoint** (line 1122) with it. (4) Add `instrument_allowlist_check(portfolio, user)` called inside save and pre-backtest — reject 403 if any slot's bar_type's bare symbol is not in user's allowlist. (5) New endpoint `GET /api/users/list` — returns `[{user_id, alias}, ...]` only, no multipliers (frontend picker). (6) Reports go to `REPORTS_DIR / user_id / ...`. |
+| [`adapter_admin/admin_server.py`](m-cube_version1/adapter_admin/admin_server.py) | Add `GET /api/users` (full registry) and `POST /api/users` (replace registry). Validation: `user_id` regex, `multiplier > 0`, `allowed_instruments` is list[str] or null, no duplicate user_ids. Pattern mirrors the existing [`/api/sizing` GET/POST](m-cube_version1/adapter_admin/admin_server.py) (lines 753-772). |
+
+### Frontend
+
+| File | Change |
+|---|---|
+| [`static/js/app.js`](m-cube_version1/static/js/app.js) `App.api` (line 161-181) and `App.cachedApi` (line 194-214) | Inject `X-User-Id` header from `localStorage.getItem("user_id")` on every request. If localStorage is empty, redirect to user-picker before any API call. |
+| [`static/js/app.js`](m-cube_version1/static/js/app.js) `App.init` | On first load, if no user_id in localStorage, fetch `/api/users/list` and show a picker modal (reuse existing modal infra). After pick, set localStorage and reload. Add a "Switch user" link in the header showing current alias. |
+| [`static/js/backtest.js`](m-cube_version1/static/js/backtest.js) lines 354-357, 604-612 | The 2 direct `fetch()` calls (FormData upload + run-stream) need to manually add the same `X-User-Id` header — `App.api` doesn't cover them. |
+| [`static/js/portfolio.js`](m-cube_version1/static/js/portfolio.js) line 1826-1829 | Same — the `/api/portfolios/backtest` stream fetch needs the header. |
+| [`adapter_admin/static/index.html`](m-cube_version1/adapter_admin/static/index.html) | Add "Users" sidebar item alongside "Sizing Defaults". Add `<script src="js/users.js">`. |
+| [`adapter_admin/static/js/app.js`](m-cube_version1/adapter_admin/static/js/app.js) | Add router case `case "users": Users.render(main); break;`. |
+
+## Reuse of existing patterns
+
+| Pattern | Reuse from |
+|---|---|
+| Config-file loader/validator/save trio | [`core/instrument_sizing.py`](m-cube_version1/core/instrument_sizing.py) — copy the `load_*`/`save_*`/`_entry_for` shape exactly |
+| Admin Flask CRUD endpoint with payload validation | [`adapter_admin/admin_server.py`](m-cube_version1/adapter_admin/admin_server.py) `_validate_sizing_payload` at line ~735 |
+| Admin UI page with editable table | [`adapter_admin/static/js/sizing_defaults.js`](m-cube_version1/adapter_admin/static/js/sizing_defaults.js) — `render`, `_rowHTML`, `_collectInto`, `save` are 1:1 templatable |
+| Cap-clamp resolution chain | Existing `resolve_trade_size` — extend, don't replace |
+| Schema-tolerant load | [`core/models.py`](m-cube_version1/core/models.py) `_filter_known_fields` at line 196 |
+
+## Migration
+
+On server startup (`server.py` near `PORTFOLIOS_DIR` definition, line 1053):
+
+1. If `portfolios/` contains `*.json` files at root level (legacy flat layout):
+   - Ensure `config/users.json` exists with at least a `_default` user (create if missing)
+   - Move `portfolios/*.json` → `portfolios/_default/*.json`
+   - Log the migration once
+2. If `portfolios/` is already partitioned (subdirs with json files), skip
+3. Idempotent — safe to run multiple times
+
+Frontend: existing browsers with empty localStorage will be sent to the picker on first load and pick `_default` (or whatever the admin renames it to).
+
+## Verification
+
+End-to-end test plan once implementation is done:
+
+### 1. Resolver math (`core/instrument_sizing.py`)
+```python
+# alice has multiplier=2.0; EURUSD admin max_size=5.0
+slot = StrategySlotConfig(bar_type_str="EURUSD...", trade_size=2.0)
+assert effective_trade_size(slot, user_id="alice") == 4.0   # 2.0 × 2.0
+slot.trade_size = 10.0
+assert effective_trade_size(slot, user_id="alice") == 5.0   # 10×2=20 → clamped to 5
+```
+
+### 2. Header validation (Flask test client)
+- Hit `GET /api/portfolios/list` with no header → 401
+- With unknown user_id → 401
+- With known user_id → 200, returns only that user's portfolios
+
+### 3. Per-user isolation
+- alice POSTs portfolio "P1"
+- bob's `GET /api/portfolios/list` does NOT include "P1"
+- bob can also create his own "P1" without conflict (different directory)
+
+### 4. Allowlist enforcement
+- bob's allowed_instruments = `["BTCUSD"]`
+- bob POSTs portfolio with EURUSD slot → 403 with descriptive error
+
+### 5. Admin CRUD round-trip
+- Admin POST `/api/users` with new user "carol" → 200
+- Main server `GET /api/users/list` includes "carol"
+- carol can immediately authenticate and create portfolios
+
+### 6. Migration
+- Stash a flat `portfolios/test_legacy.json` before startup
+- Start server
+- Verify file moved to `portfolios/_default/test_legacy.json`
+- `GET /api/portfolios/list` as `_default` user returns it
+
+### 7. Manual browser test
+- Open two browsers, set localStorage `user_id` to alice and bob
+- Verify each sees only their own portfolios in the UI
+- Switch alice's user picker → portfolios list re-fetches and updates
+
+### 8. Documentation note (no code)
+- Add a clear warning in `config/users.json._meta` that this is identity-only, not security; anyone on the network can spoof headers.
+
+## Out of scope (deliberate)
+
+- Real auth (passwords/sessions) — explicitly chosen against. Can be layered on later by replacing the header check with `flask_login.current_user.id`; everything downstream stays the same.
+- Per-user `max_size` overrides — explicitly excluded by user from feature picks.
+- Per-user `starting_capital` cap — same.
+- Audit logging of who-did-what — not requested. The `X-User-Id` header is logged by Flask access logs anyway.
+- Sharing portfolios between users — not requested. If needed later, add a `shared_with: list[user_id]` field on the portfolio.
+
+## Risk callouts
+
+1. **Spoofability**: explicit and accepted. Document loudly in `users.json._meta` and on the picker UI.
+2. **localStorage clearing** silently re-sends user to picker — fine, recoverable.
+3. **Cap order**: applying admin `max_size` AFTER user multiplier is a deliberate choice (admin authority is final). Document in `resolve_trade_size` docstring.
+4. **Allowlist symbol matching**: must match the same way as `instrument_sizing._symbol_key` (split on `.`, uppercase). Reuse that helper, don't reinvent.
+5. **`_default` user collision**: if admin renames `_default` to something else after migration, existing portfolios become orphaned. Mitigation: don't allow renaming `user_id`; only `alias` is editable.

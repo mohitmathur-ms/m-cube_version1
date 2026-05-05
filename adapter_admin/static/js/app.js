@@ -33,6 +33,7 @@ const App = {
             case "adapter_config": AdapterConfig.render(main); break;
             case "custom_adapters": CustomAdapters.render(main); break;
             case "data_formats": DataFormats.render(main); break;
+            case "users": Users.render(main); break;
             default: main.innerHTML = '<div class="alert alert-danger">Page not found.</div>';
         }
     },

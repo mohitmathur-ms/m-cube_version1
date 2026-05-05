@@ -1,0 +1,54 @@
+What already exists
+The codebase already has three size layers (per legs_logics.html:609-611):
+
+
+order_quantity = lot_size  ×  lots  ×  multiplier
+                  └─ instrument-level ─┘  └─ slot-level ─┘
+Layer	Where it lives today	Current state
+Lot size (contract size — e.g. 100 for SPY, 100k for FX)	Instrument.lot_size (NautilusTrader built-in field)	Set to None at instrument_factory.py:157 — slot exists but unused
+Multiplier / lots (how many contracts per trade)	StrategySlotConfig.trade_size at models.py:67	Active — but conflates "lots" with "raw quantity"
+Per-leg lots (multi-leg strategies)	legN_lots at range_breakout.py:104, used as config.trade_size * Decimal(lots) at range_breakout.py:173	Already implemented ✓
+So the design pattern you want is already documented and partially wired. The gap is that lot_size on the instrument isn't populated, so today trade_size has to absorb both jobs.
+
+Recommended separation
+One sentence: put lot size on the instrument (one source of truth per symbol), keep multiplier on the slot (rename trade_size → lots for clarity), and derive order quantity at submit time as instrument.lot_size × slot.lots.
+
+Concrete shape
+1. Instrument layer — populate lot_size in instrument_factory.py:
+
+
+LOT_SIZE = {
+    "EURUSD": 100_000,   # FX standard lot
+    "BTCUSD": 1,         # crypto: 1 coin
+    "SPY":    100,       # equity options-style
+    "NIFTY":  75,        # index futures
+}
+# pass into create_instrument: lot_size=Quantity(LOT_SIZE.get(symbol, 1), ...)
+2. Slot layer — rename for clarity in models.py:67:
+
+
+@dataclass
+class StrategySlotConfig:
+    lots: float = 1.0          # ← was trade_size; the multiplier
+    # keep `trade_size` as a deprecated alias for one release for JSON compat
+3. Order-submit layer — change the strategies' order build (e.g. ema_cross.py:77) from:
+
+
+quantity=self.instrument.make_qty(self.config.trade_size)
+to:
+
+
+quantity=self.instrument.make_qty(self.config.lots * float(self.instrument.lot_size))
+That single line is where the two concepts get multiplied. Everywhere upstream stays clean: instrument config knows lot size, slot config knows multiplier, neither has to know about the other.
+
+Tradeoffs
+Choice	Pros	Cons
+Lot size on instrument (recommended)	One source of truth per symbol; matches industry convention; matches Nautilus's design	Needs a lookup table (LOT_SIZE dict) maintained per asset class
+Lot size on slot	Per-strategy override	Two slots on same symbol can disagree → bugs
+Keep trade_size only (status quo)	No migration	User has to mentally multiply lot × multiplier every time
+Migration concern
+Existing portfolio JSON files have "trade_size": 1.0. If you rename to lots, _filter_known_fields will silently drop the old key and default lots to 1.0 — which is exactly the right behavior for users who had trade_size=1.0 but silently breaks anyone with trade_size != 1.0. So either (a) keep trade_size as a deprecated alias that copies into lots on load, or (b) write a one-shot migration script over portfolios/*.json.
+
+My take: the cleanest path is rename trade_size → lots on the slot + populate lot_size on the instrument + keep trade_size as a back-compat alias for one release. Total scope: ~5–6 files (models.py, instrument_factory.py, the 5 strategy files calling make_qty).
+
+Want me to go ahead and implement it, or would you rather adjust the design first (e.g., keep the name trade_size and just add lot_size, or put both on the slot)?

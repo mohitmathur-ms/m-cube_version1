@@ -67,3 +67,53 @@ def load_adapter_config_for_bar_type(
 ) -> dict | None:
     """Convenience: parse the venue from a bar type and load the config."""
     return load_adapter_config_for_venue(venue_from_bar_type(bar_type_str), configs_dir)
+
+
+def symbol_from_bar_type(bar_type_str: str) -> str | None:
+    """Extract the bare symbol from a bar type string.
+
+    "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL" -> "USDJPY".
+    """
+    if not bar_type_str:
+        return None
+    instrument_id_part = bar_type_str.split("-", 1)[0]  # "USDJPY.FOREX_MS"
+    if "." not in instrument_id_part:
+        return instrument_id_part or None
+    return instrument_id_part.split(".", 1)[0].strip() or None
+
+
+def load_instrument_config(
+    symbol: str | None,
+    venue: str | None,
+    configs_dir: Path | str | None = None,
+) -> dict | None:
+    """Return per-instrument settings from the venue's adapter config.
+
+    Looks up ``config["instruments"][symbol]`` (case-insensitive on symbol).
+    Expected shape: ``{"lot_size": <number>, "trade_size": <cap>}``.
+    Returns None when the venue config is missing, lacks an ``instruments``
+    block, or doesn't list this symbol.
+    """
+    if not symbol:
+        return None
+    cfg = load_adapter_config_for_venue(venue, configs_dir)
+    if not cfg:
+        return None
+    instruments = cfg.get("instruments") or {}
+    target = symbol.upper()
+    for key, value in instruments.items():
+        if isinstance(key, str) and key.upper() == target:
+            return value if isinstance(value, dict) else None
+    return None
+
+
+def load_instrument_config_for_bar_type(
+    bar_type_str: str,
+    configs_dir: Path | str | None = None,
+) -> dict | None:
+    """Convenience: parse symbol + venue from a bar type and load the config."""
+    return load_instrument_config(
+        symbol_from_bar_type(bar_type_str),
+        venue_from_bar_type(bar_type_str),
+        configs_dir,
+    )

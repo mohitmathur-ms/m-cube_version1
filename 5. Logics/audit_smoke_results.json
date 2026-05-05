@@ -1,0 +1,757 @@
+[
+  {
+    "total_pnl": -55.9051,
+    "total_trades": 24,
+    "wins": 0,
+    "losses": 39,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 18,
+      "Tue": 14,
+      "Wed": 13
+    },
+    "fills_hours_utc": {
+      "10": 26,
+      "11": 5,
+      "12": 14
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-04T11:05:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 6.5,
+    "status": "ok",
+    "test_id": "T01",
+    "name": "Conservative day trader (RBO + tight window + squareoff + pf_sl + move_sl)",
+    "params": {
+      "rbo_enabled": true,
+      "rbo_entry_at": "Any",
+      "rbo_cancel_other_side": true,
+      "range_monitoring": "09:00-10:00",
+      "entry_window": "10:00-15:00",
+      "squareoff": "15:30 UTC",
+      "delay_between_legs_sec": 120,
+      "pf_sl_value": 50.0,
+      "move_sl_safety_sec": 600
+    },
+    "expected": "Path B; entries 10:00-15:00; closes by 15:30; pf_sl may fire if cumulative loss exceeds $50",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -76.4615,
+    "total_trades": 16,
+    "wins": 2,
+    "losses": 14,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 15,
+      "Tue": 2,
+      "Thu": 5,
+      "Fri": 6,
+      "Wed": 4
+    },
+    "fills_hours_utc": {
+      "11": 15,
+      "12": 2,
+      "13": 3,
+      "14": 3,
+      "15": 2,
+      "16": 7
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 6.1,
+    "status": "ok",
+    "test_id": "T02",
+    "name": "Aggressive scalper (RBO Any, both directions, no leg delay)",
+    "params": {
+      "rbo_entry_at": "Any",
+      "rbo_cancel_other_side": false,
+      "rbo_range_buffer": 15,
+      "delay_between_legs_sec": 0,
+      "run_on_days": [
+        "Mon-Fri"
+      ],
+      "squareoff": "22:00 UTC"
+    },
+    "expected": "Higher trade count than T01 (no cancel_other_side, no leg delay)",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -36.2976,
+    "total_trades": 15,
+    "wins": 0,
+    "losses": 15,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 11,
+      "Wed": 9,
+      "Fri": 10
+    },
+    "fills_hours_utc": {
+      "11": 29,
+      "16": 1
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 5.0,
+    "status": "ok",
+    "test_id": "T03",
+    "name": "Defensive grid (pf_sl + trailing pf_sl + move_sl trail_after + leg delay + Mon/Wed/Fri only)",
+    "params": {
+      "pf_sl_value": 80.0,
+      "pf_sl_trail_every": 20,
+      "pf_sl_trail_by": 10,
+      "move_sl_safety_sec": 300,
+      "move_sl_trail_after": true,
+      "delay_between_legs_sec": 180,
+      "run_on_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    "expected": "Trades only on Mon/Wed/Fri; trailing SL ratchets without firing $80 threshold",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -18.4534,
+    "total_trades": 10,
+    "wins": 4,
+    "losses": 6,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Wed": 8,
+      "Thu": 8,
+      "Tue": 4
+    },
+    "fills_hours_utc": {
+      "11": 9,
+      "12": 1,
+      "13": 2,
+      "16": 8
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 5.4,
+    "status": "ok",
+    "test_id": "T04",
+    "name": "Profit lock chaser (pf_tgt + trailing target + pf_sl backstop + Tue-Thu only)",
+    "params": {
+      "pf_tgt_value": 30.0,
+      "trail_lock_min_profit": 15,
+      "trail_when_reach": 20,
+      "trail_every": 10,
+      "trail_by": 5,
+      "pf_sl_value": 60.0,
+      "run_on_days": [
+        "Tue",
+        "Wed",
+        "Thu"
+      ]
+    },
+    "expected": "Trades only Tue/Wed/Thu; profit-lock activates at +$20 if reached",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -53.127,
+    "total_trades": 12,
+    "wins": 1,
+    "losses": 11,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 9,
+      "Tue": 3,
+      "Wed": 3,
+      "Thu": 2
+    },
+    "fills_hours_utc": {
+      "5": 11,
+      "7": 2,
+      "8": 1,
+      "9": 3
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-05T05:42:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 5.9,
+    "status": "ok",
+    "test_id": "T05",
+    "name": "Asia session (05:00-10:00 entry, 11:00 squareoff, Mon-Thu, pf_sl=$40, RBO off)",
+    "params": {
+      "entry_start_time": "05:00:00",
+      "entry_end_time": "10:00:00",
+      "squareoff": "11:00 UTC",
+      "run_on_days": [
+        "Mon-Thu"
+      ],
+      "pf_sl_value": 40.0,
+      "rbo_enabled": false
+    },
+    "expected": "Entries 05:00-10:00 UTC; closes 11:00; no Friday trades",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -48.1033,
+    "total_trades": 24,
+    "wins": 2,
+    "losses": 22,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 11,
+      "Wed": 7,
+      "Fri": 14,
+      "Thu": 11,
+      "Tue": 5
+    },
+    "fills_hours_utc": {
+      "9": 2,
+      "10": 14,
+      "11": 20,
+      "12": 6,
+      "13": 6
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 7.3,
+    "status": "ok",
+    "test_id": "T06",
+    "name": "Trend follower (RBO RangeHigh + 5min leg delay + move_sl trail_after + no_reexec_sl_cost)",
+    "params": {
+      "rbo_entry_at": "RangeHigh",
+      "rbo_range_buffer": 10,
+      "range_monitoring": "09:00-10:30",
+      "rbo_entry": "10:30-16:00",
+      "delay_between_legs_sec": 300,
+      "move_sl_safety_sec": 600,
+      "move_sl_trail_after": true,
+      "no_reexec_sl_cost": true
+    },
+    "expected": "Upward breakouts only; SL pin via move_sl; no re_execute after move_sl",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -47.1416,
+    "total_trades": 8,
+    "wins": 4,
+    "losses": 10,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 12
+    },
+    "fills_hours_utc": {
+      "11": 3,
+      "12": 5,
+      "15": 2,
+      "16": 2
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-02T16:21:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 7.4,
+    "status": "ok",
+    "test_id": "T07",
+    "name": "Mean reversion (RBO RangeLow + pf_sl=$30 + pf_tgt=$20 + percentage alloc + OnSL_Only)",
+    "params": {
+      "rbo_entry_at": "RangeLow",
+      "pf_sl_value": 30.0,
+      "pf_tgt_value": 20.0,
+      "allocation_mode": "percentage",
+      "first_3_slots": "30% each",
+      "on_sl_action_on": "OnSL_Only"
+    },
+    "expected": "Downward breakouts only; clip on $30 loss or $20 profit",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -26.0291,
+    "total_trades": 10,
+    "wins": 1,
+    "losses": 26,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 12,
+      "Tue": 4,
+      "Wed": 4
+    },
+    "fills_hours_utc": {
+      "11": 17,
+      "13": 2,
+      "15": 1
+    },
+    "max_loss_hit": true,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-04T11:31:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 7.2,
+    "status": "ok",
+    "test_id": "T08",
+    "name": "Risk-averse (tight pf_sl + trail + move_sl + max_loss + squareoff + narrow window)",
+    "params": {
+      "pf_sl_value": 25.0,
+      "trail_every": 10,
+      "trail_by": 5,
+      "move_sl_safety_sec": 240,
+      "max_loss": 30,
+      "max_profit": 50,
+      "squareoff": "15:00 UTC",
+      "entry_window": "10:00-14:00"
+    },
+    "expected": "Tight pf_sl ($25) likely fires; max_loss flag if total > $30",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -15.771,
+    "total_trades": 14,
+    "wins": 7,
+    "losses": 7,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 13,
+      "Fri": 7,
+      "Wed": 4,
+      "Tue": 2,
+      "Thu": 2
+    },
+    "fills_hours_utc": {
+      "9": 10,
+      "10": 2,
+      "11": 1,
+      "13": 4,
+      "14": 1,
+      "15": 2,
+      "16": 2,
+      "18": 1,
+      "19": 2,
+      "21": 3
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 8.2,
+    "status": "ok",
+    "test_id": "T09",
+    "name": "High-frequency (RBO off + 09:30-23:59 window + delay=0 + percentage alloc 25/25/25/8.3...)",
+    "params": {
+      "rbo_enabled": false,
+      "entry_window": "09:30-23:59",
+      "delay_between_legs_sec": 0,
+      "allocation_mode": "percentage",
+      "first_3_slots": "25%",
+      "rest": "~4.2%"
+    },
+    "expected": "Higher trade count than baseline (wider entry window, no leg delay)",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -56.9949,
+    "total_trades": 16,
+    "wins": 6,
+    "losses": 10,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 13,
+      "Tue": 5,
+      "Thu": 10,
+      "Wed": 4
+    },
+    "fills_hours_utc": {
+      "11": 17,
+      "13": 2,
+      "14": 5,
+      "15": 2,
+      "16": 6
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 6.2,
+    "status": "ok",
+    "test_id": "T10",
+    "name": "Weekly cycle (Mon-Thu + 11:00-16:00 entry + trailing pf_sl + 17:00 squareoff)",
+    "params": {
+      "run_on_days": [
+        "Mon-Thu"
+      ],
+      "entry_window": "11:00-16:00",
+      "pf_sl_value": 70.0,
+      "trail_every": 15,
+      "trail_by": 8,
+      "squareoff": "17:00 UTC",
+      "rbo_enabled": false
+    },
+    "expected": "No Fri trades; trailing pf_sl ratchets",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -59.0247,
+    "total_trades": 25,
+    "wins": 0,
+    "losses": 25,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 11,
+      "Wed": 9,
+      "Thu": 16,
+      "Fri": 5,
+      "Tue": 4
+    },
+    "fills_hours_utc": {
+      "11": 36,
+      "12": 8,
+      "16": 1
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-06T11:06:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 7.0,
+    "status": "ok",
+    "test_id": "T11",
+    "name": "Both SL & Target with trailing both + move_sl",
+    "params": {
+      "pf_sl_value": 50.0,
+      "pf_sl_trail": "15/8",
+      "pf_tgt_value": 40.0,
+      "pf_tgt_trail": "lock=20 reach=30 every=10 by=5",
+      "move_sl_safety_sec": 180
+    },
+    "expected": "Both SL and target trailing run; move_sl pins entry SL after 3min",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -42.8306,
+    "total_trades": 10,
+    "wins": 2,
+    "losses": 8,
+    "path_b_summary": "none",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 6,
+      "Wed": 8,
+      "Tue": 6
+    },
+    "fills_hours_utc": {
+      "11": 10,
+      "12": 2,
+      "13": 2,
+      "14": 6
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 5.2,
+    "status": "ok",
+    "test_id": "T12",
+    "name": "Path A combo (env=0; same scenario should run as on Path B)",
+    "params": {
+      "_USE_BACKTEST_NODE": "0",
+      "pf_sl_value": 50.0,
+      "pf_tgt_value": 40.0,
+      "run_on_days": [
+        "Mon",
+        "Tue",
+        "Wed"
+      ],
+      "entry_window": "10:00-14:00",
+      "squareoff": "14:30 UTC"
+    },
+    "expected": "path_b_summary == \"none\"; path A handles all settings same as Path B",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -29.5151,
+    "total_trades": 10,
+    "wins": 1,
+    "losses": 45,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 15
+    },
+    "fills_hours_utc": {
+      "11": 15
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-02T11:59:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 6.2,
+    "status": "ok",
+    "test_id": "T13",
+    "name": "Edge: very tight settings (pf_sl=$15 + 1h window + 1min move_sl safety)",
+    "params": {
+      "pf_sl_value": 15.0,
+      "entry_window": "11:30-12:30",
+      "move_sl_safety_sec": 60,
+      "delay_between_legs_sec": 60,
+      "rbo_enabled": false
+    },
+    "expected": "pf_sl likely fires (tight $15 threshold); may trip Money-string bug",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": -103.2708,
+    "total_trades": 18,
+    "wins": 2,
+    "losses": 16,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 13,
+      "Fri": 11,
+      "Wed": 6,
+      "Thu": 2,
+      "Tue": 4
+    },
+    "fills_hours_utc": {
+      "0": 9,
+      "4": 3,
+      "8": 1,
+      "10": 1,
+      "11": 1,
+      "13": 3,
+      "14": 4,
+      "15": 2,
+      "16": 3,
+      "17": 1,
+      "19": 2,
+      "21": 6
+    },
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 9.3,
+    "status": "ok",
+    "test_id": "T14",
+    "name": "Edge: zero filters (no RBO, no day filter, 24h window, no clips)",
+    "params": {
+      "rbo_enabled": false,
+      "run_on_days": null,
+      "entry_window": "00:00-23:59",
+      "squareoff": null,
+      "pf_sl_enabled": false,
+      "pf_tgt_enabled": false,
+      "move_sl_enabled": false
+    },
+    "expected": "Maximum trade count; no clips or boundary flags",
+    "date_range": "2024-12-02 to 2024-12-06"
+  },
+  {
+    "total_pnl": 0.0,
+    "total_trades": 0,
+    "wins": 0,
+    "losses": 0,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {},
+    "fills_hours_utc": {},
+    "max_loss_hit": false,
+    "max_profit_hit": false,
+    "pf_clip_ts": null,
+    "pf_clip_reason": null,
+    "pf_clip_action": null,
+    "pf_clipped_slots": [],
+    "warnings": [],
+    "elapsed_sec": 4.1,
+    "status": "ok",
+    "test_id": "T15",
+    "name": "Edge: weekend-only run_on_days (no FX market data on Sat/Sun)",
+    "params": {
+      "run_on_days": [
+        "Sat",
+        "Sun"
+      ],
+      "pf_sl_value": 20.0,
+      "rbo_enabled": false
+    },
+    "expected": "Zero trades (no FX data on weekends); run completes without error",
+    "date_range": "2024-12-02 to 2024-12-08"
+  },
+  {
+    "total_pnl": -40.4169,
+    "total_trades": 17,
+    "wins": 0,
+    "losses": 25,
+    "path_b_summary": "all",
+    "slot_count": 9,
+    "fills_weekdays": {
+      "Mon": 18,
+      "Wed": 16
+    },
+    "fills_hours_utc": {
+      "10": 20,
+      "11": 6,
+      "12": 8
+    },
+    "max_loss_hit": true,
+    "max_profit_hit": false,
+    "pf_clip_ts": "2024-12-04T11:59:00+00:00",
+    "pf_clip_reason": "STOPLOSS",
+    "pf_clip_action": "SqOff",
+    "pf_clipped_slots": [
+      "fx_eur_ema",
+      "fx_eur_rsi",
+      "fx_eur_bb",
+      "fx_gbp_ema",
+      "fx_gbp_rsi",
+      "fx_gbp_bb",
+      "fx_jpy_ema",
+      "fx_jpy_rsi",
+      "fx_jpy_bb"
+    ],
+    "warnings": [],
+    "elapsed_sec": 6.1,
+    "status": "ok",
+    "test_id": "T16",
+    "name": "Stress test: every active setting on with realistic values",
+    "params": {
+      "rbo": "Any cancel=T buf=30",
+      "run_on_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ],
+      "entry_window": "10:00-15:00",
+      "squareoff": "16:00 UTC",
+      "delay_between_legs_sec": 120,
+      "pf_sl": "$40 trail 15/8",
+      "pf_tgt": "$25 trail lock=10 reach=20",
+      "move_sl_safety": 300,
+      "move_sl_trail_after": true,
+      "no_reexec_sl_cost": true,
+      "max_loss": 50,
+      "on_sl_action_on": "OnSL_Only",
+      "on_target_action_on": "OnTarget_Only"
+    },
+    "expected": "All gates active; trades only Mon/Wed/Fri 10-15 UTC; clip on $40 loss or $25 profit; closes by 16:00",
+    "date_range": "2024-12-02 to 2024-12-06"
+  }
+]

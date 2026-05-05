@@ -605,10 +605,15 @@
         <tr><td>Default</td><td><code>1</code></td></tr>
       </table>
       <div class="logic-text">
-        <p>Number of contract lots. Used in PnL calculation:</p>
-        <div class="code-block">pnl = (entry_price - exit_price) × QTY × lots × multiplier   # SELL
-pnl = (exit_price - entry_price) × QTY × lots × multiplier   # BUY</div>
-        <p><code>QTY = 100</code> (standard SPY lot size). <code>multiplier</code> defaults to 1.0. The <code>realized_per_lot</code> metric divides total PnL by <code>lots</code> for normalized reporting.</p>
+        <p>User-side multiplier (number of contracts). Order quantity is the per-symbol contract size (admin-configured) multiplied by lots, capped by an admin-set per-symbol max:</p>
+        <div class="code-block">order_qty = min(instrument.lot_size × slot.lots, instrument.trade_size_cap)
+            └────── admin (venue_config) ──────┘   └─ user (slot) ─┘   └─── admin cap ───┘</div>
+        <p>Both <code>lot_size</code> and the <code>trade_size</code> cap live in the venue's adapter config under <code>instruments.&lt;symbol&gt;</code> (see <code>adapter_admin/adapters_config/&lt;venue&gt;.json</code>). Example FX shape: <code>{ "EURUSD": { "lot_size": 100000, "trade_size": 10000000 } }</code>. Multi-leg strategies (Range Breakout) further multiply the resolved per-trade quantity by <code>legN_lots</code>.</p>
+        <p>Used in PnL calculation:</p>
+        <div class="code-block">pnl = (entry_price - exit_price) × order_qty   # SELL
+pnl = (exit_price - entry_price) × order_qty   # BUY</div>
+        <p>The <code>realized_per_lot</code> metric divides total PnL by <code>lots</code> for normalized reporting.</p>
+        <p><em>Migration note:</em> the legacy <code>trade_size</code> slot field has been renamed to <code>lots</code>. Old portfolios are migrated automatically on load — for an FX slot with <code>trade_size: 1000</code> and venue <code>lot_size: 100000</code>, this becomes <code>lots: 0.01</code> (preserving the original 1000-unit order quantity).</p>
       </div>
     </div>
   </div>

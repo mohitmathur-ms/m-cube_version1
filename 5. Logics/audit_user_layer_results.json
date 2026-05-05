@@ -1,0 +1,311 @@
+[
+  {
+    "total_pnl": -55.9051,
+    "total_trades": 24,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 1000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "T01",
+    "name": "Baseline _default (\u00d71.0): RBO + window + squareoff + pf_sl + move_sl",
+    "params": {
+      "user": "_default",
+      "multiplier": 1.0,
+      "complex_settings": "RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s"
+    },
+    "expected": "Baseline avg_fill_qty captured here; later tests should scale by their multipliers.",
+    "user_id": "_default",
+    "elapsed_sec": 6.6,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -59.6492,
+    "total_trades": 13,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 2000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "T02",
+    "name": "alice (\u00d72.0): same complex bundle as T01 \u2014 order qty must DOUBLE",
+    "params": {
+      "user": "alice",
+      "multiplier": 2.0,
+      "complex_settings": "RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s"
+    },
+    "expected": "avg_fill_qty == 2 \u00d7 T01 baseline (1000.0) within rounding",
+    "user_id": "alice",
+    "elapsed_sec": 6.4,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -45.0916,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 500.0,
+    "pf_clip_reason": null,
+    "test_id": "T03",
+    "name": "bob (\u00d70.5): same complex bundle \u2014 order qty must HALVE",
+    "params": {
+      "user": "bob",
+      "multiplier": 0.5,
+      "complex_settings": "RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s"
+    },
+    "expected": "avg_fill_qty == 0.5 \u00d7 T01 baseline (1000.0) within rounding",
+    "user_id": "bob",
+    "elapsed_sec": 6.5,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -61.8684,
+    "total_trades": 9,
+    "wins": 0,
+    "losses": 40,
+    "slot_count": 9,
+    "avg_fill_qty": 3000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "T04",
+    "name": "trader_agg (\u00d73.0): trailing target + reverse-on-SL + Mon-Fri",
+    "params": {
+      "user": "trader_agg",
+      "multiplier": 3.0,
+      "complex_settings": "pf_tgt 30 + trail 20/10/5 + pf_sl 60 backstop + reverse-on-SL + weekdays"
+    },
+    "expected": "avg_fill_qty == 3 \u00d7 baseline; trades fire weekdays only; reverses generate paired fills",
+    "user_id": "trader_agg",
+    "elapsed_sec": 6.7,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -0.8724,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 10.0,
+    "pf_clip_reason": null,
+    "test_id": "T05",
+    "name": "trader_safe (\u00d70.01): safety scaling + RBO + trailing pf_sl",
+    "params": {
+      "user": "trader_safe",
+      "multiplier": 0.01,
+      "complex_settings": "RBO + window + squareoff + pf_sl 80 + trailing 20/10 + move_sl"
+    },
+    "expected": "avg_fill_qty \u2248 1% of baseline; pf_sl rarely fires due to tiny exposure",
+    "user_id": "trader_safe",
+    "elapsed_sec": 7.4,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -76858.8,
+    "total_trades": 3,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 10000000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "T06",
+    "name": "runaway (\u00d7100000): admin cap MUST clamp \u2014 order qty == per-symbol cap",
+    "params": {
+      "user": "runaway",
+      "multiplier": 100000.0,
+      "complex_settings": "RBO + pf_sl 50 + cap=10M (FX) \u2014 math would overflow without cap"
+    },
+    "expected": "avg_fill_qty == 10,000,000 (admin cap binds; multiplier alone would yield 1e8)",
+    "user_id": "runaway",
+    "elapsed_sec": 7.4,
+    "status": "ok",
+    "date_range": "2024-12-02 to 2024-12-06",
+    "kind": "backtest"
+  },
+  {
+    "test_id": "T07",
+    "name": "Allowlist save: bob blocked on EURUSD (allowlist=[BTCUSD])",
+    "expected": "HTTP 403 with descriptive error message",
+    "status": "ok",
+    "detail": "bob (allowlist=[BTCUSD]) saving EURUSD -> 403",
+    "elapsed_sec": 0.2,
+    "kind": "api",
+    "observations": {
+      "status": 403,
+      "error": "Instrument 'EURUSD' is not in user 'bob's allowed_instruments. Ask admin to update the allowlist."
+    }
+  },
+  {
+    "test_id": "T08",
+    "name": "Allowlist backtest stream: bob blocked on EURUSD \u2014 error event",
+    "expected": "First NDJSON line carries event=error with 'allowed_instruments' in message",
+    "status": "ok",
+    "detail": "first stream event: {'event': 'error', 'error': \"Instrument 'EURUSD' is not in user 'bob's allowed_instruments. Ask admin to update the allowlist.\"}",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "first_event": {
+        "event": "error",
+        "error": "Instrument 'EURUSD' is not in user 'bob's allowed_instruments. Ask admin to update the allowlist."
+      }
+    }
+  },
+  {
+    "test_id": "T09",
+    "name": "Allowlist standalone backtest: alice blocked on BTCUSD",
+    "expected": "HTTP 403 \u2014 standalone path enforces same allowlist as portfolio path",
+    "status": "ok",
+    "detail": "alice (allowlist=[EURUSD,GBPUSD,USDJPY]) standalone BTCUSD -> 403",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 403,
+      "error": "Instrument 'BTCUSD' is not in user 'alice's allowed_instruments. Ask admin to update the allowlist."
+    }
+  },
+  {
+    "test_id": "T10",
+    "name": "Per-user portfolio isolation: separate portfolios/<user_id>/ dirs",
+    "expected": "alice's portfolio invisible to bob's list call",
+    "status": "ok",
+    "detail": "alice saves=200; alice sees AuditPF_T10=True; bob sees=False",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "alice_list": [
+        "AuditPF_T10",
+        "TestPF"
+      ],
+      "bob_list": []
+    }
+  },
+  {
+    "test_id": "T11",
+    "name": "Identity gate: 401 when X-User-Id is missing on mutating endpoints",
+    "expected": "HTTP 401 'X-User-Id header required'",
+    "status": "ok",
+    "detail": "missing header -> 401",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 401,
+      "error": "X-User-Id header required"
+    }
+  },
+  {
+    "test_id": "T12",
+    "name": "Identity gate: 401 on unknown user_id",
+    "expected": "HTTP 401 'Unknown user: ghost_user'",
+    "status": "ok",
+    "detail": "unknown user 'ghost_user' -> 401",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 401,
+      "error": "Unknown user: ghost_user"
+    }
+  },
+  {
+    "test_id": "T13",
+    "name": "Picker endpoint /api/users/list: returns only {user_id, alias}",
+    "expected": "200; multiplier and allowed_instruments NOT exposed via this endpoint",
+    "status": "ok",
+    "detail": "status=200, keys_clean=True, known_users_present=True",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "sample": [
+        {
+          "alias": "Default User",
+          "user_id": "_default"
+        },
+        {
+          "alias": "Alice (FX)",
+          "user_id": "alice"
+        },
+        {
+          "alias": "Bob (Crypto)",
+          "user_id": "bob"
+        }
+      ]
+    }
+  },
+  {
+    "test_id": "T14",
+    "name": "/api/users/me: full read-only row for active session user",
+    "expected": "multiplier and allowed_instruments match registry; per-header switching works",
+    "status": "ok",
+    "detail": "alice: mul=2.0, allow=['EURUSD', 'GBPUSD', 'USDJPY'] | bob: mul=0.5, allow=['BTCUSD']",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "alice": {
+        "alias": "Alice (FX)",
+        "allowed_instruments": [
+          "EURUSD",
+          "GBPUSD",
+          "USDJPY"
+        ],
+        "multiplier": 2.0,
+        "user_id": "alice"
+      },
+      "bob": {
+        "alias": "Bob (Crypto)",
+        "allowed_instruments": [
+          "BTCUSD"
+        ],
+        "multiplier": 0.5,
+        "user_id": "bob"
+      }
+    }
+  },
+  {
+    "test_id": "T15",
+    "name": "Report scoping: /api/orderbook/list returns only the caller's files",
+    "expected": "No cross-user file leakage; each session sees its own reports/<user_id>/ contents only",
+    "status": "ok",
+    "detail": "alice list contains alice-probe=True; bob list cross-leak=False",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "alice_count": 1,
+      "bob_count": 1
+    }
+  },
+  {
+    "test_id": "T16",
+    "name": "Admin live-edit: multiplier change visible on next request (no restart)",
+    "expected": "get_user reads users.json on every call; new multiplier visible immediately",
+    "status": "ok",
+    "detail": "carol multiplier before=1.5, after admin save=5.0",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "before": {
+        "alias": "Carol",
+        "allowed_instruments": [
+          "EURUSD"
+        ],
+        "multiplier": 1.5,
+        "user_id": "carol"
+      },
+      "after": {
+        "alias": "Carol",
+        "allowed_instruments": [
+          "EURUSD"
+        ],
+        "multiplier": 5.0,
+        "user_id": "carol"
+      }
+    }
+  }
+]

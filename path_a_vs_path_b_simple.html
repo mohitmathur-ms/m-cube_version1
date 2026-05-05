@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Path A vs Path B &mdash; Plain-English Guide</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    padding: 0;
+    font-size: 16px;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h2 {
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .toc ol { padding-left: 1.4rem; }
+  .toc li { margin: 0.35rem 0; }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .toc a:hover { color: var(--accent); }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.6rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.2rem;
+    color: var(--accent3);
+    margin: 1.3rem 0 0.6rem 0;
+  }
+  h4 {
+    font-size: 1rem;
+    color: var(--accent4);
+    margin: 1rem 0 0.4rem 0;
+  }
+  p { margin-bottom: 0.8rem; }
+  strong { color: #f0f6fc; }
+  em { color: var(--accent4); font-style: normal; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent2);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.8rem 0;
+    font-size: 0.84rem;
+    line-height: 1.55;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .keyword { color: var(--accent3); }
+  .function { color: var(--accent); }
+  .string { color: var(--accent2); }
+  .comment { color: var(--text-muted); font-style: italic; }
+  .arrow { color: var(--accent4); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--table-alt); }
+  .insight-box {
+    background: linear-gradient(135deg, #1a2332, #161b22);
+    border-left: 4px solid var(--accent2);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .insight-box strong { color: var(--accent2); }
+  .warn-box {
+    background: linear-gradient(135deg, #2a1f1a, #161b22);
+    border-left: 4px solid var(--accent4);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .warn-box strong { color: var(--accent4); }
+  .analogy-box {
+    background: linear-gradient(135deg, #1f1a2a, #161b22);
+    border-left: 4px solid var(--accent3);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .analogy-box strong { color: var(--accent3); }
+  .file-ref {
+    color: var(--accent4);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85em;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .col-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+  }
+  .col-box h4 {
+    margin-top: 0;
+    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-box.path-a h4 { color: var(--accent4); }
+  .col-box.path-b h4 { color: var(--accent2); }
+  .col-box pre {
+    margin: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 0.78rem;
+  }
+  .step-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin: 1rem 0;
+    padding: 0.8rem 1rem;
+    background: var(--code-bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .step-num {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    line-height: 2rem;
+    text-align: center;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .step-text { flex: 1 1 auto; }
+  .step-text strong { color: var(--accent); }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+  }
+  .badge-a { background: #3a2a1f; color: #f0883e; }
+  .badge-b { background: #1f3a2a; color: #3fb950; }
+  ul, ol { padding-left: 1.6rem; margin: 0.5rem 0; }
+  li { margin: 0.4rem 0; }
+  .recommend {
+    background: linear-gradient(135deg, #1a2a32, #161b22);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 1.2rem 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .recommend strong { color: var(--accent); }
+  dl { margin: 1rem 0; }
+  dt {
+    color: var(--accent2);
+    font-weight: 600;
+    margin-top: 0.8rem;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.95rem;
+  }
+  dd {
+    margin-left: 1.5rem;
+    margin-top: 0.2rem;
+    color: var(--text-muted);
+  }
+  .footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 2rem 0 1rem 0;
+    padding: 1rem;
+  }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.5rem; }
+    .container { padding: 1rem; }
+    section { padding: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Path A vs Path B &mdash; In Plain English</h1>
+  <p>Two ways to run a backtest in our project. What we use today, what we could switch to, and what would actually change in the code. Written so anyone can follow along &mdash; no Nautilus expertise required.</p>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#backtest">What is a backtest?</a></li>
+    <li><a href="#two-paths">The two paths &mdash; an analogy</a></li>
+    <li><a href="#path-a">Path A &mdash; what we use today</a></li>
+    <li><a href="#path-b">Path B &mdash; what we'd switch to</a></li>
+    <li><a href="#side-by-side">Side-by-side comparison</a></li>
+    <li><a href="#changes">What would change in our code</a></li>
+    <li><a href="#unchanged">What stays exactly the same</a></li>
+    <li><a href="#should-we">Should we actually switch?</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<section id="backtest">
+  <h2>1. What is a backtest?</h2>
+  <p>A <strong>backtest</strong> is a simulation. You take a trading strategy &mdash; say, "buy when the 10-day moving average crosses above the 20-day moving average" &mdash; and you replay old market data through it. The simulator pretends each historical price tick is happening live, tells the strategy about it, lets the strategy place fake orders, and tracks what would have happened.</p>
+  <p>At the end you get a P&amp;L curve, a list of trades, and a sense of whether the strategy would have made or lost money <em>if</em> it had been running back then.</p>
+  <p>Our project runs backtests using a Python library called <strong>NautilusTrader</strong>. Nautilus offers two different ways to set up a backtest. We call them Path A and Path B.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="two-paths">
+  <h2>2. The two paths &mdash; an analogy</h2>
+
+  <div class="analogy-box">
+    <strong>Imagine you want to cook dinner.</strong>
+    <p style="margin-top: 0.6rem;">There are two ways to do it.</p>
+    <p><strong style="color: var(--accent4);">Path A</strong> &mdash; cook from scratch. You pick out every ingredient yourself, measure them, set up the stove, decide the order of operations, and hand-stir at every step. You're in full control of every detail.</p>
+    <p><strong style="color: var(--accent2);">Path B</strong> &mdash; order a meal kit. You fill out a form ("I want pasta with chicken, for 2 people, ready by 7pm"), hand it to the meal-kit company, and they handle the assembly. The food comes out the same, but you spent your effort describing what you wanted instead of doing each step yourself.</p>
+  </div>
+
+  <p>Both paths produce dinner. The difference is <strong>how much manual work you do</strong> versus how much the system does for you based on a description.</p>
+
+  <p>Backtests work the same way:</p>
+  <ul>
+    <li><span class="badge badge-a">Path A</span> You build the engine, load the data, attach the strategy, and press &ldquo;run&rdquo; &mdash; one step at a time, by hand. <strong>This is what our project does today.</strong></li>
+    <li><span class="badge badge-b">Path B</span> You fill out three small forms describing what you want, hand them to a "node," and it handles the assembly. The result is the same; the wiring is automatic.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="path-a">
+  <h2>3. Path A &mdash; what we use today</h2>
+
+  <p>Today, every backtest in our project follows the same five-step recipe. It's done by hand, in code, in three places: <code>run_backtest()</code>, <code>_run_single_slot()</code>, and <code>_run_slot_group()</code> &mdash; all in <span class="file-ref">core/backtest_runner.py</span>.</p>
+
+  <h3>The five steps</h3>
+
+  <div class="step-row">
+    <div class="step-num">1</div>
+    <div class="step-text"><strong>Build the engine.</strong> The "engine" is the simulator itself. Think of it as the empty stove. We set its basic options (logging, risk checks) and turn it on.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">2</div>
+    <div class="step-text"><strong>Add the venue.</strong> A "venue" is the simulated exchange &mdash; e.g., Binance for crypto, FOREX_MS for forex. We tell the engine the account type, starting cash, and leverage.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">3</div>
+    <div class="step-text"><strong>Load the data.</strong> We open our parquet files, read the historical bars (price candles) into memory as a Python list, and hand the whole list to the engine.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">4</div>
+    <div class="step-text"><strong>Attach the strategy.</strong> We construct the strategy object (e.g., EMA crossover with periods 10 and 20) and tell the engine to use it.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">5</div>
+    <div class="step-text"><strong>Run.</strong> The engine walks through the bars in time order, calls the strategy on each one, simulates fills for any orders the strategy places, and records the results.</div>
+  </div>
+
+  <h3>What the code looks like (simplified)</h3>
+
+<pre><code>engine = BacktestEngine(config=engine_config)        <span class="comment"># step 1</span>
+
+engine.add_venue(                                     <span class="comment"># step 2</span>
+    venue=Venue(<span class="string">"FOREX_MS"</span>),
+    starting_balances=[Money(<span class="num">1_000_000</span>, USD)],
+    ...
+)
+
+bars = catalog.bars(...)                              <span class="comment"># step 3 (load)</span>
+engine.add_data(bars)                                 <span class="comment"># step 3 (hand to engine)</span>
+
+strategy = EMACross(strategy_config)                  <span class="comment"># step 4 (build)</span>
+engine.add_strategy(strategy)                         <span class="comment"># step 4 (attach)</span>
+
+engine.run()                                          <span class="comment"># step 5</span>
+</code></pre>
+
+  <p>Five method calls. Everything happens in our Python code.</p>
+
+  <div class="insight-box">
+    <strong>Key thing about Path A:</strong> all the bars are loaded into memory <em>at once</em>, before the run starts. For a 5-year EURUSD 1-minute backtest that's about 1.8 million bars sitting in RAM the entire run.
+  </div>
+
+  <h3>Where this lives in our code</h3>
+  <ul>
+    <li><span class="file-ref">core/backtest_runner.py:141</span> &mdash; <code>run_backtest()</code> handles single one-off backtests.</li>
+    <li><span class="file-ref">core/backtest_runner.py:355</span> &mdash; <code>_run_single_slot()</code> runs one strategy slot inside a portfolio backtest.</li>
+    <li><span class="file-ref">core/backtest_runner.py:718</span> &mdash; <code>_run_slot_group()</code> runs multiple strategies in one shared engine (when <code>_USE_GROUPING=1</code>).</li>
+  </ul>
+  <p>Each of these three functions does the same five steps with slight variations. Today they're three near-copies of the same recipe.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="path-b">
+  <h2>4. Path B &mdash; what we'd switch to</h2>
+
+  <p>Path B uses a class called <code>BacktestNode</code> instead of <code>BacktestEngine</code>. Same library, same package &mdash; we already have it installed. The class lives at <span class="file-ref">venv/Lib/site-packages/nautilus_trader/backtest/node.py</span>. We don't write it; we just import it.</p>
+
+  <p>Instead of calling five methods on an engine, we fill out three "forms" (called <em>configs</em>) that describe what we want, hand them to the node, and the node does the wiring for us.</p>
+
+  <h3>The three forms (configs)</h3>
+
+  <table>
+    <thead>
+      <tr><th>Form</th><th>What you put on it</th><th>Replaces&hellip;</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>BacktestVenueConfig</code></td>
+        <td>Venue name, account type, starting cash, leverage.</td>
+        <td>The <code>engine.add_venue(...)</code> call from Path A step 2.</td>
+      </tr>
+      <tr>
+        <td><code>BacktestDataConfig</code></td>
+        <td>Path to the parquet folder, which bar types to load, date range.</td>
+        <td>The manual <code>catalog.bars(...)</code> + <code>engine.add_data(...)</code> from step 3.</td>
+      </tr>
+      <tr>
+        <td><code>BacktestEngineConfig</code></td>
+        <td>Trader ID, logging settings, risk-check settings.</td>
+        <td>The argument we already pass to <code>BacktestEngine(config=...)</code> in step 1 &mdash; but now embedded inside the run config.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>You then bundle all three into one <code>BacktestRunConfig</code> and hand it to <code>BacktestNode</code>.</p>
+
+  <h3>What the code looks like (simplified)</h3>
+
+<pre><code>venue_cfg = BacktestVenueConfig(                      <span class="comment"># form 1</span>
+    name=<span class="string">"FOREX_MS"</span>,
+    starting_balances=[<span class="string">"1000000 USD"</span>],
+    ...
+)
+
+data_cfg = BacktestDataConfig(                        <span class="comment"># form 2</span>
+    catalog_path=<span class="string">"./catalog"</span>,
+    bar_types=[<span class="string">"EURUSD-1-MINUTE-MID-EXTERNAL"</span>, ...],
+    start_time=<span class="string">"2024-01-01"</span>,
+    end_time=<span class="string">"2024-12-31"</span>,
+)
+
+engine_cfg = BacktestEngineConfig(...)                <span class="comment"># form 3</span>
+
+run_cfg = BacktestRunConfig(                          <span class="comment"># bundle</span>
+    venues=[venue_cfg],
+    data=[data_cfg],
+    engine=engine_cfg,
+    chunk_size=<span class="num">100_000</span>,                          <span class="comment"># optional: stream 100k bars at a time</span>
+)
+
+node = BacktestNode(configs=[run_cfg])                <span class="comment"># hand to node</span>
+node.build()                                          <span class="comment"># node assembles the engine</span>
+engine = node.get_engine(run_cfg.id)                  <span class="comment"># grab the engine it built</span>
+engine.add_strategy(strategy)                         <span class="comment"># attach strategy (same as today)</span>
+node.run()                                            <span class="comment"># run!</span>
+</code></pre>
+
+  <div class="insight-box">
+    <strong>The key new feature:</strong> <code>chunk_size</code>. With <code>chunk_size=100_000</code>, the node loads only 100,000 bars into memory at a time. It processes them, drops them, loads the next 100,000, and so on. Peak memory stays flat regardless of how long the backtest is.
+  </div>
+
+  <h3>Why we still need <code>node.build()</code> and <code>engine.add_strategy()</code></h3>
+  <p>In a "fully config-driven" world, you'd describe the strategy on the form too &mdash; and the node would build and attach it for you. But our project loads custom strategies from user-supplied directories at runtime, and sometimes wraps them in <code>ManagedExitStrategy</code> for stop-loss/take-profit logic. That kind of dynamic construction can't be expressed on a form.</p>
+  <p>So we use a hybrid: forms for the engine/venue/data setup, and a one-line manual attach for the strategy. The strategy attach is exactly the same line as today: <code>engine.add_strategy(strategy)</code>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="side-by-side">
+  <h2>5. Side-by-side comparison</h2>
+
+  <p>Same backtest, two ways:</p>
+
+  <div class="two-col">
+    <div class="col-box path-a">
+      <h4>Path A &mdash; today</h4>
+<pre><code>engine = BacktestEngine(
+    config=engine_config,
+)
+engine.add_venue(
+    venue=Venue(<span class="string">"FOREX_MS"</span>),
+    oms_type=OmsType.NETTING,
+    account_type=AccountType.MARGIN,
+    starting_balances=[
+        Money(<span class="num">1_000_000</span>, USD),
+    ],
+    base_currency=USD,
+    default_leverage=Decimal(<span class="num">1</span>),
+)
+
+bars = catalog.bars(
+    bar_types=[<span class="string">"EURUSD-..."</span>],
+    start=start_date,
+    end=end_date,
+)
+engine.add_instrument(instrument)
+engine.add_data(bars)
+<span class="keyword">del</span> bars
+
+engine.add_strategy(strategy)
+engine.run()
+results = _extract_results(engine, ...)
+engine.dispose()
+</code></pre>
+    </div>
+    <div class="col-box path-b">
+      <h4>Path B &mdash; target</h4>
+<pre><code>run_cfg = BacktestRunConfig(
+    venues=[
+        BacktestVenueConfig(
+            name=<span class="string">"FOREX_MS"</span>,
+            oms_type=<span class="string">"NETTING"</span>,
+            account_type=<span class="string">"MARGIN"</span>,
+            starting_balances=[
+                <span class="string">"1000000 USD"</span>,
+            ],
+            base_currency=<span class="string">"USD"</span>,
+            default_leverage=<span class="num">1.0</span>,
+        ),
+    ],
+    data=[
+        BacktestDataConfig(
+            catalog_path=<span class="string">"./catalog"</span>,
+            bar_types=[<span class="string">"EURUSD-..."</span>],
+            start_time=start_date,
+            end_time=end_date,
+        ),
+    ],
+    engine=engine_config,
+    chunk_size=<span class="keyword">None</span>,                <span class="comment"># or 100_000</span>
+)
+
+node = BacktestNode(configs=[run_cfg])
+node.build()
+engine = node.get_engine(run_cfg.id)
+engine.add_strategy(strategy)
+node.run()
+results = _extract_results(engine, ...)
+<span class="comment"># dispose handled automatically</span>
+</code></pre>
+    </div>
+  </div>
+
+  <p>Both versions do the exact same thing under the hood. The difference is purely in <em>how</em> you describe it.</p>
+
+  <table>
+    <thead>
+      <tr><th width="40%">What changes</th><th width="30%">Path A</th><th width="30%">Path B</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Venue setup</td><td>Method call</td><td>Form (config object)</td></tr>
+      <tr><td>Data loading</td><td>Read into list, then add</td><td>Form points to parquet, node reads it</td></tr>
+      <tr><td>Memory usage</td><td>All bars in RAM at once</td><td>Optional: stream in chunks</td></tr>
+      <tr><td>Engine cleanup</td><td>Manual <code>engine.dispose()</code></td><td>Automatic</td></tr>
+      <tr><td>Strategy attach</td><td><code>engine.add_strategy(s)</code></td><td><code>engine.add_strategy(s)</code> (same)</td></tr>
+      <tr><td>Result extraction</td><td>Reads from <code>engine</code></td><td>Reads from <code>engine</code> (same)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="changes">
+  <h2>6. What would change in our code</h2>
+
+  <p>Three categories: things to add, things to keep as-is, and things we'd eventually delete.</p>
+
+  <h3>Things to <span style="color: var(--accent2);">add</span> (new code, ~150 lines total)</h3>
+  <ul>
+    <li><strong>One shared helper</strong> &mdash; <code>_build_run_config()</code>. Builds the three configs from our existing arguments. About 25 lines. Defined once, used by all three call sites.</li>
+    <li><strong>Three new functions</strong> &mdash; <code>run_backtest_node()</code>, <code>_run_single_slot_node()</code>, <code>_run_slot_group_node()</code>. Path B versions of our current functions. About 40-60 lines each.</li>
+    <li><strong>One env-flag check</strong> at the top of each public function:
+      <pre><code><span class="keyword">if</span> os.environ.get(<span class="string">"_USE_BACKTEST_NODE"</span>) == <span class="string">"1"</span>:
+    <span class="keyword">return</span> run_backtest_node(...)
+<span class="comment"># otherwise fall through to existing Path A code</span></code></pre>
+      This lets us toggle Path B on per-run without removing Path A. We can flip the flag, validate results, then flip back if anything looks off.</li>
+    <li><strong>Four new imports</strong> at the top of <code>backtest_runner.py</code>: <code>BacktestNode</code>, <code>BacktestVenueConfig</code>, <code>BacktestDataConfig</code>, <code>BacktestRunConfig</code>.</li>
+  </ul>
+
+  <h3>Things to <span style="color: var(--accent);">keep</span> exactly as-is</h3>
+  <ul>
+    <li><strong>The HTTP server</strong> &mdash; <code>server.py</code> calls <code>run_backtest()</code> and <code>run_portfolio_backtest()</code>. Those public function names don't change; only their internals do.</li>
+    <li><strong>The parquet writer</strong> &mdash; <code>core/nautilus_loader.py</code>. It already writes data in the format Path B reads.</li>
+    <li><strong>Result extraction</strong> &mdash; <code>_extract_results()</code> reads from a <code>BacktestEngine</code> object. Path B gives you back a <code>BacktestEngine</code> object via <code>node.get_engine(...)</code>, so this code keeps working unchanged.</li>
+    <li><strong>The strategy registry</strong> &mdash; how we load custom strategies, build their configs, and wrap them in <code>ManagedExitStrategy</code>. None of that changes.</li>
+    <li><strong>The parallel-worker pool</strong> &mdash; <code>ProcessPoolExecutor</code> still runs slots in parallel. Each worker just builds a <code>BacktestNode</code> instead of a <code>BacktestEngine</code>.</li>
+    <li><strong>FX BID/ASK auto-pairing</strong> &mdash; the <code>_pair_bid_ask_bar_type()</code> helper still gets called. Its output now feeds <code>BacktestDataConfig.bar_types</code> instead of a Python list passed to <code>add_data()</code>.</li>
+  </ul>
+
+  <h3>Things to <span style="color: var(--accent4);">remove</span> (eventually, after Path B becomes default)</h3>
+  <ul>
+    <li>The current Path A function bodies in <code>run_backtest()</code> / <code>_run_single_slot()</code> / <code>_run_slot_group()</code>.</li>
+    <li>The <code>_cached_catalog_bars()</code> LRU cache helper &mdash; it caches in-memory bar lists, which Path B doesn't need.</li>
+    <li>The <code>engine.dispose()</code> calls and <code>try/finally</code> blocks &mdash; Path B disposes engines automatically.</li>
+  </ul>
+  <p>None of these get removed up-front. We keep both paths side-by-side until the new one is fully validated, then clean up in a follow-up.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="unchanged">
+  <h2>7. What stays exactly the same</h2>
+  <p>From a user's perspective, <strong>nothing visible changes</strong>. The HTTP API responds the same way. The result HTML reports look the same. The strategies run the same way. P&amp;L numbers should be identical (or differ only by tiny floating-point noise if streaming is enabled).</p>
+  <ul>
+    <li>Strategy code is unchanged.</li>
+    <li>Parquet files on disk are unchanged.</li>
+    <li>HTTP endpoints are unchanged.</li>
+    <li>Result reports are unchanged.</li>
+    <li>Parallel-run scheduling is unchanged.</li>
+    <li>FX rate conversion is unchanged.</li>
+  </ul>
+  <p>The migration is purely an internal wiring change. Outside observers can't tell the difference.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="should-we">
+  <h2>8. Should we actually switch?</h2>
+
+  <h3>Reasons to switch</h3>
+  <ul>
+    <li><strong>Memory ceiling on long backtests.</strong> A 5-year minute-bar EURUSD backtest with BID + ASK loaded uses around 1 GB of RAM. With <code>chunk_size</code> set, peak RAM stays around 15-50 MB regardless of date range. If you're hitting RAM limits, this is the fix.</li>
+    <li><strong>Reproducibility.</strong> The configs are plain serializable objects. You can save a backtest's config to JSON, store it next to the result, and rerun the exact same backtest months later from the saved config alone.</li>
+    <li><strong>Cleaner code.</strong> Three call sites that today each repeat the same setup will share one helper. Less drift, fewer bugs like the one we just fixed in <code>_run_slot_group()</code> where one copy diverged from the others.</li>
+  </ul>
+
+  <h3>Reasons not to switch (yet)</h3>
+  <ul>
+    <li><strong>The current code already works.</strong> It's well-instrumented, tested in production, and memory-conscious (<code>del bars</code> after <code>add_data</code>). If you're not feeling pain today, the win is mostly aesthetic.</li>
+    <li><strong>The cache helper goes away.</strong> The worker-local LRU cache that today saves ~500 ms on repeated runs of the same date range disappears. This matters in CI scenarios where the same portfolio is run many times back-to-back.</li>
+    <li><strong>Real engineering cost.</strong> About 1-2 days of focused work for the migration plus a soak period validating Path A and Path B produce identical results across our portfolio set. Not free.</li>
+  </ul>
+
+  <div class="recommend">
+    <strong>Honest recommendation:</strong> If we're hitting memory limits on long backtests, or if reproducibility (saving and rerunning exact configs) becomes important, switch &mdash; but do it gated behind <code>_USE_BACKTEST_NODE=1</code> so we can validate side-by-side before flipping the default. If we're not feeling either pain point, leave it. The existing code is fine.
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="glossary">
+  <h2>9. Glossary</h2>
+  <dl>
+    <dt>Bar</dt>
+    <dd>One price candle. Has open, high, low, close, volume, and a timestamp. The basic unit a strategy reacts to.</dd>
+
+    <dt>BarType</dt>
+    <dd>A string identifier like <code>"EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL"</code>. Encodes the instrument, the time interval, and which side (BID/ASK/MID/LAST).</dd>
+
+    <dt>Catalog (Parquet catalog)</dt>
+    <dd>A folder on disk where bars are stored as Parquet files, organized by bar type. Our project writes to it via <code>nautilus_loader.py</code>; both Path A and Path B read from it.</dd>
+
+    <dt>Engine (BacktestEngine)</dt>
+    <dd>The actual simulator. Walks through bars in time order, calls the strategy on each one, simulates fills, tracks P&amp;L. Both paths use it internally; the difference is whether we construct it directly (Path A) or have a node construct it for us (Path B).</dd>
+
+    <dt>Node (BacktestNode)</dt>
+    <dd>A wrapper class introduced in Path B. Reads config objects, builds engines from them, runs them, and gives us back the engine handle for result extraction. We don't write the node; we import it from Nautilus.</dd>
+
+    <dt>Strategy</dt>
+    <dd>The trading logic itself &mdash; e.g., "buy when EMA(10) crosses above EMA(20)". Receives bars via callbacks, places orders. Doesn't care which path is used to run it.</dd>
+
+    <dt>Venue</dt>
+    <dd>The simulated exchange &mdash; e.g., "FOREX_MS" for forex, "BINANCE" for crypto. Determines fee structure, fill rules, account type.</dd>
+
+    <dt>chunk_size</dt>
+    <dd>A Path B-only setting. Controls how many bars the node holds in memory at once. <code>None</code> = load all at once (same as Path A). A number like <code>100_000</code> = stream that many bars at a time.</dd>
+
+    <dt>OMS type</dt>
+    <dd>"Order Management System" type. Two options: <code>NETTING</code> merges all orders on one instrument into a single position. <code>HEDGING</code> tracks each strategy's position independently. We use HEDGING when running multiple strategies in one shared engine.</dd>
+
+    <dt>Matching engine</dt>
+    <dd>The part of the engine that decides whether and at what price an order fills. For FX, it needs both BID and ASK bars loaded so it can fill at realistic spread prices.</dd>
+  </dl>
+</section>
+
+<div class="footer">
+  <p>For the technical version of this guide with file:line references and full code diffs, see <a href="nautilus_path_a_to_path_b_migration.html" style="color: var(--accent);">nautilus_path_a_to_path_b_migration.html</a>.</p>
+</div>
+
+</div>
+
+</body>
+</html>

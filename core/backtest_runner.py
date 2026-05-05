@@ -31,7 +31,7 @@ from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
 import numpy as np
 
 from core.strategies import STRATEGY_REGISTRY
-from core.models import PortfolioConfig, StrategySlotConfig
+from core.models import PortfolioConfig, StrategySlotConfig, effective_slot_qty
 from core.managed_strategy import ManagedExitStrategy, config_from_exit
 from core.fx_rates import FxRateResolver, parse_money_string
 from core.venue_config import load_adapter_config_for_bar_type
@@ -563,6 +563,551 @@ def _resolve_rbo(portfolio) -> tuple[_RBOSettings | None, str | None]:
     ), warning
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Other Settings tab. Spec: 5. Logics/Other_Settings_Logic.html.
+# Wired through ManagedExitStrategy at slot level (the spec is portfolio-level
+# but we adapt to our slot-independent architecture). delay_between_legs_sec
+# gates re-entries; on_sl_action_on / on_target_action_on filter the configured
+# exit action based on whether the SL/TP was the fixed level or a trailing one.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclasses.dataclass(frozen=True)
+class _OtherSettings:
+    """Validated Other Settings for ManagedExitStrategy.
+
+    All fields default-equivalent to off, so a slot wired with a freshly-built
+    instance behaves exactly like the legacy pre-Other-Settings code path.
+    """
+    delay_between_legs_sec: int = 0
+    on_sl_action_on: str = "OnSL_N_Trailing_Both"
+    on_target_action_on: str = "OnTarget_N_Trailing_Both"
+
+
+_VALID_ON_SL_ACTION_ON = ("OnSL_N_Trailing_Both", "OnSL_Only", "OnSL_Trailing_Only")
+_VALID_ON_TARGET_ACTION_ON = ("OnTarget_N_Trailing_Both", "OnTarget_Only", "OnTarget_Trailing_Only")
+
+
+def _resolve_other_settings(portfolio) -> tuple[_OtherSettings, list[str]]:
+    """Validate portfolio Other Settings fields and produce a ready-to-use struct.
+
+    Returns (settings, warnings). ``warnings`` is empty unless the user has set
+    options-only fields (Straddle Width Multiplier) or invalid enum values; we
+    surface those via stdout in run_portfolio_backtest so they're visible in
+    the worker log.
+    """
+    warnings: list[str] = []
+
+    delay = int(getattr(portfolio, "delay_between_legs_sec", 0) or 0)
+    if delay < 0:
+        warnings.append(f"delay_between_legs_sec={delay} clamped to 0 (negative)")
+        delay = 0
+
+    on_sl = getattr(portfolio, "on_sl_action_on", "OnSL_N_Trailing_Both") or "OnSL_N_Trailing_Both"
+    if on_sl not in _VALID_ON_SL_ACTION_ON:
+        warnings.append(
+            f"on_sl_action_on={on_sl!r} not in {_VALID_ON_SL_ACTION_ON} — "
+            f"falling back to default 'OnSL_N_Trailing_Both'."
+        )
+        on_sl = "OnSL_N_Trailing_Both"
+
+    on_tgt = getattr(portfolio, "on_target_action_on", "OnTarget_N_Trailing_Both") or "OnTarget_N_Trailing_Both"
+    if on_tgt not in _VALID_ON_TARGET_ACTION_ON:
+        warnings.append(
+            f"on_target_action_on={on_tgt!r} not in {_VALID_ON_TARGET_ACTION_ON} — "
+            f"falling back to default 'OnTarget_N_Trailing_Both'."
+        )
+        on_tgt = "OnTarget_N_Trailing_Both"
+
+    # Options-only fields — surface a warning if user set non-default values.
+    swm = float(getattr(portfolio, "straddle_width_multiplier", 0.0) or 0.0)
+    if swm != 0.0:
+        warnings.append(
+            f"straddle_width_multiplier={swm} is options-only (CE/PE strike "
+            f"override); ignored for FX/crypto. See Other_Settings_Logic.html."
+        )
+
+    if getattr(portfolio, "trail_wait_trade", False):
+        warnings.append(
+            "trail_wait_trade=True has no documented spec; the field is stored "
+            "but not yet wired. No effect on this run."
+        )
+
+    return _OtherSettings(
+        delay_between_legs_sec=delay,
+        on_sl_action_on=on_sl,
+        on_target_action_on=on_tgt,
+    ), warnings
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Portfolio-level Stoploss / Target. Spec: 5. Logics/portfolio_sl_tgt.html.
+# Applied post-hoc in _merge_portfolio_results via _apply_portfolio_clip.
+# Move SL to Cost is applied per-slot through ManagedExitStrategy (separate
+# wiring) — captured in _MoveSLConfig below for that path.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclasses.dataclass(frozen=True)
+class _PfStoplossSettings:
+    """Validated portfolio-level Stoploss config ready for _apply_portfolio_clip.
+
+    All values pre-validated and non-negative. Default-equivalent to "off"
+    when ``enabled=False`` — caller may treat this as None semantically.
+    """
+    enabled: bool = False
+    value: float = 0.0
+    action: str = "SqOff"  # SqOff | ReExecute
+    delay_sec: int = 0
+    reexecute_count: int = 0  # 0 = unlimited per spec §1.7
+    sqoff_only_loss_legs: bool = False
+    sqoff_only_profit_legs: bool = False
+    trail_enabled: bool = False
+    trail_every: float = 0.0
+    trail_by: float = 0.0
+
+
+@dataclasses.dataclass(frozen=True)
+class _PfTargetSettings:
+    """Validated portfolio-level Target config."""
+    enabled: bool = False
+    value: float = 0.0
+    action: str = "SqOff"
+    delay_sec: int = 0
+    reexecute_count: int = 0
+    trail_enabled: bool = False
+    trail_lock_min_profit: float = 0.0
+    trail_when_profit_reach: float = 0.0
+    trail_every: float = 0.0
+    trail_by: float = 0.0
+
+
+@dataclasses.dataclass(frozen=True)
+class _MoveSLConfig:
+    """Per-slot Move SL to Cost config (spec §3, adapted to slot-independent
+    architecture: each slot raises its own SL to entry once safety_sec elapsed
+    and position is in profit). Threaded through config_from_exit into
+    ManagedExitConfig fields move_sl_*.
+
+    ``no_reexec_sl_cost`` (ReExecute_Logics.html P1) is bundled here because
+    it modifies Move-SL behaviour: when True, the re_execute action is
+    suppressed if the SL that fired had been raised to entry by Move SL to
+    Cost. It's meaningful only in conjunction with Move SL to Cost — when
+    Move SL is disabled the flag is benignly always-no-op (the strategy's
+    _move_sl_fired_this_position flag never flips True).
+    """
+    enabled: bool = False
+    safety_sec: int = 0
+    action: str = "Move Only for Profitable Legs"
+    trail_after: bool = False
+    no_buy_legs: bool = False
+    no_reexec_sl_cost: bool = False
+
+
+_VALID_PF_SL_TYPES_FX = ("Combined Loss",)
+_VALID_PF_TGT_TYPES_FX = ("Combined Profit",)
+_OPTIONS_ONLY_PF_SL_TYPES = ("Combined Premium", "Absolute Combined Premium",
+                             "Underlying Movement", "Loss and Underlying Range")
+_OPTIONS_ONLY_PF_TGT_TYPES = ("Combined Premium", "Absolute Combined Premium",
+                              "Underlying Movement")
+_VALID_PF_ACTIONS_FX = ("SqOff", "ReExecute")
+_OPTIONS_ONLY_PF_ACTIONS = ("SqOff Other Portfolio", "Execute Other Portfolio",
+                            "Start Other Portfolio", "ReExecute at Entry Price",
+                            "ReExecute SameStrike at EntryPrice")
+_VALID_MOVE_SL_ACTIONS_FX = ("Move Only for Profitable Legs",
+                             "Move SL for All Legs Despite Loss/Profit")
+_OPTIONS_ONLY_MOVE_SL_ACTIONS = ("Move SL to LTP + Buffer for Loss Making Legs",)
+
+
+def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
+    """Validate portfolio.pf_sl_* fields per portfolio_sl_tgt.html §1-§2.
+
+    Returns (settings, warnings). settings.enabled=False when the user hasn't
+    enabled the feature OR validation falls back to safe defaults. Warnings
+    surface options-only types/actions silently downgraded to FX/crypto
+    universals.
+    """
+    warnings: list[str] = []
+    if not getattr(portfolio, "pf_sl_enabled", False):
+        return _PfStoplossSettings(enabled=False), warnings
+
+    sl_type = getattr(portfolio, "pf_sl_type", "Combined Loss") or "Combined Loss"
+    if sl_type in _OPTIONS_ONLY_PF_SL_TYPES:
+        warnings.append(
+            f"pf_sl_type={sl_type!r} is options-only (premium/underlying-based); "
+            f"downgraded to 'Combined Loss' for FX/crypto. Spec §1.2."
+        )
+        sl_type = "Combined Loss"
+    elif sl_type not in _VALID_PF_SL_TYPES_FX:
+        warnings.append(
+            f"Invalid pf_sl_type={sl_type!r} — falling back to 'Combined Loss'."
+        )
+        sl_type = "Combined Loss"
+
+    action = getattr(portfolio, "pf_sl_action", "SqOff") or "SqOff"
+    if action in _OPTIONS_ONLY_PF_ACTIONS:
+        warnings.append(
+            f"pf_sl_action={action!r} requires options/cross-portfolio infrastructure "
+            f"not implemented for FX/crypto; downgraded to 'SqOff'."
+        )
+        action = "SqOff"
+    elif action not in _VALID_PF_ACTIONS_FX:
+        warnings.append(f"Invalid pf_sl_action={action!r} — falling back to 'SqOff'.")
+        action = "SqOff"
+
+    value = max(0.0, float(getattr(portfolio, "pf_sl_value", 0.0) or 0.0))
+    delay = max(0, int(getattr(portfolio, "pf_sl_delay_sec", 0) or 0))
+    reexec = max(0, int(getattr(portfolio, "pf_sl_reexecute_count", 0) or 0))
+
+    sqoff_loss = bool(getattr(portfolio, "pf_sl_sqoff_only_loss_legs", False))
+    sqoff_profit = bool(getattr(portfolio, "pf_sl_sqoff_only_profit_legs", False))
+    if sqoff_loss and sqoff_profit:
+        warnings.append(
+            "pf_sl_sqoff_only_loss_legs and pf_sl_sqoff_only_profit_legs are "
+            "mutually exclusive (spec §1.10) — disabling both."
+        )
+        sqoff_loss = sqoff_profit = False
+
+    trail_enabled = bool(getattr(portfolio, "pf_sl_trail_enabled", False))
+    trail_every = max(0.0, float(getattr(portfolio, "pf_sl_trail_every", 0.0) or 0.0))
+    trail_by = max(0.0, float(getattr(portfolio, "pf_sl_trail_by", 0.0) or 0.0))
+    if trail_enabled and (trail_every == 0 or trail_by == 0):
+        warnings.append(
+            "pf_sl_trail_enabled=True but trail_every=0 or trail_by=0 — trailing "
+            "SL will have no effect."
+        )
+
+    return _PfStoplossSettings(
+        enabled=True, value=value, action=action, delay_sec=delay,
+        reexecute_count=reexec,
+        sqoff_only_loss_legs=sqoff_loss,
+        sqoff_only_profit_legs=sqoff_profit,
+        trail_enabled=trail_enabled,
+        trail_every=trail_every, trail_by=trail_by,
+    ), warnings
+
+
+def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
+    """Validate portfolio.pf_tgt_* fields per portfolio_sl_tgt.html §4-§5."""
+    warnings: list[str] = []
+    if not getattr(portfolio, "pf_tgt_enabled", False):
+        return _PfTargetSettings(enabled=False), warnings
+
+    tgt_type = getattr(portfolio, "pf_tgt_type", "Combined Profit") or "Combined Profit"
+    if tgt_type in _OPTIONS_ONLY_PF_TGT_TYPES:
+        warnings.append(
+            f"pf_tgt_type={tgt_type!r} is options-only; downgraded to "
+            f"'Combined Profit' for FX/crypto. Spec §4.2."
+        )
+        tgt_type = "Combined Profit"
+    elif tgt_type not in _VALID_PF_TGT_TYPES_FX:
+        warnings.append(
+            f"Invalid pf_tgt_type={tgt_type!r} — falling back to 'Combined Profit'."
+        )
+        tgt_type = "Combined Profit"
+
+    action = getattr(portfolio, "pf_tgt_action", "SqOff") or "SqOff"
+    if action in _OPTIONS_ONLY_PF_ACTIONS:
+        warnings.append(
+            f"pf_tgt_action={action!r} requires infrastructure not implemented "
+            f"for FX/crypto; downgraded to 'SqOff'."
+        )
+        action = "SqOff"
+    elif action not in _VALID_PF_ACTIONS_FX:
+        warnings.append(f"Invalid pf_tgt_action={action!r} — falling back to 'SqOff'.")
+        action = "SqOff"
+
+    value = max(0.0, float(getattr(portfolio, "pf_tgt_value", 0.0) or 0.0))
+    delay = max(0, int(getattr(portfolio, "pf_tgt_delay_sec", 0) or 0))
+    reexec = max(0, int(getattr(portfolio, "pf_tgt_reexecute_count", 0) or 0))
+
+    trail_enabled = bool(getattr(portfolio, "pf_tgt_trail_enabled", False))
+    trail_lock = max(0.0, float(getattr(portfolio, "pf_tgt_trail_lock_min_profit", 0.0) or 0.0))
+    trail_reach = max(0.0, float(getattr(portfolio, "pf_tgt_trail_when_profit_reach", 0.0) or 0.0))
+    trail_every = max(0.0, float(getattr(portfolio, "pf_tgt_trail_every", 0.0) or 0.0))
+    trail_by = max(0.0, float(getattr(portfolio, "pf_tgt_trail_by", 0.0) or 0.0))
+    if trail_enabled and trail_reach < trail_lock:
+        warnings.append(
+            f"pf_tgt_trail_when_profit_reach={trail_reach} < lock_min_profit={trail_lock} — "
+            f"per spec §5.3 the activation threshold should be >= lock_min_profit."
+        )
+
+    return _PfTargetSettings(
+        enabled=True, value=value, action=action, delay_sec=delay,
+        reexecute_count=reexec,
+        trail_enabled=trail_enabled,
+        trail_lock_min_profit=trail_lock,
+        trail_when_profit_reach=trail_reach,
+        trail_every=trail_every, trail_by=trail_by,
+    ), warnings
+
+
+def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
+    """Validate portfolio.move_sl_* fields per portfolio_sl_tgt.html §3.
+
+    Returns the per-slot config (threaded into ManagedExitConfig). Default-off
+    is the no-op state.
+    """
+    warnings: list[str] = []
+    # no_reexec_sl_cost is read regardless of move_sl_enabled — see dataclass docs.
+    no_reexec_sl_cost = bool(getattr(portfolio, "no_reexec_sl_cost", False))
+
+    if not getattr(portfolio, "move_sl_enabled", False):
+        return _MoveSLConfig(enabled=False, no_reexec_sl_cost=no_reexec_sl_cost), warnings
+
+    action = getattr(portfolio, "move_sl_action", "Move Only for Profitable Legs") \
+        or "Move Only for Profitable Legs"
+    if action in _OPTIONS_ONLY_MOVE_SL_ACTIONS:
+        warnings.append(
+            f"move_sl_action={action!r} (LTP + Buffer variant) is options-flavoured; "
+            f"downgraded to 'Move Only for Profitable Legs' for FX/crypto."
+        )
+        action = "Move Only for Profitable Legs"
+    elif action not in _VALID_MOVE_SL_ACTIONS_FX:
+        warnings.append(
+            f"Invalid move_sl_action={action!r} — falling back to 'Move Only for Profitable Legs'."
+        )
+        action = "Move Only for Profitable Legs"
+
+    safety = max(0, int(getattr(portfolio, "move_sl_safety_sec", 0) or 0))
+
+    return _MoveSLConfig(
+        enabled=True, safety_sec=safety, action=action,
+        trail_after=bool(getattr(portfolio, "move_sl_trail_after", False)),
+        no_buy_legs=bool(getattr(portfolio, "move_sl_no_buy_legs", False)),
+        no_reexec_sl_cost=no_reexec_sl_cost,
+    ), warnings
+
+
+@dataclasses.dataclass(frozen=True)
+class _ClipResult:
+    """Outcome of _apply_portfolio_clip — drives report-level enforcement
+    of portfolio Stoploss/Target. ``clip_ts is None`` means no enforcement
+    fired (or feature disabled). ``clipped_slots`` is the set of slot_ids
+    whose trades after clip_ts should be dropped — for full SqOff that's
+    every enabled slot, for selective SqOff it's only the matching subset.
+    """
+    clip_ts: str | None = None  # ISO UTC string from equity_curve_ts
+    clip_reason: str | None = None  # STOPLOSS | STOPLOSS_TRAIL | TARGET | TARGET_TRAIL
+    clip_action: str | None = None  # SqOff | ReExecute
+    clipped_slots: tuple[str, ...] = ()
+    would_reexecute: bool = False
+    reexec_count: int = 0
+    logs: tuple[str, ...] = ()
+
+
+def _ts_iso_to_ns(ts_iso: str | None) -> int:
+    """Convert an ISO timestamp string from equity_curve_ts to UTC nanoseconds.
+    Returns 0 for the seed/None entry. The merged equity curve uses ISO with
+    explicit '+00:00' offset (per _build_equity_curve_from_account)."""
+    if not ts_iso:
+        return 0
+    try:
+        return pd.Timestamp(ts_iso).value
+    except Exception:
+        return 0
+
+
+def _apply_portfolio_clip(
+    equity_curve_ts: list[dict],
+    starting_capital: float,
+    pf_sl: "_PfStoplossSettings",
+    pf_tgt: "_PfTargetSettings",
+    slot_pnl_at_clip: dict | None = None,  # slot_id -> pnl_at_clip (for selective sqoff)
+) -> _ClipResult:
+    """Walk the unified equity curve in time order and decide where the
+    portfolio-level Stoploss/Target would have triggered. Returns a
+    _ClipResult that the caller uses to drop post-clip trades from the
+    merged outputs.
+
+    Spec evaluation order (portfolio_sl_tgt.html §8) per tick:
+      1. Trailing SL ratchet
+      2. Fixed SL check
+      3. Trailing Target activate / ratchet
+      4. Fixed Target check
+    Delay confirmation: when a hit fires, defer clip by N seconds; cancel
+    if the condition clears before delay expires (oscillation guard, §1.6).
+    Trailing-Target SqOff always uses local SqOff regardless of action (§5).
+    """
+    if not pf_sl.enabled and not pf_tgt.enabled:
+        return _ClipResult()
+    if len(equity_curve_ts) < 2:
+        return _ClipResult()  # need at least one real tick after the seed
+
+    logs: list[str] = []
+
+    # Trailing SL state
+    sl_current = pf_sl.value if pf_sl.enabled else 0.0
+    sl_trail_anchor = 0.0
+    # Trailing Target state
+    tgt_trail_active = False
+    tgt_floor = 0.0
+    tgt_trail_anchor = 0.0
+    # Delay state — shared between SL and TGT per spec §4.6
+    pending_reason: str | None = None  # STOPLOSS | STOPLOSS_TRAIL | TARGET | TARGET_TRAIL
+    pending_at_ns: int = 0
+    pending_clip_ts: str | None = None
+
+    def _condition_holds(reason: str, pnl: float) -> bool:
+        """Re-check whether the same condition still holds for a pending clip."""
+        if reason == "STOPLOSS":
+            return pf_sl.enabled and pnl <= -sl_current
+        if reason == "STOPLOSS_TRAIL":
+            return pf_sl.enabled and pf_sl.trail_enabled and pnl <= -sl_current
+        if reason == "TARGET":
+            return pf_tgt.enabled and pnl >= pf_tgt.value
+        if reason == "TARGET_TRAIL":
+            return tgt_trail_active and pnl <= tgt_floor
+        return False
+
+    for pt in equity_curve_ts:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue  # seed entry
+        balance = float(pt.get("balance", starting_capital))
+        pnl = balance - starting_capital
+        ts_ns = _ts_iso_to_ns(ts)
+
+        # ── Step 1: Trailing SL ratchet ──
+        if pf_sl.enabled and pf_sl.trail_enabled and pf_sl.trail_every > 0:
+            gain = pnl - sl_trail_anchor
+            if gain >= pf_sl.trail_every:
+                steps = int(gain / pf_sl.trail_every)
+                old_sl = sl_current
+                sl_current = max(0.0, sl_current - steps * pf_sl.trail_by)
+                sl_trail_anchor += steps * pf_sl.trail_every
+                if sl_current != old_sl:
+                    logs.append(
+                        f"TRAIL_SL_UPDATED | Steps={steps} | Combined_SL={sl_current:.2f} | PnL={pnl:.2f}"
+                    )
+
+        # ── Step 2: Fixed SL check ──
+        sl_hit_now = pf_sl.enabled and pnl <= -sl_current
+        # Distinguish trailed-SL from fixed-SL hit (analogous to spec)
+        sl_reason = "STOPLOSS_TRAIL" if (sl_hit_now and pf_sl.trail_enabled and sl_current < pf_sl.value) else "STOPLOSS"
+
+        # ── Step 3: Trailing Target activate / ratchet ──
+        if pf_tgt.enabled and pf_tgt.trail_enabled:
+            if not tgt_trail_active and pnl >= pf_tgt.trail_when_profit_reach and pf_tgt.trail_when_profit_reach > 0:
+                tgt_trail_active = True
+                tgt_floor = pf_tgt.trail_lock_min_profit
+                tgt_trail_anchor = pf_tgt.trail_when_profit_reach
+                logs.append(
+                    f"TRAIL_TARGET_ACTIVATED | Lock={tgt_floor:.2f} | WhenReach={tgt_trail_anchor:.2f}"
+                )
+            if tgt_trail_active and pf_tgt.trail_every > 0:
+                gain = pnl - tgt_trail_anchor
+                if gain >= pf_tgt.trail_every:
+                    steps = int(gain / pf_tgt.trail_every)
+                    old_floor = tgt_floor
+                    tgt_floor += steps * pf_tgt.trail_by
+                    tgt_trail_anchor += steps * pf_tgt.trail_every
+                    if tgt_floor != old_floor:
+                        logs.append(
+                            f"TRAIL_TARGET_UPDATED | current_stop={tgt_floor:.2f}"
+                        )
+
+        # Trailing-Target exit (always SqOff per spec §5)
+        tgt_trail_hit_now = tgt_trail_active and pnl <= tgt_floor
+
+        # ── Step 4: Fixed Target check ──
+        tgt_hit_now = pf_tgt.enabled and pnl >= pf_tgt.value and pf_tgt.value > 0
+
+        # ── Delay confirmation handling ──
+        # Determine if any new condition fires at this tick
+        new_hit_reason: str | None = None
+        if sl_hit_now:
+            new_hit_reason = sl_reason
+        elif tgt_trail_hit_now:
+            new_hit_reason = "TARGET_TRAIL"
+        elif tgt_hit_now:
+            new_hit_reason = "TARGET"
+
+        if pending_reason is not None:
+            # Has the condition cleared?
+            if not _condition_holds(pending_reason, pnl):
+                logs.append(f"PORTFOLIO_DELAY_CLEARED | Condition persistent=False | Reason={pending_reason}")
+                pending_reason = None
+                pending_at_ns = 0
+                pending_clip_ts = None
+            else:
+                # Condition still holds; check if delay elapsed
+                delay_sec = pf_sl.delay_sec if pending_reason.startswith("STOPLOSS") else pf_tgt.delay_sec
+                if delay_sec == 0 or (ts_ns - pending_at_ns) >= delay_sec * 1_000_000_000:
+                    # Fire — clip happens at the original pending_clip_ts
+                    return _build_clip_result(
+                        clip_ts=pending_clip_ts, reason=pending_reason,
+                        pf_sl=pf_sl, pf_tgt=pf_tgt,
+                        slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                    )
+
+        if new_hit_reason is not None and pending_reason is None:
+            delay_sec = pf_sl.delay_sec if new_hit_reason.startswith("STOPLOSS") else pf_tgt.delay_sec
+            if delay_sec > 0:
+                pending_reason = new_hit_reason
+                pending_at_ns = ts_ns
+                pending_clip_ts = ts
+                logs.append(
+                    f"PORTFOLIO_DELAY_PENDING | Reason={new_hit_reason} | Delay={delay_sec}s"
+                )
+            else:
+                # No delay — clip immediately
+                return _build_clip_result(
+                    clip_ts=ts, reason=new_hit_reason,
+                    pf_sl=pf_sl, pf_tgt=pf_tgt,
+                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                )
+
+    # Walked the whole curve without firing
+    return _ClipResult(logs=tuple(logs))
+
+
+def _build_clip_result(
+    clip_ts: str,
+    reason: str,
+    pf_sl: "_PfStoplossSettings",
+    pf_tgt: "_PfTargetSettings",
+    slot_pnl_at_clip: dict | None,
+    logs: list,
+) -> _ClipResult:
+    """Construct the ClipResult, applying selective SqOff filtering and
+    classifying the action. Trailing-Target hits ignore configured action
+    (always SqOff per spec §5)."""
+    if reason.startswith("STOPLOSS"):
+        action = pf_sl.action
+        sqoff_loss = pf_sl.sqoff_only_loss_legs
+        sqoff_profit = pf_sl.sqoff_only_profit_legs
+    else:
+        action = "SqOff" if reason == "TARGET_TRAIL" else pf_tgt.action
+        sqoff_loss = False  # selective filters are SL-only per spec §1.9-§1.10
+        sqoff_profit = False
+
+    # Determine which slots are clipped
+    if slot_pnl_at_clip is not None and (sqoff_loss or sqoff_profit):
+        if sqoff_loss:
+            clipped = tuple(sid for sid, p in slot_pnl_at_clip.items() if p < 0)
+            filter_label = "LOSS_LEGS_ONLY"
+        else:
+            clipped = tuple(sid for sid, p in slot_pnl_at_clip.items() if p > 0)
+            filter_label = "PROFIT_LEGS_ONLY"
+        logs = list(logs) + [f"PORTFOLIO_PARTIAL_SQOFF | Reason={reason} | Filter={filter_label}"]
+    else:
+        # Full SqOff — every slot in slot_pnl_at_clip (or empty if not provided)
+        clipped = tuple(slot_pnl_at_clip.keys()) if slot_pnl_at_clip else ()
+        logs = list(logs) + [f"PORTFOLIO_SQOFF | Reason={reason}"]
+
+    would_reexec = action == "ReExecute"
+    if would_reexec:
+        logs.append(f"PORTFOLIO_REEXECUTE | Reason={reason} | Count=1 (v1: clip + flag, no replay)")
+
+    return _ClipResult(
+        clip_ts=clip_ts, clip_reason=reason, clip_action=action,
+        clipped_slots=clipped,
+        would_reexecute=would_reexec, reexec_count=1 if would_reexec else 0,
+        logs=tuple(logs),
+    )
+
+
 def _path_b_supports_filters(
     run_on_days: list | None,
     entry_start_time: str | None,
@@ -639,6 +1184,7 @@ def run_backtest_node(
     registry: dict | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
     """Path B (BacktestNode) variant of run_backtest.
 
@@ -691,10 +1237,15 @@ def run_backtest_node(
     # Build + attach strategy (identical to Path A from this point)
     registry_entry = (registry or STRATEGY_REGISTRY)[strategy_name]
     config_class = registry_entry["config_class"]
+    # Apply per-user multiplier same way the portfolio path does (admin
+    # cap doesn't apply here — standalone path takes raw trade_size as the
+    # final order quantity, so we just scale it by the user's multiplier).
+    from core.users import get_multiplier as _get_multiplier
+    eff_trade_size = float(trade_size) * _get_multiplier(user_id)
     config_kwargs = {
         "instrument_id": instrument_id,
         "bar_type": primary_bar_type,
-        "trade_size": Decimal(str(trade_size)),
+        "trade_size": Decimal(str(eff_trade_size)),
         **strategy_params,
     }
     if extra_bar_types and _config_supports_extra_bar_types(config_class):
@@ -726,6 +1277,7 @@ def run_backtest(
     registry: dict | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
     """
     Run a backtest using data from the catalog.
@@ -768,6 +1320,7 @@ def run_backtest(
             registry=registry,
             start_date=start_date,
             end_date=end_date,
+            user_id=user_id,
         )
 
     # Normalize to list
@@ -850,10 +1403,14 @@ def run_backtest(
     registry_entry = (registry or STRATEGY_REGISTRY)[strategy_name]
     config_class = registry_entry["config_class"]
 
+    # Apply per-user multiplier (matches Path B branch + portfolio path).
+    from core.users import get_multiplier as _get_multiplier
+    eff_trade_size = float(trade_size) * _get_multiplier(user_id)
+
     config_kwargs = {
         "instrument_id": instrument_id,
         "bar_type": primary_bar_type,
-        "trade_size": Decimal(str(trade_size)),
+        "trade_size": Decimal(str(eff_trade_size)),
         **strategy_params,
     }
 
@@ -900,12 +1457,17 @@ def _run_single_backtest_task(
     start_date: str | None,
     end_date: str | None,
     custom_strategies_dir: str | None,
+    user_id: str | None = None,
 ) -> dict:
     """Top-level worker for ProcessPoolExecutor.
 
     Custom strategy classes (loaded dynamically via importlib) are not picklable
     across process boundaries, so each worker reloads the merged registry from
     the custom strategies directory before invoking run_backtest.
+
+    ``user_id`` is forwarded to ``run_backtest`` so the per-user multiplier
+    is applied inside the worker process (which re-reads ``users.json`` via
+    ``core.users.get_multiplier``).
     """
     import time as _time
     registry = None
@@ -924,6 +1486,7 @@ def _run_single_backtest_task(
         registry=registry,
         start_date=start_date,
         end_date=end_date,
+        user_id=user_id,
     )
     # Reported back to the parent so run_backtest_stream can persist it to
     # the runtime-history file and improve LPT estimates on the next run.
@@ -959,6 +1522,9 @@ def _run_single_slot_node(
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
+    default_other_settings: "_OtherSettings | None" = None,
+    default_move_sl_settings: "_MoveSLConfig | None" = None,
+    user_id: str | None = None,
 ) -> dict:
     """Path B variant of _run_single_slot.
 
@@ -1052,6 +1618,7 @@ def _run_single_slot_node(
             # the wrapped path even if the slot has no exit-management or
             # squareoff configured. Otherwise the raw signal class would run
             # ungated, defeating the point of enabling RBO.
+            slot_qty = effective_slot_qty(slot, user_id)
             if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                 managed_config = config_from_exit(
                     exit_config=slot.exit_config,
@@ -1059,10 +1626,12 @@ def _run_single_slot_node(
                     signal_params=slot.strategy_params,
                     instrument_id=instrument_id,
                     bar_type=primary_bt,
-                    trade_size=slot.trade_size,
+                    trade_size=slot_qty,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
                     rbo_settings=default_rbo_settings,
+                    other_settings=default_other_settings,
+                    move_sl_settings=default_move_sl_settings,
                 )
                 strategy = ManagedExitStrategy(managed_config)
             else:
@@ -1075,7 +1644,7 @@ def _run_single_slot_node(
                 config_kwargs = {
                     "instrument_id": instrument_id,
                     "bar_type": primary_bt,
-                    "trade_size": Decimal(str(slot.trade_size)),
+                    "trade_size": Decimal(str(slot_qty)),
                     **filtered_params,
                 }
                 strategy_config = config_class(**config_kwargs)
@@ -1148,6 +1717,9 @@ def _run_single_slot(
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
+    default_other_settings: "_OtherSettings | None" = None,
+    default_move_sl_settings: "_MoveSLConfig | None" = None,
+    user_id: str | None = None,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -1181,6 +1753,9 @@ def _run_single_slot(
             default_entry_start_time=default_entry_start_time,
             default_entry_end_time=default_entry_end_time,
             default_rbo_settings=default_rbo_settings,
+            default_other_settings=default_other_settings,
+            default_move_sl_settings=default_move_sl_settings,
+            user_id=user_id,
         )
 
     import os
@@ -1337,6 +1912,7 @@ def _run_single_slot(
             # the wrapper because raw strategy classes don't know how to
             # time-close, and RBO needs it because the gate state machine
             # lives there.
+            slot_qty = effective_slot_qty(slot, user_id)
             if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                 managed_config = config_from_exit(
                     exit_config=slot.exit_config,
@@ -1344,8 +1920,10 @@ def _run_single_slot(
                     signal_params=slot.strategy_params,
                     instrument_id=instrument_id,
                     bar_type=primary_bt,
-                    trade_size=slot.trade_size,
+                    trade_size=slot_qty,
                     rbo_settings=default_rbo_settings,
+                    other_settings=default_other_settings,
+                    move_sl_settings=default_move_sl_settings,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
                 )
@@ -1362,7 +1940,7 @@ def _run_single_slot(
                 config_kwargs = {
                     "instrument_id": instrument_id,
                     "bar_type": primary_bt,
-                    "trade_size": Decimal(str(slot.trade_size)),
+                    "trade_size": Decimal(str(slot_qty)),
                     **filtered_params,
                 }
                 if extra_bar_types and _config_supports_extra_bar_types(config_class):
@@ -1604,6 +2182,9 @@ def _run_slot_group_node(
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
+    default_other_settings: "_OtherSettings | None" = None,
+    default_move_sl_settings: "_MoveSLConfig | None" = None,
+    user_id: str | None = None,
 ) -> list[dict]:
     """Path B variant of _run_slot_group.
 
@@ -1700,6 +2281,7 @@ def _run_slot_group_node(
                     or default_squareoff_tz
                 )
 
+                slot_qty = effective_slot_qty(slot, user_id)
                 if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
@@ -1707,11 +2289,13 @@ def _run_slot_group_node(
                         signal_params=slot.strategy_params,
                         instrument_id=instrument_id,
                         bar_type=primary_bt,
-                        trade_size=slot.trade_size,
+                        trade_size=slot_qty,
                         order_id_tag=order_tag,
                         squareoff_time=eff_squareoff_time,
                         squareoff_tz=eff_squareoff_tz,
                         rbo_settings=default_rbo_settings,
+                        other_settings=default_other_settings,
+                        move_sl_settings=default_move_sl_settings,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -1724,7 +2308,7 @@ def _run_slot_group_node(
                     config_kwargs = {
                         "instrument_id": instrument_id,
                         "bar_type": primary_bt,
-                        "trade_size": Decimal(str(slot.trade_size)),
+                        "trade_size": Decimal(str(slot_qty)),
                         "order_id_tag": order_tag,
                         **filtered_params,
                     }
@@ -1814,6 +2398,9 @@ def _run_slot_group(
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
+    default_other_settings: "_OtherSettings | None" = None,
+    default_move_sl_settings: "_MoveSLConfig | None" = None,
+    user_id: str | None = None,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -1857,6 +2444,9 @@ def _run_slot_group(
             default_entry_start_time=default_entry_start_time,
             default_entry_end_time=default_entry_end_time,
             default_rbo_settings=default_rbo_settings,
+            default_other_settings=default_other_settings,
+            default_move_sl_settings=default_move_sl_settings,
+            user_id=user_id,
         )
 
     import os
@@ -2002,6 +2592,7 @@ def _run_slot_group(
                     or default_squareoff_tz
                 )
 
+                slot_qty = effective_slot_qty(slot, user_id)
                 if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
@@ -2009,11 +2600,13 @@ def _run_slot_group(
                         signal_params=slot.strategy_params,
                         instrument_id=instrument_id,
                         bar_type=primary_bt,
-                        trade_size=slot.trade_size,
+                        trade_size=slot_qty,
                         order_id_tag=order_tag,
                         squareoff_time=eff_squareoff_time,
                         squareoff_tz=eff_squareoff_tz,
                         rbo_settings=default_rbo_settings,
+                        other_settings=default_other_settings,
+                        move_sl_settings=default_move_sl_settings,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -2028,7 +2621,7 @@ def _run_slot_group(
                     config_kwargs = {
                         "instrument_id": instrument_id,
                         "bar_type": primary_bt,
-                        "trade_size": Decimal(str(slot.trade_size)),
+                        "trade_size": Decimal(str(slot_qty)),
                         "order_id_tag": order_tag,
                         **filtered_params,
                     }
@@ -2128,12 +2721,17 @@ def run_portfolio_backtest(
     portfolio: PortfolioConfig,
     custom_strategies_dir: str | None = None,
     on_slot_complete=None,
+    user_id: str | None = None,
 ) -> dict:
     """
     Run a portfolio backtest with multiple strategy slots in parallel.
 
     Each slot runs in its own engine with allocated capital.
     Results are merged into portfolio-level metrics.
+
+    ``user_id`` threads through to ``effective_slot_qty`` so the per-user
+    multiplier (from ``config/users.json``) scales every slot's order
+    quantity. None preserves single-user behavior (multiplier=1.0).
     """
     import os
     from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -2153,6 +2751,20 @@ def run_portfolio_backtest(
             print(f"[RBO] disabled: {rbo_msg}")
         else:
             print(f"[RBO] warning: {rbo_msg}")
+
+    # Resolve Other Settings (delay_between_legs, on_sl_action_on,
+    # on_target_action_on, plus options-only fields). Spec:
+    # 5. Logics/Other_Settings_Logic.html.
+    other_settings, other_warnings = _resolve_other_settings(portfolio)
+    for w in other_warnings:
+        print(f"[OTHER] {w}")
+
+    # Resolve Move SL to Cost (per-slot adaptation). Threaded into
+    # ManagedExitConfig via config_from_exit alongside other slot params.
+    # Spec: 5. Logics/portfolio_sl_tgt.html §3.
+    move_sl_settings, move_sl_warnings = _resolve_move_sl_to_cost(portfolio)
+    for w in move_sl_warnings:
+        print(f"[MOVE_SL] {w}")
 
     # Calculate capital allocation per slot
     n = len(enabled_slots)
@@ -2250,6 +2862,9 @@ def run_portfolio_backtest(
                         default_entry_start_time=portfolio.entry_start_time,
                         default_entry_end_time=portfolio.entry_end_time,
                         default_rbo_settings=rbo_settings,
+                        default_other_settings=other_settings,
+                        default_move_sl_settings=move_sl_settings,
+                        user_id=user_id,
                     )
                     futures[future] = ("single", [slot])
                 else:
@@ -2267,6 +2882,9 @@ def run_portfolio_backtest(
                         default_entry_start_time=portfolio.entry_start_time,
                         default_entry_end_time=portfolio.entry_end_time,
                         default_rbo_settings=rbo_settings,
+                        default_other_settings=other_settings,
+                        default_move_sl_settings=move_sl_settings,
+                        user_id=user_id,
                     )
                     futures[future] = ("group", [slot for slot, _cap in group])
         else:
@@ -2286,6 +2904,9 @@ def run_portfolio_backtest(
                     default_entry_start_time=portfolio.entry_start_time,
                     default_entry_end_time=portfolio.entry_end_time,
                     default_rbo_settings=rbo_settings,
+                    default_other_settings=other_settings,
+                    default_move_sl_settings=move_sl_settings,
+                    user_id=user_id,
                 )
                 futures[future] = ("single", [slot])
 
@@ -2483,9 +3104,109 @@ def _merge_portfolio_results(
     merged_positions = pd.concat(all_positions_reports, ignore_index=True) if all_positions_reports else pd.DataFrame()
     merged_fills = pd.concat(all_fills_reports, ignore_index=True) if all_fills_reports else pd.DataFrame()
 
-    # Portfolio stop flags
+    # Portfolio stop flags (informational user-level caps, separate from the
+    # full Stoploss/Target machinery below — analogous to spec §10 Global
+    # User Limits).
     max_loss_hit = portfolio.max_loss is not None and total_pnl <= -abs(portfolio.max_loss)
     max_profit_hit = portfolio.max_profit is not None and total_pnl >= portfolio.max_profit
+
+    # Portfolio-level Stoploss / Target post-hoc clip. Spec:
+    # 5. Logics/portfolio_sl_tgt.html. Walks the merged equity curve, finds
+    # the trigger point, drops post-clip trades from the merged outputs.
+    pf_sl_settings, pf_sl_warnings = _resolve_pf_stoploss(portfolio)
+    pf_tgt_settings, pf_tgt_warnings = _resolve_pf_target(portfolio)
+    for w in pf_sl_warnings:
+        print(f"[PF_SL] {w}")
+    for w in pf_tgt_warnings:
+        print(f"[PF_TGT] {w}")
+
+    clip_result = _ClipResult()
+    if pf_sl_settings.enabled or pf_tgt_settings.enabled:
+        # Compute per-slot final P&L for selective sqoff (used at clip-point
+        # to decide which slots to clip — uses end-of-run P&L as a proxy for
+        # P&L at clip_ts, which is close enough for v1 since selective sqoff
+        # at the clip moment matters only for which slots survive past it).
+        slot_pnl_at_clip = {
+            slot.slot_id: float(slot_results[slot.slot_id]["total_pnl"])
+            for slot in portfolio.enabled_slots
+            if slot_results.get(slot.slot_id) is not None
+        }
+        clip_result = _apply_portfolio_clip(
+            equity_curve_ts, portfolio.starting_capital,
+            pf_sl_settings, pf_tgt_settings, slot_pnl_at_clip,
+        )
+        for log_line in clip_result.logs:
+            print(f"[PF_CLIP] {log_line}")
+
+        if clip_result.clip_ts is not None and clip_result.clipped_slots:
+            # Drop post-clip rows from merged_fills / merged_positions for the
+            # clipped slot set. We match by trader_id (slot_to_trader_id is
+            # built below — compute it inline here since we need it earlier).
+            _slot_to_trader_pre = {}
+            for slot in portfolio.enabled_slots:
+                r = slot_results.get(slot.slot_id)
+                if r and r.get("positions_report") is not None and not r["positions_report"].empty:
+                    tids = r["positions_report"]["trader_id"].unique()
+                    if len(tids) > 0:
+                        _slot_to_trader_pre[slot.slot_id] = str(tids[0])
+
+            clipped_traders = {
+                _slot_to_trader_pre[sid] for sid in clip_result.clipped_slots
+                if sid in _slot_to_trader_pre
+            }
+            clip_ns = _ts_iso_to_ns(clip_result.clip_ts)
+
+            def _filter_post_clip(df: "pd.DataFrame") -> "pd.DataFrame":
+                if df.empty or not clipped_traders:
+                    return df
+                if "trader_id" not in df.columns or "ts_init" not in df.columns:
+                    return df
+                # Drop rows where trader_id ∈ clipped_traders AND ts_init > clip_ns.
+                # ts_init in the report is typically a pandas Timestamp object;
+                # convert to int ns for comparison.
+                ts_int = pd.to_datetime(df["ts_init"], errors="coerce", utc=True).astype("int64")
+                mask = (df["trader_id"].astype(str).isin(clipped_traders)) & (ts_int > clip_ns)
+                return df.loc[~mask].reset_index(drop=True)
+
+            merged_fills = _filter_post_clip(merged_fills)
+            merged_positions = _filter_post_clip(merged_positions)
+
+            # Recompute aggregate stats from the clipped positions (PnL/trades
+            # for slots that were clipped). For v1 we only update the totals;
+            # per-slot stats remain pre-clip (would require recomputing each
+            # slot's win/loss from clipped merged_positions — defer).
+            #
+            # The "realized_pnl" column from Nautilus is a Money-string
+            # ("-2.20 USD", "-321 JPY") — calling .sum() on it concatenates
+            # rather than adds. Prefer the base-currency numeric column added
+            # by positions_report_with_base (e.g. "realized_pnl_USD"), which
+            # is FX-converted and float-typed. Same lookup pattern as
+            # backtest_runner.py:2978-2991.
+            if not merged_positions.empty:
+                _base_col = next(
+                    (c for c in merged_positions.columns
+                     if c.startswith("realized_pnl_") and c != "realized_pnl_"),
+                    None,
+                )
+                if _base_col is not None:
+                    _clipped_pnl = float(merged_positions[_base_col].sum())
+                elif "realized_pnl" in merged_positions.columns:
+                    # Fallback: parse Money strings ("X.XX CCY" -> X.XX). This
+                    # ignores cross-currency conversion and is only correct for
+                    # single-currency catalogs. The base-currency column above
+                    # is the right path; this branch exists for safety.
+                    _clipped_pnl = sum(
+                        float(str(x).split(" ")[0]) if x and " " in str(x) else 0.0
+                        for x in merged_positions["realized_pnl"]
+                    )
+                else:
+                    _clipped_pnl = total_pnl  # nothing to recompute
+                if _clipped_pnl != total_pnl:
+                    print(f"[PF_CLIP] Recomputed total_pnl after clip: {total_pnl:.2f} -> {_clipped_pnl:.2f}")
+                total_pnl = _clipped_pnl
+                final_balance = portfolio.starting_capital + total_pnl
+                total_return_pct = (total_pnl / portfolio.starting_capital) * 100 if portfolio.starting_capital > 0 else 0
+                total_trades = len(merged_positions)
 
     # Build slot_to_strategy_id mapping from positions_report
     slot_to_strategy_id = {}
@@ -2546,6 +3267,16 @@ def _merge_portfolio_results(
         "per_strategy": per_strategy,
         "max_loss_hit": max_loss_hit,
         "max_profit_hit": max_profit_hit,
+        # Portfolio-level Stoploss/Target post-hoc clip (spec
+        # 5. Logics/portfolio_sl_tgt.html). Null/empty when not enabled or
+        # when the clip never triggered. clip_action is informational —
+        # ReExecute is treated as clip+flag in v1, no actual replay.
+        "pf_clip_ts": clip_result.clip_ts,
+        "pf_clip_reason": clip_result.clip_reason,
+        "pf_clip_action": clip_result.clip_action,
+        "pf_clipped_slot_ids": list(clip_result.clipped_slots),
+        "pf_would_reexecute": clip_result.would_reexecute,
+        "pf_reexec_count": clip_result.reexec_count,
         "portfolio_name": portfolio.name,
         "allocation_mode": portfolio.allocation_mode,
         "fills_report": merged_fills,

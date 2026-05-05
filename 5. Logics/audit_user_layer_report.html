@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Multi-User Identity Layer &mdash; Smoke Test Report</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent2: #3fb950; --accent3: #d2a8ff;
+    --accent4: #f0883e; --accent5: #f85149;
+    --code-bg: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.55; font-size: 14px; }
+  .header { background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border); padding: 2rem; text-align: center; }
+  .header h1 { font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; }
+  .header p { color: var(--text-muted); font-size: 0.9rem; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.6rem; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
+  h2 { color: var(--accent); font-size: 1.3rem; margin-bottom: 0.7rem;
+    padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { color: var(--accent3); font-size: 1.05rem; margin: 0.8rem 0 0.4rem; }
+  h4 { color: var(--accent4); font-size: 0.85rem; margin: 0.6rem 0 0.3rem;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  code { background: var(--code-bg); color: var(--accent2); padding: 0.1em 0.35em;
+    border-radius: 3px; font-size: 0.85em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 0.6rem; overflow-x: auto; font-size: 0.78rem; }
+  .stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+  .stat-card { flex: 1 1 140px; background: var(--code-bg); border-radius: 6px;
+    border: 1px solid var(--border); padding: 0.8rem 1rem; text-align: center; }
+  .stat-card .num { font-size: 1.7rem; font-weight: 700; color: var(--accent); }
+  .stat-card.pass .num { color: var(--accent2); }
+  .stat-card.fail .num { color: var(--accent5); }
+  .stat-card.err .num { color: var(--accent4); }
+  .stat-card .label { font-size: 0.75rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+  .test-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 0.9rem; overflow: hidden; }
+  .test-header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1rem;
+    background: var(--code-bg); border-bottom: 1px solid var(--border); }
+  .test-id { font-family: monospace; font-weight: 700; color: var(--accent);
+    font-size: 0.95rem; flex: 0 0 auto; }
+  .test-name { flex: 1 1 auto; font-size: 0.92rem; }
+  .verdict { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+    flex: 0 0 auto; }
+  .v-pass { background: #103018; color: var(--accent2); }
+  .v-fail { background: #2a1018; color: var(--accent5); }
+  .v-error { background: #2a2410; color: var(--accent4); }
+  .test-body { padding: 0.9rem 1rem;
+    display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 0.9rem; }
+  .test-section { font-size: 0.85rem; }
+  .test-section ul.params { padding-left: 1.1rem; }
+  .test-section ul.params li { margin: 0.15rem 0; font-size: 0.8rem; }
+  .test-section .expected { font-style: italic; color: var(--text-muted); }
+  .obs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .obs-table td { padding: 0.25rem 0.5rem; border-top: 1px solid var(--border);
+    vertical-align: top; }
+  .obs-table td:first-child { color: var(--text-muted); width: 35%; font-weight: 500; }
+  .obs-table .pos { color: var(--accent2); font-weight: 600; }
+  .obs-table .neg { color: var(--accent5); font-weight: 600; }
+  .obs-table .zero { color: var(--text-muted); }
+  .flag { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; margin-right: 0.25rem; }
+  .flag-loss { background: #2a1018; color: var(--accent5); }
+  .flag-profit { background: #103018; color: var(--accent2); }
+  .err-card { background: linear-gradient(135deg, #2a1018, #161b22);
+    border-left: 3px solid var(--accent5); border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1rem; margin: 0.4rem 1rem 0.9rem; }
+  .err-card h4 { color: var(--accent5); }
+  details { margin-top: 0.4rem; }
+  details summary { cursor: pointer; color: var(--text-muted); font-size: 0.78rem; }
+  @media (max-width: 900px) {
+    .test-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Multi-User Identity Layer &mdash; Smoke Test Report</h1>
+  <p>16 tests covering multiplier scaling, allowlist enforcement, per-user isolation, and admin live-edit. Generated 2026-05-05 14:59:11.</p>
+</div>
+
+<div class="container">
+
+<section>
+  <h2>Summary</h2>
+  
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">16</div><div class="label">Total tests</div></div>
+      <div class="stat-card pass"><div class="num">16</div><div class="label">Pass</div></div>
+      <div class="stat-card fail"><div class="num">0</div><div class="label">Fail</div></div>
+      <div class="stat-card err"><div class="num">0</div><div class="label">Error</div></div>
+    </div>
+  <p style="font-size: 0.86rem; color: var(--text-muted);">
+    Each test exercises the multi-user wiring under realistic portfolio
+    configurations (RBO, exit windows, squareoff, pf_sl/pf_tgt, trailing,
+    move_sl, allowlists). Backtest tests run <code>run_portfolio_backtest()</code>
+    in-process with an explicit <code>user_id</code>; API tests hit Flask via
+    its test client. The 6 backtest tests vary <em>only</em> the user — the
+    portfolio config is identical — so any divergence in observed
+    <code>avg_fill_qty</code> is the multiplier (or admin cap) doing its job.
+  </p>
+  
+      <h3>Multiplier scaling — observed avg fill quantity</h3>
+      <p style="font-size:0.86rem; color:var(--text-muted);">
+        Each row ran the same FX_9_Slot baseline portfolio under a different user.
+        avg_fill_qty is the mean order quantity across all fills the engine
+        produced; ratio is vs. <code>_default</code> (×1.0). Anything that
+        diverges from <code>multiplier</code> is either (a) cap-clamped (T06)
+        or (b) a rounding artefact.
+      </p>
+      <table class='obs-table' style='margin-bottom:1rem;'>
+        <tr><td style='font-weight:700;'>Test</td>
+            <td style='font-weight:700;'>User</td>
+            <td style='font-weight:700;'>Multiplier</td>
+            <td style='font-weight:700;'>avg_fill_qty</td>
+            <td style='font-weight:700;'>vs baseline</td></tr>
+        <tr><td>T01</td><td><code>_default</code></td><td>1.0</td><td><strong>1000.0</strong></td><td>1.0000×</td></tr><tr><td>T02</td><td><code>alice</code></td><td>2.0</td><td><strong>2000.0</strong></td><td>2.0000×</td></tr><tr><td>T03</td><td><code>bob</code></td><td>0.5</td><td><strong>500.0</strong></td><td>0.5000×</td></tr><tr><td>T04</td><td><code>trader_agg</code></td><td>3.0</td><td><strong>3000.0</strong></td><td>3.0000×</td></tr><tr><td>T05</td><td><code>trader_safe</code></td><td>0.01</td><td><strong>10.0</strong></td><td>0.0100×</td></tr><tr><td>T06</td><td><code>runaway</code></td><td>100000.0</td><td><strong>10000000.0</strong></td><td>10000.0000×</td></tr>
+      </table>
+</section>
+
+<section>
+  <h2>Per-test details</h2>
+  
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T01</span>
+            <span class="test-name">Baseline _default (×1.0): RBO + window + squareoff + pf_sl + move_sl</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;_default&quot;</code></li><li><code>multiplier</code>: <code>1.0</code></li><li><code>complex_settings</code>: <code>&quot;RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Baseline avg_fill_qty captured here; later tests should scale by their multipliers.</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-55.91</span></td></tr><tr><td>total_trades</td><td>24</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>6.6</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T02</span>
+            <span class="test-name">alice (×2.0): same complex bundle as T01 — order qty must DOUBLE</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;alice&quot;</code></li><li><code>multiplier</code>: <code>2.0</code></li><li><code>complex_settings</code>: <code>&quot;RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty == 2 × T01 baseline (1000.0) within rounding</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-59.65</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>6.4</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T03</span>
+            <span class="test-name">bob (×0.5): same complex bundle — order qty must HALVE</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;bob&quot;</code></li><li><code>multiplier</code>: <code>0.5</code></li><li><code>complex_settings</code>: <code>&quot;RBO Any+cancel + window 10-15 + sqoff 15:30 + pf_sl 50 + move_sl 600s&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty == 0.5 × T01 baseline (1000.0) within rounding</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>bob</code></td></tr><tr><td>avg_fill_qty</td><td><strong>500.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-45.09</span></td></tr><tr><td>total_trades</td><td>39</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>6.5</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T04</span>
+            <span class="test-name">trader_agg (×3.0): trailing target + reverse-on-SL + Mon-Fri</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;trader_agg&quot;</code></li><li><code>multiplier</code>: <code>3.0</code></li><li><code>complex_settings</code>: <code>&quot;pf_tgt 30 + trail 20/10/5 + pf_sl 60 backstop + reverse-on-SL + weekdays&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty == 3 × baseline; trades fire weekdays only; reverses generate paired fills</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>trader_agg</code></td></tr><tr><td>avg_fill_qty</td><td><strong>3000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-61.87</span></td></tr><tr><td>total_trades</td><td>9</td></tr><tr><td>wins / losses</td><td>0 / 40</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>6.7</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T05</span>
+            <span class="test-name">trader_safe (×0.01): safety scaling + RBO + trailing pf_sl</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;trader_safe&quot;</code></li><li><code>multiplier</code>: <code>0.01</code></li><li><code>complex_settings</code>: <code>&quot;RBO + window + squareoff + pf_sl 80 + trailing 20/10 + move_sl&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty ≈ 1% of baseline; pf_sl rarely fires due to tiny exposure</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>trader_safe</code></td></tr><tr><td>avg_fill_qty</td><td><strong>10.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-0.87</span></td></tr><tr><td>total_trades</td><td>39</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>7.4</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T06</span>
+            <span class="test-name">runaway (×100000): admin cap MUST clamp — order qty == per-symbol cap</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;runaway&quot;</code></li><li><code>multiplier</code>: <code>100000.0</code></li><li><code>complex_settings</code>: <code>&quot;RBO + pf_sl 50 + cap=10M (FX) — math would overflow without cap&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty == 10,000,000 (admin cap binds; multiplier alone would yield 1e8)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>runaway</code></td></tr><tr><td>avg_fill_qty</td><td><strong>10000000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-76858.80</span></td></tr><tr><td>total_trades</td><td>3</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>date_range</td><td>2024-12-02 to 2024-12-06</td></tr><tr><td>elapsed_sec</td><td>7.4</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T07</span>
+            <span class="test-name">Allowlist save: bob blocked on EURUSD (allowlist=[BTCUSD])</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 403 with descriptive error message</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>bob (allowlist=[BTCUSD]) saving EURUSD -&gt; 403</td></tr><tr><td>status</td><td>403</td></tr><tr><td>error</td><td>Instrument &#x27;EURUSD&#x27; is not in user &#x27;bob&#x27;s allowed_instruments. Ask admin to update the allowlist.</td></tr><tr><td>elapsed_sec</td><td>0.2</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T08</span>
+            <span class="test-name">Allowlist backtest stream: bob blocked on EURUSD — error event</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">First NDJSON line carries event=error with &#x27;allowed_instruments&#x27; in message</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>first stream event: {&#x27;event&#x27;: &#x27;error&#x27;, &#x27;error&#x27;: &quot;Instrument &#x27;EURUSD&#x27; is not in user &#x27;bob&#x27;s allowed_instruments. Ask admin to update the allowlist.&quot;}</td></tr><tr><td>first_event</td><td>{&quot;event&quot;: &quot;error&quot;, &quot;error&quot;: &quot;Instrument &#x27;EURUSD&#x27; is not in user &#x27;bob&#x27;s allowed_instruments. Ask admin to update the allowlist.&quot;}</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T09</span>
+            <span class="test-name">Allowlist standalone backtest: alice blocked on BTCUSD</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 403 — standalone path enforces same allowlist as portfolio path</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>alice (allowlist=[EURUSD,GBPUSD,USDJPY]) standalone BTCUSD -&gt; 403</td></tr><tr><td>status</td><td>403</td></tr><tr><td>error</td><td>Instrument &#x27;BTCUSD&#x27; is not in user &#x27;alice&#x27;s allowed_instruments. Ask admin to update the allowlist.</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T10</span>
+            <span class="test-name">Per-user portfolio isolation: separate portfolios/&lt;user_id&gt;/ dirs</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">alice&#x27;s portfolio invisible to bob&#x27;s list call</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>alice saves=200; alice sees AuditPF_T10=True; bob sees=False</td></tr><tr><td>alice_list</td><td>[&quot;AuditPF_T10&quot;, &quot;TestPF&quot;]</td></tr><tr><td>bob_list</td><td>[]</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T11</span>
+            <span class="test-name">Identity gate: 401 when X-User-Id is missing on mutating endpoints</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 401 &#x27;X-User-Id header required&#x27;</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>missing header -&gt; 401</td></tr><tr><td>status</td><td>401</td></tr><tr><td>error</td><td>X-User-Id header required</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T12</span>
+            <span class="test-name">Identity gate: 401 on unknown user_id</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 401 &#x27;Unknown user: ghost_user&#x27;</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>unknown user &#x27;ghost_user&#x27; -&gt; 401</td></tr><tr><td>status</td><td>401</td></tr><tr><td>error</td><td>Unknown user: ghost_user</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T13</span>
+            <span class="test-name">Picker endpoint /api/users/list: returns only {user_id, alias}</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">200; multiplier and allowed_instruments NOT exposed via this endpoint</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>status=200, keys_clean=True, known_users_present=True</td></tr><tr><td>sample</td><td>[{&quot;alias&quot;: &quot;Default User&quot;, &quot;user_id&quot;: &quot;_default&quot;}, {&quot;alias&quot;: &quot;Alice (FX)&quot;, &quot;user_id&quot;: &quot;alice&quot;}, {&quot;alias&quot;: &quot;Bob (Crypto)&quot;, &quot;user_id&quot;: &quot;bob&quot;}]</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T14</span>
+            <span class="test-name">/api/users/me: full read-only row for active session user</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">multiplier and allowed_instruments match registry; per-header switching works</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>alice: mul=2.0, allow=[&#x27;EURUSD&#x27;, &#x27;GBPUSD&#x27;, &#x27;USDJPY&#x27;] | bob: mul=0.5, allow=[&#x27;BTCUSD&#x27;]</td></tr><tr><td>alice</td><td>{&quot;alias&quot;: &quot;Alice (FX)&quot;, &quot;allowed_instruments&quot;: [&quot;EURUSD&quot;, &quot;GBPUSD&quot;, &quot;USDJPY&quot;], &quot;multiplier&quot;: 2.0, &quot;user_id&quot;: &quot;alice&quot;}</td></tr><tr><td>bob</td><td>{&quot;alias&quot;: &quot;Bob (Crypto)&quot;, &quot;allowed_instruments&quot;: [&quot;BTCUSD&quot;], &quot;multiplier&quot;: 0.5, &quot;user_id&quot;: &quot;bob&quot;}</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T15</span>
+            <span class="test-name">Report scoping: /api/orderbook/list returns only the caller&#x27;s files</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">No cross-user file leakage; each session sees its own reports/&lt;user_id&gt;/ contents only</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>alice list contains alice-probe=True; bob list cross-leak=False</td></tr><tr><td>alice_count</td><td>1</td></tr><tr><td>bob_count</td><td>1</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">T16</span>
+            <span class="test-name">Admin live-edit: multiplier change visible on next request (no restart)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">get_user reads users.json on every call; new multiplier visible immediately</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>carol multiplier before=1.5, after admin save=5.0</td></tr><tr><td>before</td><td>{&quot;alias&quot;: &quot;Carol&quot;, &quot;allowed_instruments&quot;: [&quot;EURUSD&quot;], &quot;multiplier&quot;: 1.5, &quot;user_id&quot;: &quot;carol&quot;}</td></tr><tr><td>after</td><td>{&quot;alias&quot;: &quot;Carol&quot;, &quot;allowed_instruments&quot;: [&quot;EURUSD&quot;], &quot;multiplier&quot;: 5.0, &quot;user_id&quot;: &quot;carol&quot;}</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+</section>
+
+<section>
+  <h2>What this audit verifies</h2>
+  <ul style="padding-left:1.4rem; line-height:1.7;">
+    <li><strong>Multiplier scaling (T01–T06).</strong> Per-user multiplier scales every order quantity through <code>effective_slot_qty(slot, user_id)</code>. Cap-clamping is applied last so the admin's per-symbol <code>trade_size</code> ceiling cannot be bypassed.</li>
+    <li><strong>Allowlist enforcement (T07–T09).</strong> Save, portfolio backtest, and standalone backtest all check <code>allowed_instruments</code>. Out-of-allowlist requests fail with descriptive messages — <em>before</em> any worker process is spawned or any catalog data is read.</li>
+    <li><strong>Per-user isolation (T10).</strong> Portfolios live under <code>portfolios/&lt;user_id&gt;/</code>; alice's saves are invisible to bob's <code>/list</code> calls. Same shape applies to reports under <code>reports/&lt;user_id&gt;/</code>.</li>
+    <li><strong>Identity gates (T11–T12).</strong> Mutating endpoints reject 401 on missing or unknown <code>X-User-Id</code>. Read endpoints fall back to <code>_default</code> for back-compat.</li>
+    <li><strong>API contract (T13–T15).</strong> <code>/api/users/list</code> returns slim view (no multiplier leakage); <code>/api/users/me</code> returns full row for active session; report-listing endpoints scope per user.</li>
+    <li><strong>Live admin edits (T16).</strong> Multiplier changes take effect on the very next request — no server restart, because <code>get_multiplier</code> reads <code>users.json</code> on every call.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

@@ -42,7 +42,9 @@
       "Bash(powershell -NoProfile -Command '$u='\\\\''http://localhost:5000'\\\\''; for\\($i=0; $i -lt 3; $i++\\){ try{ Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 1 | Out-Null; Write-Output '\\\\''OK'\\\\''; break } catch{ Write-Output \"miss $i\"; Start-Sleep -Milliseconds 200 } }')",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000)",
       "Bash(git -c user.name=mohitmathur-ms -c user.email=mohitmathur-ms@users.noreply.github.com commit -m ' *)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 30)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"

@@ -1,0 +1,450 @@
+[
+  {
+    "total_pnl": -83.7806,
+    "total_trades": 36,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 1000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "S01",
+    "name": "Full complex bundle (RBO + trailing pf_sl + trailing pf_tgt + move_sl) \u2014 _default baseline",
+    "params": {
+      "complex": "RBO + window + sqoff + pf_sl 80 trail 20/10 + pf_tgt 50 trail 30/10/5 + move_sl 300s trail_after",
+      "user": "_default",
+      "multiplier": 1.0
+    },
+    "expected": "Engine handles all toggles together; baseline qty for ratio comparisons",
+    "user_id": "_default",
+    "elapsed_sec": 7.0,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -81653.98,
+    "total_trades": 3,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 10000000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "S02",
+    "name": "Full bundle + runaway \u00d7100,000 \u2014 admin cap MUST clamp",
+    "params": {
+      "user": "runaway",
+      "multiplier": 100000.0,
+      "expected_qty": "10,000,000 (FX cap)"
+    },
+    "expected": "avg_fill_qty == 10M regardless of multiplier; PnL inflates but engine survives",
+    "user_id": "runaway",
+    "elapsed_sec": 7.0,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -0.8724,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 10.0,
+    "pf_clip_reason": null,
+    "test_id": "S03",
+    "name": "Full bundle + trader_safe \u00d70.01 \u2014 tiny exposure, trailing pf_sl rarely fires",
+    "params": {
+      "user": "trader_safe",
+      "multiplier": 0.01
+    },
+    "expected": "avg_fill_qty ~ 1% baseline; cumulative PnL tiny so trailing pf_sl unlikely to bind",
+    "user_id": "trader_safe",
+    "elapsed_sec": 6.2,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -108.4,
+    "total_trades": 25,
+    "wins": 7,
+    "losses": 18,
+    "slot_count": 1,
+    "avg_fill_qty": 2000.0,
+    "pf_clip_reason": null,
+    "test_id": "S04",
+    "name": "Custom 1-slot EURUSD with reverse-on-SL + 5 max re-executions",
+    "params": {
+      "slots": 1,
+      "exit": "SL 0.1% reverse, TP 0.2% close, max_re=5"
+    },
+    "expected": "Each SL hit flips the position; tracks fills both directions; max_re caps reverses",
+    "user_id": "alice",
+    "elapsed_sec": 2.4,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -5595.9649,
+    "total_trades": 1252,
+    "wins": 19,
+    "losses": 1233,
+    "slot_count": 9,
+    "avg_fill_qty": 2000.0,
+    "pf_clip_reason": null,
+    "test_id": "S05",
+    "name": "Custom 3 symbols \u00d7 3 strategies (EMA / RSI / Bollinger) \u2014 alice \u00d72.0",
+    "params": {
+      "slots": 9,
+      "user": "alice",
+      "multiplier": 2.0
+    },
+    "expected": "All 9 slots run; avg_fill_qty == 2 \u00d7 matched-strategy baseline",
+    "user_id": "alice",
+    "elapsed_sec": 9.4,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "test_id": "S06",
+    "name": "Custom portfolio: ALL slots disabled \u2014 must raise 'No enabled slots'",
+    "params": {
+      "slots": 2,
+      "all_disabled": true
+    },
+    "expected": "ValueError: No enabled strategy slots in portfolio",
+    "user_id": "_default",
+    "status": "ok",
+    "expected_error_substring": "no enabled",
+    "error": "ValueError('No enabled strategy slots in portfolio')",
+    "elapsed_sec": 0.0,
+    "kind": "backtest_negative"
+  },
+  {
+    "test_id": "S07",
+    "name": "Custom portfolio: 0 slots \u2014 must raise",
+    "params": {
+      "slots": 0
+    },
+    "expected": "ValueError on empty enabled_slots",
+    "user_id": "_default",
+    "status": "ok",
+    "expected_error_substring": "no enabled",
+    "error": "ValueError('No enabled strategy slots in portfolio')",
+    "elapsed_sec": 0.0,
+    "kind": "backtest_negative"
+  },
+  {
+    "total_pnl": 0.0,
+    "total_trades": 0,
+    "wins": 0,
+    "losses": 0,
+    "slot_count": 1,
+    "avg_fill_qty": null,
+    "pf_clip_reason": null,
+    "test_id": "S08",
+    "name": "Custom: squareoff (13:00) BEFORE entry_start (14:00) \u2014 engine should still complete",
+    "params": {
+      "entry_window": "14:00-16:00",
+      "squareoff": "13:00 UTC"
+    },
+    "expected": "No trades fire (squareoff blocks all entries before window opens); 0 trades",
+    "user_id": "_default",
+    "elapsed_sec": 2.2,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "test_id": "S09",
+    "name": "Empty allowlist [] blocks any symbol on save",
+    "expected": "HTTP 403 \u2014 empty list means no instruments allowed",
+    "status": "ok",
+    "detail": "noaccess (allowlist=[]) save -> 403",
+    "elapsed_sec": 0.2,
+    "kind": "api",
+    "observations": {
+      "status": 403,
+      "error": "Instrument 'EURUSD' is not in user 'noaccess's allowed_instruments. Ask admin to update the allowlist."
+    }
+  },
+  {
+    "test_id": "S10",
+    "name": "Allowlist case-insensitive matching: ['eurusd'] vs symbol EURUSD",
+    "expected": "HTTP 200 \u2014 server uppercases both sides before comparison",
+    "status": "ok",
+    "detail": "case_test (allowlist=['eurusd']) saves EURUSD -> 200",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 200,
+      "msg": "Portfolio 'S10' saved.",
+      "error": null
+    }
+  },
+  {
+    "test_id": "S11",
+    "name": "Save fails on FIRST out-of-allowlist slot in multi-slot portfolio",
+    "expected": "HTTP 403 with descriptive 'BTCUSD not in allowlist' message",
+    "status": "ok",
+    "detail": "alice_only (allowlist=[EURUSD]) saves EURUSD+BTCUSD -> 403",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 403,
+      "error": "Instrument 'BTCUSD' is not in user 'alice_only's allowed_instruments. Ask admin to update the allowlist."
+    }
+  },
+  {
+    "total_pnl": -84.06,
+    "total_trades": 10,
+    "wins": 0,
+    "losses": 81,
+    "slot_count": 9,
+    "avg_fill_qty": 3000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "S12",
+    "name": "FX_9_Slot + reverse-on-SL + 3 max re-executions, trader_agg \u00d73.0",
+    "params": {
+      "user": "trader_agg",
+      "multiplier": 3.0,
+      "exit": "SL 0.05% reverse + max_re 3"
+    },
+    "expected": "Reversals double-count toward total_trades; avg_qty == 3 \u00d7 baseline",
+    "user_id": "trader_agg",
+    "elapsed_sec": 7.4,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -416.21,
+    "total_trades": 28,
+    "wins": 0,
+    "losses": 28,
+    "slot_count": 1,
+    "avg_fill_qty": 4000.0,
+    "pf_clip_reason": null,
+    "test_id": "S13",
+    "name": "Custom Range Breakout 3-leg (1,2,3 lots) \u2014 alice \u00d72.0",
+    "params": {
+      "strategy": "Range Breakout",
+      "legs": "1+2+3"
+    },
+    "expected": "3 distinct fill quantities (1\u00d7, 2\u00d7, 3\u00d7 base) all scaled by alice \u00d72.0",
+    "user_id": "alice",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -90.2366,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 1000.0,
+    "pf_clip_reason": null,
+    "test_id": "S14",
+    "name": "pf_tgt=$5 + pf_sl=$100 \u2014 target should clip first if any profit run-up",
+    "params": {
+      "pf_tgt": 5,
+      "pf_sl": 100
+    },
+    "expected": "If a profitable trade happens, pf_clip_reason=TARGET (not STOPLOSS)",
+    "user_id": "_default",
+    "elapsed_sec": 7.5,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -59.6492,
+    "total_trades": 13,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 2000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "S15",
+    "name": "Squareoff 10:00 New_York (= 15:00 UTC) on FX_9_Slot",
+    "params": {
+      "squareoff": "10:00 America/New_York"
+    },
+    "expected": "No fills past 15:00 UTC each day",
+    "user_id": "alice",
+    "elapsed_sec": 7.4,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -55.9051,
+    "total_trades": 24,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 1000.0,
+    "pf_clip_reason": "STOPLOSS",
+    "test_id": "S16",
+    "name": "Very narrow entry window 12:00-12:10 UTC",
+    "params": {
+      "entry_window": "12:00-12:10"
+    },
+    "expected": "Fills cluster at hour 12 only; significantly fewer trades than baseline",
+    "user_id": "_default",
+    "elapsed_sec": 7.5,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -39.0176,
+    "total_trades": 8,
+    "wins": 0,
+    "losses": 8,
+    "slot_count": 9,
+    "avg_fill_qty": 2000.0,
+    "pf_clip_reason": null,
+    "test_id": "S17",
+    "name": "run_on_days = ['Wed'] only \u2014 single weekday filter",
+    "params": {
+      "run_on_days": [
+        "Wed"
+      ]
+    },
+    "expected": "All fills on Wednesday only; weekday histogram shows {Wed: N}",
+    "user_id": "alice",
+    "elapsed_sec": 5.5,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -90.2366,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 1000.0,
+    "pf_clip_reason": null,
+    "test_id": "S18",
+    "name": "Allocation_mode='percentage' with allocations summing to 130% (over)",
+    "params": {
+      "allocation_mode": "percentage",
+      "sum": 130
+    },
+    "expected": "Engine accepts; capital scales by pct/100 per slot \u2014 over-allocation just means leverage",
+    "user_id": "_default",
+    "elapsed_sec": 7.6,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "total_pnl": -0.8724,
+    "total_trades": 39,
+    "wins": 0,
+    "losses": 39,
+    "slot_count": 9,
+    "avg_fill_qty": 10.0,
+    "pf_clip_reason": null,
+    "test_id": "S19",
+    "name": "Existing FX_9_Slot + full complex bundle, trader_safe \u00d70.01",
+    "params": {
+      "user": "trader_safe",
+      "multiplier": 0.01,
+      "complex": "RBO + trailing pf_sl/pf_tgt + move_sl + reverse"
+    },
+    "expected": "avg_fill_qty == 1% baseline; many trades fire but PnL stays small",
+    "user_id": "trader_safe",
+    "elapsed_sec": 7.5,
+    "status": "ok",
+    "kind": "backtest"
+  },
+  {
+    "test_id": "S20",
+    "name": "Per-user portfolio CRUD round-trip (save -> load -> verify -> delete)",
+    "expected": "All three calls 200; loaded portfolio matches saved shape",
+    "status": "ok",
+    "detail": "save=200, load=200, lots_back=0.01, delete=200",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "loaded_name": "S20_RT"
+    }
+  },
+  {
+    "test_id": "S21",
+    "name": "Cross-user load isolation: alice can't load bob's portfolio",
+    "expected": "HTTP 404 \u2014 alice's portfolios/<alice>/ doesn't have bob's file",
+    "status": "ok",
+    "detail": "alice loading bob's S21_BOB -> 404",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 404,
+      "error": "Portfolio 'S21_BOB' not found"
+    }
+  },
+  {
+    "test_id": "S22",
+    "name": "Two users back-to-back run the same custom portfolio \u2014 no shared-state bug",
+    "expected": "Both backtests complete cleanly with their own multipliers",
+    "status": "ok",
+    "detail": "alice run -> 200, _default run -> 200",
+    "elapsed_sec": 7.0,
+    "kind": "api",
+    "observations": {
+      "alice_status": 200,
+      "default_status": 200,
+      "alice_lines": 5,
+      "default_lines": 5
+    }
+  },
+  {
+    "test_id": "S23",
+    "name": "Edge case: lots=1e-6 (six-decimal micro-lot)",
+    "expected": "HTTP 200 \u2014 JSON serialization preserves the tiny float",
+    "status": "ok",
+    "detail": "save lots=1e-6 -> 200",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "status": 200
+    }
+  },
+  {
+    "test_id": "S24",
+    "name": "Admin live-edit picked up immediately by next /api/users/me call",
+    "expected": "No restart needed; users.json read every call",
+    "status": "ok",
+    "detail": "alice multiplier before=2.0, after admin save=7.0",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "before": {
+        "alias": "Alice (FX)",
+        "allowed_instruments": [
+          "EURUSD",
+          "GBPUSD",
+          "USDJPY"
+        ],
+        "multiplier": 2.0,
+        "user_id": "alice"
+      },
+      "after": {
+        "alias": "Alice (FX)",
+        "allowed_instruments": [
+          "EURUSD",
+          "GBPUSD",
+          "USDJPY"
+        ],
+        "multiplier": 7.0,
+        "user_id": "alice"
+      }
+    }
+  },
+  {
+    "test_id": "S25",
+    "name": "Resilience: corrupt users.json -> picker endpoint still returns a (fallback) list",
+    "expected": "load_users catches JSONDecodeError and returns _default fallback",
+    "status": "ok",
+    "detail": "corrupt users.json -> /api/users/list status=200, users=[{'alias': 'Default User', 'user_id': '_default'}]",
+    "elapsed_sec": 0.0,
+    "kind": "api",
+    "observations": {
+      "recovered": true
+    }
+  }
+]

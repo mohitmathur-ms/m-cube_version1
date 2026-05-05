@@ -93,20 +93,21 @@ def index():
 
 @app.route("/api/reports/<path:filename>")
 def download_report(filename):
-    """Serve a generated report file from the reports directory."""
+    """Serve a generated report file from the active user's reports dir."""
     safe_name = Path(filename).name  # prevent directory traversal
-    return send_from_directory(str(REPORTS_DIR), safe_name, as_attachment=True)
+    user_dir = _user_reports_dir(_resolve_user_id())
+    return send_from_directory(str(user_dir), safe_name, as_attachment=True)
 
 
 # ─── Orderbook API ───────────────────────────────────────────────────────────
 
 @app.route("/api/orderbook/list")
 def api_orderbook_list():
-    """List saved orderbook CSV files from the reports directory."""
-    REPORTS_DIR.mkdir(exist_ok=True)
+    """List the active user's saved orderbook CSV files."""
+    user_dir = _user_reports_dir(_resolve_user_id())
     files = sorted(
-        [f.name for f in REPORTS_DIR.glob("order_book_*.csv")],
-        key=lambda n: (REPORTS_DIR / n).stat().st_mtime,
+        [f.name for f in user_dir.glob("order_book_*.csv")],
+        key=lambda n: (user_dir / n).stat().st_mtime,
         reverse=True,
     )
     return jsonify({"files": files})
@@ -114,12 +115,13 @@ def api_orderbook_list():
 
 @app.route("/api/orderbook/load")
 def api_orderbook_load():
-    """Load a saved orderbook CSV file and return its records as JSON."""
+    """Load one of the active user's saved orderbook CSVs."""
     filename = request.args.get("file", "")
     safe_name = Path(filename).name  # prevent directory traversal
     if not safe_name.startswith("order_book_") or not safe_name.endswith(".csv"):
         return jsonify({"error": "Invalid file name"}), 400
-    filepath = REPORTS_DIR / safe_name
+    user_dir = _user_reports_dir(_resolve_user_id())
+    filepath = user_dir / safe_name
     if not filepath.exists():
         return jsonify({"error": "File not found"}), 404
     df = pd.read_csv(filepath)
@@ -717,6 +719,10 @@ def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
 @app.route("/api/backtest/run-stream", methods=["POST"])
 def run_backtest_stream():
     """Run backtests with real-time progress streaming (newline-delimited JSON)."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    user_id_for_run = user_or_resp["user_id"]
     data = request.json
     starting_capital = data.get("starting_capital", 100000.0)
     strategies_config = data.get("strategies", {})
@@ -730,6 +736,22 @@ def run_backtest_stream():
 
     if not instruments or not strategies_config:
         return jsonify({"error": "instruments and strategies required"}), 400
+
+    # Allowlist enforcement (matches /api/portfolios/save & /backtest).
+    # Reject up-front so we don't spin up worker processes for a request
+    # that's going to fail per-symbol anyway.
+    allowed = user_or_resp.get("allowed_instruments")
+    if isinstance(allowed, list):
+        allowed_set = {str(s).upper() for s in allowed if isinstance(s, str)}
+        for inst in instruments:
+            bt = inst.get("bar_types") or inst.get("bar_type", "")
+            primary_bt = bt[0] if isinstance(bt, list) else bt
+            sym = (_symbol_from_bar_type(primary_bt) or "").upper()
+            if sym not in allowed_set:
+                return jsonify({"error": (
+                    f"Instrument '{sym}' is not in user '{user_id_for_run}'s "
+                    f"allowed_instruments. Ask admin to update the allowlist."
+                )}), 403
 
     def generate():
         import os
@@ -818,6 +840,7 @@ def run_backtest_stream():
                     start_date=meta["start_date"],
                     end_date=meta["end_date"],
                     custom_strategies_dir=custom_dir_str,
+                    user_id=user_id_for_run,
                 )
                 futures[future] = (inst_idx, strategy_name)
                 yield json.dumps({"event": "progress", "status": "running",
@@ -870,11 +893,12 @@ def run_backtest_stream():
                     inst_label = sanitize_filename(primary_bt.split("-")[0])
 
                     if inst_strategies:
+                        user_dir = _user_reports_dir(user_id_for_run)
                         raw_name = f"{inst_label}_{'_'.join(inst_strategies.keys())}"
                         report_name = sanitize_filename(raw_name)
                         try:
                             report_html = generate_report(inst_strategies_raw, backtest_name=report_name)
-                            report_path = REPORTS_DIR / f"{report_name}_report.html"
+                            report_path = user_dir / f"{report_name}_report.html"
                             report_path.write_text(report_html, encoding="utf-8")
                         except Exception as e:
                             errors.append({"instrument": primary_bt, "strategy": "HTML Report",
@@ -885,19 +909,19 @@ def run_backtest_stream():
                             prefix = f"{inst_label}_{safe_strat}_{timestamp}"
                             if strat_results.get("positions_report"):
                                 pd.DataFrame(strat_results["positions_report"]).to_csv(
-                                    REPORTS_DIR / f"position_report_{prefix}.csv", index=False)
+                                    user_dir / f"position_report_{prefix}.csv", index=False)
                             if strat_results.get("fills_report"):
                                 pd.DataFrame(strat_results["fills_report"]).to_csv(
-                                    REPORTS_DIR / f"order_fill_report_{prefix}.csv", index=False)
+                                    user_dir / f"order_fill_report_{prefix}.csv", index=False)
                             if strat_results.get("account_report"):
                                 pd.DataFrame(strat_results["account_report"]).to_csv(
-                                    REPORTS_DIR / f"account_report_{prefix}.csv", index=False)
+                                    user_dir / f"account_report_{prefix}.csv", index=False)
                             if strat_results.get("order_book"):
                                 pd.DataFrame(strat_results["order_book"]).to_csv(
-                                    REPORTS_DIR / f"order_book_{prefix}.csv", index=False)
+                                    user_dir / f"order_book_{prefix}.csv", index=False)
                             if strat_results.get("logs"):
                                 pd.DataFrame(strat_results["logs"]).to_csv(
-                                    REPORTS_DIR / f"backtest_{prefix}_logs.csv", index=False)
+                                    user_dir / f"backtest_{prefix}_logs.csv", index=False)
 
                     instrument_results[primary_bt] = {
                         "date_range": {"start": meta["start_date"] or "", "end": meta["end_date"] or ""},
@@ -931,6 +955,10 @@ def run_backtest_stream():
 @app.route("/api/backtest/run", methods=["POST"])
 def run_backtest_api():
     """Run backtests for selected instruments × strategies."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    user_id_for_run = user_or_resp["user_id"]
     data = request.json
     starting_capital = data.get("starting_capital", 100000.0)
     strategies_config = data.get("strategies", {})
@@ -945,6 +973,20 @@ def run_backtest_api():
 
     if not instruments or not strategies_config:
         return jsonify({"error": "instruments and strategies required"}), 400
+
+    # Allowlist enforcement before doing any catalog work.
+    allowed = user_or_resp.get("allowed_instruments")
+    if isinstance(allowed, list):
+        allowed_set = {str(s).upper() for s in allowed if isinstance(s, str)}
+        for inst in instruments:
+            bt = inst.get("bar_types") or inst.get("bar_type", "")
+            primary_bt = bt[0] if isinstance(bt, list) else bt
+            sym = (_symbol_from_bar_type(primary_bt) or "").upper()
+            if sym not in allowed_set:
+                return jsonify({"error": (
+                    f"Instrument '{sym}' is not in user '{user_id_for_run}'s "
+                    f"allowed_instruments. Ask admin to update the allowlist."
+                )}), 403
 
     CUSTOM_STRATEGIES_DIR.mkdir(exist_ok=True)
     merged_registry, _ = get_merged_registry(CUSTOM_STRATEGIES_DIR)
@@ -976,6 +1018,7 @@ def run_backtest_api():
                     registry=merged_registry,
                     start_date=start_date,
                     end_date=end_date,
+                    user_id=user_id_for_run,
                 )
 
                 inst_strategies_raw[strategy_name] = results
@@ -994,12 +1037,13 @@ def run_backtest_api():
         inst_label = sanitize_filename(primary_bt.split("-")[0])  # e.g. BTCUSD.BINANCE
 
         if inst_strategies:
+            user_dir = _user_reports_dir(user_id_for_run)
             # HTML report for this instrument
             raw_name = f"{inst_label}_{'_'.join(inst_strategies.keys())}"
             report_name = sanitize_filename(raw_name)
             try:
                 report_html = generate_report(inst_strategies_raw, backtest_name=report_name)
-                report_path = REPORTS_DIR / f"{report_name}_report.html"
+                report_path = user_dir / f"{report_name}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
                 errors.append({"instrument": primary_bt, "strategy": "HTML Report",
@@ -1012,19 +1056,19 @@ def run_backtest_api():
 
                 if strat_results.get("positions_report"):
                     pd.DataFrame(strat_results["positions_report"]).to_csv(
-                        REPORTS_DIR / f"position_report_{prefix}.csv", index=False)
+                        user_dir / f"position_report_{prefix}.csv", index=False)
                 if strat_results.get("fills_report"):
                     pd.DataFrame(strat_results["fills_report"]).to_csv(
-                        REPORTS_DIR / f"order_fill_report_{prefix}.csv", index=False)
+                        user_dir / f"order_fill_report_{prefix}.csv", index=False)
                 if strat_results.get("account_report"):
                     pd.DataFrame(strat_results["account_report"]).to_csv(
-                        REPORTS_DIR / f"account_report_{prefix}.csv", index=False)
+                        user_dir / f"account_report_{prefix}.csv", index=False)
                 if strat_results.get("order_book"):
                     pd.DataFrame(strat_results["order_book"]).to_csv(
-                        REPORTS_DIR / f"order_book_{prefix}.csv", index=False)
+                        user_dir / f"order_book_{prefix}.csv", index=False)
                 if strat_results.get("logs"):
                     pd.DataFrame(strat_results["logs"]).to_csv(
-                        REPORTS_DIR / f"backtest_{prefix}_logs.csv", index=False)
+                        user_dir / f"backtest_{prefix}_logs.csv", index=False)
 
         # Use primary bar type as key for results
         result_key = primary_bt
@@ -1050,24 +1094,150 @@ from core.models import (
 )
 from core.templates import get_templates, build_template
 
-PORTFOLIOS_DIR = str(PROJECT_DIR / "portfolios")
+_PORTFOLIOS_ROOT = PROJECT_DIR / "portfolios"
+PORTFOLIOS_DIR = str(_PORTFOLIOS_ROOT)  # Kept for back-compat with non-user-scoped callers
+
+# One-shot migration: move legacy flat ``portfolios/*.json`` under
+# ``portfolios/_default/``. Idempotent — no-op when already partitioned.
+from core.migrate_users import migrate_portfolios as _migrate_portfolios, DEFAULT_USER_ID
+_migrate_portfolios(_PORTFOLIOS_ROOT)
+
+from core.users import (
+    get_user as _get_user,
+    list_users as _list_users,
+    is_instrument_allowed as _is_instrument_allowed,
+)
+from core.venue_config import symbol_from_bar_type as _symbol_from_bar_type
+
+
+def _resolve_user_id() -> str:
+    """Read X-User-Id from the current request, falling back to _default.
+
+    Identity-only: any caller can spoof the header. We accept missing
+    headers for back-compat (legacy clients that don't know about users
+    yet) and route them to the ``_default`` user, which inherits the
+    pre-migration portfolios. To enforce a strict-401 policy later, swap
+    this for ``_get_user_or_401``.
+    """
+    uid = (request.headers.get("X-User-Id") or "").strip() or DEFAULT_USER_ID
+    user = _get_user(uid)
+    return user["user_id"] if user else DEFAULT_USER_ID
+
+
+def _get_user_or_401():
+    """Return the user dict for X-User-Id, or a 401 ``Response``.
+
+    Use this when an endpoint must reject unknown users outright (e.g.
+    actions that mutate state). Returns either the user dict or a Flask
+    response with status 401 — caller checks ``isinstance(..., dict)``.
+    """
+    uid = (request.headers.get("X-User-Id") or "").strip()
+    if not uid:
+        return jsonify({"error": "X-User-Id header required"}), 401
+    user = _get_user(uid)
+    if not user:
+        return jsonify({"error": f"Unknown user: {uid}"}), 401
+    return user
+
+
+def _user_portfolios_dir(user_id: str) -> str:
+    """Per-user portfolio directory; ensures it exists.
+
+    All portfolio CRUD endpoints route through this so user-A's POST
+    and user-B's POST land in different subdirectories of ``portfolios/``.
+    Same shape as ``REPORTS_DIR / <user_id>`` for reports.
+    """
+    p = _PORTFOLIOS_ROOT / user_id
+    p.mkdir(parents=True, exist_ok=True)
+    return str(p)
+
+
+def _user_reports_dir(user_id: str):
+    """Per-user reports directory; ensures it exists.
+
+    All CSV/HTML report writes route through this so two users running a
+    portfolio with the same name don't overwrite each other. Read endpoints
+    (orderbook list/load, /api/reports/<file>) scope through here too, so
+    each user only sees their own historical reports.
+    """
+    p = REPORTS_DIR / user_id
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _check_portfolio_allowlist(portfolio_config, user) -> tuple[bool, str]:
+    """Reject portfolios whose slots include symbols outside the user's allowlist.
+
+    Returns ``(ok, error_message)``. ``user`` is the full registry dict
+    (so we read ``allowed_instruments`` directly without a second lookup).
+    Empty / null allowlist → always OK.
+    """
+    allowed = user.get("allowed_instruments")
+    if not isinstance(allowed, list):
+        return True, ""
+    allowed_set = {str(s).upper() for s in allowed if isinstance(s, str)}
+    for slot in portfolio_config.slots:
+        sym = _symbol_from_bar_type(slot.bar_type_str) or ""
+        if sym.upper() not in allowed_set:
+            return False, (
+                f"Instrument '{sym}' is not in user '{user.get('user_id')}'s "
+                f"allowed_instruments. Ask admin to update the allowlist."
+            )
+    return True, ""
+
+
+@app.route("/api/users/list")
+def api_users_list():
+    """Public-safe user list for the frontend picker.
+
+    Only returns ``user_id`` and ``alias`` — no multipliers or allowlists
+    leak through. Used by the first-load picker in static/js/app.js. The
+    full registry (with multipliers and allowlists) is admin-only via
+    ``adapter_admin/admin_server.py:/api/users`` on port 5001.
+    """
+    return jsonify({"users": _list_users()})
+
+
+@app.route("/api/users/me")
+def api_users_me():
+    """Return the active user's own row (read-only).
+
+    Surfaces what the server will actually use for this session —
+    ``multiplier`` (applied to every order quantity) and
+    ``allowed_instruments`` (whitelist enforced on save/backtest). Other
+    users' rows are NOT exposed here; only the caller's own info.
+
+    Falls back to ``_default`` when no/unknown header is sent, mirroring
+    ``_resolve_user_id``. The 4 user-facing fields are returned bare —
+    no ``_meta``, no other users.
+    """
+    uid = _resolve_user_id()
+    user = _get_user(uid) or {}
+    return jsonify({
+        "user_id": user.get("user_id", uid),
+        "alias": user.get("alias", uid),
+        "multiplier": user.get("multiplier", 1.0),
+        "allowed_instruments": user.get("allowed_instruments"),
+    })
 
 
 @app.route("/api/portfolios/list")
 def api_list_portfolios():
-    """List all saved portfolios."""
-    names = list_portfolios(PORTFOLIOS_DIR)
+    """List the current user's saved portfolios."""
+    uid = _resolve_user_id()
+    names = list_portfolios(_user_portfolios_dir(uid))
     return jsonify({"portfolios": names})
 
 
 @app.route("/api/portfolios/load")
 def api_load_portfolio():
-    """Load a portfolio by name."""
+    """Load one of the current user's portfolios by name."""
     name = request.args.get("name", "")
     if not name:
         return jsonify({"error": "name required"}), 400
+    uid = _resolve_user_id()
     try:
-        config = load_portfolio(name, PORTFOLIOS_DIR)
+        config = load_portfolio(name, _user_portfolios_dir(uid))
         return jsonify({"portfolio": portfolio_to_dict(config)})
     except FileNotFoundError:
         return jsonify({"error": f"Portfolio '{name}' not found"}), 404
@@ -1075,11 +1245,21 @@ def api_load_portfolio():
 
 @app.route("/api/portfolios/save", methods=["POST"])
 def api_save_portfolio():
-    """Save a portfolio configuration."""
+    """Save a portfolio under the current user's directory.
+
+    Rejects 401 for unknown users (mutating endpoint), 403 when any slot's
+    symbol is outside the user's allowlist.
+    """
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
     data = request.json
     try:
         config = portfolio_from_dict(data)
-        path = save_portfolio(config, PORTFOLIOS_DIR)
+        ok, err = _check_portfolio_allowlist(config, user_or_resp)
+        if not ok:
+            return jsonify({"error": err}), 403
+        path = save_portfolio(config, _user_portfolios_dir(user_or_resp["user_id"]))
         return jsonify({"success": True, "message": f"Portfolio '{config.name}' saved.", "path": str(path)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -1087,11 +1267,14 @@ def api_save_portfolio():
 
 @app.route("/api/portfolios/delete", methods=["POST"])
 def api_delete_portfolio():
-    """Delete a portfolio by name."""
+    """Delete one of the current user's portfolios."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
     name = request.json.get("name", "")
     if not name:
         return jsonify({"error": "name required"}), 400
-    if delete_portfolio(name, PORTFOLIOS_DIR):
+    if delete_portfolio(name, _user_portfolios_dir(user_or_resp["user_id"])):
         return jsonify({"success": True, "message": f"Portfolio '{name}' deleted."})
     return jsonify({"error": "Portfolio not found"}), 404
 
@@ -1122,6 +1305,10 @@ def api_portfolio_from_template():
 @app.route("/api/portfolios/backtest", methods=["POST"])
 def api_portfolio_backtest():
     """Run a portfolio backtest with streaming progress (parallel execution)."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    user_id_for_run = user_or_resp["user_id"]
     data = request.json
     catalog_path = data.get("catalog_path", CATALOG_PATH)
 
@@ -1132,6 +1319,10 @@ def api_portfolio_backtest():
 
         try:
             config = portfolio_from_dict(data.get("portfolio", data))
+            ok, err = _check_portfolio_allowlist(config, user_or_resp)
+            if not ok:
+                yield json.dumps({"event": "error", "error": err}) + "\n"
+                return
             enabled_slots = config.enabled_slots
 
             if not enabled_slots:
@@ -1176,6 +1367,7 @@ def api_portfolio_backtest():
                         portfolio=config,
                         custom_strategies_dir=str(CUSTOM_STRATEGIES_DIR),
                         on_slot_complete=on_slot_complete,
+                        user_id=user_id_for_run,
                     )
                     result_holder[0] = results
                 except Exception as e:
@@ -1232,8 +1424,8 @@ def api_portfolio_backtest():
                               "message": f"All slots finished in {elapsed:.1f}s. Generating reports...",
                               "slots_completed": total_slots}) + "\n"
 
-            # Save CSV reports
-            REPORTS_DIR.mkdir(exist_ok=True)
+            # Save CSV reports under the user's reports directory.
+            user_dir = _user_reports_dir(user_id_for_run)
             timestamp = datetime.now().strftime("%d_%B_%Y").lower()
             portfolio_label = sanitize_filename(config.name)
             prefix = f"portfolio_{portfolio_label}_{timestamp}"
@@ -1244,7 +1436,7 @@ def api_portfolio_backtest():
             ]:
                 report = results.get(report_key)
                 if report is not None and not report.empty:
-                    report.to_csv(REPORTS_DIR / f"{report_name}_{prefix}.csv", index=False)
+                    report.to_csv(user_dir / f"{report_name}_{prefix}.csv", index=False)
 
             # Build per-strategy reports for order book and logs
             per_strat = results.get("per_strategy", {})
@@ -1283,20 +1475,20 @@ def api_portfolio_backtest():
 
             ob_df = build_orderbook_dataframe(all_results_for_reports)
             if not ob_df.empty:
-                ob_df.to_csv(REPORTS_DIR / f"order_book_{prefix}.csv", index=False)
+                ob_df.to_csv(user_dir / f"order_book_{prefix}.csv", index=False)
                 results["order_book"] = ob_df.fillna("").to_dict(orient="records")
             else:
                 results["order_book"] = []
 
             logs_df = build_logs_dataframe(all_results_for_reports)
             if not logs_df.empty:
-                logs_df.to_csv(REPORTS_DIR / f"backtest_{prefix}_logs.csv", index=False)
+                logs_df.to_csv(user_dir / f"backtest_{prefix}_logs.csv", index=False)
 
             report_html = ""
             try:
                 report_html = generate_report(all_results_for_reports,
                                               backtest_name=f"Portfolio: {config.name}")
-                report_path = REPORTS_DIR / f"{prefix}_report.html"
+                report_path = user_dir / f"{prefix}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
                 print(f"[Portfolio] HTML report generation failed: {e}")

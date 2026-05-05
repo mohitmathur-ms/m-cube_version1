@@ -17,6 +17,8 @@ from nautilus_trader.model.objects import Money
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 
+from core.venue_config import load_instrument_config
+
 
 VENUE = Venue("BINANCE")
 
@@ -142,6 +144,17 @@ def create_instrument(
     # Yahoo Finance volumes for BTC can be 20B+, so we use precision=0 for safety.
     size_prec = size_precision if size_precision is not None else 0
 
+    # Per-symbol admin config (lot_size + trade_size cap). Lives in
+    # adapter_admin/adapters_config/<venue>.json under the "instruments" key.
+    # Missing config → lot_size unset (None) and the default global cap below.
+    inst_cfg = load_instrument_config(symbol_str, venue) or {}
+    lot_size_cfg = inst_cfg.get("lot_size")
+    lot_size_quantity = (
+        Quantity(int(lot_size_cfg), precision=size_prec) if lot_size_cfg else None
+    )
+    cap_cfg = inst_cfg.get("trade_size")
+    max_qty_value = int(cap_cfg) if cap_cfg else 9_999_999_999
+
     return CurrencyPair(
         instrument_id=InstrumentId(
             symbol=Symbol(symbol_str),
@@ -154,8 +167,8 @@ def create_instrument(
         size_precision=size_prec,
         price_increment=Price(10 ** (-price_prec), precision=price_prec),
         size_increment=Quantity(1, precision=size_prec),
-        lot_size=None,
-        max_quantity=Quantity(9_999_999_999, precision=size_prec),
+        lot_size=lot_size_quantity,
+        max_quantity=Quantity(max_qty_value, precision=size_prec),
         min_quantity=Quantity(1, precision=size_prec),
         max_notional=None,
         min_notional=Money(1.00, quote_currency),
