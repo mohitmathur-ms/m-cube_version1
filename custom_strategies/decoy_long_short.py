@@ -123,27 +123,36 @@ class DecoyStrategy(Strategy):
         # --- Trading logic ---
         if decoy_long:
             self.log.info("Decoy Long signal: HH+HL but red candle")
+            reason = (f"Decoy LONG: HH+HL but red candle "
+                      f"(close={cur_close:.4f}<open={cur_open:.4f}, "
+                      f"high>{prev_high:.4f}, low>{prev_low:.4f})")
             if self.portfolio.is_net_short(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.BUY)
+                self._submit_order(OrderSide.BUY, reason)
 
         elif decoy_short:
             self.log.info("Decoy Short signal: LH+LL but green candle")
+            reason = (f"Decoy SHORT: LH+LL but green candle "
+                      f"(close={cur_close:.4f}>open={cur_open:.4f}, "
+                      f"high<{prev_high:.4f}, low<{prev_low:.4f})")
             if self.portfolio.is_net_long(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.SELL)
+                self._submit_order(OrderSide.SELL, reason)
 
         self.prev_bar = bar
 
-    def _submit_order(self, side: OrderSide) -> None:
-        order = self.order_factory.market(
+    def _submit_order(self, side: OrderSide, reason: str | None = None) -> None:
+        kwargs = dict(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
         )
+        if reason:
+            kwargs["tags"] = [reason]
+        order = self.order_factory.market(**kwargs)
         self.submit_order(order)
 
     def on_stop(self) -> None:

@@ -79,9 +79,12 @@ const Orderbook = {
     /** Visible columns in display order (exclude internal fields). */
     _displayColumns: [
         "USERID", "SYMBOL", "EXCHANGE", "TRANSACTION", "QUANTITY", "LOTS",
-        "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE", "ENTRY REASON",
+        "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE",
+        "ENTRY REASON", "ENTRY DETAILED REASON",
         "OPTION TYPE", "PORTFOLIO NAME", "STRATEGY",
-        "EXIT TIME", "AVG EXIT PRICE", "EXIT REASON", "PNL",
+        "EXIT TIME", "AVG EXIT PRICE",
+        "EXIT REASON", "EXIT DETAILED REASON",
+        "PNL",
     ],
 
     _renderTable() {

@@ -1,0 +1,154 @@
+[E01] PARITY  Parity: baseline FX_9_Slot, no extras  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -89.58 -> -52.77
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -90.24 -> -55.91
+   -> fail  pnl A=$-52.77 B=$-55.91 drift=3.14; trades A=23 B=24  (12.7s)
+[E02] PARITY  Parity: RBO state machine (Any side, cancel_other)  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -89.58 -> -52.77
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -90.24 -> -55.91
+   -> fail  pnl A=$-52.77 B=$-55.91 drift=3.14; trades A=23 B=24  (11.7s)
+[E03] PARITY  Parity: trailing pf_sl + trailing pf_tgt (post-hoc clip)  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -179.37 -> -66.58
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -180.53 -> -59.65
+   -> fail  pnl A=$-66.58 B=$-59.65 drift=6.93; trades A=15 B=13  (12.7s)
+[E04] PARITY  Parity: move-SL-to-cost + trail_after + per-slot trailing SL  user=trader_agg
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -275.77 -> -53.52
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -282.27 -> -63.54
+   -> fail  pnl A=$-53.52 B=$-63.54 drift=10.02; trades A=8 B=9  (13.2s)
+[E05] PARITY  Parity: Range Breakout multi-leg (1+2+3 lots, alice ×2.0)  user=alice
+   -> fail  pnl A=$-513.41 B=$-416.21 drift=97.20; trades A=34 B=28  (5.2s)
+[E06] Path B  Path B: 3-month range with intraday entry window (per-day chunked)  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -2077.63 -> -37.89
+   -> ok  pnl=$-37.89  trades=12  avg_qty=2000.0  path_b=all  (41.4s)  CLIP=STOPLOSS
+[E07] Path B  Path B: run_on_days=[Mon,Wed,Fri] — gaps in chunked data configs  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -60.74 -> -54.15
+   -> ok  pnl=$-54.15  trades=23  avg_qty=1000.0  path_b=all  (6.1s)  CLIP=STOPLOSS
+[E08] Path B  Path B: 5-minute entry window — micro-chunked data configs  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -90.24 -> -55.91
+   -> ok  pnl=$-55.91  trades=24  avg_qty=1000.0  path_b=all  (7.1s)  CLIP=STOPLOSS
+[E09] Path B  Path B: RBO RangeHigh-only across 5-day range (daily reset)  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -89.42 -> -52.61
+   -> ok  pnl=$-52.61  trades=17  avg_qty=1000.0  path_b=all  (7.4s)  CLIP=STOPLOSS
+[E10] Path B  RBO Any + cancel_other_side + 1-min buffer (deferred-DONE phase)  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -167.63 -> -65.62
+   -> ok  pnl=$-65.62  trades=13  avg_qty=2000.0  path_b=all  (7.2s)  CLIP=STOPLOSS
+[E11] Path B  RBO + run_on_days=[Tue,Thu] — only 2 days have RBO ranges  user=_default
+   -> ok  pnl=$-29.49  trades=13  avg_qty=1000.0  path_b=all  (5.3s)
+[E12] Path B  RBO with monitoring at UTC midnight — multi-day reset boundary  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -207.04 -> -69.87
+   -> ok  pnl=$-69.87  trades=15  avg_qty=2000.0  path_b=all  (9.6s)  CLIP=STOPLOSS
+[E13] Path B  RBO + reverse-on-SL — re-exec bypasses RBO entry gate  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -1092.04 -> -60.40
+   -> ok  pnl=$-60.40  trades=11  avg_qty=2000.0  path_b=all  (7.5s)  CLIP=STOPLOSS
+[E14] Path B  Trailing SL: 0.001 step / 0.0005 offset — micro-ratchets  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -182.69 -> -61.01
+   -> ok  pnl=$-61.01  trades=13  avg_qty=2000.0  path_b=all  (7.2s)  CLIP=STOPLOSS
+[E15] Path B  Move-to-Cost + trail_after — trailing suppressed until cost hit  user=trader_agg
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -272.79 -> -63.54
+   -> ok  pnl=$-63.54  trades=9  avg_qty=3000.0  path_b=all  (7.1s)  CLIP=STOPLOSS
+[E16] Path B  Portfolio trailing SL: 5/2 ratchet across many small wins  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -90.24 -> -36.40
+   -> ok  pnl=$-36.40  trades=16  avg_qty=1000.0  path_b=all  (7.2s)  CLIP=STOPLOSS
+[E17] Path B  Portfolio TP trailing with profit lock minimum ($10)  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -180.53 -> -59.65
+   -> ok  pnl=$-59.65  trades=13  avg_qty=2000.0  path_b=all  (7.1s)  CLIP=STOPLOSS
+[E18] Path B  Path B: runaway ×100,000 with full bundle — cap MUST clamp  user=runaway
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -903280.64 -> -81653.98
+   -> ok  pnl=$-81653.98  trades=3  avg_qty=10000000.0  path_b=all  (7.1s)  CLIP=STOPLOSS
+[E19] Path B  Path B: alice ×2.0 + RBO + trailing pf_sl  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -180.53 -> -72.78
+   -> ok  pnl=$-72.78  trades=16  avg_qty=2000.0  path_b=all  (7.2s)  CLIP=STOPLOSS
+[E20] Path B  Path B: trader_safe ×0.01 + full bundle — tiny exposure  user=trader_safe
+   -> ok  pnl=$-0.87  trades=39  avg_qty=10.0  path_b=all  (7.2s)
+[E21a] Path A  Cross-path stress: alice on Path A  user=alice
+   -> ok  pnl=$-1458.81  trades=336  avg_qty=2000.0  path_b=none  (3.5s)
+[E21b] Path B  Cross-path stress: alice on Path B (no shared state from E21a)  user=alice
+   -> ok  pnl=$-1158.93  trades=268  avg_qty=2000.0  path_b=all  (3.2s)
+[E22] Path B  Squareoff time == entry_end_time (same bar fires both gates)  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -90.24 -> -55.91
+   -> ok  pnl=$-55.91  trades=24  avg_qty=1000.0  path_b=all  (6.7s)  CLIP=STOPLOSS
+[E23] Path B  DST transition (Mar 8-12 2024) with NY squareoff 10:00  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -88.19 -> -59.45
+   -> ok  pnl=$-59.45  trades=16  avg_qty=2000.0  path_b=all  (6.7s)  CLIP=STOPLOSS
+[E24] Path B  run_on_days=[Sat,Sun] on FX (no weekend data) — should error or 0 trades  user=_default
+   -> ERROR  ValueError("All slots failed: [{'slot_id': 'fx_jpy_rsi', 'display_name': 'RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_jpy_bb', 'display_name': 'Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_jpy_ema', 'display_name': 'EMA Cross on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_bb', 'display_name': 'Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_rsi', 'display_name': 'RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_bb', 'display_name': 'Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_ema', 'display_name': 'EMA Cross on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_ema', 'display_name': 'EMA Cross on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_rsi', 'display_name': 'RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}]")  (3.3s)
+[E25] Path B  1-minute entry window 12:30-12:31 UTC (extreme narrow)  user=alice
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -180.53 -> -59.65
+   -> ok  pnl=$-59.65  trades=13  avg_qty=2000.0  path_b=all  (7.3s)  CLIP=STOPLOSS
+[E26] Path B  All-knobs-on: full bundle + max_loss/max_profit + slot trailing + re_execute  user=trader_agg
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -318.17 -> -90.34
+   -> ok  pnl=$-90.34  trades=13  avg_qty=3000.0  path_b=all  (7.0s)  CLIP=STOPLOSS
+[E27] Path B  Tiny SL = 0.0001 (1 pip) — should fire on near-every entry  user=_default
+[PF_CLIP] PORTFOLIO_SQOFF | Reason=STOPLOSS
+[PF_CLIP] PORTFOLIO_REEXECUTE | Reason=STOPLOSS | Count=1 (v1: clip + flag, no replay)
+[PF_CLIP] Recomputed total_pnl after clip: -93.36 -> -58.32
+   -> ok  pnl=$-58.32  trades=24  avg_qty=1000.0  path_b=all  (7.3s)  CLIP=STOPLOSS
+[E28] Path B  Allocation_mode=percentage at 200% total (leverage)  user=alice
+   -> ok  pnl=$-180.53  trades=39  avg_qty=2000.0  path_b=all  (7.2s)
+[E29] Path B  9 mixed-strategy slots + runaway ×100,000 (Path B + cap clamp)  user=runaway
+   -> ok  pnl=$-27986754.50  trades=1252  avg_qty=10000000.0  path_b=all  (9.6s)
+[E30] Path B  Path B: inverted dates (start > end) — must error or yield 0 trades  user=_default
+   -> ERROR  ValueError("All slots failed: [{'slot_id': 'a', 'display_name': 'EMA Cross on EURUSD', 'error': '`end_time` (2024-12-02) is before `start_time` (2024-12-10)'}]")  (2.0s)
+[E31] Path B  run_on_days=[Sun] only (FX has no Sun data) — 0 trades expected  user=_default
+   -> ERROR  ValueError("All slots failed: [{'slot_id': 'fx_jpy_ema', 'display_name': 'EMA Cross on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_jpy_rsi', 'display_name': 'RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_jpy_bb', 'display_name': 'Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_bb', 'display_name': 'Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_bb', 'display_name': 'Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_ema', 'display_name': 'EMA Cross on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_ema', 'display_name': 'EMA Cross on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_eur_rsi', 'display_name': 'RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}, {'slot_id': 'fx_gbp_rsi', 'display_name': 'RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%', 'error': 'Chunked Path B yielded zero data configs — check start/end dates.'}]")  (3.4s)
+[E32] Path B  Path B: 0 slots — must raise 'no enabled slots'  user=_default
+   -> ok (expected error)  err=ValueError('No enabled strategy slots in portfolio')  (0.0s)
+[E33] Path B  Path B: malformed bar_type_str (invalid symbol) — must fail fast  user=_default
+[E34] API  Path B + Flask streaming endpoint — /api/portfolios/backtest
+   -> ok: Path B + alice via API -> 200, 5 stream lines  (3.4s)
+[E35] API  Backtest endpoint blocks portfolio with out-of-allowlist symbol
+   -> fail: alice_only (allowlist=[EURUSD]) backtest EURUSD+BTCUSD -> 200  (0.0s)
+[E36] API  Path B portfolio CRUD: save → load → backtest → delete (alice)
+   -> ok: save=200 load=200(0.025) bt=200 del=200  (3.3s)
+
+Wrote 37 test results -> D:\mcube_test_version_1_updated\m-cube_version1\5. Logics\extreme_stress_tests\extreme_stress_results.json
+Restored original registry (2 users)

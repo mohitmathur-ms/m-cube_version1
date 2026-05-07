@@ -71,11 +71,22 @@ class EMACrossStrategy(Strategy):
                 self._submit_order(OrderSide.SELL)
 
     def _submit_order(self, side: OrderSide) -> None:
+        # Attach an indicator-aware tag so the orderbook's
+        # "ENTRY DETAILED REASON" column carries the trigger detail.
+        fp = int(self.config.fast_ema_period)
+        sp = int(self.config.slow_ema_period)
+        fv = self.fast_ema.value
+        sv = self.slow_ema.value
+        if side == OrderSide.BUY:
+            reason = f"EMA Cross BUY: fast({fp})={fv:.4f} ≥ slow({sp})={sv:.4f}"
+        else:
+            reason = f"EMA Cross SELL: fast({fp})={fv:.4f} < slow({sp})={sv:.4f}"
         order = self.order_factory.market(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
+            tags=[reason],
         )
         self.submit_order(order)
 

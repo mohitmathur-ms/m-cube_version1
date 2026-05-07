@@ -1372,6 +1372,7 @@
                                  <td>${t['ENTRY TIME'].split(' ')[1] || '-'}</td>
                                 <td>${t['EXIT TIME'] ? t['EXIT TIME'].split(' ')[1] : '-'}</td>
                                 <td style="font-size: 0.75rem;">${formatExitReason(t['EXIT REASON'])}</td>
+                                <td style="font-size: 0.7rem; line-height: 1.2; color: var(--muted, #666); max-width: 320px; word-break: break-word;">${t['ENTRY DETAILED REASON'] || '-'}</td>
                                 <td style="font-size: 0.7rem; line-height: 1.2;">${legMinMaxStr}</td>
                             </tr>
                         `;
@@ -1387,7 +1388,7 @@
                                 <thead style="font-size: 0.75rem;">
                                     <tr>
                                         <th>OrderID</th><th>Symbol</th><th>Side</th><th>Type</th><th>Strike</th><th>Lots</th>
-                                        <th>Entry</th><th>Exit</th><th>PNL</th><th>In</th><th>Out</th><th>Reason</th><th>Min/Max PNL</th>
+                                        <th>Entry</th><th>Exit</th><th>PNL</th><th>In</th><th>Out</th><th>Reason</th><th>Detailed Reason</th><th>Min/Max PNL</th>
                                     </tr>
                                 </thead>
                                 <tbody>${rows}</tbody>

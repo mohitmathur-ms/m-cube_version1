@@ -111,38 +111,107 @@ def _determine_reason(
 
 
 def _build_fills_lookup(fills_report) -> dict:
-    """Build a dict mapping order_id -> reason fields from a fills_report DataFrame."""
-    lookup: dict = {}
+    """Build lookups mapping a fill to its reason fields.
+
+    Returns a dict with two views:
+
+    - ``"by_oid"`` — keyed by venue_order_id (the existing path; works when
+      the positions_report's opening_order_id happens to match the venue id,
+      which is rare under NautilusTrader's default reports because positions
+      use the *client* order id format).
+    - ``"by_pos_ts"`` — keyed by ``(trader_id, strategy_id, instrument_id,
+      ts_int_ns)`` where ``ts_int_ns`` is the fill's ``ts_init`` rounded to
+      the nearest second. This is the practical bridge from a position row's
+      ``ts_opened`` / ``ts_closed`` to the matching fill's tags, since the
+      two reports don't share an order-id key but DO share timestamps and
+      identity columns.
+
+    Each entry contains ``{type, contingency_type, tags}``.
+    """
+    out = {"by_oid": {}, "by_pos_ts": {}}
     if fills_report is None or fills_report.empty:
-        return lookup
+        return out
 
     df = fills_report.reset_index()
     col_order_id = _resolve_column(df, ["venue_order_id", "VenueOrderId", "client_order_id", "order_id"])
     col_type = _resolve_column(df, ["type", "order_type", "OrderType"])
     col_contingency = _resolve_column(df, ["contingency_type", "ContingencyType"])
     col_tags = _resolve_column(df, ["tags", "Tags"])
+    col_trader = _resolve_column(df, ["trader_id", "TraderId"])
+    col_strategy = _resolve_column(df, ["strategy_id", "StrategyId"])
+    col_instrument = _resolve_column(df, ["instrument_id", "InstrumentId"])
+    col_ts = _resolve_column(df, ["ts_init", "TsInit", "ts_event", "ts_last"])
 
-    if col_order_id is None:
-        return lookup
+    def _normalize_tags(tg):
+        # Nautilus stores tags as ``['EMA Cross BUY: …']``; unwrap to the
+        # first element's verbatim string, not the bracketed repr.
+        if isinstance(tg, (list, tuple)):
+            return str(tg[0]) if tg else ""
+        if tg is None:
+            return ""
+        return str(tg)
 
-    for raw_oid, t, c, tg in iter_columns(df, col_order_id, col_type,
-                                          col_contingency, col_tags):
-        oid = str(raw_oid)
-        if not oid:
-            continue
-        lookup[oid] = {
-            "type": str(t) if t is not None else "",
-            "contingency_type": str(c) if c is not None else "",
-            "tags": str(tg) if tg is not None else "",
+    def _ts_to_seconds(ts):
+        # Normalize timestamp -> int seconds since epoch for stable lookup.
+        # Handles pandas.Timestamp, nanosecond ints, and ISO strings.
+        if ts is None:
+            return None
+        try:
+            t = pd.Timestamp(ts)
+            if t.tzinfo is None:
+                t = t.tz_localize("UTC")
+            return int(t.timestamp())
+        except Exception:
+            try:
+                # nanosecond integer fallback
+                return int(int(ts) // 1_000_000_000)
+            except Exception:
+                return None
+
+    if col_order_id is None and col_ts is None:
+        return out
+
+    for row in df.itertuples(index=False):
+        rec = row._asdict() if hasattr(row, "_asdict") else dict(zip(df.columns, row))
+        tg = rec.get(col_tags) if col_tags else None
+        info = {
+            "type": str(rec.get(col_type) or "") if col_type else "",
+            "contingency_type": str(rec.get(col_contingency) or "") if col_contingency else "",
+            "tags": _normalize_tags(tg),
         }
-    return lookup
+        if col_order_id:
+            oid = str(rec.get(col_order_id) or "")
+            if oid:
+                out["by_oid"][oid] = info
+        if col_trader and col_strategy and col_instrument and col_ts:
+            sec = _ts_to_seconds(rec.get(col_ts))
+            if sec is not None:
+                key = (str(rec.get(col_trader)),
+                       str(rec.get(col_strategy)),
+                       str(rec.get(col_instrument)),
+                       sec)
+                out["by_pos_ts"][key] = info
+    return out
 
 
-def _build_orderbook(all_results: dict) -> list[dict]:
+def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict]:
     """Build the ORDERBOOK trade list from all strategy results.
 
     Each closed position becomes one trade record in the template's format.
+    When ``user_id`` is provided, the USERID, MULTIPLIER, and LOTS columns
+    reflect the user's per-trade multiplier (from ``config/users.json``);
+    otherwise legacy defaults are used (USERID="UID001", MULTIPLIER=1.0).
     """
+    if user_id:
+        # Local import — avoid coupling report generation to the user
+        # registry when no user_id is supplied (legacy/test path).
+        from core.users import get_multiplier as _get_multiplier
+        resolved_userid = user_id
+        multiplier = float(_get_multiplier(user_id))
+    else:
+        resolved_userid = "UID001"
+        multiplier = 1.0
+
     trades = []
 
     for strategy_name, results in all_results.items():
@@ -173,11 +242,31 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         col_id = _resolve_column(df, ["id", "Id", "position_id", "index"])
         col_opening_order = _resolve_column(df, ["opening_order_id", "OpeningOrderId"])
         col_closing_order = _resolve_column(df, ["closing_order_id", "ClosingOrderId"])
+        # Identity columns used for the timestamp-fallback fill lookup. The
+        # primary order-id linkage often fails because NautilusTrader's
+        # positions report uses the *client* order id format while the fills
+        # report uses the *venue* order id format. Falling back to
+        # (trader_id, strategy_id, instrument_id, ts_opened) gives a stable
+        # bridge using fields both reports share.
+        col_trader = _resolve_column(df, ["trader_id", "TraderId"])
+        col_strategy = _resolve_column(df, ["strategy_id", "StrategyId"])
 
         # Pre-format timestamp columns once per strategy (vectorized) instead
         # of calling pd.to_datetime per row inside the iterrows loop.
         entry_times = _format_timestamp_series(df[col_ts_open]) if col_ts_open else None
         exit_times = _format_timestamp_series(df[col_ts_close]) if col_ts_close else None
+
+        # Numeric (epoch-seconds) versions of ts_opened / ts_closed for the
+        # ts-keyed fills_lookup fallback. Computed once per strategy.
+        def _ts_seconds_series(s):
+            try:
+                t = pd.to_datetime(s, utc=True)
+                return [int(v.timestamp()) if not pd.isna(v) else None for v in t]
+            except Exception:
+                return [None] * len(s)
+
+        entry_ts_secs = _ts_seconds_series(df[col_ts_open]) if col_ts_open else [None] * len(df)
+        exit_ts_secs = _ts_seconds_series(df[col_ts_close]) if col_ts_close else [None] * len(df)
 
         # iter_columns walks all columns positionally as a single zip — ~5×
         # faster than iterrows' Series-per-row allocation. Missing columns
@@ -185,10 +274,12 @@ def _build_orderbook(all_results: dict) -> list[dict]:
         # still substitute the right defaults.
         rows = iter_columns(df, col_instrument, col_side, col_qty,
                             col_avg_open, col_avg_close, col_pnl,
-                            col_id, col_opening_order, col_closing_order)
+                            col_id, col_opening_order, col_closing_order,
+                            col_trader, col_strategy)
 
         for i, (instr_v, side_v, qty_v, avg_open_v, avg_close_v,
-                pnl_v, id_v, opening_oid_v, closing_oid_v) in enumerate(rows):
+                pnl_v, id_v, opening_oid_v, closing_oid_v,
+                trader_v, strat_v) in enumerate(rows):
             raw_instrument = str(instr_v) if col_instrument else strategy_name
             # Clean up instrument id (e.g. "BTCUSD.CRYPTO" -> symbol="BTCUSD", exchange="CRYPTO")
             parts = raw_instrument.split(".")
@@ -203,34 +294,68 @@ def _build_orderbook(all_results: dict) -> list[dict]:
             opening_oid = str(opening_oid_v) if col_opening_order else ""
             closing_oid = str(closing_oid_v) if col_closing_order else ""
 
-            entry_fill = fills_lookup.get(opening_oid, {})
-            exit_fill = fills_lookup.get(closing_oid, {})
+            # Try venue_order_id linkage first (legacy path; usually empty
+            # under default reports because positions use client-order ids).
+            entry_fill = fills_lookup["by_oid"].get(opening_oid, {})
+            exit_fill = fills_lookup["by_oid"].get(closing_oid, {})
+            # Fall back to (trader, strategy, instrument, ts_opened/closed).
+            # This is the bridge that actually matches under default Nautilus
+            # output — both reports carry these four fields.
+            if not entry_fill and col_trader and col_strategy and col_instrument:
+                key = (str(trader_v), str(strat_v), raw_instrument, entry_ts_secs[i])
+                entry_fill = fills_lookup["by_pos_ts"].get(key, {})
+            if not exit_fill and col_trader and col_strategy and col_instrument:
+                key = (str(trader_v), str(strat_v), raw_instrument, exit_ts_secs[i])
+                exit_fill = fills_lookup["by_pos_ts"].get(key, {})
 
+            # ENTRY REASON keeps the order-type-derived taxonomy
+            # (Market Order / Limit Order). Indicator string lives in
+            # ENTRY DETAILED REASON via the entry_tags below.
             entry_reason = _determine_reason(
                 order_type=entry_fill.get("type", ""),
                 is_reduce=False,
                 contingency_type=entry_fill.get("contingency_type", ""),
-                tags=entry_fill.get("tags", ""),
-            )
-            exit_reason = _determine_reason(
-                order_type=exit_fill.get("type", ""),
-                is_reduce=True,
-                contingency_type=exit_fill.get("contingency_type", ""),
-                tags=exit_fill.get("tags", ""),
+                tags="",
             )
 
+            # EXIT REASON: when the closing order has a structured tag like
+            # ``"Stop Loss: price=149.95 ≤ SL=149.96 (entry 150.00, -0.05%)"``,
+            # use the prefix before the first ``":"`` as the column value
+            # ("Stop Loss"). When the tag has no colon, use it verbatim. When
+            # there's no tag at all (legacy paths), fall back to
+            # _determine_reason's order-type taxonomy ("Market Exit" / "Stop
+            # Loss" via order_type / "OCO Exit" / "Take Profit" / etc.).
+            exit_tags_raw = (exit_fill.get("tags") or "").strip()
+            if exit_tags_raw:
+                exit_reason = exit_tags_raw.split(":", 1)[0].strip()
+            else:
+                exit_reason = _determine_reason(
+                    order_type=exit_fill.get("type", ""),
+                    is_reduce=True,
+                    contingency_type=exit_fill.get("contingency_type", ""),
+                    tags="",
+                )
+            entry_detailed_reason = (entry_fill.get("tags") or "").strip()
+            exit_detailed_reason = exit_tags_raw
+
+            # qty from the positions report is post-multiplier (the user's
+            # multiplier is applied at order placement in backtest_runner).
+            # LOTS exposes the pre-multiplier base size so that
+            # LOTS * MULTIPLIER == QUANTITY reads coherently in the orderbook.
+            base_lots = (qty / multiplier) if multiplier else qty
             trade = {
-                "USERID": "UID001",
+                "USERID": resolved_userid,
                 "SYMBOL": symbol,
                 "EXCHANGE": exchange,
                 "TRANSACTION": str(side_v) if col_side else "BUY",
-                "LOTS": qty,
-                "MULTIPLIER": 1.0,
-                "QUANTITY": qty * 1.0,
+                "LOTS": base_lots,
+                "MULTIPLIER": multiplier,
+                "QUANTITY": qty,
                 "OrderID": str(id_v) if col_id else str(i),
                 "ENTRY TIME": entry_time,
                 "ENTRY PRICE": _parse_nautilus_value(avg_open_v) if col_avg_open else 0.0,
                 "ENTRY REASON": entry_reason,
+                "ENTRY DETAILED REASON": entry_detailed_reason,
                 "OPTION TYPE": "",
                 "STRIKE": "",
                 "PORTFOLIO NAME": strategy_name,
@@ -238,6 +363,7 @@ def _build_orderbook(all_results: dict) -> list[dict]:
                 "EXIT TIME": exit_time,
                 "AVG EXIT PRICE": _parse_nautilus_value(avg_close_v) if col_avg_close else 0.0,
                 "EXIT REASON": exit_reason,
+                "EXIT DETAILED REASON": exit_detailed_reason,
                 "PNL": pnl,
                 "_IS_HEDGE": False,
                 "_PARENT_ID": "",
@@ -249,28 +375,34 @@ def _build_orderbook(all_results: dict) -> list[dict]:
     return trades
 
 
-def build_orderbook_dataframe(all_results: dict) -> pd.DataFrame:
+def build_orderbook_dataframe(all_results: dict, user_id: str | None = None) -> pd.DataFrame:
     """Build an order book DataFrame matching the full CSV schema.
 
     Parameters
     ----------
     all_results : dict
         Strategy name -> results dict (from run_backtest).
+    user_id : str, optional
+        Identity that produced the run. Used to populate USERID and to
+        scale the MULTIPLIER/LOTS columns from ``config/users.json``.
 
     Returns
     -------
     pd.DataFrame
         DataFrame with columns matching the order book CSV spec.
     """
-    trades = _build_orderbook(all_results)
+    trades = _build_orderbook(all_results, user_id=user_id)
     if not trades:
         return pd.DataFrame()
 
     column_order = [
         "USERID", "SYMBOL", "EXCHANGE", "TRANSACTION", "QUANTITY", "LOTS",
-        "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE", "ENTRY REASON",
+        "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE",
+        "ENTRY REASON", "ENTRY DETAILED REASON",
         "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY",
-        "EXIT TIME", "AVG EXIT PRICE", "EXIT REASON", "PNL",
+        "EXIT TIME", "AVG EXIT PRICE",
+        "EXIT REASON", "EXIT DETAILED REASON",
+        "PNL",
         "_IS_HEDGE", "_PARENT_ID",
     ]
     return pd.DataFrame(trades).reindex(columns=column_order, fill_value="")
@@ -450,6 +582,7 @@ def generate_report(
     all_results: dict,
     backtest_name: str = "Backtest",
     template_path: str | None = None,
+    user_id: str | None = None,
 ) -> str:
     """Generate a self-contained HTML backtest report.
 
@@ -461,6 +594,9 @@ def generate_report(
         Title for the report.
     template_path : str, optional
         Path to the HTML template. Defaults to docs/report_template.html.
+    user_id : str, optional
+        Identity that produced the run; populates USERID/MULTIPLIER columns
+        in the embedded orderbook (see ``_build_orderbook``).
 
     Returns
     -------
@@ -472,7 +608,7 @@ def generate_report(
 
     template = Path(template_path).read_text(encoding="utf-8")
 
-    orderbook = _build_orderbook(all_results)
+    orderbook = _build_orderbook(all_results, user_id=user_id)
     summary = _build_summary(orderbook)
     logs: list = []
 

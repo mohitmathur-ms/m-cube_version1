@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Extreme Stress Report &mdash; Path B &times; Full Project Surface</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent2: #3fb950; --accent3: #d2a8ff;
+    --accent4: #f0883e; --accent5: #f85149;
+    --code-bg: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.55; font-size: 14px; }
+  .header { background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border); padding: 2rem; text-align: center; }
+  .header h1 { font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; }
+  .header p { color: var(--text-muted); font-size: 0.9rem; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.6rem; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
+  h2 { color: var(--accent); font-size: 1.3rem; margin-bottom: 0.7rem;
+    padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { color: var(--accent3); font-size: 1.05rem; margin: 0.8rem 0 0.4rem; }
+  h4 { color: var(--accent4); font-size: 0.85rem; margin: 0.6rem 0 0.3rem;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  code { background: var(--code-bg); color: var(--accent2); padding: 0.1em 0.35em;
+    border-radius: 3px; font-size: 0.85em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 0.6rem; overflow-x: auto; font-size: 0.78rem; }
+  .stat-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+  .stat-card { flex: 1 1 120px; background: var(--code-bg); border-radius: 6px;
+    border: 1px solid var(--border); padding: 0.7rem 0.9rem; text-align: center; }
+  .stat-card .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .stat-card.pass .num { color: var(--accent2); }
+  .stat-card.fail .num { color: var(--accent5); }
+  .stat-card.err .num { color: var(--accent4); }
+  .stat-card .label { font-size: 0.72rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+  .test-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 0.9rem; overflow: hidden; }
+  .test-header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1rem;
+    background: var(--code-bg); border-bottom: 1px solid var(--border); }
+  .test-id { font-family: monospace; font-weight: 700; color: var(--accent);
+    font-size: 0.95rem; flex: 0 0 auto; }
+  .test-name { flex: 1 1 auto; font-size: 0.92rem; }
+  .kind-badge { font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.4rem;
+    border-radius: 3px; background: var(--surface); color: var(--text-muted);
+    border: 1px solid var(--border); text-transform: uppercase; flex: 0 0 auto; }
+  .verdict { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+    flex: 0 0 auto; }
+  .v-pass { background: #103018; color: var(--accent2); }
+  .v-fail { background: #2a1018; color: var(--accent5); }
+  .v-error { background: #2a2410; color: var(--accent4); }
+  .test-body { padding: 0.9rem 1rem;
+    display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 0.9rem; }
+  .test-section { font-size: 0.85rem; }
+  .test-section ul.params { padding-left: 1.1rem; }
+  .test-section ul.params li { margin: 0.15rem 0; font-size: 0.8rem; }
+  .test-section .expected { font-style: italic; color: var(--text-muted); }
+  .obs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .obs-table td { padding: 0.25rem 0.5rem; border-top: 1px solid var(--border);
+    vertical-align: top; }
+  .obs-table td:first-child { color: var(--text-muted); width: 35%; font-weight: 500; }
+  .obs-table .pos { color: var(--accent2); font-weight: 600; }
+  .obs-table .neg { color: var(--accent5); font-weight: 600; }
+  .obs-table .zero { color: var(--text-muted); }
+  .parity-table thead th { text-align: left; padding: 0.3rem 0.5rem;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  .parity-table td:first-child { width: 28%; }
+  .scen-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .scen-table th { text-align: left; padding: 0.5rem 0.4rem; color: var(--text-muted);
+    border-bottom: 1px solid var(--border); font-weight: 600; }
+  .scen-table td { padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--border);
+    vertical-align: top; }
+  .scen-table tr:hover td { background: var(--code-bg); }
+  .flag { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; margin-right: 0.25rem; }
+  .flag-loss { background: #2a1018; color: var(--accent5); }
+  .flag-profit { background: #103018; color: var(--accent2); }
+  .err-card { background: linear-gradient(135deg, #2a1018, #161b22);
+    border-left: 3px solid var(--accent5); border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1rem; margin: 0.4rem 1rem 0.9rem; }
+  .err-card h4 { color: var(--accent5); }
+  details { margin-top: 0.4rem; }
+  details summary { cursor: pointer; color: var(--text-muted); font-size: 0.78rem; }
+  .ok-card { background: linear-gradient(135deg, #103018, #161b22);
+    border-left: 4px solid var(--accent2); padding: 0.9rem 1.1rem;
+    margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .ok-card h4 { color: var(--accent2); font-size: 0.95rem; }
+  @media (max-width: 900px) {
+    .test-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Extreme Stress Report &mdash; Path B &times; Full Project Surface</h1>
+  <p>37 tests across 9 groups targeting Path B parity, RBO state machine, exit logic compounds,
+     multi-user multipliers, time-window races, and failure modes. Generated 2026-05-05 16:29:14.</p>
+</div>
+
+<div class="container">
+
+<section>
+  <h2>Summary</h2>
+  
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">37</div><div class="label">Total tests</div></div>
+      <div class="stat-card pass"><div class="num">27</div><div class="label">Pass</div></div>
+      <div class="stat-card fail"><div class="num">7</div><div class="label">Fail</div></div>
+      <div class="stat-card err"><div class="num">3</div><div class="label">Error</div></div>
+      <div class="stat-card"><div class="num">5</div><div class="label">Parity tests</div></div>
+      <div class="stat-card"><div class="num">29</div><div class="label">Backtest tests</div></div>
+      <div class="stat-card"><div class="num">3</div><div class="label">API tests</div></div>
+      <div class="stat-card"><div class="num">273s</div><div class="label">Total elapsed</div></div>
+    </div>
+  <p style="font-size: 0.86rem; color: var(--text-muted);">
+    <strong>0/5 parity tests</strong> verify Path A and Path B produce
+    identical metrics for the same input.
+    <strong>24 positive backtest tests</strong> stress compound configurations.
+    <strong>1 failure-mode probes</strong> verify the engine fails fast on
+    invalid inputs.
+    <strong>2 API tests</strong> verify the Path B pipeline behaves correctly through
+    the Flask layer with allowlist enforcement.
+    Total: <strong>27/37 pass</strong>.
+  </p>
+
+  <div class="ok-card">
+    <h4>Why these tests matter</h4>
+    <ul style="padding-left:1.4rem; margin-top:0.3rem;">
+      <li><strong>Parity tests (Group A)</strong> — Path B is opt-in via <code>_USE_BACKTEST_NODE=1</code>
+        and uses a different engine construction path. Without strict parity, Path B silently
+        diverges from Path A's results — invisible to anyone not specifically checking.</li>
+      <li><strong>Path B chunking (Group B)</strong> — Path B emits one BacktestDataConfig per allowed
+        day when <code>run_on_days</code> or <code>entry_start_time</code> is set. Bugs here
+        produce wrong fills on weekday boundaries or near the entry window edges.</li>
+      <li><strong>RBO compound (Group C)</strong> — RBO has a multi-state state machine that resets
+        daily; interacting with weekday filters, midnight boundaries, and slot-level reverse-on-SL
+        is the highest-risk surface in the codebase.</li>
+      <li><strong>Exit logic (Group D)</strong> — trailing SL ratcheting + move-to-cost +
+        portfolio-level trailing TP all depend on watermark state that must not roll back.</li>
+      <li><strong>Multi-user × Path B (Group E)</strong> — multiplier scaling and cap clamping must
+        work identically on both paths; back-to-back runs must not leak shared state.</li>
+      <li><strong>Time windows (Group F)</strong> — same-bar gate races, DST transitions, and
+        weekend-only filters are subtle bugs that surface only when an actual user hits them.</li>
+      <li><strong>Failure modes (Group H)</strong> — wrong inputs should fail fast with descriptive
+        errors. Silent 0-trade returns on bad config look like working backtests.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Compact scenarios table</h2>
+  
+    <table class='scen-table'>
+      <thead><tr>
+        <th style="width:50px;">#</th>
+        <th>Scenario</th>
+        <th style="width:110px;">User</th>
+        <th>Observation</th>
+        <th style="width:60px;">Time</th>
+        <th style="width:70px;">Verdict</th>
+      </tr></thead>
+      <tbody><tr><td><code>E01</code></td><td>Parity: baseline FX_9_Slot, no extras</td><td><code>_default</code></td><td>A: $-52.77/23t vs B: $-55.91/24t (drift 3.14)</td><td>12.7s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E02</code></td><td>Parity: RBO state machine (Any side, cancel_other)</td><td><code>_default</code></td><td>A: $-52.77/23t vs B: $-55.91/24t (drift 3.14)</td><td>11.7s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E03</code></td><td>Parity: trailing pf_sl + trailing pf_tgt (post-hoc clip)</td><td><code>alice</code></td><td>A: $-66.58/15t vs B: $-59.65/13t (drift 6.93)</td><td>12.7s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E04</code></td><td>Parity: move-SL-to-cost + trail_after + per-slot trailing SL</td><td><code>trader_agg</code></td><td>A: $-53.52/8t vs B: $-63.54/9t (drift 10.02)</td><td>13.2s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E05</code></td><td>Parity: Range Breakout multi-leg (1+2+3 lots, alice ×2.0)</td><td><code>alice</code></td><td>A: $-513.41/34t vs B: $-416.21/28t (drift 97.20)</td><td>5.2s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E06</code></td><td>Path B: 3-month range with intraday entry window (per-day chunked)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=12, PnL=$-37.89 CLIP=STOPLOSS</td><td>41.4s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E07</code></td><td>Path B: run_on_days=[Mon,Wed,Fri] — gaps in chunked data configs</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=23, PnL=$-54.15 CLIP=STOPLOSS</td><td>6.1s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E08</code></td><td>Path B: 5-minute entry window — micro-chunked data configs</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=24, PnL=$-55.91 CLIP=STOPLOSS</td><td>7.1s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E09</code></td><td>Path B: RBO RangeHigh-only across 5-day range (daily reset)</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=17, PnL=$-52.61 CLIP=STOPLOSS</td><td>7.4s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E10</code></td><td>RBO Any + cancel_other_side + 1-min buffer (deferred-DONE phase)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=13, PnL=$-65.62 CLIP=STOPLOSS</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E11</code></td><td>RBO + run_on_days=[Tue,Thu] — only 2 days have RBO ranges</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=13, PnL=$-29.49</td><td>5.3s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E12</code></td><td>RBO with monitoring at UTC midnight — multi-day reset boundary</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=15, PnL=$-69.87 CLIP=STOPLOSS</td><td>9.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E13</code></td><td>RBO + reverse-on-SL — re-exec bypasses RBO entry gate</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=11, PnL=$-60.40 CLIP=STOPLOSS</td><td>7.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E14</code></td><td>Trailing SL: 0.001 step / 0.0005 offset — micro-ratchets</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=13, PnL=$-61.01 CLIP=STOPLOSS</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E15</code></td><td>Move-to-Cost + trail_after — trailing suppressed until cost hit</td><td><code>trader_agg</code></td><td>[Path B] qty=3000.0, trades=9, PnL=$-63.54 CLIP=STOPLOSS</td><td>7.1s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E16</code></td><td>Portfolio trailing SL: 5/2 ratchet across many small wins</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=16, PnL=$-36.40 CLIP=STOPLOSS</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E17</code></td><td>Portfolio TP trailing with profit lock minimum ($10)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=13, PnL=$-59.65 CLIP=STOPLOSS</td><td>7.1s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E18</code></td><td>Path B: runaway ×100,000 with full bundle — cap MUST clamp</td><td><code>runaway</code></td><td>[Path B] qty=10000000.0, trades=3, PnL=$-81653.98 CLIP=STOPLOSS</td><td>7.1s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E19</code></td><td>Path B: alice ×2.0 + RBO + trailing pf_sl</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=16, PnL=$-72.78 CLIP=STOPLOSS</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E20</code></td><td>Path B: trader_safe ×0.01 + full bundle — tiny exposure</td><td><code>trader_safe</code></td><td>[Path B] qty=10.0, trades=39, PnL=$-0.87</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E21a</code></td><td>Cross-path stress: alice on Path A</td><td><code>alice</code></td><td>[Path A] qty=2000.0, trades=336, PnL=$-1458.81</td><td>3.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E21b</code></td><td>Cross-path stress: alice on Path B (no shared state from E21a)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=268, PnL=$-1158.93</td><td>3.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E22</code></td><td>Squareoff time == entry_end_time (same bar fires both gates)</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=24, PnL=$-55.91 CLIP=STOPLOSS</td><td>6.7s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E23</code></td><td>DST transition (Mar 8-12 2024) with NY squareoff 10:00</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=16, PnL=$-59.45 CLIP=STOPLOSS</td><td>6.7s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E24</code></td><td>run_on_days=[Sat,Sun] on FX (no weekend data) — should error or 0 trades</td><td><code>_default</code></td><td>[Path B] qty=—, trades=0, PnL=$0.00</td><td>3.3s</td><td><span class='verdict v-error'>ERR</span></td></tr><tr><td><code>E25</code></td><td>1-minute entry window 12:30-12:31 UTC (extreme narrow)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=13, PnL=$-59.65 CLIP=STOPLOSS</td><td>7.3s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E26</code></td><td>All-knobs-on: full bundle + max_loss/max_profit + slot trailing + re_execute</td><td><code>trader_agg</code></td><td>[Path B] qty=3000.0, trades=13, PnL=$-90.34 CLIP=STOPLOSS</td><td>7.0s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E27</code></td><td>Tiny SL = 0.0001 (1 pip) — should fire on near-every entry</td><td><code>_default</code></td><td>[Path B] qty=1000.0, trades=24, PnL=$-58.32 CLIP=STOPLOSS</td><td>7.3s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E28</code></td><td>Allocation_mode=percentage at 200% total (leverage)</td><td><code>alice</code></td><td>[Path B] qty=2000.0, trades=39, PnL=$-180.53</td><td>7.2s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E29</code></td><td>9 mixed-strategy slots + runaway ×100,000 (Path B + cap clamp)</td><td><code>runaway</code></td><td>[Path B] qty=10000000.0, trades=1252, PnL=$-27986754.50</td><td>9.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E30</code></td><td>Path B: inverted dates (start &gt; end) — must error or yield 0 trades</td><td><code>_default</code></td><td>[Path B] qty=—, trades=0, PnL=$0.00</td><td>2.0s</td><td><span class='verdict v-error'>ERR</span></td></tr><tr><td><code>E31</code></td><td>run_on_days=[Sun] only (FX has no Sun data) — 0 trades expected</td><td><code>_default</code></td><td>[Path B] qty=—, trades=0, PnL=$0.00</td><td>3.4s</td><td><span class='verdict v-error'>ERR</span></td></tr><tr><td><code>E32</code></td><td>Path B: 0 slots — must raise &#x27;no enabled slots&#x27;</td><td><code>_default</code></td><td>[Path B] qty=—, trades=0, PnL=$0.00</td><td>0.0s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E33</code></td><td>Path B: malformed bar_type_str (invalid symbol) — must fail fast</td><td><code>_default</code></td><td>[Path B] qty=—, trades=0, PnL=$0.00</td><td>1.9s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E34</code></td><td>Path B + Flask streaming endpoint — /api/portfolios/backtest</td><td><code>—</code></td><td>Path B + alice via API -&gt; 200, 5 stream lines</td><td>3.4s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>E35</code></td><td>Backtest endpoint blocks portfolio with out-of-allowlist symbol</td><td><code>—</code></td><td>alice_only (allowlist=[EURUSD]) backtest EURUSD+BTCUSD -&gt; 200</td><td>0.0s</td><td><span class='verdict v-fail'>FAIL</span></td></tr><tr><td><code>E36</code></td><td>Path B portfolio CRUD: save → load → backtest → delete (alice)</td><td><code>—</code></td><td>save=200 load=200(0.025) bt=200 del=200</td><td>3.3s</td><td><span class='verdict v-pass'>PASS</span></td></tr></tbody>
+    </table>
+</section>
+
+
+    <section>
+      <h2>A — Path A vs Path B parity <span style="font-size:0.7em; color:var(--text-muted);">
+        (0/5 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Same portfolio config run twice (Path A engine, then Path B BacktestNode). All metrics must agree within $1 / 0.5% PnL tolerance. Trade counts and clip reasons must match exactly. Any divergence is a regression in one of the paths.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E01</span>
+            <span class="test-name">Parity: baseline FX_9_Slot, no extras</span>
+            <span class="kind-badge">parity</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>variant</code>: <code>&quot;baseline&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Path A and Path B produce identical PnL/trades/qty/clip</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table parity-table'><thead><tr><th>metric</th><th>Path A</th><th>Path B</th><th>match</th></tr></thead><tbody><tr><td>total_pnl</td><td><code>$-52.77</code></td><td><code>$-55.91</code></td><td><span class='neg'>✗</span></td></tr><tr><td>total_trades</td><td><code>23</code></td><td><code>24</code></td><td><span class='neg'>✗</span></td></tr><tr><td>wins</td><td><code>0</code></td><td><code>0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>losses</td><td><code>39</code></td><td><code>39</code></td><td><span class='pos'>✓</span></td></tr><tr><td>slot_count</td><td><code>9</code></td><td><code>9</code></td><td><span class='pos'>✓</span></td></tr><tr><td>avg_fill_qty</td><td><code>1000.0</code></td><td><code>1000.0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>pf_clip_reason</td><td><code>STOPLOSS</code></td><td><code>STOPLOSS</code></td><td><span class='pos'>✓</span></td></tr><tr><td>path_b flag</td><td><code>none</code></td><td><code>all</code></td><td><span class='neg'>✗</span></td></tr><tr><td colspan='4' style='color:var(--text-muted); font-size:0.78rem; padding-top:0.4rem;'>PnL drift: $3.14 (5.9459%); tolerance ≤ $1 or ≤ 0.5%</td></tr><tr><td colspan='4' style='color:var(--accent4); font-size:0.78rem;'>pnl A=$-52.77 B=$-55.91 drift=3.14; trades A=23 B=24</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre></pre></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E02</span>
+            <span class="test-name">Parity: RBO state machine (Any side, cancel_other)</span>
+            <span class="kind-badge">parity</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo_entry_at</code>: <code>&quot;Any&quot;</code></li><li><code>cancel_other</code>: <code>true</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">RBO breakouts trigger identically on both paths</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table parity-table'><thead><tr><th>metric</th><th>Path A</th><th>Path B</th><th>match</th></tr></thead><tbody><tr><td>total_pnl</td><td><code>$-52.77</code></td><td><code>$-55.91</code></td><td><span class='neg'>✗</span></td></tr><tr><td>total_trades</td><td><code>23</code></td><td><code>24</code></td><td><span class='neg'>✗</span></td></tr><tr><td>wins</td><td><code>0</code></td><td><code>0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>losses</td><td><code>39</code></td><td><code>39</code></td><td><span class='pos'>✓</span></td></tr><tr><td>slot_count</td><td><code>9</code></td><td><code>9</code></td><td><span class='pos'>✓</span></td></tr><tr><td>avg_fill_qty</td><td><code>1000.0</code></td><td><code>1000.0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>pf_clip_reason</td><td><code>STOPLOSS</code></td><td><code>STOPLOSS</code></td><td><span class='pos'>✓</span></td></tr><tr><td>path_b flag</td><td><code>none</code></td><td><code>all</code></td><td><span class='neg'>✗</span></td></tr><tr><td colspan='4' style='color:var(--text-muted); font-size:0.78rem; padding-top:0.4rem;'>PnL drift: $3.14 (5.9459%); tolerance ≤ $1 or ≤ 0.5%</td></tr><tr><td colspan='4' style='color:var(--accent4); font-size:0.78rem;'>pnl A=$-52.77 B=$-55.91 drift=3.14; trades A=23 B=24</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre></pre></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E03</span>
+            <span class="test-name">Parity: trailing pf_sl + trailing pf_tgt (post-hoc clip)</span>
+            <span class="kind-badge">parity</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>pf_sl</code>: <code>&quot;50/trail 15→5&quot;</code></li><li><code>pf_tgt</code>: <code>&quot;30/trail 20→10/5&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Identical pf_clip_reason and clip timestamp on both paths</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table parity-table'><thead><tr><th>metric</th><th>Path A</th><th>Path B</th><th>match</th></tr></thead><tbody><tr><td>total_pnl</td><td><code>$-66.58</code></td><td><code>$-59.65</code></td><td><span class='neg'>✗</span></td></tr><tr><td>total_trades</td><td><code>15</code></td><td><code>13</code></td><td><span class='neg'>✗</span></td></tr><tr><td>wins</td><td><code>0</code></td><td><code>0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>losses</td><td><code>39</code></td><td><code>39</code></td><td><span class='pos'>✓</span></td></tr><tr><td>slot_count</td><td><code>9</code></td><td><code>9</code></td><td><span class='pos'>✓</span></td></tr><tr><td>avg_fill_qty</td><td><code>2000.0</code></td><td><code>2000.0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>pf_clip_reason</td><td><code>STOPLOSS</code></td><td><code>STOPLOSS</code></td><td><span class='pos'>✓</span></td></tr><tr><td>path_b flag</td><td><code>none</code></td><td><code>all</code></td><td><span class='neg'>✗</span></td></tr><tr><td colspan='4' style='color:var(--text-muted); font-size:0.78rem; padding-top:0.4rem;'>PnL drift: $6.93 (10.4064%); tolerance ≤ $1 or ≤ 0.5%</td></tr><tr><td colspan='4' style='color:var(--accent4); font-size:0.78rem;'>pnl A=$-66.58 B=$-59.65 drift=6.93; trades A=15 B=13</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre></pre></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E04</span>
+            <span class="test-name">Parity: move-SL-to-cost + trail_after + per-slot trailing SL</span>
+            <span class="kind-badge">parity</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>move_sl</code>: <code>&quot;180s + trail_after&quot;</code></li><li><code>slot_sl</code>: <code>&quot;0.1% trailing 0.05/0.02&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Move-to-cost arms identically; trailing ratchet matches</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table parity-table'><thead><tr><th>metric</th><th>Path A</th><th>Path B</th><th>match</th></tr></thead><tbody><tr><td>total_pnl</td><td><code>$-53.52</code></td><td><code>$-63.54</code></td><td><span class='neg'>✗</span></td></tr><tr><td>total_trades</td><td><code>8</code></td><td><code>9</code></td><td><span class='neg'>✗</span></td></tr><tr><td>wins</td><td><code>0</code></td><td><code>0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>losses</td><td><code>39</code></td><td><code>39</code></td><td><span class='pos'>✓</span></td></tr><tr><td>slot_count</td><td><code>9</code></td><td><code>9</code></td><td><span class='pos'>✓</span></td></tr><tr><td>avg_fill_qty</td><td><code>3000.0</code></td><td><code>3000.0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>pf_clip_reason</td><td><code>STOPLOSS</code></td><td><code>STOPLOSS</code></td><td><span class='pos'>✓</span></td></tr><tr><td>path_b flag</td><td><code>none</code></td><td><code>all</code></td><td><span class='neg'>✗</span></td></tr><tr><td colspan='4' style='color:var(--text-muted); font-size:0.78rem; padding-top:0.4rem;'>PnL drift: $10.02 (18.7257%); tolerance ≤ $1 or ≤ 0.5%</td></tr><tr><td colspan='4' style='color:var(--accent4); font-size:0.78rem;'>pnl A=$-53.52 B=$-63.54 drift=10.02; trades A=8 B=9</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre></pre></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E05</span>
+            <span class="test-name">Parity: Range Breakout multi-leg (1+2+3 lots, alice ×2.0)</span>
+            <span class="kind-badge">parity</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>strategy</code>: <code>&quot;Range Breakout&quot;</code></li><li><code>legs</code>: <code>&quot;1+2+3&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Identical leg-quantity ratios and fill timestamps</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table parity-table'><thead><tr><th>metric</th><th>Path A</th><th>Path B</th><th>match</th></tr></thead><tbody><tr><td>total_pnl</td><td><code>$-513.41</code></td><td><code>$-416.21</code></td><td><span class='neg'>✗</span></td></tr><tr><td>total_trades</td><td><code>34</code></td><td><code>28</code></td><td><span class='neg'>✗</span></td></tr><tr><td>wins</td><td><code>0</code></td><td><code>0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>losses</td><td><code>34</code></td><td><code>28</code></td><td><span class='neg'>✗</span></td></tr><tr><td>slot_count</td><td><code>1</code></td><td><code>1</code></td><td><span class='pos'>✓</span></td></tr><tr><td>avg_fill_qty</td><td><code>4000.0</code></td><td><code>4000.0</code></td><td><span class='pos'>✓</span></td></tr><tr><td>pf_clip_reason</td><td><code>—</code></td><td><code>—</code></td><td><span class='pos'>✓</span></td></tr><tr><td>path_b flag</td><td><code>none</code></td><td><code>all</code></td><td><span class='neg'>✗</span></td></tr><tr><td colspan='4' style='color:var(--text-muted); font-size:0.78rem; padding-top:0.4rem;'>PnL drift: $97.20 (18.9322%); tolerance ≤ $1 or ≤ 0.5%</td></tr><tr><td colspan='4' style='color:var(--accent4); font-size:0.78rem;'>pnl A=$-513.41 B=$-416.21 drift=97.20; trades A=34 B=28</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre></pre></div>
+        </div>
+    </section>
+
+    <section>
+      <h2>B — Path B-specific stress <span style="font-size:0.7em; color:var(--text-muted);">
+        (4/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Behaviours that exercise Path B&#x27;s per-day chunked BacktestDataConfig pipeline: long ranges, weekday gaps, micro entry windows, RBO daily resets across multi-day backtests.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E06</span>
+            <span class="test-name">Path B: 3-month range with intraday entry window (per-day chunked)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>range</code>: <code>&quot;2024-10-01..2024-12-31&quot;</code></li><li><code>entry_window</code>: <code>&quot;10-15 UTC&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">path_b=&#x27;all&#x27;; per-day BacktestDataConfig chunking handles range without OOM</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-37.89</span></td></tr><tr><td>total_trades</td><td>12</td></tr><tr><td>wins / losses</td><td>24 / 439</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>41.4</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E07</span>
+            <span class="test-name">Path B: run_on_days=[Mon,Wed,Fri] — gaps in chunked data configs</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>run_on_days</code>: <code>[&quot;Mon&quot;, &quot;Wed&quot;, &quot;Fri&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Tue/Thu skipped at chunk-emit time; fills cluster on M/W/F</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-54.15</span></td></tr><tr><td>total_trades</td><td>23</td></tr><tr><td>wins / losses</td><td>0 / 26</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>6.1</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E08</span>
+            <span class="test-name">Path B: 5-minute entry window — micro-chunked data configs</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>entry_window</code>: <code>&quot;12:00-12:05&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Few fills, all near 12:00 UTC; engine handles tiny per-day windows</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-55.91</span></td></tr><tr><td>total_trades</td><td>24</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.1</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E09</span>
+            <span class="test-name">Path B: RBO RangeHigh-only across 5-day range (daily reset)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;RangeHigh, mon=8-9, entry=9-16, buffer=15&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">RBO state machine resets each UTC midnight; new range each day</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-52.61</span></td></tr><tr><td>total_trades</td><td>17</td></tr><tr><td>wins / losses</td><td>4 / 32</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.4</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>C — RBO state-machine compound risks <span style="font-size:0.7em; color:var(--text-muted);">
+        (4/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        RBO interacted with cancel_other_side, weekday filters, UTC-midnight boundaries, and slot-level reverse-on-SL re-executions (which must bypass the RBO entry gate).
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E10</span>
+            <span class="test-name">RBO Any + cancel_other_side + 1-min buffer (deferred-DONE phase)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;Any side, cancel_other, 1min buffer&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Breakout fires once per side; deferred DONE collapses next bar</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-65.62</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 36</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E11</span>
+            <span class="test-name">RBO + run_on_days=[Tue,Thu] — only 2 days have RBO ranges</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;on&quot;</code></li><li><code>run_on_days</code>: <code>[&quot;Tue&quot;, &quot;Thu&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Mon/Wed/Fri filtered before RBO sees them; range built only Tue+Thu</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-29.49</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 13</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>5.3</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E12</span>
+            <span class="test-name">RBO with monitoring at UTC midnight — multi-day reset boundary</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;monitor 00:00-01:00&quot;</code></li><li><code>entry</code>: <code>&quot;01:00-23:59&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Each UTC midnight resets phase to IDLE; new range built day 2+</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-69.87</span></td></tr><tr><td>total_trades</td><td>15</td></tr><tr><td>wins / losses</td><td>0 / 43</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>9.6</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E13</span>
+            <span class="test-name">RBO + reverse-on-SL — re-exec bypasses RBO entry gate</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>rbo</code>: <code>&quot;Any/no_cancel&quot;</code></li><li><code>exit</code>: <code>&quot;reverse + max_re=5&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Initial breakout gated by RBO; subsequent reverses fire freely</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-60.40</span></td></tr><tr><td>total_trades</td><td>11</td></tr><tr><td>wins / losses</td><td>8 / 228</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.5</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>D — Exit logic compound <span style="font-size:0.7em; color:var(--text-muted);">
+        (4/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Trailing SL micro-ratchets, move-to-cost suppression of trailing until armed, portfolio-level trailing SL/TP across cumulative wins, profit-lock minimum thresholds.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E14</span>
+            <span class="test-name">Trailing SL: 0.001 step / 0.0005 offset — micro-ratchets</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>trailing</code>: <code>&quot;step=0.001, offset=0.0005&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">SL ratchets dozens of times per profitable trade; never loosens</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-61.01</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E15</span>
+            <span class="test-name">Move-to-Cost + trail_after — trailing suppressed until cost hit</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>move_sl</code>: <code>&quot;60s + trail_after&quot;</code></li><li><code>slot_sl</code>: <code>&quot;trailing 0.3&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">trailing ratchet only after move-to-cost fires (per-position one-shot)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>trader_agg</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>3000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-63.54</span></td></tr><tr><td>total_trades</td><td>9</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.1</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E16</span>
+            <span class="test-name">Portfolio trailing SL: 5/2 ratchet across many small wins</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>pf_sl</code>: <code>&quot;30 + trail 5/2&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">pf_sl ratchets every $5 of cumulative profit; tightens by $2</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-36.40</span></td></tr><tr><td>total_trades</td><td>16</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E17</span>
+            <span class="test-name">Portfolio TP trailing with profit lock minimum ($10)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>pf_tgt</code>: <code>&quot;100 + trail when ≥20, lock_min=10, every 10/by 5&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Once profit ≥$20, target floats; can&#x27;t drop below $10 floor</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-59.65</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.1</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>E — Multi-user × Path B <span style="font-size:0.7em; color:var(--text-muted);">
+        (5/5 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Path B with extreme multipliers (×0.01 to ×100,000), allowlist-restricted users, and cross-path back-to-back runs to verify no shared mutable state between Path A and B.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E18</span>
+            <span class="test-name">Path B: runaway ×100,000 with full bundle — cap MUST clamp</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;runaway&quot;</code></li><li><code>multiplier</code>: <code>100000.0</code></li><li><code>expected_qty</code>: <code>&quot;10,000,000 (FX cap)&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty clamped to 10M; engine survives all toggles together</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>runaway</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>10000000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-81653.98</span></td></tr><tr><td>total_trades</td><td>3</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.1</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E19</span>
+            <span class="test-name">Path B: alice ×2.0 + RBO + trailing pf_sl</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;alice&quot;</code></li><li><code>multiplier</code>: <code>2.0</code></li><li><code>rbo</code>: <code>&quot;on&quot;</code></li><li><code>pf_sl</code>: <code>&quot;60 trail 15/7&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">qty = 2× baseline across 9 slots; RBO + pf_sl interact correctly</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-72.78</span></td></tr><tr><td>total_trades</td><td>16</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E20</span>
+            <span class="test-name">Path B: trader_safe ×0.01 + full bundle — tiny exposure</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;trader_safe&quot;</code></li><li><code>multiplier</code>: <code>0.01</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">avg_fill_qty == 1% baseline; trailing pf_sl rarely binds (small $$)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>trader_safe</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>10.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-0.87</span></td></tr><tr><td>total_trades</td><td>39</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E21a</span>
+            <span class="test-name">Cross-path stress: alice on Path A</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;alice&quot;</code></li><li><code>path</code>: <code>&quot;A&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Path A baseline for E21</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path A</code></td></tr><tr><td>path_b flag</td><td><code>none</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-1458.81</span></td></tr><tr><td>total_trades</td><td>336</td></tr><tr><td>wins / losses</td><td>3 / 333</td></tr><tr><td>slot_count</td><td>1</td></tr><tr><td>elapsed_sec</td><td>3.5</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E21b</span>
+            <span class="test-name">Cross-path stress: alice on Path B (no shared state from E21a)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>user</code>: <code>&quot;alice&quot;</code></li><li><code>path</code>: <code>&quot;B&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Path B sees same alice multiplier; no leakage from prior Path A run</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-1158.93</span></td></tr><tr><td>total_trades</td><td>268</td></tr><tr><td>wins / losses</td><td>3 / 265</td></tr><tr><td>slot_count</td><td>1</td></tr><tr><td>elapsed_sec</td><td>3.2</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>F — Time window edge cases <span style="font-size:0.7em; color:var(--text-muted);">
+        (3/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Same-bar gate races (squareoff = entry_end), DST transitions on America/New_York, weekend-only filters on FX (no data), single-bar entry windows.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E22</span>
+            <span class="test-name">Squareoff time == entry_end_time (same bar fires both gates)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>entry_end</code>: <code>&quot;15:00 UTC&quot;</code></li><li><code>squareoff</code>: <code>&quot;15:00 UTC&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Squareoff wins; no fills past 15:00 UTC; engine handles ordering</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-55.91</span></td></tr><tr><td>total_trades</td><td>24</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>6.7</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E23</span>
+            <span class="test-name">DST transition (Mar 8-12 2024) with NY squareoff 10:00</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>range</code>: <code>&quot;2024-03-08..2024-03-12&quot;</code></li><li><code>squareoff</code>: <code>&quot;10:00 America/New_York&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">ZoneInfo handles DST shift on 2024-03-10; squareoff hits at right UTC offset</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-59.45</span></td></tr><tr><td>total_trades</td><td>16</td></tr><tr><td>wins / losses</td><td>2 / 20</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>6.7</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E24</span>
+            <span class="test-name">run_on_days=[Sat,Sun] on FX (no weekend data) — should error or 0 trades</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-error">ERROR</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>run_on_days</code>: <code>[&quot;Sat&quot;, &quot;Sun&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Path B emits per-day configs for Sat/Sun; catalog returns no bars; total_trades==0</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>—</code></td></tr><tr><td>avg_fill_qty</td><td><strong>None</strong></td></tr><tr><td>total_pnl</td><td><span class='zero'>$0.00</span></td></tr><tr><td>total_trades</td><td>0</td></tr><tr><td>wins / losses</td><td>0 / 0</td></tr><tr><td>slot_count</td><td>0</td></tr><tr><td>elapsed_sec</td><td>3.3</td></tr></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre>ValueError(&quot;All slots failed: [{&#x27;slot_id&#x27;: &#x27;fx_jpy_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}]&quot;)</pre><details><summary>traceback</summary><pre>Traceback (most recent call last):
+  File &quot;d:\mcube_test_version_1_updated\m-cube_version1\stress_test_extreme_path_b.py&quot;, line 224, in run_backtest_test
+    results = run_portfolio_backtest(catalog_path=CATALOG_PATH,
+                                     portfolio=pf,
+                                     user_id=user_id)
+  File &quot;D:\mcube_test_version_1_updated\m-cube_version1\core\backtest_runner.py&quot;, line 2968, in run_portfolio_backtest
+    raise ValueError(f&quot;All slots failed: {errors}&quot;)
+ValueError: All slots failed: [{&#x27;slot_id&#x27;: &#x27;fx_jpy_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}]
+</pre></details></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E25</span>
+            <span class="test-name">1-minute entry window 12:30-12:31 UTC (extreme narrow)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>entry_window</code>: <code>&quot;12:30-12:31&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">At most one fill per slot per day (1 bar in window)</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-59.65</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.3</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>G — Extreme configurations <span style="font-size:0.7em; color:var(--text-muted);">
+        (4/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        All-knobs-on portfolios, sub-pip stop-losses, 200% allocation (leverage), 9 mixed-strategy slots under runaway multiplier with cap clamping.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E26</span>
+            <span class="test-name">All-knobs-on: full bundle + max_loss/max_profit + slot trailing + re_execute</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>settings</code>: <code>&quot;every active gate&quot;</code></li><li><code>user</code>: <code>&quot;trader_agg&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Engine survives every interacting toggle; results sensible</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>trader_agg</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>3000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-90.34</span></td></tr><tr><td>total_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>0 / 41</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.0</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E27</span>
+            <span class="test-name">Tiny SL = 0.0001 (1 pip) — should fire on near-every entry</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>slot_sl</code>: <code>&quot;points 0.0001&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Many SL hits, total_trades ≈ entry attempts</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>1000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-58.32</span></td></tr><tr><td>total_trades</td><td>24</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.3</td></tr><tr><td>pf_clip</td><td><span class='flag flag-loss'>STOPLOSS</span></td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E28</span>
+            <span class="test-name">Allocation_mode=percentage at 200% total (leverage)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>allocation_mode</code>: <code>&quot;percentage&quot;</code></li><li><code>sum</code>: <code>200.0</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Engine accepts; capital scales 2× per slot — leverage applied</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>alice</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>2000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-180.53</span></td></tr><tr><td>total_trades</td><td>39</td></tr><tr><td>wins / losses</td><td>0 / 39</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>7.2</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E29</span>
+            <span class="test-name">9 mixed-strategy slots + runaway ×100,000 (Path B + cap clamp)</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>slots</code>: <code>9</code></li><li><code>user</code>: <code>&quot;runaway&quot;</code></li><li><code>multiplier</code>: <code>100000.0</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">All 9 slots clamped to FX cap; engine survives 9× cap-clamped fills</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>runaway</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>all</code></td></tr><tr><td>avg_fill_qty</td><td><strong>10000000.0</strong></td></tr><tr><td>total_pnl</td><td><span class='neg'>$-27986754.50</span></td></tr><tr><td>total_trades</td><td>1252</td></tr><tr><td>wins / losses</td><td>19 / 1233</td></tr><tr><td>slot_count</td><td>9</td></tr><tr><td>elapsed_sec</td><td>9.6</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+    <section>
+      <h2>H — Failure-mode probes <span style="font-size:0.7em; color:var(--text-muted);">
+        (1/4 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Inverted dates, exclusively-Sunday weekday filter on FX, empty slot lists, malformed bar-type strings — engine should fail fast or return clean 0-trades, never produce wrong numbers silently.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E30</span>
+            <span class="test-name">Path B: inverted dates (start &gt; end) — must error or yield 0 trades</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-error">ERROR</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>start</code>: <code>&quot;2024-12-10&quot;</code></li><li><code>end</code>: <code>&quot;2024-12-02&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Either ValueError &#x27;no data configs&#x27; or clean 0-trade return</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>—</code></td></tr><tr><td>avg_fill_qty</td><td><strong>None</strong></td></tr><tr><td>total_pnl</td><td><span class='zero'>$0.00</span></td></tr><tr><td>total_trades</td><td>0</td></tr><tr><td>wins / losses</td><td>0 / 0</td></tr><tr><td>slot_count</td><td>0</td></tr><tr><td>elapsed_sec</td><td>2.0</td></tr></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre>ValueError(&quot;All slots failed: [{&#x27;slot_id&#x27;: &#x27;a&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD&#x27;, &#x27;error&#x27;: &#x27;`end_time` (2024-12-02) is before `start_time` (2024-12-10)&#x27;}]&quot;)</pre><details><summary>traceback</summary><pre>Traceback (most recent call last):
+  File &quot;d:\mcube_test_version_1_updated\m-cube_version1\stress_test_extreme_path_b.py&quot;, line 224, in run_backtest_test
+    results = run_portfolio_backtest(catalog_path=CATALOG_PATH,
+                                     portfolio=pf,
+                                     user_id=user_id)
+  File &quot;D:\mcube_test_version_1_updated\m-cube_version1\core\backtest_runner.py&quot;, line 2968, in run_portfolio_backtest
+    raise ValueError(f&quot;All slots failed: {errors}&quot;)
+ValueError: All slots failed: [{&#x27;slot_id&#x27;: &#x27;a&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD&#x27;, &#x27;error&#x27;: &#x27;`end_time` (2024-12-02) is before `start_time` (2024-12-10)&#x27;}]
+</pre></details></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E31</span>
+            <span class="test-name">run_on_days=[Sun] only (FX has no Sun data) — 0 trades expected</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-error">ERROR</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>run_on_days</code>: <code>[&quot;Sun&quot;]</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">Path B emits Sun-only configs; catalog returns no bars; 0 trades</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>—</code></td></tr><tr><td>avg_fill_qty</td><td><strong>None</strong></td></tr><tr><td>total_pnl</td><td><span class='zero'>$0.00</span></td></tr><tr><td>total_trades</td><td>0</td></tr><tr><td>wins / losses</td><td>0 / 0</td></tr><tr><td>slot_count</td><td>0</td></tr><tr><td>elapsed_sec</td><td>3.4</td></tr></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre>ValueError(&quot;All slots failed: [{&#x27;slot_id&#x27;: &#x27;fx_jpy_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}]&quot;)</pre><details><summary>traceback</summary><pre>Traceback (most recent call last):
+  File &quot;d:\mcube_test_version_1_updated\m-cube_version1\stress_test_extreme_path_b.py&quot;, line 224, in run_backtest_test
+    results = run_portfolio_backtest(catalog_path=CATALOG_PATH,
+                                     portfolio=pf,
+                                     user_id=user_id)
+  File &quot;D:\mcube_test_version_1_updated\m-cube_version1\core\backtest_runner.py&quot;, line 2968, in run_portfolio_backtest
+    raise ValueError(f&quot;All slots failed: {errors}&quot;)
+ValueError: All slots failed: [{&#x27;slot_id&#x27;: &#x27;fx_jpy_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_jpy_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on USDJPY | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_bb&#x27;, &#x27;display_name&#x27;: &#x27;Bollinger Bands on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_ema&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_eur_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on EURUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}, {&#x27;slot_id&#x27;: &#x27;fx_gbp_rsi&#x27;, &#x27;display_name&#x27;: &#x27;RSI Mean Reversion on GBPUSD | SL: 0.5% | TP: 1%&#x27;, &#x27;error&#x27;: &#x27;Chunked Path B yielded zero data configs — check start/end dates.&#x27;}]
+</pre></details></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E32</span>
+            <span class="test-name">Path B: 0 slots — must raise &#x27;no enabled slots&#x27;</span>
+            <span class="kind-badge">backtest_negative</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>slots</code>: <code>0</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">ValueError on empty enabled_slots — same behaviour as Path A</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>expected_error_substring</td><td>no enabled</td></tr><tr><td>actual_error</td><td><code>ValueError(&#x27;No enabled strategy slots in portfolio&#x27;)</code></td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E33</span>
+            <span class="test-name">Path B: malformed bar_type_str (invalid symbol) — must fail fast</span>
+            <span class="kind-badge">backtest</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>bar_type</code>: <code>&quot;NOTREAL.FOREX_MS-1-MINUTE-MID-EXTERNAL&quot;</code></li></ul>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">RuntimeError or KeyError — descriptive failure, not a silent 0-trade</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>user_id</td><td><code>_default</code></td></tr><tr><td>path</td><td><code>Path B</code></td></tr><tr><td>path_b flag</td><td><code>—</code></td></tr><tr><td>avg_fill_qty</td><td><strong>None</strong></td></tr><tr><td>total_pnl</td><td><span class='zero'>$0.00</span></td></tr><tr><td>total_trades</td><td>0</td></tr><tr><td>wins / losses</td><td>0 / 0</td></tr><tr><td>slot_count</td><td>0</td></tr><tr><td>elapsed_sec</td><td>1.9</td></tr></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre>Expected error but ran successfully: {&#x27;total_pnl&#x27;: 0.0, &#x27;total_trades&#x27;: 0, &#x27;wins&#x27;: 0, &#x27;losses&#x27;: 0, &#x27;slot_count&#x27;: 1, &#x27;avg_fill_qty&#x27;: None, &#x27;pf_clip_reason&#x27;: None, &#x27;path_b&#x27;: &#x27;all&#x27;}</pre></div>
+        </div>
+    </section>
+
+    <section>
+      <h2>I — API + Path B integration <span style="font-size:0.7em; color:var(--text-muted);">
+        (2/3 pass)</span></h2>
+      <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.8rem;">
+        Path B-active backtests via the Flask streaming endpoint, allowlist enforcement at /api/portfolios/backtest, full per-user CRUD round-trip.
+      </p>
+      
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E34</span>
+            <span class="test-name">Path B + Flask streaming endpoint — /api/portfolios/backtest</span>
+            <span class="kind-badge">api</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 200 with multi-line stream; final &#x27;complete&#x27; line present</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>Path B + alice via API -&gt; 200, 5 stream lines</td></tr><tr><td>status</td><td>200</td></tr><tr><td>lines</td><td>5</td></tr><tr><td>elapsed_sec</td><td>3.4</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E35</span>
+            <span class="test-name">Backtest endpoint blocks portfolio with out-of-allowlist symbol</span>
+            <span class="kind-badge">api</span>
+            <span class="verdict v-fail">FAIL</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">HTTP 400/403 — second slot (BTCUSD) fails allowlist check</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>alice_only (allowlist=[EURUSD]) backtest EURUSD+BTCUSD -&gt; 200</td></tr><tr><td>status</td><td>200</td></tr><tr><td>snippet</td><td>{&quot;event&quot;: &quot;error&quot;, &quot;error&quot;: &quot;Instrument &#x27;BTCUSD&#x27; is not in user &#x27;alice_only&#x27;s allowed_instruments. Ask admin to update the allowlist.&quot;}
+</td></tr><tr><td>elapsed_sec</td><td>0.0</td></tr></table>
+            </div>
+          </div>
+          <div class='err-card'><h4>Failure</h4><pre>alice_only (allowlist=[EURUSD]) backtest EURUSD+BTCUSD -&gt; 200</pre></div>
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">E36</span>
+            <span class="test-name">Path B portfolio CRUD: save → load → backtest → delete (alice)</span>
+            <span class="kind-badge">api</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <p class='expected'>(no parameters)</p>
+            </div>
+            <div class="test-section">
+              <h4>Expected</h4>
+              <p class="expected">All four endpoints 200; lots round-trip; backtest streams to completion</p>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>detail</td><td>save=200 load=200(0.025) bt=200 del=200</td></tr><tr><td>loaded_name</td><td>E36_pathB_crud</td></tr><tr><td>stream_lines</td><td>5</td></tr><tr><td>elapsed_sec</td><td>3.3</td></tr></table>
+            </div>
+          </div>
+          
+        </div>
+    </section>
+
+<section>
+  <h2>How to reproduce</h2>
+  <pre>python stress_test_extreme_path_b.py
+python stress_test_extreme_path_b_report.py</pre>
+  <p style="font-size: 0.85rem; color: var(--text-muted);">
+    Both scripts are at the project root. They seed an isolated test registry,
+    run the suite, write JSON+HTML to <code>5. Logics/extreme_stress_tests/</code>,
+    then restore the original <code>users.json</code> registry. Safe to re-run.
+    The Parity tests run each backtest twice (Path A then Path B), so total
+    runtime is roughly 1.5&times; <code>stress_test_portfolios.py</code>.
+  </p>
+</section>
+
+</div>
+</body>
+</html>

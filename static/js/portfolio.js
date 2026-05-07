@@ -177,6 +177,12 @@ const Portfolio = {
         let resultsHTML = "";
         if (this.results) resultsHTML = this._renderResults();
 
+        // Pre-fill the global From/To inputs from the selected portfolio so
+        // they mirror the Timing-tab dates. Empty when nothing is selected.
+        const activePf = this.activeIndex !== null ? this.portfolios[this.activeIndex] : null;
+        const gStartVal = activePf?.start_date || "";
+        const gEndVal = activePf?.end_date || "";
+
         document.getElementById("portfolio-app").innerHTML = `
             <div style="border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;">
                 <div style="overflow-x: auto;">
@@ -211,9 +217,13 @@ const Portfolio = {
 
             <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 0 10px 0;">
                 <span style="font-size: 0.84rem; color: var(--text-secondary);">From:</span>
-                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;" id="pf-global-start" value="">
+                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
+                       id="pf-global-start" value="${gStartVal}"
+                       onchange="Portfolio._onGlobalDateChange('start', this.value)">
                 <span style="font-size: 0.84rem; color: var(--text-secondary);">To:</span>
-                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;" id="pf-global-end" value="">
+                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
+                       id="pf-global-end" value="${gEndVal}"
+                       onchange="Portfolio._onGlobalDateChange('end', this.value)">
                 <button class="btn btn-primary btn-sm" onclick="Portfolio.runSelectedBacktest()" style="padding: 5px 16px;">
                     &#9654; Start Testing
                 </button>
@@ -276,12 +286,35 @@ const Portfolio = {
             return;
         }
         this._currentPortfolio = this.portfolios[this.activeIndex];
-        // Apply global date overrides if set
-        const gStart = document.getElementById("pf-global-start")?.value;
-        const gEnd = document.getElementById("pf-global-end")?.value;
-        if (gStart) this._currentPortfolio.start_date = gStart;
-        if (gEnd) this._currentPortfolio.end_date = gEnd;
         this.runBacktest();
+    },
+
+    /**
+     * Two-way binding for the global From/To inputs: mutate the active
+     * portfolio's start_date/end_date and persist via the same save endpoint
+     * the Timing tab uses, so both surfaces are a single source of truth.
+     */
+    _onGlobalDateChange(which, value) {
+        if (this.activeIndex === null || !this.portfolios[this.activeIndex]) {
+            App.toast("Select a portfolio first.", "error");
+            return;
+        }
+        const pf = this.portfolios[this.activeIndex];
+        const key = which === "start" ? "start_date" : "end_date";
+        pf[key] = value || null;
+
+        // Strip UI-only fields (matches _savePortfolioModal's clean step).
+        const cleanPf = JSON.parse(JSON.stringify(pf));
+        delete cleanPf._enabled;
+        delete cleanPf._ui;
+        delete cleanPf.on_leg_fail;
+        delete cleanPf.execution_mode;
+        delete cleanPf.strategy_tag;
+        delete cleanPf.max_legs;
+        delete cleanPf.tgt_sl_per_lot;
+        App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
+            .then(() => App.log(`Portfolio "${pf.name}" ${key} updated`, "SUCCESS", "Multileg", pf.name))
+            .catch(() => {});
     },
 
     openGlobalSettings() {

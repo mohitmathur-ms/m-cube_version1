@@ -451,19 +451,32 @@ class RangeBreakoutStrategy(Strategy):
         return entry - delta if side == OrderSide.BUY else entry + delta
 
     # ── Order plumbing ────────────────────────────────────────────────────
-    def _submit_market(self, side: OrderSide, qty: Quantity) -> None:
-        order = self.order_factory.market(
+    def _submit_market(self, side: OrderSide, qty: Quantity, reason: str | None = None) -> None:
+        kwargs = dict(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=qty,
             time_in_force=TimeInForce.GTC,
         )
+        if reason:
+            kwargs["tags"] = [reason]
+        order = self.order_factory.market(**kwargs)
         self.submit_order(order)
 
     def _enter_leg(self, side: OrderSide, legs: list[LegState], idx: int, price: float) -> None:
         if self._leg_qty_decimals[idx] <= 0:
             return
-        self._submit_market(side, self._leg_qty[idx])
+        # Forensic tag: which leg, which side broke out, the range it broke,
+        # and the current price. Lands in fills_report["tags"] -> orderbook's
+        # "ENTRY DETAILED REASON" column.
+        leg_no = idx + 1
+        rh = self._leg_range_high[idx] if idx < len(self._leg_range_high) else None
+        rl = self._leg_range_low[idx] if idx < len(self._leg_range_low) else None
+        if side == OrderSide.BUY:
+            reason = f"RBO leg{leg_no} BUY: price={price:.4f} > range_high={rh:.4f}" if rh is not None else f"RBO leg{leg_no} BUY @ {price:.4f}"
+        else:
+            reason = f"RBO leg{leg_no} SELL: price={price:.4f} < range_low={rl:.4f}" if rl is not None else f"RBO leg{leg_no} SELL @ {price:.4f}"
+        self._submit_market(side, self._leg_qty[idx], reason)
         leg = legs[idx]
         leg.active = True
         leg.entry_price = price

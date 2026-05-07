@@ -52,26 +52,33 @@ class BollingerBandsStrategy(Strategy):
 
         close = float(bar.close)
 
+        p = int(self.config.bb_period)
+        sd = float(self.config.bb_std)
         if close <= self.bb.lower:
+            reason = f"Bollinger BUY: close={close:.4f} ≤ lower({sd}σ,p{p})={self.bb.lower:.4f}"
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.BUY)
+                self._submit_order(OrderSide.BUY, reason)
             elif self.portfolio.is_net_short(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
-                self._submit_order(OrderSide.BUY)
+                self._submit_order(OrderSide.BUY, reason)
         elif close >= self.bb.upper:
+            reason = f"Bollinger SELL: close={close:.4f} ≥ upper({sd}σ,p{p})={self.bb.upper:.4f}"
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.SELL)
+                self._submit_order(OrderSide.SELL, reason)
             elif self.portfolio.is_net_long(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
-                self._submit_order(OrderSide.SELL)
+                self._submit_order(OrderSide.SELL, reason)
 
-    def _submit_order(self, side: OrderSide) -> None:
-        order = self.order_factory.market(
+    def _submit_order(self, side: OrderSide, reason: str | None = None) -> None:
+        kwargs = dict(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
         )
+        if reason:
+            kwargs["tags"] = [reason]
+        order = self.order_factory.market(**kwargs)
         self.submit_order(order)
 
     def on_stop(self) -> None:

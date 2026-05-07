@@ -65,11 +65,18 @@ class RSIMeanReversionStrategy(Strategy):
                 self._submit_order(OrderSide.SELL)
 
     def _submit_order(self, side: OrderSide) -> None:
+        rv = self.rsi.value
+        p = int(self.config.rsi_period)
+        if side == OrderSide.BUY:
+            reason = f"RSI({p})={rv:.2f} ≤ oversold({self.config.oversold})"
+        else:
+            reason = f"RSI({p})={rv:.2f} ≥ overbought({self.config.overbought})"
         order = self.order_factory.market(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
+            tags=[reason],
         )
         self.submit_order(order)
 

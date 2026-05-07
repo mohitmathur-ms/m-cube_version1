@@ -668,7 +668,8 @@ def strategy_guidelines():
 
 # ─── Backtest API ────────────────────────────────────────────────────────────
 
-def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
+def _serialize_backtest_result(results: dict, strategy_name: str,
+                                user_id: str | None = None) -> dict:
     """Convert a single backtest result (with DataFrames) to a JSON-serializable dict."""
     serializable = {
         "starting_capital": results["starting_capital"],
@@ -707,7 +708,7 @@ def _serialize_backtest_result(results: dict, strategy_name: str) -> dict:
 
     # Build order book and logs
     safe_name = sanitize_filename(strategy_name)
-    ob_df = build_orderbook_dataframe({safe_name: results})
+    ob_df = build_orderbook_dataframe({safe_name: results}, user_id=user_id)
     serializable["order_book"] = ob_df.fillna("").to_dict(orient="records") if not ob_df.empty else []
 
     logs_df = build_logs_dataframe({safe_name: results})
@@ -858,7 +859,7 @@ def run_backtest_stream():
                     results = future.result()
                     meta["strategies_raw"][strategy_name] = results
                     meta["strategies_serialized"][strategy_name] = _serialize_backtest_result(
-                        results, strategy_name)
+                        results, strategy_name, user_id=user_id_for_run)
                     elapsed_sec = results.get("elapsed_seconds") if isinstance(results, dict) else None
                     if elapsed_sec is not None:
                         runtime_history.record(
@@ -897,7 +898,8 @@ def run_backtest_stream():
                         raw_name = f"{inst_label}_{'_'.join(inst_strategies.keys())}"
                         report_name = sanitize_filename(raw_name)
                         try:
-                            report_html = generate_report(inst_strategies_raw, backtest_name=report_name)
+                            report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
+                                                          user_id=user_id_for_run)
                             report_path = user_dir / f"{report_name}_report.html"
                             report_path.write_text(report_html, encoding="utf-8")
                         except Exception as e:
@@ -1022,7 +1024,8 @@ def run_backtest_api():
                 )
 
                 inst_strategies_raw[strategy_name] = results
-                inst_strategies[strategy_name] = _serialize_backtest_result(results, strategy_name)
+                inst_strategies[strategy_name] = _serialize_backtest_result(
+                    results, strategy_name, user_id=user_id_for_run)
 
             except Exception as e:
                 errors.append({
@@ -1042,7 +1045,8 @@ def run_backtest_api():
             raw_name = f"{inst_label}_{'_'.join(inst_strategies.keys())}"
             report_name = sanitize_filename(raw_name)
             try:
-                report_html = generate_report(inst_strategies_raw, backtest_name=report_name)
+                report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
+                                              user_id=user_id_for_run)
                 report_path = user_dir / f"{report_name}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
@@ -1473,7 +1477,7 @@ def api_portfolio_backtest():
                     "wins": sr["wins"], "losses": sr["losses"], "win_rate": sr["win_rate"],
                 }
 
-            ob_df = build_orderbook_dataframe(all_results_for_reports)
+            ob_df = build_orderbook_dataframe(all_results_for_reports, user_id=user_id_for_run)
             if not ob_df.empty:
                 ob_df.to_csv(user_dir / f"order_book_{prefix}.csv", index=False)
                 results["order_book"] = ob_df.fillna("").to_dict(orient="records")
@@ -1487,7 +1491,8 @@ def api_portfolio_backtest():
             report_html = ""
             try:
                 report_html = generate_report(all_results_for_reports,
-                                              backtest_name=f"Portfolio: {config.name}")
+                                              backtest_name=f"Portfolio: {config.name}",
+                                              user_id=user_id_for_run)
                 report_path = user_dir / f"{prefix}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:

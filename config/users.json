@@ -2,14 +2,8 @@
   "users": [
     {
       "user_id": "_default",
-      "alias": "Default User",
-      "multiplier": 2,
-      "allowed_instruments": null
-    },
-    {
-      "user_id": "u_mosgp7u4",
-      "alias": "New User",
-      "multiplier": 1,
+      "alias": "Default",
+      "multiplier": 1.0,
       "allowed_instruments": null
     }
   ]

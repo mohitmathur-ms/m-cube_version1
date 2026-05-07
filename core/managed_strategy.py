@@ -124,6 +124,13 @@ class ManagedExitStrategy(Strategy):
         self.re_execution_count = 0
         self.position_side = None  # "LONG" or "SHORT" or None
         self._expecting_close_fill = False  # next on_order_filled is a close, not an open
+        # Forensic reason string set by the signal function in ``_check_entries``
+        # right before calling ``_submit_order``. Attached to the Nautilus
+        # order's ``tags`` so it lands in fills_report["tags"], where
+        # report_generator surfaces it via the orderbook's
+        # "ENTRY DETAILED REASON" column. Cleared after each submit so a
+        # subsequent reverse-on-SL or close-and-flip doesn't reuse it.
+        self._pending_entry_reason: str | None = None
 
         # Squareoff state. Resolve the tz once at init — ZoneInfo lookups are
         # cached but the conversion still costs a hash; storing the object lets
@@ -385,8 +392,28 @@ class ManagedExitStrategy(Strategy):
         # Same close-fill flag as _handle_exit; without it on_order_filled would
         # mis-classify the closing fill as a new entry.
         self._expecting_close_fill = True
-        self.close_all_positions(self.config.instrument_id)
+        hh = self._squareoff_min // 60
+        mm = self._squareoff_min % 60
+        tz_name = getattr(self._squareoff_tz, "key", None) or str(self._squareoff_tz)
+        reason = f"Squareoff: daily close @ {hh:02d}:{mm:02d} {tz_name}"
+        self._close_with_reason(reason)
         self._reset_exit_state()
+
+    def _close_with_reason(self, reason: str | None) -> None:
+        """Close all open positions on this slot's instrument with a tag.
+
+        Thin wrapper around ``self.close_all_positions(...)`` that adds a
+        structured ``tags=[reason]``. The closing fill's ``tags`` column
+        flows into ``fills_report``, where the orderbook builder splits on
+        ``":"`` — prefix becomes EXIT REASON ("Stop Loss"), full string
+        becomes EXIT DETAILED REASON. ``reason=None`` is the legacy
+        untagged path.
+        """
+        instrument_id = self.config.instrument_id
+        kwargs = {}
+        if reason:
+            kwargs["tags"] = [reason]
+        self.close_all_positions(instrument_id, **kwargs)
 
     def _check_exits(self, close: float, is_long: bool, is_short: bool) -> None:
         if self.entry_price == 0:
@@ -478,7 +505,7 @@ class ManagedExitStrategy(Strategy):
                 if self.sl_wait_count < self.config.sl_wait_bars:
                     sl_hit = False
             if sl_hit:
-                self._handle_exit("sl", is_long)
+                self._handle_exit("sl", is_long, close=close)
                 return
         else:
             self.sl_wait_count = 0
@@ -492,9 +519,9 @@ class ManagedExitStrategy(Strategy):
                 tp_hit = True
 
             if tp_hit:
-                self._handle_exit("tp", is_long)
+                self._handle_exit("tp", is_long, close=close)
 
-    def _handle_exit(self, exit_type: str, was_long: bool) -> None:
+    def _handle_exit(self, exit_type: str, was_long: bool, close: float = 0.0) -> None:
         action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
 
         # Apply on_sl_action_on / on_target_action_on filter per
@@ -529,11 +556,34 @@ class ManagedExitStrategy(Strategy):
             if filter_cfg == "OnTarget_Trailing_Only":
                 action = "close"
 
+        # Build a structured reason for the close order's `tags` so the
+        # orderbook's EXIT REASON column shows "Stop Loss" / "Take Profit" /
+        # "Trailing SL" / "Reverse on SL" instead of the order-type-derived
+        # "Market Exit" placeholder.
+        if self.entry_price:
+            raw_pct = ((close - self.entry_price) / self.entry_price) * 100
+        else:
+            raw_pct = 0.0
+        # Convention: positive pct == in profit (matches profit_pct elsewhere).
+        pct = raw_pct if was_long else -raw_pct
+        if exit_type == "sl":
+            op = "≤" if was_long else "≥"
+            label = "Trailing SL" if self._was_trailed else "Stop Loss"
+            if action == "reverse":
+                label = "Reverse on SL"
+            reason = (f"{label}: price={close:.4f} {op} SL={self.current_sl:.4f} "
+                      f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
+        else:  # tp
+            op = "≥" if was_long else "≤"
+            label = "Reverse on TP" if action == "reverse" else "Take Profit"
+            reason = (f"{label}: price={close:.4f} {op} TP={self.current_tp:.4f} "
+                      f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
+
         # Flag the upcoming fill as a close — otherwise on_order_filled would
         # set position_side to the opposite side (SELL closing a LONG would
         # incorrectly mark us as SHORT) and get us stuck in an impossible state.
         self._expecting_close_fill = True
-        self.close_all_positions(self.config.instrument_id)
+        self._close_with_reason(reason)
         self._reset_exit_state()
 
         if action == "re_execute":
@@ -586,8 +636,16 @@ class ManagedExitStrategy(Strategy):
         args["is_long"] = is_long
         args["is_short"] = is_short
 
-        side = signal_entry["signal_fn"](**args)
+        ret = signal_entry["signal_fn"](**args)
+        # Backwards-compat: legacy signal_fn returned a bare OrderSide. New
+        # contract is a 2-tuple (side, detailed_reason). Normalize so custom
+        # strategies loaded via core/custom_strategy_loader.py keep working.
+        if isinstance(ret, tuple) and len(ret) == 2:
+            side, detailed_reason = ret
+        else:
+            side, detailed_reason = ret, None
         if side is not None:
+            self._pending_entry_reason = detailed_reason
             self._submit_order(side)
             self._set_exit_levels(side)
 
@@ -664,13 +722,21 @@ class ManagedExitStrategy(Strategy):
         self.position_side = None
 
     def _submit_order(self, side: OrderSide) -> None:
-        order = self.order_factory.market(
+        # Attach the indicator-and-condition reason as a tag on the Nautilus
+        # order. Tags propagate to fills_report["tags"], which the orderbook
+        # builder surfaces via the "ENTRY DETAILED REASON" column. Cleared
+        # right after submit so a subsequent reverse/close doesn't reuse it.
+        kwargs = dict(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
         )
+        if self._pending_entry_reason:
+            kwargs["tags"] = [self._pending_entry_reason]
+        order = self.order_factory.market(**kwargs)
         self.submit_order(order)
+        self._pending_entry_reason = None
 
     def on_stop(self) -> None:
         self.cancel_all_orders(self.config.instrument_id)

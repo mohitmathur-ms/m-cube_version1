@@ -2,7 +2,7 @@
   "name": "Portfolio 5",
   "description": "",
   "created_at": "2026-05-04T04:35:54.111679+00:00",
-  "updated_at": "2026-05-05T07:38:38.310547+00:00",
+  "updated_at": "2026-05-07T05:16:24.697268+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -83,7 +83,7 @@
         "use_ema": true
       },
       "bar_type_str": "BTCUSD.BINANCE_MS-1-DAY-LAST-EXTERNAL",
-      "trade_size": 1.0,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "none",
@@ -118,7 +118,7 @@
         "use_ema": false
       },
       "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1.0,
+      "lots": 1e-05,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "none",

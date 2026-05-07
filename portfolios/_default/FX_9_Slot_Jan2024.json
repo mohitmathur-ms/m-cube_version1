@@ -2,11 +2,80 @@
   "name": "FX_9_Slot_Jan2024",
   "description": "Benchmark portfolio: Jan 2024 only, 9 slots, 1-min MID bars.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-04-22T00:00:00+00:00",
+  "updated_at": "2026-05-07T05:37:48.357292+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
   "allocation_mode": "equal",
+  "start_date": "2024-01-01",
+  "end_date": "2024-01-31",
+  "squareoff_time": null,
+  "squareoff_tz": null,
+  "run_on_days": [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu"
+  ],
+  "entry_start_time": "10:30:00",
+  "entry_end_time": "11:55:00",
+  "rbo_enabled": true,
+  "range_monitoring_start": "10:30:00",
+  "range_monitoring_end": "11:00:00",
+  "rbo_entry_start": "11:00:00",
+  "rbo_entry_end": "11:55:00",
+  "rbo_range_buffer": 0,
+  "rbo_entry_at": "RangeHigh",
+  "rbo_monitoring": "Underlying",
+  "rbo_cancel_other_side": true,
+  "delay_between_legs_sec": 0,
+  "on_sl_action_on": "OnSL_N_Trailing_Both",
+  "on_target_action_on": "OnTarget_N_Trailing_Both",
+  "straddle_width_multiplier": 0,
+  "trail_wait_trade": false,
+  "pf_sl_enabled": false,
+  "pf_sl_type": "Combined Loss",
+  "pf_sl_value": 0,
+  "pf_sl_action": "SqOff",
+  "pf_sl_delay_sec": 0,
+  "pf_sl_reexecute_count": 0,
+  "pf_sl_sqoff_only_loss_legs": false,
+  "pf_sl_sqoff_only_profit_legs": false,
+  "pf_sl_trail_enabled": false,
+  "pf_sl_trail_every": 0,
+  "pf_sl_trail_by": 0,
+  "move_sl_enabled": false,
+  "move_sl_safety_sec": 0,
+  "move_sl_action": "Move Only for Profitable Legs",
+  "move_sl_trail_after": false,
+  "move_sl_no_buy_legs": false,
+  "move_sl_hit_on_leg_sl": false,
+  "move_sl_hit_on_leg_target": false,
+  "pf_tgt_enabled": false,
+  "pf_tgt_type": "Combined Profit",
+  "pf_tgt_value": 0,
+  "pf_tgt_action": "SqOff",
+  "pf_tgt_delay_sec": 0,
+  "pf_tgt_reexecute_count": 0,
+  "pf_tgt_trail_enabled": false,
+  "pf_tgt_trail_lock_min_profit": 0,
+  "pf_tgt_trail_when_profit_reach": 0,
+  "pf_tgt_trail_every": 0,
+  "pf_tgt_trail_by": 0,
+  "no_reexec_sl_cost": false,
+  "no_wait_trade_reexec": false,
+  "no_strike_change_reexec": false,
+  "no_reentry_after_end": false,
+  "no_reentry_sl_cost": true,
+  "exit_order_type": "MARKET",
+  "exit_sell_first": true,
+  "on_portfolio_complete": "None",
+  "leg_target_monitoring": "Realtime",
+  "leg_trailing_monitoring": "Realtime",
+  "leg_sl_monitoring": "Realtime",
+  "leg_sl_trailing_monitoring": "Realtime",
+  "combined_target_monitoring": "Realtime",
+  "combined_sl_monitoring": "Realtime",
   "slots": [
     {
       "slot_id": "fx_eur_ema",
@@ -16,7 +85,7 @@
         "slow_ema_period": 30
       },
       "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -24,28 +93,32 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_eur_rsi",
       "strategy_name": "RSI Mean Reversion",
       "strategy_params": {
-        "rsi_period": 14,
         "overbought": 70,
-        "oversold": 30
+        "oversold": 30,
+        "rsi_period": 14
       },
       "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -53,17 +126,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_eur_bb",
@@ -73,7 +150,7 @@
         "bb_std": 2
       },
       "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -81,17 +158,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_gbp_ema",
@@ -101,7 +182,7 @@
         "slow_ema_period": 30
       },
       "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -109,28 +190,32 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_gbp_rsi",
       "strategy_name": "RSI Mean Reversion",
       "strategy_params": {
-        "rsi_period": 14,
         "overbought": 70,
-        "oversold": 30
+        "oversold": 30,
+        "rsi_period": 14
       },
       "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -138,17 +223,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_gbp_bb",
@@ -158,7 +247,7 @@
         "bb_std": 2
       },
       "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -166,17 +255,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_jpy_ema",
@@ -186,7 +279,7 @@
         "slow_ema_period": 30
       },
       "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -194,28 +287,32 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_jpy_rsi",
       "strategy_name": "RSI Mean Reversion",
       "strategy_params": {
-        "rsi_period": 14,
         "overbought": 70,
-        "oversold": 30
+        "oversold": 30,
+        "rsi_period": 14
       },
       "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -223,17 +320,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     },
     {
       "slot_id": "fx_jpy_bb",
@@ -243,7 +344,7 @@
         "bb_std": 2
       },
       "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL",
-      "trade_size": 1000,
+      "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
@@ -251,17 +352,21 @@
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",
-        "target_value": 1.0,
+        "target_value": 1,
         "target_lock_trigger": null,
         "target_lock_minimum": null,
         "sl_wait_bars": 0,
         "on_sl_action": "close",
         "on_target_action": "close",
-        "max_re_executions": 0
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
       },
       "enabled": true,
-      "start_date": "2024-01-01",
-      "end_date": "2024-01-31"
+      "start_date": null,
+      "end_date": null,
+      "squareoff_time": null,
+      "squareoff_tz": null
     }
   ]
 }

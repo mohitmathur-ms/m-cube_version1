@@ -59,27 +59,36 @@ class FourMAStrategy(Strategy):
             return
 
         v1, v2, v3, v4 = self.ma1.value, self.ma2.value, self.ma3.value, self.ma4.value
+        p1, p2, p3, p4 = (int(self.config.ma1_period), int(self.config.ma2_period),
+                          int(self.config.ma3_period), int(self.config.ma4_period))
 
         if v1 > v2 > v3 > v4:
+            reason = (f"4MA BUY: ma{p1}>ma{p2}>ma{p3}>ma{p4} "
+                      f"({v1:.4f}/{v2:.4f}/{v3:.4f}/{v4:.4f})")
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.BUY)
+                self._submit_order(OrderSide.BUY, reason)
             elif self.portfolio.is_net_short(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
-                self._submit_order(OrderSide.BUY)
+                self._submit_order(OrderSide.BUY, reason)
         elif v1 < v2 < v3 < v4:
+            reason = (f"4MA SELL: ma{p1}<ma{p2}<ma{p3}<ma{p4} "
+                      f"({v1:.4f}/{v2:.4f}/{v3:.4f}/{v4:.4f})")
             if self.portfolio.is_flat(self.config.instrument_id):
-                self._submit_order(OrderSide.SELL)
+                self._submit_order(OrderSide.SELL, reason)
             elif self.portfolio.is_net_long(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
-                self._submit_order(OrderSide.SELL)
+                self._submit_order(OrderSide.SELL, reason)
 
-    def _submit_order(self, side: OrderSide) -> None:
-        order = self.order_factory.market(
+    def _submit_order(self, side: OrderSide, reason: str | None = None) -> None:
+        kwargs = dict(
             instrument_id=self.config.instrument_id,
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
         )
+        if reason:
+            kwargs["tags"] = [reason]
+        order = self.order_factory.market(**kwargs)
         self.submit_order(order)
 
     def on_stop(self) -> None:
