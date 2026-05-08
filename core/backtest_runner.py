@@ -3174,8 +3174,17 @@ def _merge_portfolio_results(
                 mask = (df["trader_id"].astype(str).isin(clipped_traders)) & (ts_int > clip_ns)
                 return df.loc[~mask].reset_index(drop=True)
 
-            merged_fills = _filter_post_clip(merged_fills)
-            merged_positions = _filter_post_clip(merged_positions)
+            # v1 ReExecute is documented as "clip + flag, no replay" (see
+            # _apply_portfolio_clip log line). For ReExecute, do NOT actually
+            # drop trades — the flag is informational only, the trades really
+            # happened. Filtering here would empty the orderbook/positions
+            # whenever the clip fires near the start of the run (e.g. tight
+            # pf_sl_value with bid/ask spread immediately tipping combined
+            # PnL negative). SqOff still filters: post-clip trades genuinely
+            # "shouldn't have happened" once the portfolio was squared off.
+            if not clip_result.would_reexecute:
+                merged_fills = _filter_post_clip(merged_fills)
+                merged_positions = _filter_post_clip(merged_positions)
 
             # Recompute aggregate stats from the clipped positions (PnL/trades
             # for slots that were clipped). For v1 we only update the totals;
