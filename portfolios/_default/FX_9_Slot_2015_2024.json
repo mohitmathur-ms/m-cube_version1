@@ -2,7 +2,7 @@
   "name": "FX_9_Slot_2015_2024",
   "description": "Multi-year stress test: EMA/RSI/Bollinger x EURUSD/GBPUSD/USDJPY on 1-minute MID bars, 2015-2024.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-07T05:23:27.374488+00:00",
+  "updated_at": "2026-05-07T09:48:02.692186+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -84,7 +84,7 @@
       "allocation_pct": 0,
       "exit_config": {
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 10,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "target_type": "percentage",

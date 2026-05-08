@@ -1,0 +1,760 @@
+[
+  {
+    "test_id": "S01",
+    "name": "Baseline: no SL/TP \u2014 strategy-signal exits only",
+    "params": {
+      "stop_loss_type": "none",
+      "target_type": "none"
+    },
+    "expected": "No 'Stop Loss' / 'Trailing SL' / 'Take Profit' in EXIT REASON; trades close on opposite signal.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S01_S01_baseline.json",
+    "elapsed_sec": 3.8,
+    "status": "ok",
+    "orderbook_pnl": -729.05,
+    "orderbook_trades": 336,
+    "orderbook_wins": 3,
+    "orderbook_losses": 333,
+    "exit_reason_counts": {
+      "Market Exit": 336
+    },
+    "fills_tag_counts": {},
+    "engine_pnl": -729.05,
+    "engine_trades": 336,
+    "engine_wins": 3,
+    "engine_losses": 333,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "got 336 trades"
+      },
+      {
+        "label": "no_stop_loss_exits",
+        "detail": "exit reasons: ['Market Exit']"
+      },
+      {
+        "label": "no_trailing_sl_exits",
+        "detail": "trailing should not appear without configured SL"
+      },
+      {
+        "label": "no_take_profit_exits",
+        "detail": "target_type=none \u2192 no Take Profit exits"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "4/4"
+  },
+  {
+    "test_id": "S02",
+    "name": "Percentage SL = 0.10% (10 pips on EURUSD)",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.1
+    },
+    "expected": "EXIT REASON contains 'Stop Loss' rows; some losing trades.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S02_S02_percentage_sl.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -10.73,
+    "orderbook_trades": 3,
+    "orderbook_wins": 0,
+    "orderbook_losses": 3,
+    "exit_reason_counts": {
+      "Stop Loss": 3
+    },
+    "fills_tag_counts": {
+      "Stop Loss": 3
+    },
+    "engine_pnl": -10.73,
+    "engine_trades": 3,
+    "engine_wins": 0,
+    "engine_losses": 3,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "3 trades"
+      },
+      {
+        "label": "has_stop_loss_exits",
+        "detail": "expected 'Stop Loss' in exit reasons ['Stop Loss']"
+      },
+      {
+        "label": "no_trailing_sl_exits",
+        "detail": "fixed SL must not be tagged as 'Trailing SL'"
+      },
+      {
+        "label": "losers_present",
+        "detail": "SL hits should produce losing trades; got 3"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "4/4"
+  },
+  {
+    "test_id": "S03",
+    "name": "Points SL = 0.0010 (10 pips absolute on EURUSD)",
+    "params": {
+      "stop_loss_type": "points",
+      "stop_loss_value": 0.001
+    },
+    "expected": "Same behaviour as percentage SL but priced in absolute points.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S03_S03_points_sl.json",
+    "elapsed_sec": 2.6,
+    "status": "ok",
+    "orderbook_pnl": -16.7,
+    "orderbook_trades": 5,
+    "orderbook_wins": 0,
+    "orderbook_losses": 5,
+    "exit_reason_counts": {
+      "Stop Loss": 5
+    },
+    "fills_tag_counts": {
+      "Stop Loss": 5
+    },
+    "engine_pnl": -16.7,
+    "engine_trades": 5,
+    "engine_wins": 0,
+    "engine_losses": 5,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "5 trades"
+      },
+      {
+        "label": "has_stop_loss_exits",
+        "detail": "expected 'Stop Loss' in ['Stop Loss']"
+      },
+      {
+        "label": "losers_present",
+        "detail": "got 5 losers"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S04",
+    "name": "Trailing SL: initial 0.30%, step 0.05% / offset 0.02%",
+    "params": {
+      "stop_loss_type": "trailing",
+      "stop_loss_value": 0.3,
+      "trailing_sl_step": 0.05,
+      "trailing_sl_offset": 0.02
+    },
+    "expected": "Mix of 'Trailing SL' and 'Stop Loss' exits; trailing hits after watermark advances.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S04_S04_trailing_sl.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -7.94,
+    "orderbook_trades": 2,
+    "orderbook_wins": 0,
+    "orderbook_losses": 2,
+    "exit_reason_counts": {
+      "Trailing SL": 1,
+      "Stop Loss": 1
+    },
+    "fills_tag_counts": {
+      "Trailing SL": 1,
+      "Stop Loss": 1
+    },
+    "engine_pnl": -7.94,
+    "engine_trades": 2,
+    "engine_wins": 0,
+    "engine_losses": 2,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "2 trades"
+      },
+      {
+        "label": "has_sl_exits",
+        "detail": "need at least one SL/Trailing SL exit; counts={'Trailing SL': 1, 'Stop Loss': 1}"
+      },
+      {
+        "label": "trailing_or_fixed_sl_appears",
+        "detail": "either label acceptable; got ['Stop Loss', 'Trailing SL']"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S05",
+    "name": "Trailing SL micro: step 0.005% / offset 0.002%",
+    "params": {
+      "stop_loss_type": "trailing",
+      "stop_loss_value": 0.2,
+      "trailing_sl_step": 0.005,
+      "trailing_sl_offset": 0.002
+    },
+    "expected": "Many trailing-SL ratchets per profitable trade; Trailing SL exits dominate.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S05_S05_micro_trailing.json",
+    "elapsed_sec": 2.6,
+    "status": "ok",
+    "orderbook_pnl": -94.11,
+    "orderbook_trades": 38,
+    "orderbook_wins": 1,
+    "orderbook_losses": 37,
+    "exit_reason_counts": {
+      "Trailing SL": 32,
+      "Stop Loss": 5,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Trailing SL": 32,
+      "Stop Loss": 5
+    },
+    "engine_pnl": -94.11,
+    "engine_trades": 38,
+    "engine_wins": 1,
+    "engine_losses": 37,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "38 trades"
+      },
+      {
+        "label": "has_sl_exits",
+        "detail": "micro-trailing must hit SL; counts={'Trailing SL': 32, 'Stop Loss': 5, 'Market Exit': 1}"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S06",
+    "name": "Target lock: trigger=0.10%, minimum=0.05% + trailing 0.30%",
+    "params": {
+      "target_lock_trigger": 0.1,
+      "target_lock_minimum": 0.05,
+      "stop_loss_type": "trailing",
+      "trailing_sl_step": 0.1,
+      "trailing_sl_offset": 0.05
+    },
+    "expected": "Once profit \u2265 0.10%, SL ratchets to 0.05% (locked-in profit). Subsequent SL hits tagged Trailing SL.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S06_S06_target_lock.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -2.66,
+    "orderbook_trades": 1,
+    "orderbook_wins": 0,
+    "orderbook_losses": 1,
+    "exit_reason_counts": {
+      "Trailing SL": 1
+    },
+    "fills_tag_counts": {
+      "Trailing SL": 1
+    },
+    "engine_pnl": -2.66,
+    "engine_trades": 1,
+    "engine_wins": 0,
+    "engine_losses": 1,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "1 trades"
+      },
+      {
+        "label": "has_sl_exits",
+        "detail": "target_lock-armed trades must hit some SL; counts={'Trailing SL': 1}"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S07",
+    "name": "Percentage SL=0.20% + Percentage TP=0.30%",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.2,
+      "target_type": "percentage",
+      "target_value": 0.3
+    },
+    "expected": "Both 'Stop Loss' and 'Take Profit' exits in orderbook; wins from TP, losses from SL.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S07_S07_pct_sl_pct_tp.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -25.88,
+    "orderbook_trades": 9,
+    "orderbook_wins": 2,
+    "orderbook_losses": 7,
+    "exit_reason_counts": {
+      "Take Profit": 2,
+      "Stop Loss": 6,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Take Profit": 2,
+      "Stop Loss": 6
+    },
+    "engine_pnl": -25.88,
+    "engine_trades": 9,
+    "engine_wins": 2,
+    "engine_losses": 7,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "9 trades"
+      },
+      {
+        "label": "has_stop_loss",
+        "detail": "need Stop Loss; got ['Market Exit', 'Stop Loss', 'Take Profit']"
+      },
+      {
+        "label": "has_take_profit",
+        "detail": "need Take Profit; got ['Market Exit', 'Stop Loss', 'Take Profit']"
+      },
+      {
+        "label": "winners_present",
+        "detail": "TP hits should give wins; got 2"
+      },
+      {
+        "label": "losers_present",
+        "detail": "SL hits should give losses; got 7"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "5/5"
+  },
+  {
+    "test_id": "S08",
+    "name": "Points SL=0.0015 + Points TP=0.0030",
+    "params": {
+      "stop_loss_type": "points",
+      "stop_loss_value": 0.0015,
+      "target_type": "points",
+      "target_value": 0.003
+    },
+    "expected": "SL and TP exits priced in absolute points (1.5/3.0 pips).",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S08_S08_pts_sl_pts_tp.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -19.72,
+    "orderbook_trades": 13,
+    "orderbook_wins": 6,
+    "orderbook_losses": 7,
+    "exit_reason_counts": {
+      "Take Profit": 6,
+      "Stop Loss": 7
+    },
+    "fills_tag_counts": {
+      "Take Profit": 6,
+      "Stop Loss": 7
+    },
+    "engine_pnl": -19.72,
+    "engine_trades": 13,
+    "engine_wins": 6,
+    "engine_losses": 7,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "13 trades"
+      },
+      {
+        "label": "has_stop_loss_or_tp",
+        "detail": "need at least SL or TP exits; got ['Stop Loss', 'Take Profit']"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S09",
+    "name": "on_sl_action='reverse' \u2014 SL flips position",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.1,
+      "on_sl_action": "reverse",
+      "target_type": "percentage",
+      "target_value": 0.2
+    },
+    "expected": "EXIT REASON includes 'Reverse on SL'; subsequent reversed trade carries its own SL/TP.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S09_S09_reverse_on_sl.json",
+    "elapsed_sec": 2.6,
+    "status": "ok",
+    "orderbook_pnl": -83.16,
+    "orderbook_trades": 37,
+    "orderbook_wins": 10,
+    "orderbook_losses": 27,
+    "exit_reason_counts": {
+      "Take Profit": 11,
+      "Reverse on SL": 25,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Take Profit": 11,
+      "Reverse on SL": 25
+    },
+    "engine_pnl": -83.16,
+    "engine_trades": 37,
+    "engine_wins": 10,
+    "engine_losses": 27,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "37 trades"
+      },
+      {
+        "label": "engine_emits_reverse_on_sl",
+        "detail": "fills_report.tags must contain 'Reverse on SL'; got {'Take Profit': 11, 'Reverse on SL': 25}"
+      },
+      {
+        "label": "orderbook_propagates_reverse_on_sl",
+        "detail": "orderbook EXIT REASON should also contain 'Reverse on SL'; got ['Market Exit', 'Reverse on SL', 'Take Profit'] \u2014 close+open same-ts collision in _build_fills_lookup masks the close tag"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S10",
+    "name": "on_sl_action='re_execute' max=3 \u2014 re-enters after SL",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.1,
+      "on_sl_action": "re_execute",
+      "max_re_executions": 3
+    },
+    "expected": "Stop Loss exits present; slot re-enters up to 3\u00d7 per signal trigger.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S10_S10_re_execute.json",
+    "elapsed_sec": 2.4,
+    "status": "ok",
+    "orderbook_pnl": -10.73,
+    "orderbook_trades": 3,
+    "orderbook_wins": 0,
+    "orderbook_losses": 3,
+    "exit_reason_counts": {
+      "Stop Loss": 3
+    },
+    "fills_tag_counts": {
+      "Stop Loss": 3
+    },
+    "engine_pnl": -10.73,
+    "engine_trades": 3,
+    "engine_wins": 0,
+    "engine_losses": 3,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "3 trades"
+      },
+      {
+        "label": "has_stop_loss",
+        "detail": "re_execute still goes through SL exit; got ['Stop Loss']"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S11",
+    "name": "on_target_action='reverse' \u2014 TP flips position",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.5,
+      "target_type": "percentage",
+      "target_value": 0.1,
+      "on_target_action": "reverse"
+    },
+    "expected": "EXIT REASON includes 'Reverse on TP'; reversed leg has fresh SL/TP.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S11_S11_reverse_on_tp.json",
+    "elapsed_sec": 2.6,
+    "status": "ok",
+    "orderbook_pnl": -50.28,
+    "orderbook_trades": 16,
+    "orderbook_wins": 0,
+    "orderbook_losses": 16,
+    "exit_reason_counts": {
+      "Reverse on TP": 10,
+      "Stop Loss": 5,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Reverse on TP": 10,
+      "Stop Loss": 5
+    },
+    "engine_pnl": -50.28,
+    "engine_trades": 16,
+    "engine_wins": 0,
+    "engine_losses": 16,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "16 trades"
+      },
+      {
+        "label": "engine_emits_reverse_on_tp",
+        "detail": "fills_report.tags must contain 'Reverse on TP'; got {'Reverse on TP': 10, 'Stop Loss': 5}"
+      },
+      {
+        "label": "orderbook_propagates_reverse_on_tp",
+        "detail": "orderbook EXIT REASON should also contain 'Reverse on TP'; got ['Market Exit', 'Reverse on TP', 'Stop Loss'] \u2014 close+open same-ts collision masks tag"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S12",
+    "name": "sl_wait_bars=3 \u2014 SL needs 3 confirmation bars",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.1,
+      "sl_wait_bars": 3
+    },
+    "expected": "Fewer SL exits than no-wait baseline because brief breaches are filtered.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S12_S12_sl_wait_bars.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -14.12,
+    "orderbook_trades": 4,
+    "orderbook_wins": 0,
+    "orderbook_losses": 4,
+    "exit_reason_counts": {
+      "Stop Loss": 4
+    },
+    "fills_tag_counts": {
+      "Stop Loss": 4
+    },
+    "engine_pnl": -14.12,
+    "engine_trades": 4,
+    "engine_wins": 0,
+    "engine_losses": 4,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "4 trades"
+      },
+      {
+        "label": "engine_completed",
+        "detail": "engine completed without crash"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S13",
+    "name": "Tight target lock: trigger 0.05%, minimum 0.02%",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.4,
+      "target_lock_trigger": 0.05,
+      "target_lock_minimum": 0.02
+    },
+    "expected": "Most trades touch lock trigger; later SL hits tagged Trailing SL.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S13_S13_tight_lock.json",
+    "elapsed_sec": 2.5,
+    "status": "ok",
+    "orderbook_pnl": -2.44,
+    "orderbook_trades": 1,
+    "orderbook_wins": 0,
+    "orderbook_losses": 1,
+    "exit_reason_counts": {
+      "Trailing SL": 1
+    },
+    "fills_tag_counts": {
+      "Trailing SL": 1
+    },
+    "engine_pnl": -2.44,
+    "engine_trades": 1,
+    "engine_wins": 0,
+    "engine_losses": 1,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "1 trades"
+      },
+      {
+        "label": "has_sl_exits",
+        "detail": "need SL exits; counts={'Trailing SL': 1}"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "2/2"
+  },
+  {
+    "test_id": "S14",
+    "name": "Multi-slot mixed SL types (none/pct/pts/trailing)",
+    "params": {
+      "slot_count": 4,
+      "sl_types": [
+        "none",
+        "percentage 0.10",
+        "points 0.0010",
+        "trailing 0.30/0.05/0.02"
+      ]
+    },
+    "expected": "All 4 slots run; each isolates its own SL config.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S14_S14_mixed_sl_types.json",
+    "elapsed_sec": 5.7,
+    "status": "ok",
+    "orderbook_pnl": -804.632,
+    "orderbook_trades": 362,
+    "orderbook_wins": 4,
+    "orderbook_losses": 358,
+    "exit_reason_counts": {
+      "Market Exit": 338,
+      "Stop Loss": 11,
+      "Trailing SL": 13
+    },
+    "fills_tag_counts": {
+      "Stop Loss": 11,
+      "Trailing SL": 13
+    },
+    "engine_pnl": -804.632,
+    "engine_trades": 362,
+    "engine_wins": 4,
+    "engine_losses": 358,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "362 trades"
+      },
+      {
+        "label": "has_sl_exits",
+        "detail": "4 slots, 3 with SL; counts={'Market Exit': 338, 'Stop Loss': 11, 'Trailing SL': 13}"
+      },
+      {
+        "label": "multi_slot",
+        "detail": "4 slots over 5 days should produce >5 trades; got 362"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S15",
+    "name": "Compound: tight SL 0.05% + reverse + max_re=5",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.05,
+      "on_sl_action": "reverse",
+      "max_re_executions": 5,
+      "target_type": "percentage",
+      "target_value": 0.2
+    },
+    "expected": "Many Reverse on SL exits; reversal chain limited by max_re.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S15_S15_compound_reverse.json",
+    "elapsed_sec": 2.6,
+    "status": "ok",
+    "orderbook_pnl": -119.3,
+    "orderbook_trades": 63,
+    "orderbook_wins": 17,
+    "orderbook_losses": 46,
+    "exit_reason_counts": {
+      "Take Profit": 17,
+      "Reverse on SL": 45,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Take Profit": 17,
+      "Reverse on SL": 45
+    },
+    "engine_pnl": -119.3,
+    "engine_trades": 63,
+    "engine_wins": 17,
+    "engine_losses": 46,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "63 trades"
+      },
+      {
+        "label": "engine_emits_reverse_on_sl",
+        "detail": "compound reverse must emit 'Reverse on SL' in fills.tags; got {'Take Profit': 17, 'Reverse on SL': 45}"
+      },
+      {
+        "label": "orderbook_propagates_reverse_on_sl",
+        "detail": "orderbook should show 'Reverse on SL'; got ['Market Exit', 'Reverse on SL', 'Take Profit'] \u2014 close+open same-ts masks the close tag in the report builder"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  },
+  {
+    "test_id": "S16",
+    "name": "All-features: trailing+lock + points+reverse + pct+re_execute",
+    "params": {
+      "slot_count": 3,
+      "features": [
+        "trailing+lock+TP",
+        "points+TP+reverse",
+        "pct+TP+re_execute+wait"
+      ]
+    },
+    "expected": "Diverse EXIT REASONs across slots; engine handles all SL features simultaneously.",
+    "user_id": null,
+    "portfolio_path": "5. Logics\\stoploss_tests\\portfolios\\S16_S16_all_features.json",
+    "elapsed_sec": 4.3,
+    "status": "ok",
+    "orderbook_pnl": -332.6997,
+    "orderbook_trades": 145,
+    "orderbook_wins": 6,
+    "orderbook_losses": 139,
+    "exit_reason_counts": {
+      "Take Profit": 44,
+      "Reverse on SL": 50,
+      "Stop Loss": 44,
+      "Trailing SL": 6,
+      "Market Exit": 1
+    },
+    "fills_tag_counts": {
+      "Take Profit": 44,
+      "Trailing SL": 6,
+      "Stop Loss": 44,
+      "Reverse on SL": 50
+    },
+    "engine_pnl": -332.6997,
+    "engine_trades": 145,
+    "engine_wins": 6,
+    "engine_losses": 139,
+    "verification_pass": true,
+    "checks_passed": [
+      {
+        "label": "trades_executed",
+        "detail": "145 trades"
+      },
+      {
+        "label": "has_diversity",
+        "detail": "need \u22652 distinct exit reasons across 3 slots; got {'Take Profit': 44, 'Reverse on SL': 50, 'Stop Loss': 44, 'Trailing SL': 6, 'Market Exit': 1}"
+      },
+      {
+        "label": "has_sl_or_tp",
+        "detail": "need at least one SL/TP class exit; got ['Market Exit', 'Reverse on SL', 'Stop Loss', 'Take Profit', 'Trailing SL']"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3"
+  }
+]

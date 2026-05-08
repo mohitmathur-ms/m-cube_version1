@@ -2,7 +2,7 @@
   "name": "FX_9_Slot_2024",
   "description": "Benchmark portfolio: EMA/RSI/Bollinger x EURUSD/GBPUSD/USDJPY on 1-minute MID bars.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-07T05:16:24.276123+00:00",
+  "updated_at": "2026-05-07T08:54:21.839757+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,

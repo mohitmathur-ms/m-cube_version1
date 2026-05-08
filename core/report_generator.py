@@ -113,22 +113,30 @@ def _determine_reason(
 def _build_fills_lookup(fills_report) -> dict:
     """Build lookups mapping a fill to its reason fields.
 
-    Returns a dict with two views:
+    Returns a dict with three views:
 
     - ``"by_oid"`` — keyed by venue_order_id (the existing path; works when
       the positions_report's opening_order_id happens to match the venue id,
       which is rare under NautilusTrader's default reports because positions
       use the *client* order id format).
-    - ``"by_pos_ts"`` — keyed by ``(trader_id, strategy_id, instrument_id,
-      ts_int_ns)`` where ``ts_int_ns`` is the fill's ``ts_init`` rounded to
-      the nearest second. This is the practical bridge from a position row's
-      ``ts_opened`` / ``ts_closed`` to the matching fill's tags, since the
-      two reports don't share an order-id key but DO share timestamps and
-      identity columns.
+    - ``"by_pos_ts_open"`` / ``"by_pos_ts_close"`` — keyed by
+      ``(trader_id, strategy_id, instrument_id, ts_int_ns)`` where
+      ``ts_int_ns`` is the fill's ``ts_init`` rounded to the nearest second.
+      Splitting open vs. close fills (by ``is_reduce_only``) is required
+      because ``on_sl_action="reverse"`` / ``on_target_action="reverse"``
+      emits a close fill (with the structured tag) and immediately
+      submits an opposite-side open fill on the *same bar* — the two
+      fills share an identical timestamp, so a single dict would let the
+      tag-less open fill overwrite the tagged close fill, and the
+      orderbook EXIT REASON would lose the "Reverse on SL"/"Reverse on
+      TP" label.
+    - ``"by_pos_ts"`` — combined fallback (whichever fill landed last)
+      for fills_reports that don't carry an ``is_reduce_only`` column.
 
     Each entry contains ``{type, contingency_type, tags}``.
     """
-    out = {"by_oid": {}, "by_pos_ts": {}}
+    out = {"by_oid": {}, "by_pos_ts": {},
+           "by_pos_ts_open": {}, "by_pos_ts_close": {}}
     if fills_report is None or fills_report.empty:
         return out
 
@@ -141,6 +149,7 @@ def _build_fills_lookup(fills_report) -> dict:
     col_strategy = _resolve_column(df, ["strategy_id", "StrategyId"])
     col_instrument = _resolve_column(df, ["instrument_id", "InstrumentId"])
     col_ts = _resolve_column(df, ["ts_init", "TsInit", "ts_event", "ts_last"])
+    col_reduce = _resolve_column(df, ["is_reduce_only", "IsReduceOnly", "reduce_only"])
 
     def _normalize_tags(tg):
         # Nautilus stores tags as ``['EMA Cross BUY: …']``; unwrap to the
@@ -190,7 +199,16 @@ def _build_fills_lookup(fills_report) -> dict:
                        str(rec.get(col_strategy)),
                        str(rec.get(col_instrument)),
                        sec)
+                # Combined view kept for back-compat / no-reduce-col fallback.
                 out["by_pos_ts"][key] = info
+                # Role-split views — disambiguate close from open when
+                # both fire on the same bar (reverse-on-SL/TP path).
+                if col_reduce:
+                    is_close = bool(rec.get(col_reduce))
+                    if is_close:
+                        out["by_pos_ts_close"][key] = info
+                    else:
+                        out["by_pos_ts_open"][key] = info
     return out
 
 
@@ -299,14 +317,19 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
             entry_fill = fills_lookup["by_oid"].get(opening_oid, {})
             exit_fill = fills_lookup["by_oid"].get(closing_oid, {})
             # Fall back to (trader, strategy, instrument, ts_opened/closed).
-            # This is the bridge that actually matches under default Nautilus
-            # output — both reports carry these four fields.
+            # Use the role-split lookups (open vs close) so a reverse-on-SL/TP
+            # close fill on the same bar as its follow-up open fill keeps
+            # its structured tag (e.g. "Reverse on SL: …") instead of
+            # being overwritten by the tag-less open fill. Combined view
+            # remains the fallback when fills_report has no reduce-only column.
             if not entry_fill and col_trader and col_strategy and col_instrument:
                 key = (str(trader_v), str(strat_v), raw_instrument, entry_ts_secs[i])
-                entry_fill = fills_lookup["by_pos_ts"].get(key, {})
+                entry_fill = (fills_lookup["by_pos_ts_open"].get(key)
+                              or fills_lookup["by_pos_ts"].get(key, {}))
             if not exit_fill and col_trader and col_strategy and col_instrument:
                 key = (str(trader_v), str(strat_v), raw_instrument, exit_ts_secs[i])
-                exit_fill = fills_lookup["by_pos_ts"].get(key, {})
+                exit_fill = (fills_lookup["by_pos_ts_close"].get(key)
+                             or fills_lookup["by_pos_ts"].get(key, {}))
 
             # ENTRY REASON keeps the order-type-derived taxonomy
             # (Market Order / Limit Order). Indicator string lives in

@@ -453,6 +453,12 @@ def _build_run_config(
             rbo_settings=rbo_settings,
         )
     else:
+        # Construct full-day ISO timestamps so end_date is inclusive of the
+        # final calendar day, matching Path A (_cached_catalog_bars: +1d -1ns)
+        # and the chunked branch above (win_end = "23:59:59.999999"). Bare
+        # date strings here would be interpreted by Nautilus as midnight
+        # start of end_date, silently dropping all bars on the final day —
+        # a Path A vs B parity bug.
         data_cfgs = [BacktestDataConfig(
             catalog_path=catalog_path,
             # Nautilus resolves data_cls via path.rsplit(":", 1) — must use
@@ -461,8 +467,8 @@ def _build_run_config(
             data_cls="nautilus_trader.model.data:Bar",
             instrument_id=str(instrument_id),
             bar_types=bar_type_strs,
-            start_time=start_date,
-            end_time=end_date,
+            start_time=f"{start_date}T00:00:00+00:00" if start_date else None,
+            end_time=f"{end_date}T23:59:59.999999+00:00" if end_date else None,
         )]
 
     from nautilus_trader.config import RiskEngineConfig

@@ -340,14 +340,14 @@ const Portfolio = {
         const items = [
             { label: "Save All to Server", action: "Portfolio.saveAllPortfolios()" },
             { label: "Reload from Server", action: "Portfolio.reloadAll()" },
-            { label: "Import Portfolio JSON", action: "document.getElementById('pf-import-input').click()" },
+            { label: "Import Portfolio JSON", action: "Portfolio.triggerImport()" },
             { label: "Export Selected JSON", action: "Portfolio.exportSelectedJSON()" },
         ];
         menu.innerHTML = items.map(it =>
             `<div style="padding:7px 14px; font-size:0.84rem; cursor:pointer;"
                  onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"
                  onclick="document.getElementById('pf-options-menu').remove(); ${it.action}">${it.label}</div>`
-        ).join("") + '<input type="file" id="pf-import-input" accept=".json" style="display:none;" onchange="Portfolio.importJSON(event)">';
+        ).join("");
         document.body.appendChild(menu);
         const close = (e) => { if (!menu.contains(e.target) && e.target !== event.target) { menu.remove(); document.removeEventListener("click", close); } };
         setTimeout(() => document.addEventListener("click", close), 0);
@@ -390,6 +390,19 @@ const Portfolio = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a"); a.href = url; a.download = `${pf.name}.json`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    },
+
+    triggerImport() {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.style.display = "none";
+        input.addEventListener("change", (e) => {
+            this.importJSON(e);
+            input.remove();
+        });
+        document.body.appendChild(input);
+        input.click();
     },
 
     importJSON(event) {
