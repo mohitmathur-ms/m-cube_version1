@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL & Target — Implementation Report</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7cfa;
+    --accent2: #7ed6a0;
+    --warn: #f7c948;
+    --danger: #e96060;
+    --text: #d4d8f0;
+    --muted: #7a80a0;
+    --code-bg: #141824;
+    --radius: 8px;
+    --accent-blue: var(--accent);
+    --accent-green: var(--accent2);
+    --accent-red: var(--danger);
+    --accent-yellow: var(--warn);
+    --accent-purple: #c084fc;
+    --accent-orange: #fb923c;
+    --text-muted: var(--muted);
+    --text-dim: var(--muted);
+    --valid: rgba(126,214,160,.08);
+    --valid-text: var(--accent2);
+    --invalid: rgba(233,96,96,.08);
+    --invalid-text: var(--danger);
+    --warn-bg: rgba(247,201,72,.08);
+    --warn-text: var(--warn);
+    --badge-sl: rgba(233,96,96,.12);
+    --badge-sl-text: var(--danger);
+    --badge-tgt: rgba(91,124,250,.12);
+    --badge-tgt-text: var(--accent);
+    --badge-trail: rgba(126,214,160,.12);
+    --badge-trail-text: var(--accent2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .layout { display: flex; min-height: 100vh; }
+  nav {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav .logo {
+    padding: 0 20px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  nav a {
+    display: block;
+    padding: 7px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  nav a:hover { color: var(--text); background: rgba(79,142,247,0.07); }
+  nav a.active { color: var(--accent-blue); border-left-color: var(--accent-blue); }
+  nav .nav-section {
+    padding: 14px 20px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  main {
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 1100px;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  h2 {
+    font-size: 19px; font-weight: 700; color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 28px 0 12px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--text-muted); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  p { color: var(--text-muted); margin-bottom: 12px; }
+  ul, ol { margin: 8px 0 16px 22px; color: var(--text-muted); }
+  ul li, ol li { margin: 4px 0; }
+  .level-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 48px 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .level-badge {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .level-badge.l1 { background: rgba(79,142,247,0.15); color: var(--accent-blue); border: 2px solid var(--accent-blue); }
+  .level-badge.l2 { background: rgba(62,207,142,0.15); color: var(--accent-green); border: 2px solid var(--accent-green); }
+  .level-title { font-size: 17px; font-weight: 700; color: var(--text); }
+  .level-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .table-wrap { overflow-x: auto; margin: 12px 0 24px; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  td.key { font-family: 'Fira Code', 'Cascadia Code', monospace; color: var(--accent-yellow); font-size: 12px; }
+  td strong { color: var(--text); font-weight: 600; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12.5px;
+    color: #c9d1d9;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+    line-height: 1.7;
+    white-space: pre;
+  }
+  pre .kw { color: #ff7b72; }
+  pre .str { color: #a8d8a8; }
+  pre .num { color: #a5d6ff; }
+  pre .cm  { color: var(--text-dim); font-style: italic; }
+  pre .key2 { color: var(--accent-yellow); }
+  .callout {
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13px;
+    border-left: 3px solid;
+  }
+  .callout.info { background: rgba(79,142,247,0.08); border-color: var(--accent-blue); color: var(--text-muted); }
+  .callout.warn { background: rgba(245,200,66,0.08); border-color: var(--accent-yellow); color: var(--text-muted); }
+  .callout.danger { background: rgba(242,107,107,0.08); border-color: var(--accent-red); color: var(--text-muted); }
+  .callout.success { background: rgba(62,207,142,0.08); border-color: var(--accent-green); color: var(--text-muted); }
+  .callout strong { color: var(--text); }
+  .tag {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag.sl { background: var(--badge-sl); color: var(--badge-sl-text); }
+  .tag.tgt { background: var(--badge-tgt); color: var(--badge-tgt-text); }
+  .tag.trail { background: var(--badge-trail); color: var(--badge-trail-text); }
+  .tag.action { background: rgba(167,139,250,0.12); color: var(--accent-purple); }
+  .tag.fx { background: rgba(126,214,160,.12); color: var(--accent-green); }
+  .tag.opt { background: rgba(167,139,250,0.12); color: var(--accent-purple); }
+  code { font-family: 'Fira Code', monospace; background: var(--code-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 12px; color: var(--accent-yellow); }
+  .formula {
+    background: var(--code-bg);
+    border: 1px solid var(--accent-blue);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .formula .line { margin: 4px 0; }
+  .formula .comment { color: var(--text-dim); font-size: 12px; }
+  .formula .highlight { color: var(--accent-green); font-weight: 600; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .page-header { margin-bottom: 32px; }
+  .page-header h1 { margin-bottom: 4px; }
+  .page-header .subtitle { color: var(--text-muted); font-size: 14px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+  .type-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 14px 0 24px;
+  }
+  .type-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .type-card .t-name {
+    font-weight: 700; color: var(--text); font-size: 14px; margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .type-card .t-name .num { font-size: 11px; color: var(--text-dim); }
+  .type-card .t-key { font-family: monospace; font-size: 11px; color: var(--accent-yellow); margin-bottom: 8px; }
+  .type-card .t-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+  .ascii-flow {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin: 16px 0 24px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .ref-line {
+    font-family: 'Fira Code', monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin: 6px 0;
+  }
+  .ref-line a { color: var(--accent-blue); text-decoration: none; }
+  .ref-line a:hover { text-decoration: underline; }
+  .count-pill {
+    display: inline-block;
+    min-width: 22px;
+    text-align: center;
+    background: rgba(91,124,250,.18);
+    color: var(--accent-blue);
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+    margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav>
+  <div class="logo">SL &amp; Target — Implementation</div>
+  <div class="nav-section">Start Here</div>
+  <a href="#intro">1. Introduction</a>
+  <a href="#architecture">2. Architecture at a Glance</a>
+  <div class="nav-section">Leg-Level</div>
+  <a href="#leg-sl">3. Leg-Level Stoploss (4 types)</a>
+  <a href="#leg-target">4. Leg-Level Target (3 types)</a>
+  <a href="#leg-aux">5. Auxiliary Leg Features</a>
+  <div class="nav-section">Portfolio-Level</div>
+  <a href="#pf-sl">6. Portfolio Stoploss (5 types)</a>
+  <a href="#pf-target">7. Portfolio Target (4 types)</a>
+  <div class="nav-section">How-To</div>
+  <a href="#impl-guide">8. Implementation Guide</a>
+  <a href="#types-catalog">9. Types Catalog (Quick Ref)</a>
+  <a href="#glossary">10. Glossary &amp; FAQ</a>
+</nav>
+
+<main>
+
+<div class="page-header">
+  <h1>Stoploss &amp; Target — Implementation Report</h1>
+  <div class="subtitle">A friendly, end-to-end walk-through of every way you can configure stoploss (SL) and target (TGT) in this system — both at the leg level (per-strategy slot) and the portfolio level (whole book). Includes JSON keys, formulas, code entry points and copy-paste recipes.</div>
+</div>
+
+<!-- ════════════════════════════════════ 1. INTRODUCTION ═══ -->
+<section id="intro">
+  <h2>1. Introduction</h2>
+  <p><strong>What is a stoploss?</strong> A pre-set price (or PnL amount) at which an open position is automatically closed to <em>limit losses</em>. <strong>What is a target?</strong> The opposite — a pre-set level at which the position is closed to <em>lock in profits</em>.</p>
+  <p>This system supports SL and Target at <strong>two independent levels</strong>:</p>
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">Leg Level <span class="tag sl">per-slot</span></div>
+      <div class="t-key">core/managed_strategy.py</div>
+      <div class="t-desc">Each strategy slot in a portfolio has its own SL/TGT. Evaluated in real time on every bar. Acts only on that single slot. Think of it as the local stop for one player.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">Portfolio Level <span class="tag tgt">aggregate</span></div>
+      <div class="t-key">core/backtest_runner.py</div>
+      <div class="t-desc">Looks at the combined PnL of all slots together. When the whole book hits a loss/profit number, all slots can be cut at once. Think of it as the "team" risk limit.</div>
+    </div>
+  </div>
+  <div class="callout info">
+    <strong>Analogy:</strong> imagine each slot is a player on a team. Leg-level SL/TGT is each player's personal stop ("I'll quit if I lose $50"). Portfolio-level SL/TGT is the coach's rule for the whole team ("if the team is down $500 collectively, everyone goes home"). Both can be active at the same time — whichever fires first wins.
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 2. ARCHITECTURE ═══ -->
+<section id="architecture">
+  <h2>2. Architecture at a Glance</h2>
+  <p>Here is the full lifecycle of an SL/Target check in the engine, from the moment a bar arrives to the final report:</p>
+  <div class="ascii-flow">
+   ┌──────────────────────────────────────────────────────────────────────┐
+   │  NEW BAR ARRIVES (every 1 second / configured timeframe)              │
+   └────────────────────────────────────────┬─────────────────────────────┘
+                                            │
+                          ┌─────────────────▼─────────────────┐
+                          │  ManagedExitStrategy.on_bar()     │  ◄── core/managed_strategy.py:223
+                          └─────────────────┬─────────────────┘
+                                            │
+                          ┌─────────────────▼─────────────────┐
+                          │  Squareoff time check (force exit)│      managed_strategy.py:253
+                          └─────────────────┬─────────────────┘
+                                            │
+                          ┌─────────────────▼─────────────────┐
+                          │  _check_exits() — LEG-LEVEL       │  ◄── managed_strategy.py:418
+                          │   • Move SL to cost                │      L:438
+                          │   • Target locking                 │      L:463
+                          │   • Trailing SL ratchet            │      L:482
+                          │   • SL hit (with sl_wait_bars)     │      L:495
+                          │   • Target hit                     │      L:514
+                          └─────────────────┬─────────────────┘
+                                            │  fires?
+                          ┌─────────────────▼─────────────────┐
+                          │  _handle_exit()                   │      managed_strategy.py:524
+                          │   close / re_execute / reverse     │
+                          └─────────────────┬─────────────────┘
+                                            │  ...repeat each bar...
+                                            │
+                                            ▼
+                          ┌───────────────────────────────────┐
+                          │  Backtest finishes, results merged│
+                          └─────────────────┬─────────────────┘
+                                            │
+                          ┌─────────────────▼─────────────────┐
+                          │  _apply_portfolio_clip()          │  ◄── core/backtest_runner.py:917
+                          │   walks combined equity curve:    │
+                          │    1. Trailing PF SL ratchet       │      L:978
+                          │    2. PF SL hit?                   │      L:991
+                          │    3. Trailing PF TGT activate     │      L:996
+                          │    4. PF TGT hit?                  │      L:1020
+                          │   → drop trades after clip ts      │
+                          └───────────────────────────────────┘
+  </div>
+
+  <h3>Leg vs Portfolio at a glance</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Aspect</th><th>Leg Level</th><th>Portfolio Level</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Where configured</strong></td><td><code>exit_config</code> on each strategy slot</td><td><code>PortfolioConfig.pf_*</code> fields</td></tr>
+        <tr><td><strong>What it watches</strong></td><td>Single slot's price vs entry</td><td>Combined PnL of all slots</td></tr>
+        <tr><td><strong>When it runs</strong></td><td>Real-time, every bar</td><td>Post-hoc, on merged equity curve</td></tr>
+        <tr><td><strong>Scope of action</strong></td><td>Closes only that slot</td><td>Clips ALL slots (with optional filters)</td></tr>
+        <tr><td><strong>Action options</strong></td><td><code>close</code>, <code>re_execute</code>, <code>reverse</code></td><td><code>SqOff</code>, <code>ReExecute</code> (+ filter only-loss/only-profit legs)</td></tr>
+        <tr><td><strong>Code entry point</strong></td><td><code>ManagedExitStrategy._check_exits()</code></td><td><code>_apply_portfolio_clip()</code></td></tr>
+        <tr><td><strong>Source file</strong></td><td><code>core/managed_strategy.py</code></td><td><code>core/backtest_runner.py</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 3. LEG-LEVEL SL ═══ -->
+<div class="level-header">
+  <div class="level-badge l1">L</div>
+  <div>
+    <div class="level-title">Leg Level — per strategy slot</div>
+    <div class="level-sub">Configured under <code>exit_config</code> in each slot of <code>portfolios/&lt;name&gt;.json</code> · Defined in <code>core/models.py</code> as <code>ExitConfig</code></div>
+  </div>
+</div>
+
+<section id="leg-sl">
+  <h2><span class="tag sl">SL</span> 3. Leg-Level Stoploss <span class="count-pill">4 types</span></h2>
+  <p>Leg stoploss is set per slot via the <code>stop_loss_type</code> field. Exactly four values are accepted (see <code>core/models.py:24</code>):</p>
+
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">3.1 None <span class="num">type 1/4</span></div>
+      <div class="t-key">"stop_loss_type": "none"</div>
+      <div class="t-desc">No SL is checked. The position only exits via target, squareoff time, or manual close. This is the default value.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">3.2 Percentage <span class="num">type 2/4</span></div>
+      <div class="t-key">"stop_loss_type": "percentage"</div>
+      <div class="t-desc">SL is a % away from entry. <code>stop_loss_value: 0.5</code> means 0.5% below entry for a long, 0.5% above for a short. Computed at fill time, never moves.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">3.3 Points <span class="num">type 3/4</span></div>
+      <div class="t-key">"stop_loss_type": "points"</div>
+      <div class="t-desc">SL is a fixed price distance from entry. <code>stop_loss_value: 0.0050</code> on a long entry of 1.1000 → SL at 1.0950. Useful for FX (raw pip distance).</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">3.4 Trailing <span class="num">type 4/4</span></div>
+      <div class="t-key">"stop_loss_type": "trailing"</div>
+      <div class="t-desc">Starts as a % SL, then ratchets tighter as profit grows. Two extra fields — <code>trailing_sl_step</code> (profit needed to ratchet) and <code>trailing_sl_offset</code> (how much to tighten by).</div>
+    </div>
+  </div>
+
+  <h3>Formulas (from <code>_compute_sl_price()</code>, managed_strategy.py:710)</h3>
+  <div class="formula">
+    <div class="line"><span class="comment"># percentage</span></div>
+    <div class="line">long_sl  = entry_price * (1 - stop_loss_value / 100)</div>
+    <div class="line">short_sl = entry_price * (1 + stop_loss_value / 100)</div>
+    <div class="line">&nbsp;</div>
+    <div class="line"><span class="comment"># points</span></div>
+    <div class="line">long_sl  = entry_price - stop_loss_value</div>
+    <div class="line">short_sl = entry_price + stop_loss_value</div>
+    <div class="line">&nbsp;</div>
+    <div class="line"><span class="comment"># trailing — ratchets every `trailing_sl_step` % of profit</span></div>
+    <div class="line"><span class="highlight">on every bar:</span></div>
+    <div class="line">  if profit_pct &gt;= last_trail_level + trailing_sl_step:</div>
+    <div class="line">      current_sl = current_sl + trailing_sl_offset   <span class="comment"># long: tighten upward</span></div>
+    <div class="line">      last_trail_level = profit_pct</div>
+  </div>
+
+  <h3>Example — 0.5% percentage SL on a long EUR/USD trade</h3>
+<pre><span class="cm">// portfolios/my_portfolio.json — slot.exit_config</span>
+{
+  <span class="key2">"stop_loss_type"</span>: <span class="str">"percentage"</span>,
+  <span class="key2">"stop_loss_value"</span>: <span class="num">0.5</span>,
+  <span class="key2">"target_type"</span>:    <span class="str">"none"</span>,
+  <span class="key2">"target_value"</span>:   <span class="num">0.0</span>
+}
+<span class="cm">// Entry @ 1.1000 long → SL @ 1.10000 * (1 - 0.005) = 1.09450</span></pre>
+
+  <div class="ref-line"><strong>Code references:</strong> SL field defined in <code>core/models.py:24</code> · SL fill price computed in <code>core/managed_strategy.py:686-694</code> · SL hit detection (with optional <code>sl_wait_bars</code>) in <code>managed_strategy.py:495-511</code> · trailing-SL ratchet at <code>managed_strategy.py:482-492</code>.</div>
+</section>
+
+<!-- ════════════════════════════════════ 4. LEG-LEVEL TARGET ═══ -->
+<section id="leg-target">
+  <h2><span class="tag tgt">TGT</span> 4. Leg-Level Target <span class="count-pill">3 types</span></h2>
+  <p>Leg target is set via <code>target_type</code> in <code>exit_config</code>. Three values are accepted (see <code>core/models.py:30</code>):</p>
+
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">4.1 None <span class="num">type 1/3</span></div>
+      <div class="t-key">"target_type": "none"</div>
+      <div class="t-desc">No profit target is checked. Position is held until SL, squareoff, or manual close. Default value.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">4.2 Percentage <span class="num">type 2/3</span></div>
+      <div class="t-key">"target_type": "percentage"</div>
+      <div class="t-desc">Target is a % away from entry. <code>target_value: 0.5</code> means 0.5% above entry for a long, 0.5% below for a short.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">4.3 Points <span class="num">type 3/3</span></div>
+      <div class="t-key">"target_type": "points"</div>
+      <div class="t-desc">Target is a fixed price distance from entry. <code>target_value: 0.0050</code> on a long at 1.1000 → target at 1.1050.</div>
+    </div>
+  </div>
+
+  <h3>Formulas (from <code>on_order_filled()</code>, managed_strategy.py:697-706)</h3>
+  <div class="formula">
+    <div class="line"><span class="comment"># percentage</span></div>
+    <div class="line">long_tp  = entry_price * (1 + target_value / 100)</div>
+    <div class="line">short_tp = entry_price * (1 - target_value / 100)</div>
+    <div class="line">&nbsp;</div>
+    <div class="line"><span class="comment"># points</span></div>
+    <div class="line">long_tp  = entry_price + target_value</div>
+    <div class="line">short_tp = entry_price - target_value</div>
+  </div>
+
+  <h3>4.4 Bonus: Target Locking (a SL-style trailing protection)</h3>
+  <p>Two optional fields turn a winning leg into a guaranteed-minimum-profit leg by raising the SL once a profit threshold is reached:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="key">target_lock_trigger</td><td>Profit % at which the lock activates (e.g., 0.4 → 0.4% in profit).</td></tr>
+        <tr><td class="key">target_lock_minimum</td><td>The minimum % profit that will now be guaranteed by raising the SL (e.g., 0.2 → SL is moved so the worst case is +0.2% profit).</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout info"><strong>Where:</strong> implemented in <code>managed_strategy.py:463-471</code>. Once triggered, this acts as a one-shot SL upgrade — the SL is raised, the original target_type still controls the upper exit.</div>
+
+  <div class="ref-line"><strong>Code references:</strong> target field at <code>core/models.py:30</code> · TP fill price at <code>core/managed_strategy.py:697-706</code> · TP hit detection at <code>managed_strategy.py:514-522</code>.</div>
+</section>
+
+<!-- ════════════════════════════════════ 5. AUXILIARY LEG FEATURES ═══ -->
+<section id="leg-aux">
+  <h2>5. Auxiliary Leg Exit Features</h2>
+  <p>These are not separate "types" of SL/Target, but they shape how SL and Target behave at the leg level:</p>
+
+  <h3>5.1 SL Wait Bars (false-trigger filter)</h3>
+  <p>Field <code>sl_wait_bars</code> on <code>ExitConfig</code>. SL only fires if the SL condition holds for <em>N consecutive bars</em>. If the price wicks back inside the SL within those N bars, the trigger is cancelled. Useful to filter out single-bar wicks. Default <code>0</code> = fire immediately.</p>
+
+  <h3>5.2 Move SL to Cost (break-even protection)</h3>
+  <p>Configured at the <em>portfolio</em> level (because it can react to events on other slots) but <em>applied</em> per leg. After the position has been profitable for <code>move_sl_safety_sec</code> seconds, the SL is raised to the entry price — so the worst case becomes break-even.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="key">move_sl_enabled</td><td>Master switch.</td></tr>
+        <tr><td class="key">move_sl_safety_sec</td><td>How long the leg must stay in profit before SL is moved.</td></tr>
+        <tr><td class="key">move_sl_action</td><td><code>"Move Only for Profitable Legs"</code> (default) — only profitable legs are protected.</td></tr>
+        <tr><td class="key">move_sl_trail_after</td><td>If true, SL keeps trailing further as profit grows.</td></tr>
+        <tr><td class="key">move_sl_no_buy_legs</td><td>Skip the move-to-cost logic for long positions.</td></tr>
+        <tr><td class="key">move_sl_hit_on_leg_sl</td><td>Cross-slot trigger: when any other slot's SL hits, run move-to-cost on remaining legs.</td></tr>
+        <tr><td class="key">move_sl_hit_on_leg_target</td><td>Same but triggered when any slot's target hits.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="ref-line"><strong>Code:</strong> <code>core/managed_strategy.py:438-457</code> · validation in <code>core/backtest_runner.py:851-885</code>.</div>
+
+  <h3>5.3 Squareoff Time (time-based forced exit)</h3>
+  <p>A clock-based exit. Set <code>squareoff_time</code> (HH:MM) and optional <code>squareoff_tz</code> (IANA timezone). Resolution priority:</p>
+  <ol>
+    <li><strong>Leg-level</strong> <code>ExitConfig.squareoff_time</code> — most specific, wins if set.</li>
+    <li><strong>Slot-level</strong> <code>StrategySlotConfig.squareoff_time</code> — falls back here.</li>
+    <li><strong>Portfolio-level</strong> <code>PortfolioConfig.squareoff_time</code> — last resort.</li>
+  </ol>
+  <div class="ref-line"><strong>Code:</strong> evaluated in <code>core/managed_strategy.py:253-272</code> at the very top of <code>on_bar()</code>.</div>
+
+  <h3>5.4 Exit Actions — what happens when SL/TGT fires</h3>
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">close <span class="tag action">default</span></div>
+      <div class="t-key">"on_sl_action": "close"</div>
+      <div class="t-desc">Just closes the position. The slot remains armed — re-entries depend on the strategy's normal entry logic.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">re_execute</div>
+      <div class="t-key">"on_sl_action": "re_execute"</div>
+      <div class="t-desc">Closes the position AND immediately re-opens it in the same direction (subject to <code>max_re_executions</code> cap and <code>delay_between_legs_sec</code>).</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">reverse</div>
+      <div class="t-key">"on_sl_action": "reverse"</div>
+      <div class="t-desc">Closes and immediately opens an equal-and-opposite position. Often used as an "if I'm wrong, flip" tactic.</div>
+    </div>
+  </div>
+
+  <h3>5.5 Action Filters (Other Settings tab)</h3>
+  <p>Two filter fields on <code>PortfolioConfig</code> decide whether the action above fires when the SL/TGT hit was the <em>fixed</em> level vs a <em>trailed</em> level:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Values</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td class="key">on_sl_action_on</td><td><code>OnSL_N_Trailing_Both</code> · <code>OnSL_Only</code> · <code>OnSL_Trailing_Only</code></td><td>Fire on any SL hit / only fixed-SL hits / only trailed-SL hits.</td></tr>
+        <tr><td class="key">on_target_action_on</td><td><code>OnTarget_N_Trailing_Both</code> · <code>OnTarget_Only</code> · <code>OnTarget_Trailing_Only</code></td><td>Same shape, for targets.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 6. PORTFOLIO LEVEL SL ═══ -->
+<div class="level-header">
+  <div class="level-badge l2">P</div>
+  <div>
+    <div class="level-title">Portfolio Level — whole-book risk limits</div>
+    <div class="level-sub">Configured on <code>PortfolioConfig</code> directly · Evaluated post-hoc on the merged equity curve in <code>_apply_portfolio_clip()</code> (<code>core/backtest_runner.py:917</code>)</div>
+  </div>
+</div>
+
+<section id="pf-sl">
+  <h2><span class="tag sl">SL</span> 6. Portfolio-Level Stoploss <span class="count-pill">5 types</span></h2>
+  <p>Set via <code>pf_sl_type</code> on <code>PortfolioConfig</code>. The <em>five</em> accepted strings are listed below — but only one is universal: on FX/crypto books all options-only types silently downgrade to <code>"Combined Loss"</code> with a warning logged from <code>_resolve_pf_stoploss()</code> (<code>backtest_runner.py:728-793</code>).</p>
+
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">6.1 Combined Loss <span class="tag fx">FX + Options</span></div>
+      <div class="t-key">"pf_sl_type": "Combined Loss"</div>
+      <div class="t-desc">Universal type. Fires when summed PnL across all slots ≤ <code>−pf_sl_value</code>. Implementation: <code>backtest_runner.py:991</code>.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">6.2 Combined Premium <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_sl_type": "Combined Premium"</div>
+      <div class="t-desc">Net premium received/paid across legs of a multi-leg options structure crosses a threshold. On FX it is downgraded to Combined Loss with a warning (<code>backtest_runner.py:742-745</code>).</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">6.3 Absolute Combined Premium <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_sl_type": "Absolute Combined Premium"</div>
+      <div class="t-desc">Like Combined Premium but uses absolute value — ignores the sign of the net premium.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">6.4 Underlying Movement <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_sl_type": "Underlying Movement"</div>
+      <div class="t-desc">Triggers based on how far the underlying spot has moved vs entry — independent of leg PnL.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">6.5 Loss and Underlying Range <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_sl_type": "Loss and Underlying Range"</div>
+      <div class="t-desc">Compound trigger — fires only when both a PnL loss threshold AND a spot-range threshold are breached.</div>
+    </div>
+  </div>
+
+  <h3>6.6 Bonus: Trailing Portfolio SL</h3>
+  <p>Three fields on <code>PortfolioConfig</code> ratchet the SL tighter as the book gains:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="key">pf_sl_trail_enabled</td><td>Master switch for trailing portfolio SL.</td></tr>
+        <tr><td class="key">pf_sl_trail_every</td><td>Profit step (raw PnL) required before the SL ratchets. e.g., <code>100</code> = each $100 of new high-water mark triggers a tighten.</td></tr>
+        <tr><td class="key">pf_sl_trail_by</td><td>How much (raw PnL) the SL tightens per ratchet step.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="ref-line"><strong>Code:</strong> trailing-SL ratchet at <code>core/backtest_runner.py:978-988</code>.</div>
+
+  <h3>6.7 Portfolio SL action options</h3>
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">SqOff <span class="tag action">default</span></div>
+      <div class="t-key">"pf_sl_action": "SqOff"</div>
+      <div class="t-desc">Square off all open legs at the moment the portfolio SL fires. Optional filter flags below let you cut only-loss-legs or only-profit-legs.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">ReExecute</div>
+      <div class="t-key">"pf_sl_action": "ReExecute"</div>
+      <div class="t-desc">Square off and replay strategy entries from the clip point onward (subject to <code>pf_sl_reexecute_count</code>; <code>0</code> = unlimited).</div>
+    </div>
+  </div>
+
+  <h3>6.8 All Portfolio SL fields (full schema)</h3>
+<pre>{
+  <span class="key2">"pf_sl_enabled"</span>: <span class="kw">false</span>,
+  <span class="key2">"pf_sl_type"</span>: <span class="str">"Combined Loss"</span>,
+  <span class="key2">"pf_sl_value"</span>: <span class="num">0.0</span>,                    <span class="cm">// raw PnL amount (positive)</span>
+  <span class="key2">"pf_sl_action"</span>: <span class="str">"SqOff"</span>,                 <span class="cm">// SqOff | ReExecute</span>
+  <span class="key2">"pf_sl_delay_sec"</span>: <span class="num">0</span>,                   <span class="cm">// confirmation delay before firing</span>
+  <span class="key2">"pf_sl_reexecute_count"</span>: <span class="num">0</span>,             <span class="cm">// 0 = unlimited</span>
+  <span class="key2">"pf_sl_sqoff_only_loss_legs"</span>: <span class="kw">false</span>,
+  <span class="key2">"pf_sl_sqoff_only_profit_legs"</span>: <span class="kw">false</span>,    <span class="cm">// mutually exclusive with above</span>
+  <span class="key2">"pf_sl_trail_enabled"</span>: <span class="kw">false</span>,
+  <span class="key2">"pf_sl_trail_every"</span>: <span class="num">0.0</span>,
+  <span class="key2">"pf_sl_trail_by"</span>: <span class="num">0.0</span>
+}</pre>
+</section>
+
+<!-- ════════════════════════════════════ 7. PORTFOLIO TARGET ═══ -->
+<section id="pf-target">
+  <h2><span class="tag tgt">TGT</span> 7. Portfolio-Level Target <span class="count-pill">4 types</span></h2>
+  <p>Set via <code>pf_tgt_type</code> on <code>PortfolioConfig</code>. The four types mirror the SL list, minus the compound "Loss and Underlying Range" combo. Same FX-vs-Options downgrade rules apply.</p>
+
+  <div class="type-card-grid">
+    <div class="type-card">
+      <div class="t-name">7.1 Combined Profit <span class="tag fx">FX + Options</span></div>
+      <div class="t-key">"pf_tgt_type": "Combined Profit"</div>
+      <div class="t-desc">Universal type. Fires when summed PnL across all slots ≥ <code>pf_tgt_value</code>. Implementation: <code>backtest_runner.py:1020</code>.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">7.2 Combined Premium <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_tgt_type": "Combined Premium"</div>
+      <div class="t-desc">Mirror of the SL counterpart, but for profit side.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">7.3 Absolute Combined Premium <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_tgt_type": "Absolute Combined Premium"</div>
+      <div class="t-desc">Absolute-value variant — fires regardless of sign.</div>
+    </div>
+    <div class="type-card">
+      <div class="t-name">7.4 Underlying Movement <span class="tag opt">Options-only</span></div>
+      <div class="t-key">"pf_tgt_type": "Underlying Movement"</div>
+      <div class="t-desc">Fires when underlying spot has moved a configured distance from entry, regardless of PnL.</div>
+    </div>
+  </div>
+
+  <h3>7.5 Bonus: Trailing Portfolio Target / Profit Lock</h3>
+  <p>Once profit reaches <code>pf_tgt_trail_when_profit_reach</code>, the system starts <em>locking</em> a minimum profit (the <code>pf_tgt_trail_lock_min_profit</code>) and trails the SL upward as further gains accrue.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="key">pf_tgt_trail_enabled</td><td>Master switch.</td></tr>
+        <tr><td class="key">pf_tgt_trail_when_profit_reach</td><td>Activation threshold (raw PnL). Below this, no locking.</td></tr>
+        <tr><td class="key">pf_tgt_trail_lock_min_profit</td><td>Minimum profit (raw PnL) you guarantee from this point on.</td></tr>
+        <tr><td class="key">pf_tgt_trail_every</td><td>Each PnL step that further raises the locked floor.</td></tr>
+        <tr><td class="key">pf_tgt_trail_by</td><td>How much the locked floor rises per step.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="ref-line"><strong>Code:</strong> <code>core/backtest_runner.py:996-1014</code>.</div>
+
+  <h3>7.6 All Portfolio Target fields (full schema)</h3>
+<pre>{
+  <span class="key2">"pf_tgt_enabled"</span>: <span class="kw">false</span>,
+  <span class="key2">"pf_tgt_type"</span>: <span class="str">"Combined Profit"</span>,
+  <span class="key2">"pf_tgt_value"</span>: <span class="num">0.0</span>,
+  <span class="key2">"pf_tgt_action"</span>: <span class="str">"SqOff"</span>,                <span class="cm">// SqOff | ReExecute</span>
+  <span class="key2">"pf_tgt_delay_sec"</span>: <span class="num">0</span>,
+  <span class="key2">"pf_tgt_reexecute_count"</span>: <span class="num">0</span>,            <span class="cm">// 0 = unlimited</span>
+  <span class="key2">"pf_tgt_trail_enabled"</span>: <span class="kw">false</span>,
+  <span class="key2">"pf_tgt_trail_when_profit_reach"</span>: <span class="num">0.0</span>,
+  <span class="key2">"pf_tgt_trail_lock_min_profit"</span>: <span class="num">0.0</span>,
+  <span class="key2">"pf_tgt_trail_every"</span>: <span class="num">0.0</span>,
+  <span class="key2">"pf_tgt_trail_by"</span>: <span class="num">0.0</span>
+}</pre>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 8. IMPLEMENTATION GUIDE ═══ -->
+<section id="impl-guide">
+  <h2>8. Implementation Guide — How to Wire It Up</h2>
+  <p>Five copy-paste recipes covering the most common scenarios. Edit the file <code>portfolios/&lt;your_portfolio&gt;.json</code>, save, and re-run a backtest. No code changes are needed.</p>
+
+  <h3>Recipe 8.1 — Add a 0.5% leg-level SL with no target</h3>
+  <p>Edit the slot's <code>exit_config</code>:</p>
+<pre>{
+  <span class="cm">// inside slots[i].exit_config</span>
+  <span class="key2">"stop_loss_type"</span>: <span class="str">"percentage"</span>,
+  <span class="key2">"stop_loss_value"</span>: <span class="num">0.5</span>,
+  <span class="key2">"target_type"</span>:    <span class="str">"none"</span>,
+  <span class="key2">"target_value"</span>:   <span class="num">0.0</span>,
+  <span class="key2">"on_sl_action"</span>:   <span class="str">"close"</span>
+}</pre>
+  <div class="callout success"><strong>Effect:</strong> for every entry on this slot, position is closed when price moves 0.5% against entry. No profit target — the only way out is SL or squareoff.</div>
+
+  <h3>Recipe 8.2 — Add a trailing leg-level SL (initial 0.3%, ratchet 0.05%, tighten 0.02%)</h3>
+<pre>{
+  <span class="key2">"stop_loss_type"</span>: <span class="str">"trailing"</span>,
+  <span class="key2">"stop_loss_value"</span>: <span class="num">0.3</span>,         <span class="cm">// initial SL distance %</span>
+  <span class="key2">"trailing_sl_step"</span>: <span class="num">0.05</span>,      <span class="cm">// every 0.05% of profit, ratchet</span>
+  <span class="key2">"trailing_sl_offset"</span>: <span class="num">0.02</span>,    <span class="cm">// tighten SL by 0.02% per ratchet</span>
+  <span class="key2">"target_type"</span>: <span class="str">"none"</span>,
+  <span class="key2">"on_sl_action"</span>: <span class="str">"close"</span>
+}</pre>
+  <div class="callout success"><strong>Effect:</strong> SL starts 0.3% from entry. As soon as the trade is +0.05% in profit, SL tightens by 0.02%. As more profit accrues, SL keeps stepping closer to current price — locking in gains.</div>
+
+  <h3>Recipe 8.3 — Portfolio Combined-Loss SL of $500 with SqOff</h3>
+  <p>Edit the top level of <code>portfolios/&lt;name&gt;.json</code> (NOT inside <code>exit_config</code>):</p>
+<pre>{
+  <span class="cm">// top-level fields on PortfolioConfig</span>
+  <span class="key2">"pf_sl_enabled"</span>: <span class="kw">true</span>,
+  <span class="key2">"pf_sl_type"</span>: <span class="str">"Combined Loss"</span>,
+  <span class="key2">"pf_sl_value"</span>: <span class="num">500.0</span>,
+  <span class="key2">"pf_sl_action"</span>: <span class="str">"SqOff"</span>,
+  <span class="key2">"pf_sl_delay_sec"</span>: <span class="num">0</span>
+}</pre>
+  <div class="callout success"><strong>Effect:</strong> after the backtest finishes, the merged equity curve is walked tick-by-tick. The first moment combined PnL ≤ -$500, all open trades are clipped (closed) at that timestamp; trades after the clip are dropped from the report.</div>
+
+  <h3>Recipe 8.4 — Portfolio Combined-Profit target $1000 with profit lock</h3>
+<pre>{
+  <span class="key2">"pf_tgt_enabled"</span>: <span class="kw">true</span>,
+  <span class="key2">"pf_tgt_type"</span>: <span class="str">"Combined Profit"</span>,
+  <span class="key2">"pf_tgt_value"</span>: <span class="num">1000.0</span>,
+  <span class="key2">"pf_tgt_action"</span>: <span class="str">"SqOff"</span>,
+  <span class="key2">"pf_tgt_trail_enabled"</span>: <span class="kw">true</span>,
+  <span class="key2">"pf_tgt_trail_when_profit_reach"</span>: <span class="num">600.0</span>,    <span class="cm">// arm at +$600</span>
+  <span class="key2">"pf_tgt_trail_lock_min_profit"</span>: <span class="num">300.0</span>,        <span class="cm">// guarantee +$300</span>
+  <span class="key2">"pf_tgt_trail_every"</span>: <span class="num">100.0</span>,                  <span class="cm">// every +$100 more profit...</span>
+  <span class="key2">"pf_tgt_trail_by"</span>: <span class="num">50.0</span>                         <span class="cm">// ...raise the floor by $50</span>
+}</pre>
+  <div class="callout success"><strong>Effect:</strong> hard target is $1000. But once the book is up $600, a profit-lock arms guaranteeing at least $300; for every additional $100 of gain, the locked floor steps up by $50. Either the target or the floor will close out the book.</div>
+
+  <h3>Recipe 8.5 — Combine leg SL with portfolio SL</h3>
+  <p>Both can be active simultaneously — they don't conflict. Each slot has its own leg SL, the portfolio has an aggregate SL.</p>
+<pre><span class="cm">// each slot</span>
+slot.exit_config = {
+  <span class="key2">"stop_loss_type"</span>: <span class="str">"percentage"</span>,
+  <span class="key2">"stop_loss_value"</span>: <span class="num">0.5</span>,
+  <span class="key2">"on_sl_action"</span>: <span class="str">"close"</span>
+}
+<span class="cm">// portfolio top level</span>
+portfolio.pf_sl_enabled = <span class="kw">true</span>
+portfolio.pf_sl_type    = <span class="str">"Combined Loss"</span>
+portfolio.pf_sl_value   = <span class="num">500.0</span>
+portfolio.pf_sl_action  = <span class="str">"SqOff"</span></pre>
+  <div class="callout warn"><strong>Precedence:</strong> Leg SL fires in real time during the backtest. Portfolio SL is applied <em>post-hoc</em>. If the portfolio-level clip happens before some leg SL would have fired, post-clip leg trades are dropped from the report. Net: whichever exit is "earlier" in time wins, with portfolio clipping taking precedence in the merged report.</div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 9. TYPES CATALOG ═══ -->
+<section id="types-catalog">
+  <h2>9. Types Catalog — Quick Reference</h2>
+  <p>The single page to skim if you only have 30 seconds:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Level</th><th>Stoploss types</th><th>Target types</th><th>Trailing variant</th><th>Auxiliary</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Leg</strong> (per-slot)</td>
+          <td>
+            <span class="count-pill">4</span><br>
+            • <code>none</code><br>
+            • <code>percentage</code><br>
+            • <code>points</code><br>
+            • <code>trailing</code>
+          </td>
+          <td>
+            <span class="count-pill">3</span><br>
+            • <code>none</code><br>
+            • <code>percentage</code><br>
+            • <code>points</code>
+          </td>
+          <td>Trailing SL via <code>trailing_sl_step</code> + <code>trailing_sl_offset</code>; target locking via <code>target_lock_trigger</code> + <code>target_lock_minimum</code></td>
+          <td><code>sl_wait_bars</code>, <code>move_sl_to_cost</code>, <code>squareoff_time</code>, exit-action filters</td>
+        </tr>
+        <tr>
+          <td><strong>Portfolio</strong> (all slots)</td>
+          <td>
+            <span class="count-pill">5</span><br>
+            • <code>Combined Loss</code> <span class="tag fx">FX+Opt</span><br>
+            • <code>Combined Premium</code> <span class="tag opt">Opt</span><br>
+            • <code>Absolute Combined Premium</code> <span class="tag opt">Opt</span><br>
+            • <code>Underlying Movement</code> <span class="tag opt">Opt</span><br>
+            • <code>Loss and Underlying Range</code> <span class="tag opt">Opt</span>
+          </td>
+          <td>
+            <span class="count-pill">4</span><br>
+            • <code>Combined Profit</code> <span class="tag fx">FX+Opt</span><br>
+            • <code>Combined Premium</code> <span class="tag opt">Opt</span><br>
+            • <code>Absolute Combined Premium</code> <span class="tag opt">Opt</span><br>
+            • <code>Underlying Movement</code> <span class="tag opt">Opt</span>
+          </td>
+          <td>Trailing PF SL (<code>pf_sl_trail_*</code>); Trailing PF Target / Profit Lock (<code>pf_tgt_trail_*</code>)</td>
+          <td><code>pf_*_delay_sec</code>, <code>pf_*_reexecute_count</code>, only-loss/only-profit filters, Move SL to Cost, time-based squareoff</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Tally</h3>
+  <ul>
+    <li><strong>Leg-level SL types:</strong> 4</li>
+    <li><strong>Leg-level Target types:</strong> 3 (+ target-locking add-on)</li>
+    <li><strong>Portfolio-level SL types:</strong> 5 (1 universal + 4 options-only)</li>
+    <li><strong>Portfolio-level Target types:</strong> 4 (1 universal + 3 options-only)</li>
+    <li><strong>Total distinct configurable SL/TGT "modes":</strong> 16, before counting trailing variants and the action filters.</li>
+  </ul>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ 10. GLOSSARY & FAQ ═══ -->
+<section id="glossary">
+  <h2>10. Glossary &amp; FAQ</h2>
+
+  <h3>Glossary</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Leg</strong></td><td>One individual open position. Inside this codebase, leg-level state is tracked inside a <em>slot</em>'s strategy instance.</td></tr>
+        <tr><td><strong>Slot</strong></td><td>A configured strategy entry on a portfolio (one row in <code>slots[]</code>). Each slot has its own SL/TGT via <code>exit_config</code>.</td></tr>
+        <tr><td><strong>Portfolio</strong></td><td>The collection of all slots, plus shared run settings (capital, dates, RBO, portfolio SL/TGT).</td></tr>
+        <tr><td><strong>FX</strong></td><td>Foreign exchange instruments. The "universal" SL/TGT types are the only ones that work here — options-only types are downgraded with a warning.</td></tr>
+        <tr><td><strong>Trailing</strong></td><td>An SL/floor that ratchets in your favor as the trade moves into profit, but never moves against you.</td></tr>
+        <tr><td><strong>Clip</strong></td><td>The portfolio-level act of cutting all trades from a given timestamp onward in the merged equity curve.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>FAQ</h3>
+
+  <h4>Why does Options have more SL/Target types than FX?</h4>
+  <p>Multi-leg options books have additional risk dimensions (net premium, underlying spot movement, range breaches) that simply don't exist for spot FX. The codebase keeps the option-specific values in the schema for forward compatibility but downgrades them to "Combined Loss" / "Combined Profit" with a warning when the portfolio runs FX/crypto data — see <code>core/backtest_runner.py:742-745</code>.</p>
+
+  <h4>What if my leg SL fires before the portfolio SL would have?</h4>
+  <p>Leg SL fires in real time during the backtest run. Portfolio SL is applied <em>after</em> the backtest, by walking the merged equity curve. If your leg SL fires at 10:32:00 and the portfolio-level SL would have fired at 10:31:30, the post-hoc clip drops every trade after 10:31:30 — including trades the leg SL had already closed. Net effect: the earlier of the two timestamps wins.</p>
+
+  <h4>Where are SL/TGT hits logged?</h4>
+  <p>The exit reason string is constructed in <code>_handle_exit()</code> at <code>core/managed_strategy.py:570-575</code> and emitted with the close event. Reports built from the merged trades file include the reason verbatim, so SL/TGT/squareoff/clip hits are all distinguishable in the audit trail.</p>
+
+  <h4>Can I have a target without a stoploss (or vice versa)?</h4>
+  <p>Yes. Both <code>stop_loss_type</code> and <code>target_type</code> default to <code>"none"</code>. Set whichever you need. They are evaluated independently each bar.</p>
+
+  <h4>Does <code>re_execute</code> on a leg respect the portfolio's no-re-entry rules?</h4>
+  <p>Yes. Re-execute fires through <code>_handle_exit()</code> but is gated by <code>delay_between_legs_sec</code> on the portfolio and by <code>max_re_executions</code> on the leg. The ReExecute tab also has a <code>no_reexec_sl_cost</code> flag that suppresses re-execution after a Move-SL-to-Cost upgrade — see <code>5. Logics/ReExecute_Logics.html</code> for the full spec.</p>
+
+  <hr class="divider">
+
+  <h3>Source-of-truth files for further reading</h3>
+  <ul>
+    <li><code>core/models.py</code> — <code>ExitConfig</code> (lines 20–56), <code>StrategySlotConfig</code> (lines 59–100), <code>PortfolioConfig</code> (lines 103–237)</li>
+    <li><code>core/managed_strategy.py</code> — leg-level engine; <code>_check_exits()</code> at line 418, <code>_handle_exit()</code> at line 524, <code>on_order_filled()</code> at line 657, <code>_compute_sl_price()</code> at line 710</li>
+    <li><code>core/backtest_runner.py</code> — portfolio-level engine; <code>_resolve_pf_stoploss()</code> at line 728, <code>_resolve_pf_target()</code> at line 796, <code>_apply_portfolio_clip()</code> at line 917</li>
+    <li><code>5. Logics/sl_tgt.html</code> — original leg-level spec (developer-density)</li>
+    <li><code>5. Logics/portfolio_sl_tgt.html</code> — original portfolio-level spec</li>
+    <li><code>5. Logics/Other_Settings_Logic.html</code> — action filters (OnSL_*, OnTarget_*)</li>
+    <li><code>5. Logics/ReExecute_Logics.html</code> — re-execution and Move-SL-to-Cost interactions</li>
+  </ul>
+</section>
+
+</main>
+
+</div>
+</body>
+</html>

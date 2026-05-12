@@ -3,7 +3,13 @@
     {
       "user_id": "_default",
       "alias": "Default",
-      "multiplier": 1.0,
+      "multiplier": 6,
+      "allowed_instruments": null
+    },
+    {
+      "user_id": "u_mownziwo",
+      "alias": "New User",
+      "multiplier": 1,
       "allowed_instruments": null
     }
   ]

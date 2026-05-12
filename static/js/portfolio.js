@@ -516,7 +516,7 @@ const Portfolio = {
 
         // Build inline-editable legs table rows
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
+        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
         let legsRows = "";
         if ((pf.slots || []).length === 0) {
             legsRows = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
@@ -1355,7 +1355,7 @@ const Portfolio = {
     /** Build HTML for a single inline leg row */
     _buildInlineLegRow(slot, i) {
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
+        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];

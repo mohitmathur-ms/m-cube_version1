@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aggregator + Strategy Complete Guide — m-cube_version1</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1240px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #8250df 100%); color: white; padding: 36px; margin: -32px -40px 28px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 26px; }
+  header.cover .subtitle { margin: 0; font-size: 14px; opacity: 0.92; }
+  header.cover .meta { margin-top: 10px; font-size: 12px; opacity: 0.8; }
+  h2 { font-size: 21px; margin-top: 36px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16px; margin-top: 22px; }
+  h4 { font-size: 14px; margin-top: 18px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f9fafb; }
+  td.center, th.center { text-align: center; white-space: nowrap; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; background: #f6f8fa; padding: 1px 6px; border-radius: 3px; color: #d63384; }
+  pre { background: #f6f8fa; border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; overflow-x: auto; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok    { background: var(--green-bg); color: var(--green); }
+  .badge-bad   { background: var(--red-bg);   color: var(--red); }
+  .badge-warn  { background: var(--amber-bg); color: var(--amber); }
+  .badge-info  { background: var(--blue-bg); color: var(--accent); }
+  .badge-purple{ background: var(--purple-bg); color: var(--purple); }
+  .callout       { background: var(--blue-bg);  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-warn  { background: var(--amber-bg); border-left: 4px solid var(--amber);  padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-ok    { background: var(--green-bg); border-left: 4px solid var(--green);  padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-tech  { background: var(--purple-bg); border-left: 4px solid var(--purple); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-tech strong { color: var(--purple); }
+  .simple        { background: #f6f8fa; border-left: 4px solid #57606a; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14.5px; }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--muted); }
+  .filebox { background: #2d2d2d; color: #f8f8f2; padding: 8px 14px; border-radius: 6px 6px 0 0; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px; margin-top: 12px; margin-bottom: 0; }
+  .filebox + pre { margin-top: 0; border-radius: 0 0 6px 6px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Aggregator + Strategy Complete Guide</h1>
+  <p class="subtitle">Notebooks <code style="background:rgba(255,255,255,0.18); color:#fff;">aggregate_1min_to_5min.ipynb</code> and <code style="background:rgba(255,255,255,0.18); color:#fff;">aggregator_strategy_demo.ipynb</code>, explained from scratch.</p>
+  <p class="meta">Plain English → Technical detail → Code snippets · Reference for future readers</p>
+</header>
+
+<div class="callout">
+  <strong>What this document is.</strong> A self-contained walkthrough of two NautilusTrader notebooks in this project: one that converts 1-minute FX bars into 5-minute bars two different ways, and one that wires both aggregation paths into a real EMA-cross strategy with bracket SL/TP. Every section follows the same pattern — a plain-English summary, a "Technically:" callout with formal terms, then a code snippet pulled from the actual notebook.
+</div>
+
+<nav class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#sec-1">Overview &amp; motivation</a></li>
+    <li><a href="#sec-2">The data pipeline</a></li>
+    <li><a href="#sec-3">Aggregation: two approaches</a></li>
+    <li><a href="#sec-4">The Bar5MinFeatures dataclass</a></li>
+    <li><a href="#sec-5">Same vs different between aggregators</a></li>
+    <li><a href="#sec-6">The trading strategy</a></li>
+    <li><a href="#sec-7">Order routing pipeline</a></li>
+    <li><a href="#sec-8">The two clocks</a></li>
+    <li><a href="#sec-9">Order lifecycle</a></li>
+    <li><a href="#sec-10">Worked example: 39 vs 40 brackets</a></li>
+    <li><a href="#sec-11">publish_data / on_data</a></li>
+    <li><a href="#sec-12">The 6 reports</a></li>
+    <li><a href="#sec-13">Entry control — order types, TIF, time delays</a></li>
+    <li><a href="#sec-14">Exit control — beyond SL/TP</a></li>
+    <li><a href="#sec-15">Gotchas we hit</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="sec-1">1. Overview &amp; motivation</h2>
+
+<div class="simple">
+We have 1-minute FX bars. Most strategies want 5-minute bars instead, so something has to combine every five 1-min bars into one 5-min bar. Nautilus has a built-in way to do this; you can also write your own. We did both — to compare them side-by-side and prove they agree (or find where they don't).
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> The two notebooks demonstrate two ways to produce a <code>5-MINUTE</code> bar stream from a <code>1-MINUTE-EXTERNAL</code> source: (a) Nautilus's <code>TimeBarAggregator</code> driven by a composite <code>BarType</code> with aggregation source <code>INTERNAL</code>; (b) a user-space <code>FiveMinAggregator</code> class that buffers <code>Bar</code> objects, computes OHLCV plus derived features (range, ATR(14), EMA(9/21), RSI(14), VWAP, etc.), and emits a custom dataclass. The first notebook only writes CSVs; the second wires both into a real <code>Strategy</code> with bracket SL/TP and produces the standard Nautilus reports (<code>order_fills</code>, <code>positions</code>, <code>account</code>).
+</div>
+
+<h3>The two notebooks at a glance</h3>
+<table>
+  <thead><tr><th>Notebook</th><th>What it produces</th><th>Strategy logic</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>aggregate_1min_to_5min.ipynb</code></td>
+      <td>Two CSVs: <code>eurusd_5min_nautilus.csv</code> + <code>eurusd_5min_custom_features.csv</code></td>
+      <td>None — the "strategies" only write bars to disk</td>
+    </tr>
+    <tr>
+      <td><code>aggregator_strategy_demo.ipynb</code></td>
+      <td>Six CSVs under <code>reports_aggregator_demo/</code>: <code>{internal,custom}_{order_fills,positions,account}.csv</code></td>
+      <td>EMA-cross with bracket SL/TP, run separately for each aggregation path</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="sec-2">2. The data pipeline</h2>
+
+<div class="simple">
+Our raw data is one folder per trading day, each with two CSVs — an ASK side (the price someone will sell to you) and a BID side (the price someone will buy from you). Each row is one 1-minute bar. We load all days for the month into a DataFrame, then hand it to Nautilus, which wraps each row into a <code>Bar</code> object.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> Source CSVs live under <code>C:/Users/HP/Desktop/MS/Dataset/FX_yyyy/Fx/EUROUSD/2024/01/&lt;DD&gt;/&lt;DD&gt;.&lt;MM&gt;.&lt;YYYY&gt;_&lt;SIDE&gt;_OHLCV.csv</code> with timestamps in the format <code>DD.MM.YYYY HH:MM:SS.fff GMT+HHMM</code> (Indian Standard Time = UTC+05:30 in our case). After <code>pd.to_datetime(..., utc=True)</code> the index is UTC; Nautilus requires UTC nanoseconds internally (<code>BarDataWrangler.process</code> calls <code>as_utc_index(data)</code>). For display, the notebook converts back to <code>Asia/Kolkata</code> via <code>tz_convert(OUTPUT_TZ)</code> when writing CSV output.
+</div>
+
+<h4>Loading the full month</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-04</div>
+<pre><code>def load_month(data_dir: Path, side: str) -> pd.DataFrame:
+    """Concatenate every `*_&lt;side&gt;_OHLCV.csv` under `data_dir/&lt;DD&gt;/` into one UTC frame."""
+    frames: list[pd.DataFrame] = []
+    for day_dir in sorted(data_dir.iterdir()):
+        if not day_dir.is_dir():
+            continue
+        for csv_path in sorted(day_dir.glob(f"*_{side}_OHLCV.csv")):
+            frames.append(pd.read_csv(csv_path))
+    df = pd.concat(frames, ignore_index=True)
+    df["timestamp"] = pd.to_datetime(
+        df["timestamp"], format="%d.%m.%Y %H:%M:%S.%f GMT%z", utc=True
+    )
+    df = df.set_index("timestamp").sort_index()
+    df = df[~df.index.duplicated(keep="last")]  # drop day-boundary overlaps
+    return df[["open", "high", "low", "close", "volume"]].astype(float)
+
+
+df_1min_ask = load_month(DATA_DIR, side="ASK")
+df_1min_bid = load_month(DATA_DIR, side="BID")
+</code></pre>
+
+<div class="callout-warn">
+  <strong>BID + ASK is mandatory for FX, not optional.</strong> Nautilus's simulated FX matching engine needs both quote sides to determine a fillable price for any market order. With only ASK loaded, every market entry is rejected with <code>'no market for EURUSD.FOREX_MS'</code> and the bracket's SL/TP children cascade-reject. The project enforces this everywhere — see <code>core/backtest_runner.py:_pair_bid_ask_bar_type</code>. Strategies still <em>subscribe</em> to just one side (we pick ASK); the other side is only there for the matching engine.
+</div>
+
+<h4>Wrangling DataFrames into Nautilus Bar objects</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-06</div>
+<pre><code>instrument = create_instrument(BASE, QUOTE, venue=VENUE_NAME)
+
+BAR_TYPE_1MIN_ASK = BarType.from_str(f"{instrument.id}-1-MINUTE-ASK-EXTERNAL")
+BAR_TYPE_1MIN_BID = BarType.from_str(f"{instrument.id}-1-MINUTE-BID-EXTERNAL")
+BAR_TYPE_5MIN_INTERNAL = BarType.from_str(
+    f"{instrument.id}-5-MINUTE-ASK-INTERNAL@1-MINUTE-EXTERNAL"
+)
+
+BARS_1MIN_ASK = BarDataWrangler(BAR_TYPE_1MIN_ASK, instrument).process(df_1min_ask)
+BARS_1MIN_BID = BarDataWrangler(BAR_TYPE_1MIN_BID, instrument).process(df_1min_bid)
+ALL_BARS = BARS_1MIN_ASK + BARS_1MIN_BID         # both sides fed to the engine
+</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="sec-3">3. Aggregation: two approaches</h2>
+
+<h3 id="sec-3-1">3.1 Nautilus INTERNAL aggregator</h3>
+
+<div class="simple">
+Tell Nautilus the bar type you want is "5-minute bars built internally from 1-minute external bars." Nautilus reads your wish, spawns its own aggregator behind the scenes, and feeds your strategy the 5-min bars as if they were the original input. You write no aggregation code.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> A <strong>composite</strong> <code>BarType</code> string has the form <code>&lt;id&gt;-&lt;step&gt;-&lt;agg&gt;-&lt;price&gt;-INTERNAL@&lt;step&gt;-&lt;agg&gt;-EXTERNAL</code>. The right-hand side declares the source bar spec (only step + aggregation + source — no price type) and the left-hand side declares the output. When a strategy calls <code>self.subscribe_bars(composite_bar_type)</code>, the <code>DataEngine</code> recognises the <code>INTERNAL@…-EXTERNAL</code> shape, instantiates a <code>TimeBarAggregator</code> with a <code>TestClock</code>, sets it to historical mode, and routes the EXTERNAL source bars through it. The aggregator's <code>_pre_process_historical_events</code> advances the test clock to each incoming bar's <code>ts_init</code> and fires any pending timer events inline before applying the bar; the <code>_build_bar</code> path emits the aggregated bar via the message bus back to the strategy's <code>on_bar</code>.
+</div>
+
+<h4>Composite bar-type syntax</h4>
+<table>
+  <thead><tr><th>String</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>EURUSD.FOREX_MS-5-MINUTE-ASK-INTERNAL@1-MINUTE-EXTERNAL</code></td><td>Target: 5-min ASK bars, built internally by Nautilus. Source: 1-min EXTERNAL bars (price type inferred from context).</td></tr>
+    <tr><td><code>EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL</code></td><td>Plain 1-min ASK bars. Strategy receives them as-is.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout-warn">
+  <strong>Gotcha:</strong> the right-hand side of <code>@</code> does NOT include the price type. <code>...-INTERNAL@1-MINUTE-ASK-EXTERNAL</code> raises <code>ValueError: invalid token: '1-MINUTE' at position 5</code>. Correct form is <code>...-INTERNAL@1-MINUTE-EXTERNAL</code>.
+</div>
+
+<h3 id="sec-3-2">3.2 Custom FiveMinAggregator</h3>
+
+<div class="simple">
+Same idea, but you write the aggregator yourself in plain Python. Each 1-min bar comes in, you stash it in a list. When you notice you've moved into the next 5-minute window, you take the list you've been building, compute open/high/low/close/volume from it (plus extra features like ATR, EMA, RSI), and hand that out as one 5-min bar.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> A pure-Python class with two state buckets: (1) <em>per-window</em> state (<code>_buffer</code>, <code>_window_close</code>) and (2) <em>cross-window</em> state (<code>_prev_close</code>, <code>_ema_s</code>, <code>_ema_l</code>, Wilder-style <code>_avg_gain</code>/<code>_avg_loss</code>/<code>_atr</code>, cumulative VWAP <code>_cum_pv</code>/<code>_cum_v</code>). The bucketing rule is <code>bucket_close = ts.ceil(f"{N}min")</code> — this snaps a timestamp upward to the next N-minute mark, with the special property that timestamps already on the boundary stay put. That implements the <strong>left-open <code>(T-N, T]</code></strong> convention and matches Nautilus's default <code>interval_type="left-open"</code>. All indicator updates use one-line recurrence forms (<code>new = old + α·(sample − old)</code>) so each emit is O(1) regardless of how many past bars exist.
+</div>
+
+<h4>The whole class</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-08</div>
+<pre><code>class FiveMinAggregator:
+    """Buffer 1-min bars, emit a `Bar5MinFeatures` at every N-min boundary."""
+
+    def __init__(self, target_minutes=5, ema_short_period=9, ema_long_period=21,
+                 rsi_period=14, atr_period=14):
+        self.target_minutes = target_minutes
+        self._alpha_ema_s = 2.0 / (ema_short_period + 1)
+        self._alpha_ema_l = 2.0 / (ema_long_period + 1)
+        self._alpha_rsi   = 1.0 / rsi_period
+        self._alpha_atr   = 1.0 / atr_period
+
+        # per-window state
+        self._buffer: list[Bar] = []
+        self._window_close: pd.Timestamp | None = None
+
+        # cross-window state (drives derived features)
+        self._prev_close = None
+        self._ema_s = None; self._ema_l = None
+        self._avg_gain = 0.0; self._avg_loss = 0.0
+        self._atr = None
+        self._cum_pv = 0.0; self._cum_v = 0.0
+
+    def on_bar(self, bar: Bar) -> Bar5MinFeatures | None:
+        ts = pd.Timestamp(bar.ts_event, unit="ns", tz="UTC")
+        bucket_close = ts.ceil(f"{self.target_minutes}min")
+        emitted = None
+        if self._window_close is None:
+            self._window_close = bucket_close
+        elif bucket_close != self._window_close:
+            emitted = self._close_window()          # close prior window
+            self._window_close = bucket_close
+        self._buffer.append(bar)
+        return emitted
+
+    def flush(self) -> Bar5MinFeatures | None:
+        """End-of-stream: emit any trailing partial window."""
+        if self._buffer:
+            return self._close_window()
+        return None
+</code></pre>
+
+<h4>The bucketing decision, step by step</h4>
+<table>
+  <thead><tr><th>Bar timestamp</th><th><code>ts.ceil("5min")</code></th><th>Action when <code>_window_close=22:05</code></th></tr></thead>
+  <tbody>
+    <tr><td><code>22:00</code></td><td><code>22:00</code></td><td>Different bucket → close prior window, start new at 22:00</td></tr>
+    <tr><td><code>22:01</code></td><td><code>22:05</code></td><td>Same bucket → just buffer</td></tr>
+    <tr><td><code>22:02</code></td><td><code>22:05</code></td><td>Same → buffer</td></tr>
+    <tr><td><code>22:03</code></td><td><code>22:05</code></td><td>Same → buffer</td></tr>
+    <tr><td><code>22:04</code></td><td><code>22:05</code></td><td>Same → buffer</td></tr>
+    <tr><td><code>22:05</code></td><td><code>22:05</code></td><td>Same (boundary bar stays in current window) → buffer</td></tr>
+    <tr><td><code>22:06</code></td><td><code>22:10</code></td><td>Different → emit <code>Bar5MinFeatures(timestamp=22:05)</code> with 5 bars, start new window</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Why <code>flush()</code> exists.</strong> The aggregator only emits when a <em>new</em> bucket arrives. If the data stream ends mid-window (e.g. data ends at 18:29 but the window closes at 18:30), the 4 partial bars sit in the buffer forever — no future bar to trigger emission. <code>flush()</code> is the explicit "stream is done, emit whatever's there" call. Our strategies call it from <code>on_stop</code> but discard the result (we don't trade on partial windows).
+</div>
+
+<h4>Inside <code>_close_window</code> — what the derived features actually compute</h4>
+<table>
+  <thead><tr><th>Field</th><th>Formula</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>open / high / low / close / volume / n_ticks</code></td><td>first / max / min / last / sum / count over the buffer</td><td>Standard OHLCV roll-up. <code>n_ticks</code> flags partial windows (e.g. 4 instead of 5 at end-of-data).</td></tr>
+    <tr><td><code>range / body / upper_wick / lower_wick</code></td><td><code>high-low</code>, <code>|close-open|</code>, <code>high-max(o,c)</code>, <code>min(o,c)-low</code></td><td>Candle geometry features for candlestick-style filters.</td></tr>
+    <tr><td><code>log_return / pct_return</code></td><td><code>log(close/prev_close)</code>, <code>close/prev_close - 1</code></td><td>Returns vs. prior 5-min close (uses <code>_prev_close</code> state).</td></tr>
+    <tr><td><code>typical_price / vwap</code></td><td><code>(H+L+C)/3</code>, then cumulative <code>Σ(typical·vol)/Σ(vol)</code></td><td>Session VWAP. Never resets in our impl — for daily VWAP, zero <code>_cum_pv</code>/<code>_cum_v</code> at session start.</td></tr>
+    <tr><td><code>tr / atr_14</code></td><td><code>max(range, |H-pc|, |L-pc|)</code>, then Wilder EWM with <code>α=1/14</code></td><td>True Range captures gap volatility; ATR is its smoothed version.</td></tr>
+    <tr><td><code>ema_9 / ema_21</code></td><td><code>new = old + α·(close - old)</code>, <code>α=2/(N+1)</code></td><td>Standard streaming EMA recurrence.</td></tr>
+    <tr><td><code>rsi_14</code></td><td>Wilder smoothing of gain/loss → <code>RS = avg_gain/avg_loss</code> → <code>RSI = 100-100/(1+RS)</code></td><td>Standard 14-period RSI, streaming form.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="sec-4">4. The <code>Bar5MinFeatures</code> dataclass</h2>
+
+<div class="simple">
+A plain Python record class — like a struct — that holds one 5-minute bar plus all the derived features in one place. The aggregator builds one of these every time a window closes; the strategy or a CSV writer can pull individual fields off it.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> A <code>@dataclass</code> with 20 fields. <code>field_names()</code> returns the column order for <code>csv.DictWriter</code>; <code>to_row()</code> calls <code>dataclasses.asdict</code> for serialisation. Note this is <strong>not</strong> a Nautilus <code>Data</code> subclass — so it cannot be routed via <code>publish_data</code> / <code>on_data</code> without first inheriting from <code>nautilus_trader.core.data.Data</code> and exposing <code>ts_event</code>/<code>ts_init</code> properties (see §11).
+</div>
+
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-08 (header)</div>
+<pre><code>@dataclass
+class Bar5MinFeatures:
+    timestamp: pd.Timestamp
+    open: float; high: float; low: float; close: float
+    volume: float
+    n_ticks: int                     # how many 1-min bars folded into this 5-min bar
+    range: float; body: float
+    upper_wick: float; lower_wick: float
+    log_return: float | None         # None on the first emit (no prior close)
+    pct_return: float | None
+    typical_price: float; vwap: float
+    tr: float; atr_14: float
+    ema_9: float; ema_21: float
+    rsi_14: float | None             # None until prev_close exists
+
+    @classmethod
+    def field_names(cls) -> list[str]: return [f.name for f in fields(cls)]
+    def to_row(self) -> dict:         return asdict(self)
+</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="sec-5">5. Same vs different between the two aggregators</h2>
+
+<div class="simple">
+The two aggregators produce <em>the same numbers</em> — same OHLCV bar by bar. But they hand those bars to the strategy at slightly different moments in time. Nautilus delivers each 5-min bar the moment its closing 1-min bar arrives; our custom one delivers it one minute later, when the next 1-min bar shows up. That one-minute lag is invisible if you only look at the bars, but it changes when orders get placed.
+</div>
+
+<table>
+  <thead><tr><th>Aspect</th><th>Custom <code>FiveMinAggregator</code></th><th>Nautilus INTERNAL</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Bucketing</strong></td><td>Left-open <code>(T-5, T]</code> via <code>ts.ceil("5min")</code></td><td>Left-open <code>(T-5, T]</code> (<code>interval_type="left-open"</code> default)</td></tr>
+    <tr><td><strong>OHLC math</strong></td><td>first open / max high / min low / last close / sum volume</td><td>same</td></tr>
+    <tr><td><strong>Leading 1-bar partial</strong> (first bar exactly on a boundary)</td><td>Emitted as a 1-tick "5-min bar"</td><td>Emitted as a 1-tick "5-min bar"</td></tr>
+    <tr><td><strong>Trailing partial</strong> (data ends mid-window)</td><td>Available via <code>flush()</code>; our strategy discards it</td><td>Never emitted (timer for the missing boundary never fires)</td></tr>
+    <tr><td><strong>OHLCV on overlapping windows</strong></td><td colspan="2" class="center">Bit-identical (verified, <code>max abs diff = 0</code>)</td></tr>
+    <tr><td><strong>When the 5-min bar reaches the strategy</strong></td><td>At <code>T+1</code> — emission triggered only when the next bucket's first bar arrives</td><td>At <code>T</code> — timer fires inline in <code>_pre_process_historical_events</code> before the next bar is processed</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>The 1-minute delivery lag is the only material difference</strong>, and it only matters when the strategy submits orders or otherwise acts at bar-arrival time. For pure data export (the first notebook) you see identical CSV content for every overlapping row. For trading (the second notebook), this lag cascades through order-fill prices, SL/TP triggers, and position-state alignment — see §10.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="sec-6">6. The trading strategy</h2>
+
+<div class="simple">
+On every 5-minute bar we look at two moving averages — a fast one (9-period) and a slow one (21-period). When the fast one crosses above the slow one, we buy; below, we sell. With every entry we automatically attach a stop-loss (close out if price drops 20 pips against us) and a take-profit (close out if price moves 40 pips in our favour). One trade at a time — if we're still in a position, we ignore new crosses.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> Two <code>ExponentialMovingAverage</code> indicators are updated per 5-min bar (auto-registered for the internal strategy via <code>register_indicator_for_bars</code>; manually via <code>update_raw(close)</code> for the custom strategy since the engine doesn't know about the user-space aggregator). Cross detection uses the sign of <code>fast_ema.value - slow_ema.value</code> compared against a stored <code>_prev_fast_above</code>. On a cross, if <code>self.portfolio.is_flat(instrument_id)</code> the strategy submits a <strong>bracket</strong>: an <code>OrderList</code> containing a market <code>MARKET</code> entry, a <code>STOP_MARKET</code> stop-loss child, and a <code>LIMIT</code> take-profit child, linked under contingency type <code>OUO</code> ("one-updates-other": when one child fills, the other is cancelled).
+</div>
+
+<h4>The bracket helper</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-10</div>
+<pre><code>def submit_bracket(strategy, instrument, side, entry_price):
+    if side == OrderSide.BUY:
+        sl = instrument.make_price(entry_price - SL_PIPS * PIP)   # 20 pips below
+        tp = instrument.make_price(entry_price + TP_PIPS * PIP)   # 40 pips above
+    else:
+        sl = instrument.make_price(entry_price + SL_PIPS * PIP)
+        tp = instrument.make_price(entry_price - TP_PIPS * PIP)
+    order_list = strategy.order_factory.bracket(
+        instrument_id=instrument.id,
+        order_side=side,
+        quantity=instrument.make_qty(TRADE_SIZE),
+        sl_trigger_price=sl,
+        tp_price=tp,
+        time_in_force=TimeInForce.GTC,
+    )
+    strategy.submit_order_list(order_list)
+</code></pre>
+
+<h4>The internal-aggregation strategy</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-12 (excerpt)</div>
+<pre><code>class InternalEmaCrossStrategy(Strategy):
+    def on_start(self):
+        self.instrument = self.cache.instrument(self.config.instrument_id)
+        self.register_indicator_for_bars(self.config.bar_type, self.fast_ema)
+        self.register_indicator_for_bars(self.config.bar_type, self.slow_ema)
+        self.subscribe_bars(self.config.bar_type)        # 5-min INTERNAL@1-min EXTERNAL
+
+    def on_bar(self, bar: Bar):
+        if not self.indicators_initialized(): return
+        fast_above = self.fast_ema.value > self.slow_ema.value
+        if self._prev_fast_above is None:
+            self._prev_fast_above = fast_above; return
+        crossed_up   = fast_above and not self._prev_fast_above
+        crossed_down = (not fast_above) and self._prev_fast_above
+        self._prev_fast_above = fast_above
+        if not (crossed_up or crossed_down): return
+        if not self.portfolio.is_flat(self.config.instrument_id):
+            return                                       # let active bracket finish
+        side = OrderSide.BUY if crossed_up else OrderSide.SELL
+        submit_bracket(self, self.instrument, side, float(bar.close))
+</code></pre>
+
+<h4>The custom-aggregation strategy</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-14 (excerpt)</div>
+<pre><code>class CustomAggEmaCrossStrategy(Strategy):
+    def on_start(self):
+        self.instrument = self.cache.instrument(self.config.instrument_id)
+        self.subscribe_bars(self.config.bar_type)        # 1-min EXTERNAL
+
+    def on_bar(self, bar: Bar):
+        b5 = self._aggregator.on_bar(bar)                # buffer 1-min, maybe emit 5-min
+        if b5 is None: return
+        self.fast_ema.update_raw(b5.close)               # manual EMA updates
+        self.slow_ema.update_raw(b5.close)
+        if not (self.fast_ema.initialized and self.slow_ema.initialized): return
+        # ... same cross-detect + is_flat + submit_bracket as internal ...
+</code></pre>
+
+<div class="callout">
+  <strong><code>submit_bracket</code> is OUR helper, not a Nautilus method.</strong> Inside, it calls Nautilus's real method <code>strategy.submit_order_list(order_list)</code> — the bracket-aware sibling of <code>submit_order(order)</code>. Use <code>submit_order</code> for a single order; use <code>submit_order_list</code> for a linked group (an <code>OrderList</code> produced by <code>order_factory.bracket(...)</code>).
+</div>
+
+<!-- ============================================================ -->
+<h2 id="sec-7">7. Order routing pipeline</h2>
+
+<div class="simple">
+When the strategy says "buy", the order doesn't go straight to the matching engine. It goes through a chain: first a routing layer, then a risk checker, then a venue adapter, then finally the simulated exchange where the actual fill happens. Each layer has one job — and importantly, every step is the same in live trading; only the final adapter swaps from "simulated exchange" to "real broker".
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> <code>self.submit_order(order)</code> (or <code>submit_order_list</code>) puts a <code>SubmitOrder</code> command onto the in-process message bus. The <code>ExecutionEngine</code> consumes it, hands it to the <code>RiskEngine</code> (which we configure with <code>bypass=True</code> so it forwards without checking), which hands it to the <code>BacktestExecClient</code>, which hands it to the <code>SimulatedExchange</code>'s <code>MatchingEngine</code>. The matching engine maintains a working-order book; market orders fill on the next bar, limit/stop orders sit queued until their condition is met. Fill events flow back via the same bus to the strategy's <code>on_order_filled</code> / <code>on_position_opened</code> handlers.
+</div>
+
+<h4>The pipeline diagram</h4>
+<pre><code>strategy.submit_order(order)             # or submit_order_list for brackets
+        │  non-blocking — returns immediately
+        ▼
+┌────────────────────────────┐
+│  ExecutionEngine           │  wraps as SubmitOrder command, routes
+└────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────┐
+│  RiskEngine                │  pre-trade checks (bypass=True → forwards)
+└────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────┐
+│  BacktestExecClient        │  venue adapter (in live: BinanceExecClient, IBExecClient, …)
+└────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────┐
+│  SimulatedExchange  →  MatchingEngine       │
+│   - working-order book                       │
+│   - consumes 1-min BID/ASK bars              │
+│   - simulates fills/triggers per bar         │
+└─────────────────────────────────────────────┘
+        │
+        ▼  fill / cancel / reject events flow back
+strategy.on_order_filled / on_position_opened / …
+</code></pre>
+
+<div class="callout-ok">
+  <strong>Live vs backtest:</strong> only the last box changes. Same strategy code, same submission API, same upstream pipeline — in live trading <code>BacktestExecClient</code> + <code>SimulatedExchange</code> are replaced by a live execution client and the real venue. That's the whole reason for the layered design.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="sec-8">8. The two clocks</h2>
+
+<div class="simple">
+Two completely different rhythms are running in parallel during a backtest. The strategy "thinks" every 5 minutes — only at boundary bars. The matching engine "thinks" every 1 minute — checking if any working order (especially SL/TP) should fire. So when the strategy is asleep between two 5-minute wake-ups, the matching engine is still wide awake and can quietly close your position before you ever see another bar.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> The strategy's <code>on_bar</code> fires on the cadence of whatever <code>BarType</code> it subscribed to (5-min in our case). The matching engine inside <code>SimulatedExchange</code> consumes every record in <code>add_data()</code> — which, for our FX setup, is the full 1-min BID+ASK stream. Each 1-min bar triggers the matching engine to (a) fill any pending market orders at the bar's open, (b) check each working stop/limit order's trigger against the bar's <code>[low, high]</code> range and fire it if touched. This happens whether the strategy is currently awake or not.
+</div>
+
+<table>
+  <thead><tr><th>Clock</th><th>Cadence</th><th>What runs on it</th></tr></thead>
+  <tbody>
+    <tr><td><strong>5-min decision clock</strong></td><td>22:00, 22:05, 22:10, …</td><td>Strategy's <code>on_bar</code>, EMA cross detection, <code>submit_bracket</code> calls</td></tr>
+    <tr><td><strong>1-min execution clock</strong></td><td>22:00, 22:01, 22:02, 22:03, …</td><td>Matching engine's per-bar checks: entry fills, SL/TP triggers, position-close events</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="sec-9">9. Order lifecycle</h2>
+
+<div class="simple">
+A bracket order has three pieces — an entry, a stop-loss, and a take-profit. The entry is a "buy at next price" market order that <em>always</em> fills on the very next bar, no conditions. Once it fills, the SL and TP become active and wait. The matching engine then checks every following 1-minute bar's price range against the SL and TP levels; the first one that gets touched fires immediately on that bar, and cancels the other one.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> An <code>OrderList</code> from <code>order_factory.bracket(...)</code> contains three orders linked under <code>ContingencyType.OUO</code>. The entry (<code>OrderType.MARKET</code> by default) fills on the next bar at that bar's open price — unconditional because market orders have no price predicate. Once the entry fills, the SL (<code>OrderType.STOP_MARKET</code>) and TP (<code>OrderType.LIMIT</code>) children transition from dormant to <em>working</em>. On every subsequent 1-min bar, the matching engine checks: does <code>[low, high]</code> contain the SL trigger price? Does it contain the TP price? If either is touched, the matching engine fills it <em>on that same bar</em> at the trigger/limit price (not the next bar — that's the difference from market orders), then auto-cancels the sibling via the OUO contingency.
+</div>
+
+<h4>Two fill rules, side by side</h4>
+<table>
+  <thead><tr><th>Order type</th><th>When does it fill?</th><th>At what price?</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Market</strong> (the entry)</td><td><strong>Next bar</strong> after submission — unconditional</td><td>Next bar's open price (ASK side for BUY, BID side for SELL)</td></tr>
+    <tr><td><strong>Stop-market</strong> (SL)</td><td><strong>Same bar</strong> whose <code>[low, high]</code> range contains the stop price</td><td>At the stop trigger price (simplification — real venues can have stop slippage)</td></tr>
+    <tr><td><strong>Limit</strong> (TP)</td><td><strong>Same bar</strong> whose <code>[low, high]</code> range contains the limit price</td><td>At the limit price</td></tr>
+  </tbody>
+</table>
+
+<h4>Concrete timeline of one bracket</h4>
+<pre><code>22:00  strategy.on_bar(5-min bar) → cross detected
+       → submit_bracket(BUY entry, SL=1.0980, TP=1.1040)
+       → matching engine queues 3 orders. Entry is "pending fill".
+         SL and TP are dormant (waiting for entry to activate them).
+
+22:01  matching engine processes 22:01 1-min bar
+       → fills the market entry at 22:01's open = 1.1000      ← ENTRY FILL
+       → position OPEN (long 100k EUR)
+       → SL and TP become WORKING
+
+22:02  matching engine: 22:02 range [1.1005, 1.1015]. Neither trigger touched. Wait.
+22:03  matching engine: range [1.1008, 1.1020]. No trigger.
+22:04  matching engine: range [1.1005, 1.1025]. No trigger.
+22:05  strategy wakes (5-min bar). Cross-check → is_flat? NO → skip.
+22:06  matching engine: range [1.1020, 1.1041]. TP=1.1040 is inside!
+       → fires TP at 1.1040.                                   ← EXIT FILL
+       → OUO cancels SL.
+       → position CLOSED. Strategy is now flat (but doesn't know yet).
+
+22:10  strategy wakes. Cross check → is_flat? YES → can submit a new bracket.
+</code></pre>
+
+<div class="callout">
+  <strong>Three timestamps to keep distinct.</strong> Strategy submits at <code>T</code>; market entry fills at <code>T+1</code>'s open and <em>that</em> is when the position opens; SL or TP closes the position whenever its trigger is first touched (could be any later 1-min bar).
+</div>
+
+<div class="callout-warn">
+  <strong>Why <code>is_flat</code> is checked at the top of <code>on_bar</code>, not after <code>submit_order</code>.</strong> <code>submit_order</code> is non-blocking — it returns instantly, before any fill. So if you called <code>is_flat</code> immediately after submitting, it would still report the pre-submission state. The portfolio state only updates when the fill event flows back through the message bus, which happens on the next bar at the earliest. So the right pattern is: at the start of each <code>on_bar</code>, ask "what's my state right now?" — the answer reflects everything that filled before this bar.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="sec-10">10. Worked example: 39 vs 40 brackets</h2>
+
+<div class="simple">
+We ran the exact same strategy on the exact same data through both aggregators. The internal path made 39 trades; the custom path made 40. The aggregated 5-min bars themselves were identical — same open/high/low/close. The reason for the extra trade is much more subtle: it's that 1-minute delay in when the custom aggregator hands each bar to the strategy. That tiny lag changes the price at which entries fill, which changes where SL/TP get placed, which changes when positions close, which changes whether the strategy is in or out of a trade at some <em>later</em> cross. Across 40 entries over a month, the net imbalance lands at +1 for custom.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> The custom aggregator's <code>flush()</code> result is discarded in <code>on_stop</code> (we don't run cross-detection on the trailing partial), so the trailing partial is NOT the source — the fills count <code>80 = 40 × 2</code> proves every bracket completed normally with both entry and exit fills. The cause is the cascade: <em>delivery lag → different entry fill bar → different fill price → different absolute SL/TP price levels → SL/TP triggers fire on different 1-min bars → position-close time differs → <code>is_flat</code> state differs at some future cross detection → one path takes a trade the other skips</em>. Over many crosses the timing perturbations don't cancel perfectly; this run happens to net +1 for custom.
+</div>
+
+<h4>Run summary</h4>
+<table>
+  <thead><tr><th>Metric</th><th>Internal path</th><th>Custom path</th></tr></thead>
+  <tbody>
+    <tr><td>Brackets submitted</td><td class="center">39</td><td class="center">40</td></tr>
+    <tr><td>Order fills</td><td class="center">78</td><td class="center">80</td></tr>
+    <tr><td>Positions closed</td><td class="center">39</td><td class="center">40</td></tr>
+    <tr><td>Account events</td><td class="center">315</td><td class="center">323</td></tr>
+    <tr><td>OHLCV of overlapping 5-min bars</td><td colspan="2" class="center">Bit-identical (max abs diff = 0)</td></tr>
+  </tbody>
+</table>
+
+<h4>Concrete numerical example of the cascade</h4>
+<pre><code>Cross #N fires for some window (T-5, T].
+
+INTERNAL                                          CUSTOM
+─────────                                         ──────
+T      Strategy receives 5-min bar inline.        T      Strategy doesn't see it yet
+       → submit_bracket(BUY)                              (custom emits on T+1).
+T+1    Entry fills at T+1's open  = 1.1000        T+1    Custom emits 5-min bar.
+       SL = 1.0980, TP = 1.1040                          → submit_bracket(BUY)
+                                                  T+2    Entry fills at T+2's open = 1.1002
+                                                         SL = 1.0982, TP = 1.1042
+
+…price action moves up…
+T+35   bar range touches TP=1.1040 → fires        T+38   bar range touches TP=1.1042 → fires
+       position closed                                    (took 3 more minutes since
+       strategy is FLAT from T+35                          TP is 2 pips higher)
+                                                         position closed
+                                                         strategy is FLAT from T+38
+
+Next cross fires at T+40 (5-min boundary):
+   internal: is_flat? YES (since T+35) → enters bracket  ← (in our actual run, more often)
+   custom:   is_flat? YES (since T+38) → enters bracket    custom is the one still in position
+                                                            and skips, while internal takes it
+                                                            — net +1 for custom over the month.
+</code></pre>
+
+<div class="callout-ok">
+  <strong>Sanity test if you want to confirm.</strong> Remove the <code>flush()</code> call from <code>CustomAggEmaCrossStrategy.on_stop</code> — the bracket count will still be 40, not 39. That proves the trailing partial isn't contributing.
+</div>
+
+<div class="callout-warn">
+  <strong>If you want the two paths to produce identical bracket counts:</strong> modify <code>FiveMinAggregator.on_bar</code> to also call <code>_close_window()</code> immediately when a bar lands exactly on a boundary (<code>ts == bucket_close</code>), instead of waiting for the next bar to trigger it. That mirrors Nautilus's "fire timer at the boundary bar" semantics and eliminates the 1-min delivery lag.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="sec-11">11. <code>publish_data</code> / <code>on_data</code> — when (and when not) to use them</h2>
+
+<div class="simple">
+Nautilus has a "message bus" — components talk to each other by publishing typed messages and subscribing to types they care about. Bars and quotes already use this internally; you get them via <code>on_bar</code> and <code>on_quote_tick</code>. If you have <em>custom</em> data (something Nautilus doesn't natively know about — a market-regime label, an alternative data feed, a custom aggregated bar with extra features), you publish it via <code>publish_data</code> and other strategies subscribe to receive it via <code>on_data</code>.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> <code>Actor.publish_data(data_type, data)</code> publishes a <code>Data</code> subclass instance on the message bus under a custom-data topic. <code>Actor.subscribe_data(DataType(cls), instrument_id=…)</code> registers <code>self.handle_data</code> for that topic, which forwards to <code>on_data</code>. Bars, quotes, trades, order book events all have their own typed channels (<code>subscribe_bars</code> + <code>on_bar</code>, etc.) — don't shoehorn them through <code>publish_data</code>. For plain scalar values use <code>publish_signal(name, value, ts_event)</code> + <code>subscribe_signal(name)</code> + <code>on_signal(signal)</code> — it auto-generates a <code>Signal*</code> data class for you.
+</div>
+
+<h4>When to use</h4>
+<table>
+  <thead><tr><th>Scenario</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Cross-strategy / cross-actor sharing</td><td>A <code>RegimeDetectorActor</code> publishes <code>MarketRegime</code> snapshots; multiple strategies subscribe. Single producer, many consumers.</td></tr>
+    <tr><td>Custom data clients / adapters</td><td>An adapter pulls funding rates, news events, on-chain metrics — emits them as a custom <code>Data</code> type for strategies to consume.</td></tr>
+    <tr><td>Replaying alt-data in a backtest</td><td><code>engine.add_data(custom_data_list)</code> interleaves custom <code>Data</code> records with bars/ticks in time order. Subscribed strategies receive them via <code>on_data</code>.</td></tr>
+  </tbody>
+</table>
+
+<h4>When NOT to use</h4>
+<table>
+  <thead><tr><th>Scenario</th><th>Use instead</th></tr></thead>
+  <tbody>
+    <tr><td>Inside one strategy with no other consumer</td><td>Just call a private helper method (e.g. <code>self._on_5min_bar(b5)</code>) — no bus overhead, no <code>Data</code> subclass needed</td></tr>
+    <tr><td>Built-in market data (bars, quotes, trades, book events)</td><td>Use the typed channel (<code>subscribe_bars</code>/<code>on_bar</code>, etc.)</td></tr>
+    <tr><td>Plain scalar values (int / float / str)</td><td>Use <code>publish_signal</code>/<code>subscribe_signal</code> — auto-generates the <code>Data</code> class for you</td></tr>
+  </tbody>
+</table>
+
+<h4>How it would fit our notebook</h4>
+<p>In <code>CustomAggEmaCrossStrategy</code>, the strategy both produces and consumes <code>Bar5MinFeatures</code> — same actor, single consumer. So we just return the dataclass from <code>on_bar</code> and act on it directly. No bus traffic needed.</p>
+
+<p>But if you later wanted a second strategy in the same engine (say a portfolio-overlay watching multiple FX pairs' RSI) to consume the same 5-min features, the refactor would be:</p>
+<ol>
+  <li>Make <code>Bar5MinFeatures</code> subclass <code>nautilus_trader.core.data.Data</code> with <code>ts_event</code> / <code>ts_init</code> properties.</li>
+  <li>After <code>_close_window()</code> in the aggregator, call <code>self.publish_data(DataType(Bar5MinFeatures), b5)</code>.</li>
+  <li>The second strategy adds <code>self.subscribe_data(DataType(Bar5MinFeatures), instrument_id=...)</code> in <code>on_start</code> and implements <code>on_data(self, data: Bar5MinFeatures)</code>.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="sec-12">12. The 6 reports</h2>
+
+<div class="simple">
+After each strategy run we ask the engine for three standard CSVs: every fill that happened, every position that was opened/closed, and the running account balance log. We do this twice (internal + custom), so we get six files total. They live under <code>reports_aggregator_demo/</code>.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> <code>engine.trader.generate_order_fills_report()</code>, <code>generate_positions_report()</code>, and <code>generate_account_report(venue)</code> return <code>pandas.DataFrame</code> objects. These are the same helpers used by the project's main <code>core/backtest_runner.py</code> — the schema lines up with the rest of the codebase.
+</div>
+
+<h4>What's in each file</h4>
+<table>
+  <thead><tr><th>File</th><th>One row =</th><th>Useful columns</th></tr></thead>
+  <tbody>
+    <tr><td><code>{prefix}_order_fills.csv</code></td><td>One fill event (entry or exit)</td><td><code>client_order_id</code>, <code>order_side</code>, <code>order_type</code>, <code>quantity</code>, <code>last_px</code>, <code>ts_event</code></td></tr>
+    <tr><td><code>{prefix}_positions.csv</code></td><td>One closed position lifecycle</td><td><code>position_id</code>, <code>entry</code>, <code>exit</code>, <code>realized_pnl</code>, <code>duration_ns</code></td></tr>
+    <tr><td><code>{prefix}_account.csv</code></td><td>One account state snapshot at a balance-changing event</td><td><code>account_id</code>, <code>currency</code>, <code>balance_total</code>, <code>ts_event</code></td></tr>
+  </tbody>
+</table>
+
+<h4>The report writer</h4>
+<div class="filebox">aggregator_strategy_demo.ipynb · cell-16</div>
+<pre><code>def _save_reports(engine, prefix, venue):
+    fills = engine.trader.generate_order_fills_report()
+    fills.to_csv(REPORTS_DIR / f"{prefix}_order_fills.csv")
+
+    positions = engine.trader.generate_positions_report()
+    positions.to_csv(REPORTS_DIR / f"{prefix}_positions.csv")
+
+    account = engine.trader.generate_account_report(venue)
+    account.to_csv(REPORTS_DIR / f"{prefix}_account.csv")
+</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="sec-13">13. Entry control — order types, time-in-force, time-based triggers</h2>
+
+<div class="simple">
+In our notebook we used the simplest possible entry: "buy at next market price." But Nautilus supports far more. You can vary three independent dimensions: <em>what kind</em> of order (market, limit, stop, etc.), <em>how long</em> it lives (good-til-cancelled, good-til-date, immediate-or-cancel, etc.), and <em>when</em> you actually submit it (right now, after a 10-second delay, at 09:30 every morning, etc.). And the bracket factory can take any of those non-market entries with SL+TP still attached.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> Entry orders are <code>Order</code> objects produced by <code>OrderFactory</code> methods on the strategy (<code>self.order_factory.market(...)</code>, <code>.limit(...)</code>, <code>.stop_market(...)</code>, etc.). All accept a <code>TimeInForce</code> enum and an optional <code>expire_time: datetime</code>. Time-based scheduling uses the strategy's per-instance <code>Clock</code> (<code>self.clock.set_time_alert(name, alert_time, callback)</code> or <code>set_timer(name, interval, callback)</code>); callbacks fire in the same engine event loop. <code>order_factory.bracket(...)</code> accepts <code>entry_order_type=OrderType.LIMIT</code> (or <code>STOP_MARKET</code>, etc.) plus <code>entry_price</code> / <code>entry_trigger_price</code>, letting you combine non-market entries with SL+TP children under the same OUO contingency.
+</div>
+
+<h3 id="sec-13-1">13.1 Order type — controls <em>at what price</em> the entry fills</h3>
+
+<table>
+  <thead><tr><th>Order type</th><th>When does it fill?</th><th>Typical use</th></tr></thead>
+  <tbody>
+    <tr><td><code>MARKET</code> (default)</td><td>Next bar, unconditional</td><td>"Get me in NOW, I don't care about a few pips of slippage"</td></tr>
+    <tr><td><code>LIMIT</code></td><td>When price reaches your specified level (or better)</td><td>Patient buy — "only enter if I get filled at 1.0995 or lower"</td></tr>
+    <tr><td><code>STOP_MARKET</code></td><td>When price crosses the trigger; fills as market once triggered</td><td>Breakout entry — "BUY if price breaks above 1.1050"</td></tr>
+    <tr><td><code>STOP_LIMIT</code></td><td>Trigger fires, then a limit order at a separate price is placed</td><td>Breakout with slippage cap — trigger at 1.1050, max fill 1.1053</td></tr>
+    <tr><td><code>MARKET_IF_TOUCHED</code> (MIT)</td><td>Touches the level → fills as market</td><td>Buy-on-dip — "BUY market when price touches 1.0950"</td></tr>
+    <tr><td><code>LIMIT_IF_TOUCHED</code> (LIT)</td><td>Touches a trigger → places a limit order</td><td>Buy-on-dip with limit-price discipline</td></tr>
+  </tbody>
+</table>
+
+<div class="filebox">example — limit entry</div>
+<pre><code># LIMIT entry — wait for price to come to us
+order = self.order_factory.limit(
+    instrument_id=self.config.instrument_id,
+    order_side=OrderSide.BUY,
+    quantity=self.instrument.make_qty(Decimal("100000")),
+    price=self.instrument.make_price(1.0995),     # only fill at 1.0995 or lower
+    time_in_force=TimeInForce.GTC,
+)
+self.submit_order(order)
+</code></pre>
+
+<div class="filebox">example — stop-market breakout entry</div>
+<pre><code># STOP_MARKET entry — breakout buy
+order = self.order_factory.stop_market(
+    instrument_id=self.config.instrument_id,
+    order_side=OrderSide.BUY,
+    quantity=self.instrument.make_qty(Decimal("100000")),
+    trigger_price=self.instrument.make_price(1.1050),   # fires when price >= 1.1050
+    time_in_force=TimeInForce.GTC,
+)
+self.submit_order(order)
+</code></pre>
+
+<div class="filebox">example — bracket where the entry itself is a limit (not market)</div>
+<pre><code>order_list = self.order_factory.bracket(
+    instrument_id=...,
+    order_side=OrderSide.BUY,
+    quantity=...,
+    entry_order_type=OrderType.LIMIT,           # ← non-market entry
+    entry_price=self.instrument.make_price(1.0995),
+    sl_trigger_price=self.instrument.make_price(1.0975),
+    tp_price=self.instrument.make_price(1.1035),
+    time_in_force=TimeInForce.GTC,
+)
+self.submit_order_list(order_list)
+</code></pre>
+
+<h3 id="sec-13-2">13.2 Time-in-force — controls <em>how long</em> the order lives</h3>
+
+<table>
+  <thead><tr><th>TIF</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td><code>GTC</code> (default)</td><td>Good-til-cancelled — sits forever until filled or cancelled</td></tr>
+    <tr><td><code>GTD</code></td><td>Good-til-date — auto-cancels at <code>expire_time</code></td></tr>
+    <tr><td><code>IOC</code></td><td>Immediate-or-cancel — fill what you can right now, cancel the rest</td></tr>
+    <tr><td><code>FOK</code></td><td>Fill-or-kill — fill the whole quantity right now or cancel everything</td></tr>
+    <tr><td><code>DAY</code></td><td>Expires at end of trading session</td></tr>
+  </tbody>
+</table>
+
+<div class="filebox">example — limit that auto-cancels after 30 min</div>
+<pre><code>order = self.order_factory.limit(
+    ...,
+    time_in_force=TimeInForce.GTD,
+    expire_time=self.clock.utc_now() + pd.Timedelta(minutes=30),
+)
+</code></pre>
+
+<h3 id="sec-13-3">13.3 Time-delayed entry via the strategy clock</h3>
+
+<div class="simple">
+"Enter 10 seconds after the signal" or "submit a buy at 09:30 every morning" doesn't fit any single order type — you implement it by detecting the signal in <code>on_bar</code>, then asking the clock to fire a callback at a future time. The callback does the actual <code>submit_order</code>.
+</div>
+
+<div class="filebox">example — delay entry by 10 seconds</div>
+<pre><code>def on_bar(self, bar):
+    # detect signal here, but don't submit yet
+    if cross_detected and self.portfolio.is_flat(...):
+        self._last_close = float(bar.close)
+        self.clock.set_time_alert(
+            name="delayed_entry",
+            alert_time=self.clock.utc_now() + pd.Timedelta(seconds=10),
+            callback=self._submit_delayed_entry,
+        )
+
+def _submit_delayed_entry(self, event):
+    # Fires when the alert time arrives
+    submit_bracket(self, self.instrument, OrderSide.BUY, self._last_close)
+</code></pre>
+
+<p>Other clock methods you'll use:</p>
+<ul>
+  <li><code>set_timer(name, interval, callback)</code> — recurring tick (e.g. evaluate every 30 seconds)</li>
+  <li><code>cancel_timer(name)</code> / <code>cancel_time_alert(name)</code> — kill a pending schedule</li>
+  <li><code>set_time_alert_ns(..., alert_time_ns=...)</code> — same idea but using nanosecond timestamps</li>
+</ul>
+
+<div class="callout-warn">
+  <strong>Backtest caveat.</strong> In a backtest the clock advances in lockstep with the data, so a 10-second delay against 1-min bar data has no effect — the next bar is 60 seconds later, not 10. Sub-bar delays only matter when you replay quote/trade ticks (granular enough to advance the clock between scheduled callback time and the next data event) or in live trading. With 1-min bar data, the smallest meaningful schedule is the next bar.
+</div>
+
+<h3 id="sec-13-4">13.4 Multi-bar / conditional entry</h3>
+
+<div class="simple">
+"Enter only after 3 consecutive bars above a level" or "wait for confirmation from a higher timeframe" — no special API for this; just keep a counter or flag in <code>__init__</code> and update it across bars, gating <code>submit_bracket</code> on the predicate.
+</div>
+
+<div class="filebox">example — require 3 consecutive bars above a level</div>
+<pre><code>def __init__(self, config):
+    ...
+    self._consecutive_above = 0
+
+def on_bar(self, bar):
+    if float(bar.close) &gt; THRESHOLD:
+        self._consecutive_above += 1
+    else:
+        self._consecutive_above = 0
+
+    if self._consecutive_above &gt;= 3 and self.portfolio.is_flat(...):
+        submit_bracket(self, self.instrument, OrderSide.BUY, float(bar.close))
+</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="sec-14">14. Exit control — beyond SL/TP</h2>
+
+<div class="simple">
+Brackets give you automatic SL/TP exits, which covers most cases. But you can supplement or replace them with: closing manually on a signal, reversing direction on an opposite signal, scheduling a daily square-off at a fixed time, exiting on an indicator extreme, trailing the stop as price moves in your favour, moving the stop to break-even once a profit threshold is hit, or simply closing after N bars regardless of price.
+</div>
+
+<div class="callout-tech">
+  <strong>Technically:</strong> Position closes flow through the same engine pipeline as entries — they're just orders. <code>self.close_position(position)</code> and <code>self.close_all_positions(instrument_id)</code> internally generate opposite-side market orders sized to net the position to zero. Trailing offsets are available natively via the bracket factory (<code>sl_trailing_offset</code>, <code>sl_trailing_offset_type</code>); more complex exit logic (move-to-cost, bar-count, trailing with custom step) is implemented strategy-side by cancelling and replacing the working SL order each bar. The project's <code>core/managed_strategy.py</code> implements production-grade versions of trailing-SL, move-to-cost, and timed square-off — refer there for full code.
+</div>
+
+<h3 id="sec-14-1">14.1 Manual close</h3>
+
+<div class="filebox">closing on any condition</div>
+<pre><code>def on_bar(self, bar):
+    if some_exit_condition_met:
+        self.close_all_positions(self.config.instrument_id)
+        # OR for a specific position only:
+        # for pos in self.cache.positions_open(instrument_id=self.config.instrument_id):
+        #     self.close_position(pos)
+</code></pre>
+
+<p>Internally these submit opposite-side market orders sized to bring the net position back to zero. In <code>NETTING</code> mode they net cleanly to flat.</p>
+
+<h3 id="sec-14-2">14.2 Reverse on opposite signal</h3>
+
+<div class="simple">
+This is the pattern the project's existing <code>strategies/ema_cross.py</code> uses — when the EMA cross flips, close the current position and immediately open a fresh one in the opposite direction.
+</div>
+
+<div class="filebox">strategies/ema_cross.py — reversal pattern</div>
+<pre><code># Currently long; fast EMA just crossed below slow
+if self.fast_ema.value &lt; self.slow_ema.value:
+    if self.portfolio.is_net_long(self.config.instrument_id):
+        self.close_all_positions(self.config.instrument_id)   # close the long
+        self._submit_order(OrderSide.SELL)                    # open a fresh short
+</code></pre>
+
+<p>In <code>NETTING</code> mode you can also just submit a SELL of <code>qty = 2 × position_qty</code> to reverse in one order, but the two-step form is clearer.</p>
+
+<h3 id="sec-14-3">14.3 Time-based exit ("square off at HH:MM")</h3>
+
+<div class="simple">
+"Close everything at 15:15 every day, no questions asked." Useful for intraday strategies that don't want to carry overnight risk.
+</div>
+
+<div class="filebox">daily square-off via clock alert</div>
+<pre><code>def on_start(self):
+    ...
+    # Set a daily alert at 15:15 local time to flatten everything
+    self.clock.set_time_alert(
+        name="daily_squareoff",
+        alert_time=self._next_squareoff_time(),
+        callback=self._on_squareoff,
+    )
+
+def _on_squareoff(self, event):
+    self.cancel_all_orders(self.config.instrument_id)
+    self.close_all_positions(self.config.instrument_id)
+    # Re-arm for tomorrow
+    self.clock.set_time_alert("daily_squareoff", self._next_squareoff_time(), self._on_squareoff)
+</code></pre>
+
+<p>The project already implements this — see <code>core/managed_strategy.py</code>, the <code>squareoff_minute</code> / <code>squareoff_tz</code> config fields.</p>
+
+<h3 id="sec-14-4">14.4 Indicator-based exit</h3>
+
+<div class="simple">
+Close when a separate indicator gives an exit signal — e.g. RSI saying "overbought" closes a long even if the SL/TP haven't been hit yet.
+</div>
+
+<div class="filebox">example — RSI extreme exit</div>
+<pre><code>def on_bar(self, bar):
+    if not self.portfolio.is_flat(self.config.instrument_id):
+        # In-position: check separate exit conditions
+        if self.rsi.value &gt; 70 and self.portfolio.is_net_long(...):
+            self.close_all_positions(self.config.instrument_id)
+        elif self.rsi.value &lt; 30 and self.portfolio.is_net_short(...):
+            self.close_all_positions(self.config.instrument_id)
+        return
+    # else: flat → look for entries
+</code></pre>
+
+<h3 id="sec-14-5">14.5 Trailing stop — move SL with price as it moves in your favour</h3>
+
+<div class="simple">
+Lock in profits as price moves. Nautilus has built-in support — just pass a trailing offset to the bracket factory. You can also do it manually by cancelling and replacing the SL order each bar.
+</div>
+
+<div class="filebox">built-in via the bracket factory</div>
+<pre><code>order_list = self.order_factory.bracket(
+    instrument_id=...,
+    order_side=OrderSide.BUY,
+    quantity=...,
+    sl_trailing_offset=Decimal("20"),                         # 20 pips
+    sl_trailing_offset_type=TrailingOffsetType.PRICE,         # or BASIS_POINTS, TICKS
+    tp_price=self.instrument.make_price(1.1040),
+)
+</code></pre>
+
+<p>Manual variant — cancel the current SL when price has moved N pips in your favour, then submit a new SL at the new level. Production version with <code>trailing_sl_step</code> / <code>trailing_sl_offset</code> lives in <code>core/managed_strategy.py</code>.</p>
+
+<h3 id="sec-14-6">14.6 Move-to-cost / break-even stop</h3>
+
+<div class="simple">
+After the position is in profit by some threshold, move the SL up to the entry price so the worst case becomes "flat" instead of a loss. Many traders consider this essential risk management.
+</div>
+
+<div class="filebox">example — move SL to entry after threshold</div>
+<pre><code>def on_bar(self, bar):
+    if not self.portfolio.is_flat(self.config.instrument_id):
+        positions = list(self.cache.positions_open(instrument_id=self.config.instrument_id))
+        if not positions: return
+        pos = positions[0]
+        unrealised_pnl_pips = (float(bar.close) - float(pos.avg_px_open)) / PIP
+        if unrealised_pnl_pips &gt; MOVE_SL_THRESHOLD_PIPS and not self._moved_to_cost:
+            # Cancel old SL, place new one at entry price
+            for working in self.cache.orders_working(instrument_id=...):
+                if working.order_type == OrderType.STOP_MARKET:
+                    self.cancel_order(working)
+            new_sl = self.order_factory.stop_market(
+                ...,
+                trigger_price=self.instrument.make_price(float(pos.avg_px_open)),
+                time_in_force=TimeInForce.GTC,
+                reduce_only=True,
+            )
+            self.submit_order(new_sl)
+            self._moved_to_cost = True
+</code></pre>
+
+<p>Production version is in <code>core/managed_strategy.py</code> under the <code>move_sl_enabled</code> / <code>move_sl_safety_sec</code> / <code>move_sl_action</code> config block.</p>
+
+<h3 id="sec-14-7">14.7 Bar-count / time-in-position exit</h3>
+
+<div class="simple">
+Close after N bars regardless of price. Useful when you want a hard time cap on how long capital is committed to any one trade.
+</div>
+
+<div class="filebox">example — close after 20 bars in position</div>
+<pre><code>def on_bar(self, bar):
+    if not self.portfolio.is_flat(...):
+        self._bars_in_position += 1
+        if self._bars_in_position &gt;= 20:                # exit after 20 5-min bars
+            self.close_all_positions(self.config.instrument_id)
+            self._bars_in_position = 0
+        return
+</code></pre>
+
+<h3 id="sec-14-8">14.8 Combining bracket SL/TP with early exit</h3>
+
+<div class="simple">
+You can keep the bracket's SL/TP as your safety net <em>and</em> exit early on a different signal. Just cancel the bracket children and close the position when the early-exit fires.
+</div>
+
+<div class="filebox">example — early exit on opposite EMA cross</div>
+<pre><code>def on_bar(self, bar):
+    # Already in a bracket position — check for an EARLY exit signal
+    if not self.portfolio.is_flat(...):
+        if self.fast_ema.value &lt; self.slow_ema.value and self.portfolio.is_net_long(...):
+            # Cross back down — exit BEFORE SL/TP fires
+            self.cancel_all_orders(...)        # cancel pending SL + TP children
+            self.close_all_positions(...)
+        return
+    # else: flat → look for entries (existing cross detection)
+</code></pre>
+
+<h3 id="sec-14-cheatsheet">Cheatsheet</h3>
+
+<table>
+  <thead><tr><th>What you want</th><th>Mechanism</th></tr></thead>
+  <tbody>
+    <tr><td>Patient entry at a price level</td><td><code>order_factory.limit(...)</code></td></tr>
+    <tr><td>Breakout entry</td><td><code>order_factory.stop_market(...)</code> with <code>trigger_price</code></td></tr>
+    <tr><td>Limit/stop entry with SL+TP attached</td><td><code>order_factory.bracket(entry_order_type=...)</code></td></tr>
+    <tr><td>Auto-cancel after N minutes</td><td><code>TimeInForce.GTD</code> + <code>expire_time</code></td></tr>
+    <tr><td>Submit at a future time</td><td><code>self.clock.set_time_alert(name, alert_time, callback)</code></td></tr>
+    <tr><td>Recurring evaluation</td><td><code>self.clock.set_timer(name, interval, callback)</code></td></tr>
+    <tr><td>Multi-bar confirmation</td><td>Counter in <code>__init__</code>, updated in <code>on_bar</code>, gate <code>submit_bracket</code></td></tr>
+    <tr><td>Daily square-off</td><td><code>set_time_alert</code> + <code>close_all_positions</code> in the callback</td></tr>
+    <tr><td>Reverse on opposite signal</td><td><code>close_all_positions()</code> + <code>_submit_order(opposite_side)</code> (see <code>strategies/ema_cross.py</code>)</td></tr>
+    <tr><td>Indicator exit (RSI, etc.)</td><td>Check condition at top of <code>on_bar</code>, call <code>close_all_positions</code></td></tr>
+    <tr><td>Trailing stop</td><td>Bracket <code>sl_trailing_offset=...</code>, or manual cancel+replace SL (see <code>core/managed_strategy.py</code>)</td></tr>
+    <tr><td>Move SL to break-even</td><td>Cancel current SL, submit new SL at entry price once PnL &gt; threshold (see <code>core/managed_strategy.py</code> <code>move_sl_*</code> config)</td></tr>
+    <tr><td>Time-in-position exit</td><td>Increment <code>_bars_in_position</code>, close when threshold hit</td></tr>
+    <tr><td>Bracket as safety + early exit on signal</td><td>Add early-exit check inside <code>on_bar</code> with <code>cancel_all_orders</code> + <code>close_all_positions</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="sec-15">15. Gotchas we hit (and how to avoid them)</h2>
+
+<table>
+  <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>ValueError: invalid token: '1-MINUTE' at position 5</code> when parsing a composite <code>BarType</code></td>
+      <td>Included the price type on the right side of <code>@</code>: <code>...-INTERNAL@1-MINUTE-ASK-EXTERNAL</code></td>
+      <td>Drop the price type from the right side: <code>...-INTERNAL@1-MINUTE-EXTERNAL</code></td>
+    </tr>
+    <tr>
+      <td><code>OrderRejected reason='no market for EURUSD.FOREX_MS'</code> — every entry rejected, SL/TP cascade-reject</td>
+      <td>Loaded only ASK 1-min bars; FX matching engine needs both BID and ASK to construct quotes</td>
+      <td>Load both sides, pass <code>ALL_BARS = BARS_1MIN_ASK + BARS_1MIN_BID</code> to <code>engine.add_data()</code>. Strategies still subscribe to one side only.</td>
+    </tr>
+    <tr>
+      <td><code>ModuleNotFoundError: No module named 'core'</code> when running the notebook from <code>ipynb/</code> subfolder</td>
+      <td><code>PROJECT_ROOT = Path.cwd()</code> resolves to <code>ipynb/</code>, not the project root</td>
+      <td>Walk up from <code>cwd</code> looking for a <code>core/instrument_factory.py</code> marker file; fall back to the notebook's own directory via <code>__vsc_ipynb_file__</code> if cwd is too far up</td>
+    </tr>
+    <tr>
+      <td>CSV timestamps render in UTC instead of the source's IST time</td>
+      <td>Nautilus stores all timestamps as UTC nanoseconds internally — the loader does <code>pd.to_datetime(..., utc=True)</code> which converts the source's <code>GMT+0530</code> to UTC</td>
+      <td>Convert back for display when writing CSV: <code>pd.Timestamp(bar.ts_event, unit="ns", tz="UTC").tz_convert(OUTPUT_TZ).isoformat()</code> where <code>OUTPUT_TZ = "Asia/Kolkata"</code></td>
+    </tr>
+    <tr>
+      <td>Custom aggregator output has one extra row at the end compared to the Nautilus output</td>
+      <td>The data stream ends mid-window (last 4 of 5 bars present). Custom's <code>flush()</code> emits this trailing partial as a 5-min bar; Nautilus's timer never fires for the un-reached boundary and skips it.</td>
+      <td>Filter on <code>n_ticks == target_minutes</code> downstream if you want only complete windows. For trading logic, just don't call cross-detection on the flushed bar (our strategies discard <code>flush()</code> result).</td>
+    </tr>
+    <tr>
+      <td>Custom and internal aggregator strategies produce different bracket counts (e.g. 39 vs 40) despite identical OHLCV</td>
+      <td>1-minute emission lag: custom emits a 5-min bar one tick after Nautilus does. Cascades through entry fill prices → SL/TP levels → exit times → <code>is_flat</code> state at future crosses.</td>
+      <td>If you need exact agreement, modify <code>FiveMinAggregator.on_bar</code> to also call <code>_close_window()</code> when the bar lands exactly on the boundary (<code>ts == bucket_close</code>). Otherwise accept the small divergence — both behaviors are internally consistent.</td>
+    </tr>
+    <tr>
+      <td><code>PermissionError: [Errno 13]</code> when the notebook tries to write its output CSV</td>
+      <td>The CSV file is open in another tab (VS Code preview, Excel, etc.) which holds a write lock on Windows</td>
+      <td>Close the file in the other tab, then re-run the cell</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<p class="small">End of guide. Source notebooks: <code>ipynb/aggregate_1min_to_5min.ipynb</code> and <code>ipynb/aggregator_strategy_demo.ipynb</code>. Reports written to <code>reports_aggregator_demo/</code>. For deeper Nautilus internals, see the sibling docs in this directory (<code>nautilus_lifecycle_handlers.html</code>, <code>nautilus_trader_storage_and_bars.html</code>, <code>nautilus_trader_data_workflow.html</code>).</p>
+
+</div>
+</body>
+</html>
