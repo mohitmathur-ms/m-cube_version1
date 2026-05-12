@@ -172,7 +172,7 @@ const LoadData = {
         }
 
         try {
-            const data = await App.api(`/api/csv/scan?folder=${encodeURIComponent(folder)}`);
+            const data = await App.api(`/api/csv/scan?folder=${encodeURIComponent(folder)}`, { timeoutMs: 0 });
             this.entries = data.entries;
 
             if (data.count === 0) {
