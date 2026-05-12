@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M_Cube Crypto Dashboard</title>
+    <!-- Apply persisted theme before the stylesheet evaluates so the first
+         paint already matches the user's choice (no flash of wrong theme). -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem("theme");
+                if (!t) {
+                    t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+                }
+                document.documentElement.setAttribute("data-theme", t);
+            } catch (_) {
+                document.documentElement.setAttribute("data-theme", "light");
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
     <!-- Plotly.js for charts — deferred so it doesn't block first paint. -->
@@ -16,6 +31,12 @@
         <div class="header-settings">
             <label for="catalog-path">Catalog Path:</label>
             <input type="text" id="catalog-path" value="./catalog" placeholder="Catalog path">
+            <button type="button" id="theme-toggle-btn" class="theme-toggle"
+                    onclick="App.toggleTheme()"
+                    title="Toggle dark / light mode" aria-label="Toggle theme">
+                <span class="theme-icon-light" aria-hidden="true">&#9788;</span>
+                <span class="theme-icon-dark" aria-hidden="true">&#9790;</span>
+            </button>
         </div>
     </header>
 

@@ -332,7 +332,7 @@ const Portfolio = {
 
         const menu = document.createElement("div");
         menu.id = "pf-options-menu";
-        menu.style.cssText = "position:fixed; background:#fff; border:1px solid var(--border-color); border-radius:4px; box-shadow:0 4px 16px rgba(0,0,0,0.15); z-index:500; padding:4px 0; min-width:180px;";
+        menu.style.cssText = "position:fixed; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-color); border-radius:4px; box-shadow:0 4px 16px rgba(0,0,0,0.25); z-index:500; padding:4px 0; min-width:180px;";
         const rect = event.target.getBoundingClientRect();
         menu.style.top = (rect.bottom + 4) + "px";
         menu.style.left = rect.left + "px";
@@ -549,7 +549,7 @@ const Portfolio = {
 
         const body = `
             <!-- Top settings bar -->
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px 10px; background:#f8f9fa; border:1px solid var(--border-color); border-radius:4px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px 10px; background:var(--bg-footer); border:1px solid var(--border-color); border-radius:4px;">
                 <div style="flex:2; min-width:140px;">
                     <div style="font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">PORTFOLIO NAME</div>
                     <input type="text" class="form-control" id="pf-m-name" value="${pf.name}" style="font-size:0.82rem; padding:4px 8px;">
@@ -1703,7 +1703,7 @@ const Portfolio = {
         const actions = ["close", "re_execute", "reverse"];
 
         const body = `
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:#f8f9fa; border:1px solid var(--border-color); border-radius:4px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:var(--bg-footer); border:1px solid var(--border-color); border-radius:4px;">
                 <div style="flex:2; min-width:140px;">
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">STRATEGY</div>
                     <select class="form-control" id="leg-m-strategy" onchange="Portfolio._onLegStratChange()" style="font-size:0.82rem; padding:5px 8px;">${stratOpts}</select>

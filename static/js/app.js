@@ -44,11 +44,100 @@ const App = {
      */
     async init() {
         this.bindNavigation();
+        this.initTheme();
         await this._ensureUserSelected();
         await this._refreshCurrentUser();
         this._renderUserChip();
         this.log(`Signed in as ${this.getUserAlias() || this.getUserId()}`, "MESSAGE", "SYSTEM");
         this.navigate("dashboard");
+    },
+
+    // ─── Theme (dark / light) ─────────────────────────────────────────────
+    //
+    // The chosen theme is applied early by an inline script in index.html
+    // (so the first paint is correct). This block syncs in-page state with
+    // that choice, lets the user toggle it, and exposes a Plotly layout
+    // partial so charts re-render with theme-appropriate colors.
+
+    /** Read the current theme from the DOM ("light" or "dark"). */
+    getTheme() {
+        return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    },
+
+    /** Persist + apply a theme. Repaints any already-rendered Plotly charts
+     *  in place so their backgrounds and font colors match. */
+    setTheme(theme) {
+        const t = theme === "dark" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+        try { localStorage.setItem("theme", t); } catch {}
+        this._repaintPlotlyCharts();
+    },
+
+    /** Flip the theme. Wired to the header button via onclick. */
+    toggleTheme() {
+        this.setTheme(this.getTheme() === "dark" ? "light" : "dark");
+    },
+
+    /** Read whatever was set by the inline early-paint script (or apply
+     *  the OS preference if nothing is stored). Idempotent — safe to call
+     *  on every init. */
+    initTheme() {
+        const stored = (() => {
+            try { return localStorage.getItem("theme"); } catch { return null; }
+        })();
+        if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+        } else if (!document.documentElement.getAttribute("data-theme")) {
+            const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+        }
+    },
+
+    /** Plotly layout partial that matches the current theme. Spread this
+     *  into chart layouts (`{ ...App.plotlyTheme(), title: ... }`) — the
+     *  plot() helper also auto-merges it as a fallback. */
+    plotlyTheme() {
+        const dark = this.getTheme() === "dark";
+        const css = getComputedStyle(document.documentElement);
+        const pick = (name, fallback) => (css.getPropertyValue(name).trim() || fallback);
+        const bg = pick("--bg-card", dark ? "#1e242c" : "#ffffff");
+        const text = pick("--text-primary", dark ? "#e6edf3" : "#1a1a1a");
+        const grid = pick("--border-light", dark ? "#2a3340" : "#e5e7eb");
+        return {
+            paper_bgcolor: bg,
+            plot_bgcolor: bg,
+            font: { color: text },
+            xaxis: { gridcolor: grid, zerolinecolor: grid, linecolor: grid, tickcolor: grid },
+            yaxis: { gridcolor: grid, zerolinecolor: grid, linecolor: grid, tickcolor: grid },
+            legend: { bgcolor: "rgba(0,0,0,0)", font: { color: text } },
+        };
+    },
+
+    /** Re-apply the current Plotly theme to every chart already on the page.
+     *  Only touches layout (colors / fonts) — trace data is untouched. */
+    _repaintPlotlyCharts() {
+        if (typeof Plotly === "undefined") return;
+        const theme = this.plotlyTheme();
+        // Flatten the nested xaxis/yaxis/legend/font objects into Plotly's
+        // dotted-path relayout syntax so we don't blow away existing settings.
+        const update = {
+            "paper_bgcolor": theme.paper_bgcolor,
+            "plot_bgcolor": theme.plot_bgcolor,
+            "font.color": theme.font.color,
+            "xaxis.gridcolor": theme.xaxis.gridcolor,
+            "xaxis.zerolinecolor": theme.xaxis.zerolinecolor,
+            "xaxis.linecolor": theme.xaxis.linecolor,
+            "xaxis.tickcolor": theme.xaxis.tickcolor,
+            "yaxis.gridcolor": theme.yaxis.gridcolor,
+            "yaxis.zerolinecolor": theme.yaxis.zerolinecolor,
+            "yaxis.linecolor": theme.yaxis.linecolor,
+            "yaxis.tickcolor": theme.yaxis.tickcolor,
+            "legend.bgcolor": theme.legend.bgcolor,
+            "legend.font.color": theme.legend.font.color,
+        };
+        document.querySelectorAll(".js-plotly-plot").forEach((el) => {
+            try { Plotly.relayout(el, update); } catch (_) { /* non-fatal */ }
+        });
     },
 
     // ─── User identity (X-User-Id, no auth) ───────────────────────────────
@@ -467,7 +556,11 @@ const App = {
     },
 
     /** Plotly render helper: uses react() after first plot for ~5x faster updates.
-     *  Safe to call before Plotly finishes loading (deferred <script>) — it waits. */
+     *  Safe to call before Plotly finishes loading (deferred <script>) — it waits.
+     *
+     *  Auto-merges the current theme into `layout` so every chart picks up
+     *  dark/light backgrounds without each page having to remember. The
+     *  caller's layout wins — explicit colors are preserved. */
     async plot(divId, traces, layout, config = { responsive: true }) {
         const el = typeof divId === "string" ? document.getElementById(divId) : divId;
         if (!el) return;
@@ -475,12 +568,27 @@ const App = {
             await this._plotlyReady();
             if (!el.isConnected) return; // user navigated away
         }
+        const themed = this._mergeTheme(layout || {});
         // If Plotly has already rendered into this node it will have _fullData.
         if (el._fullData) {
-            Plotly.react(el, traces, layout, config);
+            Plotly.react(el, traces, themed, config);
         } else {
-            Plotly.newPlot(el, traces, layout, config);
+            Plotly.newPlot(el, traces, themed, config);
         }
+    },
+
+    /** Merge the active Plotly theme with a caller-supplied layout. Caller's
+     *  fields win; theme defaults fill in the gaps. */
+    _mergeTheme(layout) {
+        const theme = this.plotlyTheme();
+        const merged = { ...theme, ...layout };
+        // Nested axis/legend/font objects need a shallow merge of their own
+        // so per-chart settings (title, range, etc.) survive.
+        merged.xaxis = { ...theme.xaxis, ...(layout.xaxis || {}) };
+        merged.yaxis = { ...theme.yaxis, ...(layout.yaxis || {}) };
+        merged.font  = { ...theme.font,  ...(layout.font  || {}) };
+        merged.legend = { ...theme.legend, ...(layout.legend || {}) };
+        return merged;
     },
 
     _plotlyReady() {
