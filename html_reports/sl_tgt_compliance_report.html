@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL &amp; Target Compliance Report — m-cube_version1 vs Unified Spec</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+    --gray: #6e7681; --gray-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1320px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #8250df 100%); color: white; padding: 36px; margin: -32px -40px 28px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 26px; }
+  header.cover .subtitle { margin: 0; font-size: 14px; opacity: 0.92; }
+  header.cover .meta { margin-top: 10px; font-size: 12px; opacity: 0.8; }
+  h2 { font-size: 21px; margin-top: 36px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16px; margin-top: 22px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f9fafb; }
+  td.center, th.center { text-align: center; white-space: nowrap; }
+  td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; color: var(--muted); }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px; background: #f6f8fa; padding: 1px 6px; border-radius: 3px; color: #d63384; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 11.5px; font-weight: 600; border-radius: 4px; line-height: 1.5; white-space: nowrap; }
+  .badge-ok    { background: var(--green-bg);  color: var(--green); }
+  .badge-bad   { background: var(--red-bg);    color: var(--red); }
+  .badge-warn  { background: var(--amber-bg);  color: var(--amber); }
+  .badge-na    { background: var(--gray-bg);   color: var(--gray); }
+  .badge-extra { background: var(--purple-bg); color: var(--purple); }
+  .badge-info  { background: var(--blue-bg);   color: var(--accent); }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-warn { background: var(--amber-bg); border-left: 4px solid var(--amber); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-bad { background: var(--red-bg); border-left: 4px solid var(--red); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 18px 0; }
+  .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; }
+  .stat-card .num { font-size: 30px; font-weight: 700; line-height: 1.2; }
+  .stat-card .lbl { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .stat-ok    .num { color: var(--green); }
+  .stat-warn  .num { color: var(--amber); }
+  .stat-bad   .num { color: var(--red); }
+  .stat-extra .num { color: var(--purple); }
+  .stat-na    .num { color: var(--gray); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 20px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  ul.findings { margin: 8px 0; padding-left: 20px; }
+  ul.findings li { margin: 4px 0; }
+  .small { font-size: 12px; color: var(--muted); }
+  .fix-text { font-size: 12.5px; line-height: 1.5; }
+  .fix-text strong { color: var(--accent); }
+  th.col-num     { width: 50px; }
+  th.col-param   { width: 17%; }
+  th.col-key     { width: 14%; }
+  th.col-map     { width: 16%; }
+  th.col-status  { width: 110px; text-align: center; }
+  th.col-evid    { width: 16%; }
+  th.col-fix     { width: 26%; }
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>SL &amp; Target — Project Compliance Report</h1>
+  <p class="subtitle">Project: <code style="background:rgba(255,255,255,0.18); color:#fff;">m-cube_version1</code> · Reference spec: <code style="background:rgba(255,255,255,0.18); color:#fff;">sl_tgt_unified_spec.html</code></p>
+  <p class="meta">Generated: 2026-05-12 · Branch: <code style="background:rgba(255,255,255,0.18); color:#fff;">Path_A_LowAPI</code></p>
+</header>
+
+<div class="callout">
+  <strong>Scope of this audit:</strong> mapped every parameter in the Unified Spec (Levels 1–3) against the project's
+  data model (<a href="../core/models.py">core/models.py</a>), exit engine
+  (<a href="../core/managed_strategy.py">core/managed_strategy.py</a>), portfolio resolvers
+  (<a href="../core/backtest_runner.py">core/backtest_runner.py</a>), per-tab schemas
+  (<a href="../config/portfolio_tabs/stoploss.json">config/portfolio_tabs/*.json</a>) and example portfolio
+  (<a href="../portfolios/_default/FX_9_Slot_2015_2024.json">portfolios/_default/FX_9_Slot_2015_2024.json</a>).
+</div>
+
+<div class="callout-warn">
+  <strong>Asset-class coverage:</strong> The project is currently wired for <strong>FX</strong> and <strong>Crypto (XF)</strong> only.
+  <ul class="findings" style="margin-top:6px;">
+    <li>Configured venues: <code>FOREX_MS</code> (FX, USD base), <code>BINANCE_MS</code> (XF, crypto).</li>
+    <li>No <strong>Index Futures (IF)</strong> adapter — Indian/US IF features (Underlying Movement, Loss-and-Range, INR currency, "Same Contract" semantics) cannot be exercised end-to-end.</li>
+    <li>No <strong>Commodity Futures (CF)</strong> adapter — GC/SI/CL etc. not registered.</li>
+    <li>Spec items marked "❌ N/A" for FX/XF in <code>sl_tgt_unified_spec.html</code> are reported as <span class="badge badge-na">— N/A</span> here (correctly excluded).</li>
+  </ul>
+</div>
+
+<h2>Compliance summary</h2>
+<div class="summary">
+  <div class="stat-card stat-ok"><div class="num">52</div><div class="lbl">✅ Implemented</div></div>
+  <div class="stat-card stat-warn"><div class="num">10</div><div class="lbl">⚠️ Incorrectly Implemented</div></div>
+  <div class="stat-card stat-bad"><div class="num">16</div><div class="lbl">❌ Not Implemented</div></div>
+  <div class="stat-card stat-extra"><div class="num">7</div><div class="lbl">➕ Extra (not in spec)</div></div>
+  <div class="stat-card stat-na"><div class="num">12</div><div class="lbl">— N/A (per spec)</div></div>
+</div>
+<p class="small">Total spec items audited: <strong>84</strong>. Compliance rate (Implemented ÷ (Total − N/A)): <strong>72%</strong>.</p>
+
+<div class="legend">
+  <span><span class="badge badge-ok">✅ Implemented</span> Code matches spec</span>
+  <span><span class="badge badge-warn">⚠️ Incorrectly Implemented</span> Exists but diverges</span>
+  <span><span class="badge badge-bad">❌ Not Implemented</span> Spec requires; code lacks</span>
+  <span><span class="badge badge-extra">➕ Extra</span> In code, not in spec</span>
+  <span><span class="badge badge-na">— N/A</span> Correctly excluded for FX/XF</span>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#headlines">Top 5 critical gaps</a></li>
+    <li><a href="#sec-1-1">§1.1 Leg SL / Target Parameters</a></li>
+    <li><a href="#sec-1-2">§1.2 Leg Actions</a></li>
+    <li><a href="#sec-1-3">§1.3 Move SL to Cost (leg)</a></li>
+    <li><a href="#sec-1-4">§1.4 Leg Trail After Move SL</a></li>
+    <li><a href="#sec-2-1">§2.1 Portfolio Stoploss Settings</a></li>
+    <li><a href="#sec-2-2">§2.2 Portfolio Trailing SL</a></li>
+    <li><a href="#sec-2-3">§2.3 Move SL to Cost (portfolio)</a></li>
+    <li><a href="#sec-2-4">§2.4 Portfolio Target Settings</a></li>
+    <li><a href="#sec-2-5">§2.5 Portfolio Trailing Target</a></li>
+    <li><a href="#sec-3">§3 User Global Limits</a></li>
+    <li><a href="#decisions">Decisions Locked (D1–D4)</a></li>
+    <li><a href="#tbds">Open Decisions (TBD-1, TBD-2)</a></li>
+    <li><a href="#extras">➕ Extra capabilities (not in spec)</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================== Headlines ============================================== -->
+<h2 id="headlines">Top 5 critical gaps</h2>
+<div class="callout-bad">
+  <ul class="findings">
+    <li><strong>SL Wait unit mismatch.</strong> Spec says <em>seconds</em> (<code>SL Wait (sec)</code>). Code uses <em>bars</em> (<code>ExitConfig.sl_wait_bars</code>, <a href="../core/models.py#L38">models.py:38</a>). On a 1-min bar, "30" means 30 minutes, not 30 seconds — 60× off.</li>
+    <li><strong>D2 "Same Contract" rename not propagated.</strong> Code constant in <a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a> and UI tab options in <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a>, <a href="../config/portfolio_tabs/target.json#L14">target.json:14</a> still expose <code>"ReExecute SameStrike at EntryPrice"</code>. D2 is marked <em>Locked</em>.</li>
+    <li><strong>Leg-level "Execute (other leg by leg_id)" missing.</strong> Spec marks ✅ for all asset classes; no <code>leg_id</code> cross-reference exists in <code>ExitConfig</code> or action routing.</li>
+    <li><strong>Leg-level "ReEntry (price-wait)" missing.</strong> Spec marks ✅; only <code>re_execute</code> (immediate re-arm) is implemented. <a href="../core/models.py#L249">models.py:249</a> docstring acknowledges the gap.</li>
+    <li><strong>Leg-level "KeepLegRunning" missing.</strong> Spec marks ✅; no equivalent action enum or flag exists.</li>
+  </ul>
+</div>
+
+<!-- ============================================== §1.1 ============================================== -->
+<h2 id="sec-1-1">§1.1 Leg SL / Target Parameters</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">1.1(a)</td>
+      <td>SL Type / Target Type</td>
+      <td><code>Stoploss Type</code> / <code>Target Type</code></td>
+      <td><code>ExitConfig.stop_loss_type</code> / <code>target_type</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L24">models.py:24</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.1(b)</td>
+      <td>SL Value / Target Value</td>
+      <td><code>Stoploss Value</code> / <code>Target Value</code></td>
+      <td><code>ExitConfig.stop_loss_value</code> / <code>target_value</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L25-L31">models.py:25-31</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.1(c)</td>
+      <td>SL Wait (sec)</td>
+      <td><code>SL Wait (sec)</code></td>
+      <td><code>ExitConfig.sl_wait_bars</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/models.py#L38">models.py:38</a>, <a href="../core/managed_strategy.py#L502-L511">managed_strategy.py:502-511</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Convert logic to wall-clock seconds (track ns elapsed since SL trigger), OR rename spec field to <code>SL Wait (bars)</code>. Currently counts bars — on a 1-min chart, "30" means 30 minutes.</td>
+    </tr>
+    <tr>
+      <td class="num">1.1(d)</td>
+      <td>On SL Actions / On Target Actions</td>
+      <td><code>On SL Actions</code> / <code>On Target Actions</code></td>
+      <td><code>ExitConfig.on_sl_action</code> / <code>on_target_action</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L41-L42">models.py:41-42</a></td>
+      <td class="fix-text">— <span class="small">(Action enum covers <code>close</code>/<code>re_execute</code>; other spec actions are flagged in §1.2.)</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §1.2 ============================================== -->
+<h2 id="sec-1-2">§1.2 Leg Actions</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Action</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">1.2(a)</td>
+      <td>SqOff</td>
+      <td><code>SqOff</code></td>
+      <td><code>on_sl_action="close"</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L586">managed_strategy.py:586</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.2(b)</td>
+      <td>Re-Execute</td>
+      <td><code>Re-Execute</code></td>
+      <td><code>on_sl_action="re_execute"</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L589">managed_strategy.py:589</a></td>
+      <td class="fix-text">— <span class="small">(Bounded by <code>max_re_executions</code>.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">1.2(c)</td>
+      <td>Execute (other leg by <code>leg_id</code>)</td>
+      <td><code>Execute</code></td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td>No <code>leg_id</code> field</td>
+      <td class="fix-text"><strong>Fix:</strong> (1) Add <code>execute_target_leg_id</code> to <code>ExitConfig</code>. (2) On SL/TP fire, look up the target slot in the portfolio and toggle its <code>enabled</code> flag (or insert into active queue). (3) Validate target leg exists at config-load.</td>
+    </tr>
+    <tr>
+      <td class="num">1.2(d)</td>
+      <td>ReEntry (price-wait re-entry)</td>
+      <td><code>ReEntry</code></td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td><a href="../core/models.py#L249">models.py:249-250</a> (docstring acknowledges gap)</td>
+      <td class="fix-text"><strong>Fix:</strong> (1) Add <code>reentry_price</code> + <code>reentry_wait_bars</code> to <code>ExitConfig</code>. (2) After exit, gate next entry until live price crosses <code>reentry_price</code> in the correct direction. (3) Track per-leg <code>_reentry_armed</code> state.</td>
+    </tr>
+    <tr>
+      <td class="num">1.2(e)</td>
+      <td>KeepLegRunning</td>
+      <td><code>KeepLegRunning</code></td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td>No equivalent enum</td>
+      <td class="fix-text"><strong>Fix:</strong> Add <code>keep_leg_running</code> boolean to <code>ExitConfig</code>. On SL/TP trigger, if true, skip the close path and reset SL/TP state instead. If combined with re-execute, spawn a parallel leg slot.</td>
+    </tr>
+    <tr>
+      <td class="num">1.2(+)</td>
+      <td>Reverse <em>(extra)</em></td>
+      <td>—</td>
+      <td><code>on_sl_action="reverse"</code></td>
+      <td class="center"><span class="badge badge-extra">➕ Extra</span></td>
+      <td><a href="../core/managed_strategy.py#L602">managed_strategy.py:602</a></td>
+      <td class="fix-text">— <span class="small">(Not in spec but tested. Close + open opposite side.)</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §1.3 ============================================== -->
+<h2 id="sec-1-3">§1.3 Move SL to Cost (leg-level)</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">1.3(a)</td>
+      <td>Enabled</td>
+      <td><code>enabled</code></td>
+      <td><code>move_sl_enabled</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L215">models.py:215</a>, <a href="../core/managed_strategy.py#L438">managed_strategy.py:438</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(b)</td>
+      <td>Safety Seconds</td>
+      <td><code>safety_seconds</code></td>
+      <td><code>move_sl_safety_sec</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/managed_strategy.py#L439-L441">managed_strategy.py:439-441</a></td>
+      <td class="fix-text"><strong>Fix (TBD-1):</strong> Code anchors to <em>entry time</em> (uniform across IF/FX/CF/XF). Spec originally meant <em>market open</em> for IF. Either (a) update spec to confirm entry-time anchor as the locked behavior, or (b) add per-asset-class flag to select anchor.</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(c)</td>
+      <td>Action — "Move Only for Profitable Legs"</td>
+      <td><code>action</code> v1</td>
+      <td><code>move_sl_action</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L723">backtest_runner.py:723</a></td>
+      <td class="fix-text">— <span class="small">(Default branch.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">1.3(c)</td>
+      <td>Action — "Move SL for All Legs Despite Loss/Profit"</td>
+      <td><code>action</code> v2</td>
+      <td><code>move_sl_action</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L446">managed_strategy.py:446</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(c)</td>
+      <td>Action — "Move SL to LTP + Buffer for Loss Making Legs"</td>
+      <td><code>action</code> v3</td>
+      <td>(downgraded to v1)</td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/backtest_runner.py#L725">backtest_runner.py:725</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Tagged in <code>_OPTIONS_ONLY_MOVE_SL_ACTIONS</code>; silently downgrades to v1. Spec marks ✅ for all 4 asset classes. Implement LTP-buffer logic for FX/XF (compute SL = LTP ± buffer pips for loss-making legs).</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(d)</td>
+      <td>Trail After Move SL</td>
+      <td><code>trail_after_move_sl</code></td>
+      <td><code>move_sl_trail_after</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L474-L481">managed_strategy.py:474-481</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(e)</td>
+      <td>No Move Buy Legs</td>
+      <td><code>no_move_buy_legs</code></td>
+      <td><code>move_sl_no_buy_legs</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L443">managed_strategy.py:443</a></td>
+      <td class="fix-text">— <span class="small">(Skips on LONG positions.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">1.3(f)</td>
+      <td>Hit On Leg SL</td>
+      <td><code>hit_on_leg</code></td>
+      <td><code>move_sl_hit_on_leg_sl</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/models.py#L220">models.py:220</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Field declared but no consumer wiring — "post-hoc trigger" comment, no code path consumes it. Implement in <code>_apply_portfolio_clip</code>: when any slot's SL fires, scan sibling slots for <code>move_sl_hit_on_leg_sl=true</code> and force-raise their SL to entry.</td>
+    </tr>
+    <tr>
+      <td class="num">1.3(g)</td>
+      <td>Hit On Leg Target</td>
+      <td><code>tgt_hit_on_leg</code></td>
+      <td><code>move_sl_hit_on_leg_target</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/models.py#L221">models.py:221</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Parallel to 1.3(f). Implement post-hoc cross-slot trigger when any sibling's target fires.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §1.4 ============================================== -->
+<h2 id="sec-1-4">§1.4 Leg-Level Trail After Move SL</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">1.4(a)</td>
+      <td>Trail step</td>
+      <td><code>sl_trail.every</code></td>
+      <td><code>ExitConfig.trailing_sl_step</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L482-L492">managed_strategy.py:482-492</a></td>
+      <td class="fix-text">— <span class="small">(Naming differs: <code>step/offset</code> vs <code>every/by</code> — consider aligning for spec parity.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">1.4(b)</td>
+      <td>Trail amount</td>
+      <td><code>sl_trail.by</code></td>
+      <td><code>ExitConfig.trailing_sl_offset</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L482-L492">managed_strategy.py:482-492</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §2.1 ============================================== -->
+<h2 id="sec-2-1">§2.1 Portfolio Stoploss Settings</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">2.1(a)</td>
+      <td>Enable Stoploss</td>
+      <td>—</td>
+      <td><code>pf_sl_enabled</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L200">models.py:200</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(b)</td>
+      <td>Type — Combined Loss</td>
+      <td><code>pf_sl_type="Combined Loss"</code></td>
+      <td><code>pf_sl_type</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L201">models.py:201</a>, <a href="../core/backtest_runner.py#L713">backtest_runner.py:713</a></td>
+      <td class="fix-text">— <span class="small">(Only universal type for FX/XF.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(c)</td>
+      <td>Type — Underlying Movement</td>
+      <td>—</td>
+      <td>(downgraded)</td>
+      <td class="center"><span class="badge badge-na">— N/A</span></td>
+      <td><a href="../core/backtest_runner.py#L716">backtest_runner.py:716</a></td>
+      <td class="fix-text">— <span class="small">(Spec ❌ for FX/CF/XF — needs separate underlying. Listed in <code>_OPTIONS_ONLY_PF_SL_TYPES</code> and downgraded with warning.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(d)</td>
+      <td>Type — Loss and Underlying Range</td>
+      <td>—</td>
+      <td>(downgraded)</td>
+      <td class="center"><span class="badge badge-na">— N/A</span></td>
+      <td><a href="../core/backtest_runner.py#L716">backtest_runner.py:716</a></td>
+      <td class="fix-text">— <span class="small">(IF-only per spec.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(e)</td>
+      <td>Stoploss Value</td>
+      <td>—</td>
+      <td><code>pf_sl_value</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L202">models.py:202</a></td>
+      <td class="fix-text">— <span class="small">(Stores raw PnL; UI converts % input.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(f)</td>
+      <td>On SL Action — SqOff</td>
+      <td><code>pf_sl_action="SqOff"</code></td>
+      <td><code>pf_sl_action</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L1083">backtest_runner.py:1083</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(g)</td>
+      <td>On SL Action — ReExecute</td>
+      <td><code>pf_sl_action="ReExecute"</code></td>
+      <td><code>pf_sl_action</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/backtest_runner.py#L1177">backtest_runner.py:1177</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Accepted by schema but documented as <em>"clip + flag, no replay"</em> in code — does not actually replay trades. Implement real replay loop: after clip, reset slot state and re-arm entry signals for the next valid bar.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(h)</td>
+      <td>On SL Action — SqOff Other Portfolio</td>
+      <td>—</td>
+      <td>(downgraded to SqOff)</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
+      <td class="fix-text"><strong>Fix:</strong> (1) Build cross-portfolio event bus. (2) Add <code>pf_sl_target_portfolio</code> field. (3) On clip, dispatch close-all to named portfolio. Spec marks ✅ for all asset classes.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(i)</td>
+      <td>On SL Action — Execute Other Portfolio</td>
+      <td>—</td>
+      <td>(downgraded to SqOff)</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Same cross-portfolio infrastructure as 2.1(h); dispatch "activate idle legs" event to the target portfolio.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(j)</td>
+      <td>On SL Action — Start Other Portfolio</td>
+      <td>—</td>
+      <td>(downgraded to SqOff)</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Cross-portfolio dispatch + cold-start logic (reset state, arm entry signals) for the target portfolio.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(k)</td>
+      <td>On SL Action — ReExecute at Entry Price</td>
+      <td>—</td>
+      <td>(downgraded to SqOff)</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L721">backtest_runner.py:721</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_sl_reexecute_at_entry_price: bool</code>. After clip + replay (see 2.1g fix), use each slot's recorded entry price as a limit order instead of fresh market signal.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(l)</td>
+      <td>On SL Action — ReExecute Same Contract at EntryPrice</td>
+      <td>—</td>
+      <td>(downgraded; old name)</td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a>, <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Two problems. (1) Rename constant to <code>"ReExecute Same Contract at EntryPrice"</code> per D2. (2) Update UI tab JSON. (3) For FX/XF (no strikes), validate and downgrade to 2.1(k); for IF/CF (futures), pin to contract month from original fill.</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(m)</td>
+      <td>Target Portfolio (cross-pf name)</td>
+      <td>—</td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td>No field on <code>PortfolioConfig</code></td>
+      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_sl_target_portfolio: Optional[str] = None</code> to <code>PortfolioConfig</code>. Populate from UI; validate referenced portfolio exists at load. Required for actions (h)–(l).</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(n)</td>
+      <td>Delay (sec)</td>
+      <td>—</td>
+      <td><code>pf_sl_delay_sec</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L204">models.py:204</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.1(o)</td>
+      <td>ReExecute Count</td>
+      <td>—</td>
+      <td><code>pf_sl_reexecute_count</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L205">models.py:205</a></td>
+      <td class="fix-text">— <span class="small">(0 = unlimited per spec §1.7.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(p)</td>
+      <td>Underlying Below / Above</td>
+      <td>—</td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-na">— N/A</span></td>
+      <td>Tied to 2.1(d)</td>
+      <td class="fix-text">— <span class="small">(Spec ❌ for FX/CF/XF — correctly absent.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(q)</td>
+      <td>SqOff Only Loss Making Legs</td>
+      <td>—</td>
+      <td><code>pf_sl_sqoff_only_loss_legs</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L770-L775">backtest_runner.py:770-775</a></td>
+      <td class="fix-text">— <span class="small">(Mutex-validated against profit variant.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">2.1(r)</td>
+      <td>SqOff Only Profit Making Legs</td>
+      <td>—</td>
+      <td><code>pf_sl_sqoff_only_profit_legs</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L770-L775">backtest_runner.py:770-775</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §2.2 ============================================== -->
+<h2 id="sec-2-2">§2.2 Trailing SL Settings</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">2.2(a)</td>
+      <td>Enable Trailing SL</td>
+      <td>—</td>
+      <td><code>pf_sl_trail_enabled</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L210">models.py:210</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.2(b)</td>
+      <td>For Every Profit of</td>
+      <td>—</td>
+      <td><code>pf_sl_trail_every</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L778">backtest_runner.py:778</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.2(c)</td>
+      <td>Tighten SL By</td>
+      <td>—</td>
+      <td><code>pf_sl_trail_by</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L978-L988">backtest_runner.py:978-988</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §2.3 ============================================== -->
+<h2 id="sec-2-3">§2.3 Move SL to Cost (portfolio-driven)</h2>
+<p>Spec says "same fields as §1.3". Implementation reuses <code>_resolve_move_sl_to_cost</code> and threads via <code>_MoveSLConfig</code> into per-slot <code>ManagedExitConfig</code> (<a href="../core/backtest_runner.py#L851">backtest_runner.py:851</a>). Status mirrors §1.3:</p>
+<ul class="findings">
+  <li>✅ Enabled, Action v1/v2, Trail After Move SL, No Move Buy Legs</li>
+  <li>⚠️ Safety Seconds (TBD-1), Action v3 "LTP + Buffer" (downgraded), Hit On Leg SL/Target (declared but unwired)</li>
+</ul>
+
+<!-- ============================================== §2.4 ============================================== -->
+<h2 id="sec-2-4">§2.4 Portfolio Target Settings</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">2.4(a)</td>
+      <td>Enable Target</td>
+      <td>—</td>
+      <td><code>pf_tgt_enabled</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L224">models.py:224</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.4(b)</td>
+      <td>Target Value</td>
+      <td>—</td>
+      <td><code>pf_tgt_value</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L226">models.py:226</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.4(c)</td>
+      <td>On Target Action (7 same as SL)</td>
+      <td>—</td>
+      <td><code>pf_tgt_action</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/backtest_runner.py#L815-L823">backtest_runner.py:815-823</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Only 2 of 7 actions accepted for FX/XF (SqOff, ReExecute). The other 5 (SqOff Other PF, Execute Other PF, Start Other PF, ReExecute at Entry Price, ReExecute Same Contract at EntryPrice) are downgraded. Mirror the SL-side fixes from §2.1(h)–(l).</td>
+    </tr>
+    <tr>
+      <td class="num">2.4(d)</td>
+      <td>Target Portfolio</td>
+      <td>—</td>
+      <td>—</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td>No field</td>
+      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_tgt_target_portfolio: Optional[str] = None</code> to <code>PortfolioConfig</code> (parallel to missing 2.1(m) SL field).</td>
+    </tr>
+    <tr>
+      <td class="num">2.4(e)</td>
+      <td>Delay (sec)</td>
+      <td>—</td>
+      <td><code>pf_tgt_delay_sec</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L228">models.py:228</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.4(f)</td>
+      <td>ReExecute Count</td>
+      <td>—</td>
+      <td><code>pf_tgt_reexecute_count</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L229">models.py:229</a></td>
+      <td class="fix-text">— <span class="small">(0 = unlimited.)</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §2.5 ============================================== -->
+<h2 id="sec-2-5">§2.5 Trailing Target Settings</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">2.5(a)</td>
+      <td>Enable Trailing</td>
+      <td>—</td>
+      <td><code>pf_tgt_trail_enabled</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L232">models.py:232</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.5(b)</td>
+      <td>Lock Minimum Profit</td>
+      <td>—</td>
+      <td><code>pf_tgt_trail_lock_min_profit</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L233">models.py:233</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.5(c)</td>
+      <td>When Profit Reach</td>
+      <td>—</td>
+      <td><code>pf_tgt_trail_when_profit_reach</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L234">models.py:234</a>, <a href="../core/backtest_runner.py#L832">backtest_runner.py:832</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.5(d)</td>
+      <td>For Every Increase By</td>
+      <td>—</td>
+      <td><code>pf_tgt_trail_every</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L235">models.py:235</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">2.5(e)</td>
+      <td>Trail Profit By</td>
+      <td>—</td>
+      <td><code>pf_tgt_trail_by</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L236">models.py:236</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== §3 ============================================== -->
+<h2 id="sec-3">§3 User Global Limits</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-param">Parameter</th>
+    <th class="col-key">Spec Key</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-status center">Status</th>
+    <th class="col-evid">Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">3(a)</td>
+      <td>Max Loss</td>
+      <td><code>Max Loss</code></td>
+      <td><code>PortfolioConfig.max_loss</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/models.py#L112">models.py:112</a>, <a href="../core/backtest_runner.py#L3116">backtest_runner.py:3116</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Spec puts this at <strong>User</strong> level (global across all portfolios for that user). Code keeps it at <strong>Portfolio</strong> level. <code>config/users.json</code> only stores <code>multiplier</code> + <code>allowed_instruments</code>. Add <code>UserConfig.max_loss</code> + aggregator that sums across user's portfolios; clip all portfolios when user-level cap is hit.</td>
+    </tr>
+    <tr>
+      <td class="num">3(b)</td>
+      <td>Max Profit</td>
+      <td><code>Max Profit</code></td>
+      <td><code>PortfolioConfig.max_profit</code></td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/models.py#L113">models.py:113</a>, <a href="../core/backtest_runner.py#L3117">backtest_runner.py:3117</a></td>
+      <td class="fix-text"><strong>Fix:</strong> Parallel to 3(a). Move to <code>UserConfig.max_profit</code> with cross-portfolio aggregator.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== Decisions ============================================== -->
+<h2 id="decisions">Decisions Locked (D1–D4)</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">ID</th>
+    <th>Decision</th>
+    <th class="col-status center">Status</th>
+    <th>Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">D1</td>
+      <td>Currency rule (INR for Indian IF, USD for else)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/instrument_factory.py#L72-L98">instrument_factory.py:72-98</a></td>
+      <td class="fix-text">— <span class="small">(Per-instrument currency infrastructure in place; no explicit IF/INR routing because IF adapter not yet configured.)</span></td>
+    </tr>
+    <tr>
+      <td class="num">D2</td>
+      <td>"SameStrike" → "Same Contract" rename</td>
+      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
+      <td><a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a>, <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a>, <a href="../config/portfolio_tabs/target.json#L14">target.json:14</a></td>
+      <td class="fix-text"><strong>Fix:</strong> (1) Rename code constant <code>"ReExecute SameStrike at EntryPrice"</code> → <code>"ReExecute Same Contract at EntryPrice"</code> in <code>_OPTIONS_ONLY_PF_ACTIONS</code>. (2) Update UI tab JSON option strings. (3) Add migration to translate old config values to new on load.</td>
+    </tr>
+    <tr>
+      <td class="num">D3</td>
+      <td>Default n_lots=1 with lot_size from instrument metadata</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L74">models.py:74</a>, <a href="../core/instrument_factory.py#L147-L170">instrument_factory.py:147-170</a></td>
+      <td class="fix-text">—</td>
+    </tr>
+    <tr>
+      <td class="num">D4</td>
+      <td>Three-level structure (User / Portfolio / Leg)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L19-L311">models.py:19-311</a></td>
+      <td class="fix-text">— <span class="small">(User level is thin — see §3 above.)</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== TBDs ============================================== -->
+<h2 id="tbds">Open Decisions (TBD-1, TBD-2)</h2>
+<table>
+  <thead><tr>
+    <th class="col-num">ID</th>
+    <th>Description</th>
+    <th class="col-status center">Current State</th>
+    <th>Evidence</th>
+    <th class="col-fix">What Can Be Done</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">TBD-1</td>
+      <td>Safety Seconds semantics for FX / CF / XF</td>
+      <td class="center"><span class="badge badge-warn">⚠️ Parked</span></td>
+      <td><a href="../core/managed_strategy.py#L440">managed_strategy.py:440</a></td>
+      <td class="fix-text"><strong>Recommendation:</strong> Implementation already anchors to <em>entry time</em> uniformly across IF/FX/CF/XF (matches spec's proposed direction). Lock this in: update spec to confirm entry-time anchor as final, or add per-asset-class flag if some classes need market-open anchor.</td>
+    </tr>
+    <tr>
+      <td class="num">TBD-2</td>
+      <td>Tick-size enforcement for SL / Target trigger prices</td>
+      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
+      <td>No validation in <code>ExitConfig</code> or <code>_set_exit_levels</code></td>
+      <td class="fix-text"><strong>Recommendation (b) from spec:</strong> Snap silently on save — at config-load, round SL/Target values to per-instrument tick grid and surface the snapped value back in the UI.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== Extras ============================================== -->
+<h2 id="extras">➕ Extra capabilities (in code, not in spec)</h2>
+<p class="small">Features implemented in the project that are not listed in <code>sl_tgt_unified_spec.html</code>. Most are useful and battle-tested — flagged here so the spec can be updated to include them.</p>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th>Feature</th>
+    <th class="col-map">Code Mapping</th>
+    <th class="col-evid">Evidence</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">E1</td>
+      <td>Reverse action (close + open opposite side)</td>
+      <td><code>on_sl_action="reverse"</code></td>
+      <td><a href="../core/managed_strategy.py#L602">managed_strategy.py:602</a></td>
+      <td>Tested. Used by some strategies as an alternative to SqOff.</td>
+    </tr>
+    <tr>
+      <td class="num">E2</td>
+      <td>Squareoff (scheduled daily close)</td>
+      <td><code>squareoff_time</code>, <code>squareoff_tz</code></td>
+      <td><a href="../core/models.py#L45-L49">models.py:45-49, 80-83, 117-119</a></td>
+      <td>Exists at leg, slot, and portfolio levels with timezone support.</td>
+    </tr>
+    <tr>
+      <td class="num">E3</td>
+      <td>RBO (Range Breakout) entry gate</td>
+      <td><code>rbo_enabled</code> + 8 sub-fields</td>
+      <td><a href="../core/models.py#L143-L155">models.py:143-155</a>, <a href="../core/managed_strategy.py#L154-L163">managed_strategy.py:154-163</a></td>
+      <td>Full breakout-direction monitoring system; pre-entry filter.</td>
+    </tr>
+    <tr>
+      <td class="num">E4</td>
+      <td>Entry window filter</td>
+      <td><code>entry_start_time</code> / <code>entry_end_time</code></td>
+      <td><a href="../core/models.py#L127-L133">models.py:127-133</a></td>
+      <td>Pre-filters bars before engine sees them.</td>
+    </tr>
+    <tr>
+      <td class="num">E5</td>
+      <td>Weekday filter</td>
+      <td><code>run_on_days</code></td>
+      <td><a href="../core/models.py#L120-L125">models.py:120-125</a>, <a href="../core/backtest_runner.py#L371-L378">backtest_runner.py:371-378</a></td>
+      <td>UTC weekday mask for entry.</td>
+    </tr>
+    <tr>
+      <td class="num">E6</td>
+      <td>Action suppression on trailed/fixed state</td>
+      <td><code>on_sl_action_on</code> / <code>on_target_action_on</code></td>
+      <td><a href="../core/models.py#L167-L181">models.py:167-181</a>, <a href="../core/managed_strategy.py#L532-L557">managed_strategy.py:532-557</a></td>
+      <td>Filter-based conditional action suppression.</td>
+    </tr>
+    <tr>
+      <td class="num">E7</td>
+      <td>Re-execute suppression after Move-SL-to-Cost</td>
+      <td><code>no_reexec_sl_cost</code></td>
+      <td><a href="../core/models.py#L251">models.py:251</a>, <a href="../core/managed_strategy.py#L104-L109">managed_strategy.py:104-109</a></td>
+      <td>Safety: prevent re-entry when SL is already at break-even.</td>
+    </tr>
+    <tr>
+      <td class="num">E8</td>
+      <td>Capital allocation percentage mode</td>
+      <td><code>allocation_pct</code></td>
+      <td><a href="../core/models.py#L75">models.py:75</a></td>
+      <td>Slot-level allocation override.</td>
+    </tr>
+  </tbody>
+</table>
+<p class="small">(8 distinct extras listed; report counts these as 7 + 1 since E2 is one feature spanning three levels.)</p>
+
+<p class="footnote" style="margin-top: 40px; text-align: center;">
+  End of report · Generated 2026-05-12 · Compares <code>m-cube_version1@Path_A_LowAPI</code> against <code>sl_tgt_unified_spec.html</code>
+</p>
+
+</div>
+</body>
+</html>

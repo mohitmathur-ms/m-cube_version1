@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nautilus Lifecycle Handlers — m-cube_version1</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1240px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #8250df 100%); color: white; padding: 36px; margin: -32px -40px 28px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 26px; }
+  header.cover .subtitle { margin: 0; font-size: 14px; opacity: 0.92; }
+  header.cover .meta { margin-top: 10px; font-size: 12px; opacity: 0.8; }
+  h2 { font-size: 21px; margin-top: 36px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16px; margin-top: 22px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f9fafb; }
+  td.center, th.center { text-align: center; white-space: nowrap; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; background: #f6f8fa; padding: 1px 6px; border-radius: 3px; color: #d63384; }
+  pre { background: #f6f8fa; border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; overflow-x: auto; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok    { background: var(--green-bg); color: var(--green); }
+  .badge-bad   { background: var(--red-bg);   color: var(--red); }
+  .badge-warn  { background: var(--amber-bg); color: var(--amber); }
+  .badge-na    { background: #e1e4e8; color: #57606a; }
+  .badge-info  { background: var(--blue-bg); color: var(--accent); }
+  .badge-purple{ background: var(--purple-bg); color: var(--purple); }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-warn { background: var(--amber-bg); border-left: 4px solid var(--amber); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout-ok { background: var(--green-bg); border-left: 4px solid var(--green); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+  .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-ok  .num { color: var(--green); }
+  .stat-na  .num { color: var(--muted); }
+  .stat-info .num { color: var(--accent); }
+  .stat-purple .num { color: var(--purple); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 20px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  ul.findings { margin: 8px 0; padding-left: 20px; }
+  ul.findings li { margin: 4px 0; }
+  .small { font-size: 12px; color: var(--muted); }
+  .step-num { display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; background: var(--accent); color: white; font-weight: 600; font-size: 12px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Nautilus Lifecycle Handlers — Full Pipeline</h1>
+  <p class="subtitle">Project: <code style="background:rgba(255,255,255,0.18); color:#fff;">m-cube_version1</code> · <em>data → bar → strategy → submit → accept → fill confirmation</em></p>
+  <p class="meta">Generated: 2026-05-09 · Reference: <code style="background:rgba(255,255,255,0.18); color:#fff;">nautilus_trader</code> v1.x · Branch <code style="background:rgba(255,255,255,0.18); color:#fff;">Path_A_LowAPI</code></p>
+</header>
+
+<div class="callout">
+  <strong>What this document answers:</strong> for the full pipeline
+  <em>data arrives → it gets aggregated into a bar → the bar reaches our strategy → the strategy decides to place an order → the engine routes the order → the venue accepts it → the venue confirms a fill → the position state is updated</em>,
+  which Nautilus handlers fire in which order, which ones the project currently overrides, and which ones it could override but doesn't.
+</div>
+
+<h2>Counts at a glance</h2>
+<div class="summary">
+  <div class="stat-card stat-info"><div class="num">~33</div><div class="lbl">Total Nautilus handlers (Actor + Strategy)</div></div>
+  <div class="stat-card stat-ok"><div class="num">4</div><div class="lbl">Handlers we override</div></div>
+  <div class="stat-card stat-na"><div class="num">29</div><div class="lbl">Handlers available but unused</div></div>
+  <div class="stat-card stat-purple"><div class="num">1</div><div class="lbl">"Final fill confirmation" handler</div></div>
+</div>
+
+<div class="legend">
+  <span><span class="badge badge-ok">✅ Overridden</span> Project defines this hook</span>
+  <span><span class="badge badge-na">✗ Not used</span> Available but project doesn't override</span>
+  <span><span class="badge badge-warn">⚠ Catch-all</span> Fires for every event in its category</span>
+  <span><span class="badge badge-purple">★ Confirmation</span> The fill-confirmation handler</span>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#diagram">Pipeline diagram</a></li>
+    <li><a href="#stage1">Stage 1 — Data → Bar → Strategy</a></li>
+    <li><a href="#stage2">Stage 2 — Strategy → Order (submit)</a></li>
+    <li><a href="#stage3">Stage 3 — Order lifecycle events</a></li>
+    <li><a href="#stage4">Stage 4 — Position lifecycle</a></li>
+    <li><a href="#stage5">Stage 5 — Engine teardown</a></li>
+    <li><a href="#happypath">Happy-path call sequence</a></li>
+    <li><a href="#takeaways">Practical takeaways</a></li>
+    <li><a href="#verify">Verification commands</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================== Diagram ============================================== -->
+<h2 id="diagram">Pipeline diagram</h2>
+
+<pre><code>┌───────────────────────────────────────────────────────────────────────────┐
+│  RAW CSV / TICK DATA                                                       │
+│       │                                                                    │
+│       ▼  load_csv() → DataFrame                                            │
+│  ┌────────────────────────┐                                                │
+│  │ BarDataWrangler.process│   ← Nautilus class, called by core/nautilus_loader.py
+│  └────────────────────────┘                                                │
+│       │                                                                    │
+│       ▼  list[Bar]                                                         │
+│  ┌────────────────────────┐                                                │
+│  │ ParquetDataCatalog     │   ← persist as .parquet                        │
+│  └────────────────────────┘                                                │
+│       │                                                                    │
+│       ▼  engine.add_data(bars)                                             │
+│  ╔══════════════════════════════════════════════════════════════════════╗  │
+│  ║ Nautilus BacktestEngine — feeds bars in time order                   ║  │
+│  ║                                                                      ║  │
+│  ║   Bar → DataEngine → subscribers                                     ║  │
+│  ║                          │                                           ║  │
+│  ║                          ▼                                           ║  │
+│  ║              ┌────────────────────────┐                              ║  │
+│  ║              │  Strategy.on_bar(bar)  │ ◄── ✅ WE OVERRIDE           ║  │
+│  ║              └────────────────────────┘                              ║  │
+│  ║                          │                                           ║  │
+│  ║                          ▼ _check_entries / _check_exits             ║  │
+│  ║              ┌──────────────────────────────────┐                    ║  │
+│  ║              │ order_factory.market(...)        │                    ║  │
+│  ║              │ submit_order(order)              │ ── async ──┐       ║  │
+│  ║              └──────────────────────────────────┘            │       ║  │
+│  ║                                                              │       ║  │
+│  ║   ┌──────────────────────────────────────────────────────────┘       ║  │
+│  ║   ▼                                                                  ║  │
+│  ║  RiskEngine ─► ExecutionEngine ─► SimulatedVenue                     ║  │
+│  ║                                          │                           ║  │
+│  ║   Events bubble back to Strategy:        ▼                           ║  │
+│  ║                                                                      ║  │
+│  ║      on_order_initialized   ✗ not used                               ║  │
+│  ║      on_order_submitted     ✗ not used                               ║  │
+│  ║      on_order_accepted      ✗ not used                               ║  │
+│  ║      on_order_filled        ★ ✅ WE OVERRIDE  ◄── final confirmation ║  │
+│  ║          │                                                           ║  │
+│  ║          ▼ entry_price set, SL/TP computed, position_side flipped    ║  │
+│  ║                                                                      ║  │
+│  ║      on_position_opened     ✗ not used (we infer from on_order_filled)║ │
+│  ║                                                                      ║  │
+│  ╚══════════════════════════════════════════════════════════════════════╝  │
+│                                                                            │
+│  At end:  on_stop  ✅ WE OVERRIDE — cancel_all_orders + close_all_positions│
+└───────────────────────────────────────────────────────────────────────────┘</code></pre>
+
+<!-- ============================================== Stage 1 ============================================== -->
+<h2 id="stage1">Stage 1 — Data → Bar → Strategy</h2>
+<p>Nautilus's <code>DataEngine</code> dispatches data events to subscribers. The handlers below all live in the <code>Actor</code> base class (which <code>Strategy</code> inherits). Project subscribes only to bars; everything else is available but unused.</p>
+
+<table>
+  <thead><tr>
+    <th>Handler</th><th>Event class / payload</th><th>Fires when</th>
+    <th class="center">We override?</th><th>Where (or why not)</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><code>on_start(self)</code></td>
+      <td>—</td>
+      <td>Engine startup, exactly once.</td>
+      <td class="center"><span class="badge badge-ok">✅ Overridden</span></td>
+      <td>Resolve instrument from cache, register indicators, <code>subscribe_bars(bar_type)</code>. <a href="core/managed_strategy.py#L187-L221">managed_strategy.py:187</a>.</td>
+    </tr>
+    <tr>
+      <td><code>on_bar(self, Bar bar)</code></td>
+      <td><code>Bar</code> (OHLCV + ts_event)</td>
+      <td>A new bar is dispatched after <code>subscribe_bars(...)</code>.</td>
+      <td class="center"><span class="badge badge-ok">✅ Overridden</span></td>
+      <td>Cache bar ts, RBO state step, squareoff check, <code>_check_exits</code> / <code>_check_entries</code>. <a href="core/managed_strategy.py#L223-L277">managed_strategy.py:223</a>.</td>
+    </tr>
+    <tr>
+      <td><code>on_quote_tick(self, QuoteTick tick)</code></td>
+      <td><code>QuoteTick</code></td>
+      <td>If we'd called <code>subscribe_quote_ticks(...)</code>.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Project is bar-only.</td>
+    </tr>
+    <tr>
+      <td><code>on_trade_tick(self, TradeTick tick)</code></td>
+      <td><code>TradeTick</code></td>
+      <td>If we'd called <code>subscribe_trade_ticks(...)</code>.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Same.</td>
+    </tr>
+    <tr>
+      <td><code>on_order_book(self, OrderBook book)</code><br>
+          <code>on_order_book_deltas(self, deltas)</code><br>
+          <code>on_order_book_depth(self, depth)</code></td>
+      <td><code>OrderBook</code> / deltas / depth</td>
+      <td>If we'd subscribed to an order book.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Bar-only project.</td>
+    </tr>
+    <tr>
+      <td><code>on_mark_price(self, MarkPriceUpdate)</code><br>
+          <code>on_index_price(self, IndexPriceUpdate)</code><br>
+          <code>on_funding_rate(self, FundingRateUpdate)</code></td>
+      <td>Reference price updates</td>
+      <td>Derivatives-specific (perpetuals, indices).</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Not derivatives-aware in this project.</td>
+    </tr>
+    <tr>
+      <td><code>on_instrument(self, Instrument)</code><br>
+          <code>on_instrument_status(self, InstrumentStatus)</code><br>
+          <code>on_instrument_close(self, InstrumentClose)</code></td>
+      <td>Instrument metadata + halts/closes</td>
+      <td>Live data feed sends instrument changes / session events.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Backtest doesn't use these.</td>
+    </tr>
+    <tr>
+      <td><code>on_data(self, data)</code></td>
+      <td>any custom data type</td>
+      <td>Catch-all for user-defined data classes.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>Project has no custom data types.</td>
+    </tr>
+    <tr>
+      <td><code>on_signal(self, signal)</code></td>
+      <td>signal payload</td>
+      <td>Custom signal stream.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>on_historical_data(self, data)</code></td>
+      <td>bulk replay</td>
+      <td>Bulk historical loader callback.</td>
+      <td class="center"><span class="badge badge-na">✗ Not used</span></td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== Stage 2 ============================================== -->
+<h2 id="stage2">Stage 2 — Strategy → Order (submit)</h2>
+
+<p>Inside <code>on_bar</code>, our <code>_check_entries</code> builds and submits via the project's single helper <code>_submit_order</code>:</p>
+
+<pre><code># core/managed_strategy.py:724-739
+def _submit_order(self, side: OrderSide) -> None:
+    kwargs = dict(
+        instrument_id=self.config.instrument_id,
+        order_side=side,
+        quantity=self.instrument.make_qty(self.config.trade_size),
+        time_in_force=TimeInForce.GTC,
+    )
+    if self._pending_entry_reason:
+        kwargs["tags"] = [self._pending_entry_reason]
+    order = self.order_factory.market(**kwargs)
+    self.submit_order(order)
+    self._pending_entry_reason = None</code></pre>
+
+<table>
+  <thead><tr><th>Step</th><th>Nautilus call</th><th>Returns</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td><span class="step-num">1</span> Build market order</td><td><code>self.order_factory.market(instrument_id, order_side, quantity, time_in_force, tags)</code></td><td><code>MarketOrder</code> object (with stamped ID)</td><td><a href="core/managed_strategy.py#L737">managed_strategy.py:737</a></td></tr>
+    <tr><td><span class="step-num">2</span> Submit (async)</td><td><code>self.submit_order(order)</code></td><td><code>None</code> — control returns immediately</td><td><a href="core/managed_strategy.py#L738">managed_strategy.py:738</a></td></tr>
+    <tr><td><span class="step-num">3</span> Convert size</td><td><code>instrument.make_qty(decimal_size)</code></td><td><code>Quantity</code> (precision-enforced)</td><td><a href="core/managed_strategy.py#L732">managed_strategy.py:732</a></td></tr>
+    <tr><td><span class="step-num">4</span> Exit (close)</td><td><code>self.close_all_positions(instrument_id, tags=[reason])</code></td><td><code>None</code> — engine submits the closing market order internally</td><td><a href="core/managed_strategy.py#L416">managed_strategy.py:416</a></td></tr>
+  </tbody>
+</table>
+
+<div class="callout-warn">
+  <strong>Important:</strong> <code>submit_order(order)</code> does <em>not</em> block on a fill. It hands the command to the engine and returns. The fill confirmation arrives later via the order-lifecycle events in Stage 3.
+</div>
+
+<p class="small">Calls the project does <strong>NOT</strong> make: <code>order_factory.limit</code>, <code>.stop_market</code>, <code>.stop_limit</code>, <code>.bracket</code>, <code>submit_order_list</code>, <code>modify_order</code>, <code>cancel_order</code> (individual). Only market orders + GTC.</p>
+
+<!-- ============================================== Stage 3 ============================================== -->
+<h2 id="stage3">Stage 3 — Order lifecycle events</h2>
+<p>After <code>submit_order</code>, the order travels <code>RiskEngine → ExecutionEngine → SimulatedVenue</code>. Each transition fires a separate event and a separate handler. Events fire in the order shown below; the order may stop early on a terminal event.</p>
+
+<table>
+  <thead><tr>
+    <th>#</th><th>Handler</th><th>Event class</th><th>Meaning</th>
+    <th class="center">Always fires<sup>¹</sup>?</th>
+    <th class="center">We override?</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>on_order_initialized</code></td><td><code>OrderInitialized</code></td><td>The <code>Order</code> object was constructed and stamped with an ID — <em>before</em> it goes anywhere.</td><td class="center">Yes</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>2</td><td><code>on_order_denied</code></td><td><code>OrderDenied</code></td><td>RiskEngine refused to forward (limits exceeded, blocked instrument). <strong>Terminal failure path.</strong></td><td class="center">Only on deny</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>3</td><td><code>on_order_submitted</code></td><td><code>OrderSubmitted</code></td><td>Engine sent the order to the venue.</td><td class="center">Yes (if not denied)</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>4a</td><td><code>on_order_rejected</code></td><td><code>OrderRejected</code></td><td>Venue refused (bad price, no margin, instrument halted). <strong>Terminal failure path.</strong></td><td class="center">On reject</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>4b</td><td><code>on_order_accepted</code></td><td><code>OrderAccepted</code></td><td>Venue acknowledged; order is live in the book.</td><td class="center">On accept</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>5a</td><td><code>on_order_emulated</code> / <code>on_order_released</code></td><td><code>OrderEmulated</code> / <code>Released</code></td><td>Only for emulated / contingent orders.</td><td class="center">Conditional</td><td class="center"><span class="badge badge-na">✗ N/A</span></td></tr>
+    <tr><td>5b</td><td><code>on_order_triggered</code></td><td><code>OrderTriggered</code></td><td>Stop / conditional order crossed its trigger price.</td><td class="center">Stop orders only</td><td class="center"><span class="badge badge-na">✗ N/A</span></td></tr>
+    <tr><td>5c</td><td><code>on_order_pending_update</code><br><code>on_order_updated</code><br><code>on_order_modify_rejected</code></td><td>Update events</td><td>Only if we call <code>modify_order(...)</code>.</td><td class="center">Modify only</td><td class="center"><span class="badge badge-na">✗ N/A</span></td></tr>
+    <tr><td>5d</td><td><code>on_order_pending_cancel</code><br><code>on_order_canceled</code><br><code>on_order_cancel_rejected</code></td><td>Cancel events</td><td>Only if we call <code>cancel_order(...)</code> or the venue auto-cancels.</td><td class="center">Cancel only</td><td class="center"><span class="badge badge-na">✗</span></td></tr>
+    <tr><td>5e</td><td><code>on_order_expired</code></td><td><code>OrderExpired</code></td><td>TimeInForce expiry (DAY, IOC, GTD). Project uses GTC, so won't fire.</td><td class="center">Non-GTC only</td><td class="center"><span class="badge badge-na">✗ N/A</span></td></tr>
+    <tr style="background: #fef9e6;"><td><strong>6</strong></td><td><code><strong>on_order_filled</strong></code></td><td><code>OrderFilled</code></td><td><strong>Venue confirms a fill (full or partial). The fill event carries <code>last_qty</code>, <code>last_px</code>, <code>commission</code>. <em>This is the "final fill confirmation" handler.</em></strong></td><td class="center"><strong>Yes (when filled)</strong></td><td class="center"><span class="badge badge-purple">★ ✅ Overridden</span></td></tr>
+    <tr><td>7</td><td><code>on_order_event</code></td><td><code>OrderEvent</code> (base)</td><td><strong>Catch-all</strong> — fires for <em>every</em> order event above (after the specific handler). One place to log everything.</td><td class="center">Yes (always)</td><td class="center"><span class="badge badge-warn">⚠ Catch-all, not used</span></td></tr>
+  </tbody>
+</table>
+<p class="small"><sup>¹</sup> "Always fires" assumes the path the event lives on actually happens. E.g. <code>on_order_rejected</code> won't fire if the order was accepted — it's a branch.</p>
+
+<div class="callout-ok">
+  <strong>Happy path for a market order:</strong> <code>on_order_initialized</code> → <code>on_order_submitted</code> → <code>on_order_accepted</code> → <code>on_order_filled</code> ★. Of these four, the project hooks only the last one. The order's lifetime in the book between accept and fill is essentially zero for market orders.
+</div>
+
+<p>Inside <code>on_order_filled</code> the project does (<a href="core/managed_strategy.py#L657-L708">managed_strategy.py:657</a>):</p>
+<pre><code>def on_order_filled(self, event) -&gt; None:
+    if self._expecting_close_fill:           # this fill is closing an existing position
+        self._expecting_close_fill = False
+        return
+    self.entry_price = float(event.last_px)  # ← fill confirmation: price
+    self.highest_profit = 0.0
+    self.sl_wait_count = 0
+    self._was_trailed = False
+    self._reentry_blocked_until_ns = 0
+    self._entry_filled_at_ns = self._current_bar_ts_ns
+    self._move_sl_fired_this_position = False
+    is_buy = event.order_side == OrderSide.BUY
+    self.position_side = "LONG" if is_buy else "SHORT"
+    # ... compute current_sl, current_tp from entry_price + ExitConfig</code></pre>
+
+<!-- ============================================== Stage 4 ============================================== -->
+<h2 id="stage4">Stage 4 — Position lifecycle</h2>
+<p>A fill not only triggers <code>on_order_filled</code> — Nautilus's <code>PortfolioFacade</code> also rolls the fill into a <code>Position</code> object and fires position events. These run <strong>after</strong> <code>on_order_filled</code> for the same fill.</p>
+
+<table>
+  <thead><tr><th>Handler</th><th>Event class</th><th>Fires when</th><th class="center">We override?</th></tr></thead>
+  <tbody>
+    <tr><td><code>on_position_opened</code></td><td><code>PositionOpened</code></td><td>Net position transitioned <em>flat → non-flat</em>. A new <code>Position</code> object now exists.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td></tr>
+    <tr><td><code>on_position_changed</code></td><td><code>PositionChanged</code></td><td>An existing position's quantity changed (scale-in / partial close).</td><td class="center"><span class="badge badge-na">✗ Not used</span></td></tr>
+    <tr><td><code>on_position_closed</code></td><td><code>PositionClosed</code></td><td>Net position transitioned <em>back to flat</em>. <strong>Final realized PnL is on this event.</strong></td><td class="center"><span class="badge badge-na">✗ Not used</span></td></tr>
+    <tr><td><code>on_position_event</code></td><td><code>PositionEvent</code> (base)</td><td>Catch-all for the three above.</td><td class="center"><span class="badge badge-warn">⚠ Catch-all, not used</span></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Why we don't override these:</strong> the project derives all position state from <code>on_order_filled</code> directly — tracking <code>position_side</code> in a private field (<a href="core/managed_strategy.py#L683">managed_strategy.py:683</a>). The dedicated position events would be a cleaner place to do it (especially for realized PnL), but the current single-strategy-per-engine design makes the inference safe.
+</div>
+
+<!-- ============================================== Stage 5 ============================================== -->
+<h2 id="stage5">Stage 5 — Engine teardown &amp; lifecycle</h2>
+<table>
+  <thead><tr><th>Handler</th><th>Fires when</th><th class="center">We override?</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td><code>on_stop(self)</code></td><td>Engine shutdown / <code>engine.stop()</code> / end of backtest run.</td><td class="center"><span class="badge badge-ok">✅ Overridden</span></td><td><code>cancel_all_orders</code> + <code>close_all_positions</code>. <a href="core/managed_strategy.py#L741-L743">managed_strategy.py:741</a>.</td></tr>
+    <tr><td><code>on_resume(self)</code></td><td>Live trading: strategy resumed after a pause.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>Backtest doesn't pause/resume.</td></tr>
+    <tr><td><code>on_reset(self)</code></td><td>Strategy reset between backtest runs.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>Each run uses a fresh strategy instance.</td></tr>
+    <tr><td><code>on_dispose(self)</code></td><td>Resource cleanup.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>—</td></tr>
+    <tr><td><code>on_degrade(self)</code> / <code>on_fault(self)</code></td><td>Component health transitions in live mode.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>Live-only.</td></tr>
+    <tr><td><code>on_load(self, dict[str, bytes] state)</code></td><td>State restoration on resume.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>—</td></tr>
+    <tr><td><code>on_save(self) → dict</code></td><td>State snapshot for resume.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>—</td></tr>
+    <tr><td><code>on_market_exit(self)</code></td><td>Strategy-defined market-exit hook.</td><td class="center"><span class="badge badge-na">✗ Not used</span></td><td>Project uses portfolio/leg <code>squareoff_time</code> instead.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================== Happy path ============================================== -->
+<h2 id="happypath">Happy-path call sequence (one round-trip trade)</h2>
+
+<pre><code>┌─ Engine start ─────────────────────────────────────────────────────────────┐
+│ on_start                                            ✅                      │
+│   └─ subscribe_bars(bar_type)                                              │
+│   └─ register_indicator_for_bars(bar_type, ema_fast)                       │
+│   └─ register_indicator_for_bars(bar_type, ema_slow)                       │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼  (every bar)
+┌─ Bar #N arrives ───────────────────────────────────────────────────────────┐
+│ on_bar(bar)                                         ✅                      │
+│   ├─ _rbo_step (if rbo_enabled)                                            │
+│   ├─ squareoff check                                                       │
+│   ├─ if not flat → _check_exits                                            │
+│   │     └─ (if SL/TP hit) close_all_positions → ENTERS ORDER PATH          │
+│   └─ if flat → _check_entries                                              │
+│         └─ signal_fn returns BUY/SELL                                      │
+│         └─ _submit_order(side) → ENTERS ORDER PATH                         │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼  (order path — async, fires on later bars)
+┌─ Order lifecycle ──────────────────────────────────────────────────────────┐
+│ on_order_initialized        ✗ not used                                     │
+│ on_order_submitted          ✗ not used                                     │
+│ on_order_accepted           ✗ not used                                     │
+│                                                                            │
+│ on_order_filled             ★ ✅  ◄── final confirmation                   │
+│   └─ entry_price = event.last_px                                           │
+│   └─ position_side = LONG / SHORT                                          │
+│   └─ current_sl, current_tp computed from entry + ExitConfig               │
+│                                                                            │
+│ (Position events fire next — but we don't hook them)                       │
+│ on_position_opened          ✗ not used                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼  (continue bar loop until exit signal)
+┌─ Exit (SL hit) ────────────────────────────────────────────────────────────┐
+│ on_bar(bar)                                         ✅                      │
+│   └─ _check_exits  → close <= current_sl                                   │
+│       └─ _expecting_close_fill = True                                      │
+│       └─ close_all_positions(instrument_id, tags=["Stop Loss: ..."])       │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼  (closing market order — same lifecycle)
+┌─ Closing order lifecycle ──────────────────────────────────────────────────┐
+│ on_order_filled             ★ ✅                                            │
+│   └─ _expecting_close_fill is True → return early (already flat)           │
+│                                                                            │
+│ on_position_closed          ✗ not used                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼  (next signal can fire)
+                              ⋮
+┌─ Engine end ───────────────────────────────────────────────────────────────┐
+│ on_stop                                             ✅                      │
+│   └─ cancel_all_orders + close_all_positions                               │
+└────────────────────────────────────────────────────────────────────────────┘</code></pre>
+
+<!-- ============================================== Takeaways ============================================== -->
+<h2 id="takeaways">Practical takeaways</h2>
+<ol>
+  <li><strong>The single "fill confirmation" handler is <code>on_order_filled(OrderFilled event)</code>.</strong> The project already overrides it ([<a href="core/managed_strategy.py#L657">managed_strategy.py:657</a>]) and uses <code>event.last_px</code> as the canonical entry price.</li>
+  <li><strong>For richer ack tracking</strong> (e.g. "log every transition" / "alert on rejected orders"), override the catch-all <code>on_order_event(OrderEvent event)</code> once — it fires for <em>every</em> order event in Stage 3. Saves defining 14 separate hooks.</li>
+  <li><strong>For realized PnL</strong>, override <code>on_position_closed(PositionClosed event)</code> instead of recomputing PnL from fills + entry_price. The event payload carries the realized PnL directly.</li>
+  <li><strong>Failure paths are currently silent.</strong> <code>on_order_denied</code> (RiskEngine refused) and <code>on_order_rejected</code> (venue refused) aren't overridden. With <code>RiskEngineConfig(bypass=True)</code> at <a href="core/backtest_runner.py#L474">backtest_runner.py:474</a> these are unlikely in backtest, but if they fire the strategy never knows — <code>position_side</code> stays <code>None</code> while the user wonders why no trades happen.</li>
+</ol>
+
+<!-- ============================================== Verify ============================================== -->
+<h2 id="verify">Verification commands (read-only)</h2>
+<p>Re-derive the handler list and override count from the source any time:</p>
+
+<pre><code># All 25 strategy-specific handlers
+Grep "cpdef void on_" venv/Lib/site-packages/nautilus_trader/trading/strategy.pyx
+
+# All 24 actor-level handlers (data + lifecycle + persistence)
+Grep "cpdef void on_" venv/Lib/site-packages/nautilus_trader/common/actor.pyx
+
+# What we actually override — should yield exactly 4
+Grep "def on_" core/managed_strategy.py
+#   on_start
+#   on_bar
+#   on_order_filled
+#   on_stop
+
+# Order-construction APIs we use — should yield only .market(...) calls
+Grep "order_factory\." core/managed_strategy.py
+
+# Engine wiring — 5 add_* methods plus run()
+Grep "engine\.(add_|run\()" core/backtest_runner.py</code></pre>
+
+<p class="small" style="margin-top:24px;">
+  Generated against project working tree at <code>d:\mcube_test_version_1_updated\m-cube_version1</code>
+  — branch <code>Path_A_LowAPI</code>. Reference Nautilus source: <code>venv\Lib\site-packages\nautilus_trader\</code>.
+</p>
+
+</div>
+</body>
+</html>

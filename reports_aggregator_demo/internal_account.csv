@@ -1,0 +1,316 @@
+,total,locked,free,currency,account_id,account_type,base_currency,margins,reported,info
+2024-01-01 22:00:00+00:00,1000000.00,0.00,1000000.00,USD,FOREX_MS-001,MARGIN,USD,[],True,{}
+2024-01-02 01:15:00+00:00,999999.91,1.00,999998.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.00', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 01:15:00+00:00,999999.91,1.00,999998.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.00', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 01:15:00+00:00,999999.91,1.00,999998.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.00', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 01:15:00+00:00,999889.59,1288.08,998601.51,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1288.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 02:53:00+00:00,999889.47,1287.57,998601.90,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1287.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 02:53:00+00:00,999889.47,1287.57,998601.90,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1287.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 02:53:00+00:00,999577.39,0.00,999577.39,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 02:53:00+00:00,999577.39,0.00,999577.39,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 05:20:00+00:00,999577.38,0.08,999577.30,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 05:20:00+00:00,999577.38,0.08,999577.30,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 05:20:00+00:00,999577.38,0.08,999577.30,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 05:20:00+00:00,999467.13,1286.33,998180.80,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1286.33', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 10:09:00+00:00,999466.79,1284.92,998181.87,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1284.92', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 10:09:00+00:00,999466.79,1284.92,998181.87,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1284.92', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 10:09:00+00:00,999155.08,0.00,999155.08,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 10:09:00+00:00,999155.08,0.00,999155.08,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 15:00:00+00:00,999154.87,2.47,999152.40,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '2.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:00:00+00:00,999154.87,2.47,999152.40,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '2.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:00:00+00:00,999154.87,2.47,999152.40,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '2.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:00:00+00:00,999045.42,1279.38,997766.04,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1279.38', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:55:00+00:00,999045.22,1278.57,997766.65,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1278.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:55:00+00:00,999045.22,1278.57,997766.65,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1278.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 15:55:00+00:00,998733.96,0.00,998733.96,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 15:55:00+00:00,998733.96,0.00,998733.96,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-02 18:25:00+00:00,998733.93,0.35,998733.58,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.35', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 18:25:00+00:00,998733.93,0.35,998733.58,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.35', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 18:25:00+00:00,998733.93,0.35,998733.58,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.35', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-02 18:25:00+00:00,998624.41,1278.05,997346.36,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1278.05', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 10:01:00+00:00,998624.30,1277.56,997346.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 10:01:00+00:00,998624.30,1277.56,997346.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 10:01:00+00:00,998313.07,0.00,998313.07,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-03 10:01:00+00:00,998313.07,0.00,998313.07,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-03 15:00:00+00:00,998312.69,4.47,998308.22,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:00:00+00:00,998312.69,4.47,998308.22,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:00:00+00:00,998312.69,4.47,998308.22,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:00:00+00:00,998203.82,1274.60,996929.22,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1274.60', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:40:00+00:00,998203.29,1272.40,996930.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1272.40', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:40:00+00:00,998203.29,1272.40,996930.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1272.40', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 15:40:00+00:00,997892.77,0.00,997892.77,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-03 15:40:00+00:00,997892.77,0.00,997892.77,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-03 18:10:00+00:00,997892.68,1.09,997891.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 18:10:00+00:00,997892.68,1.09,997891.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 18:10:00+00:00,997892.68,1.09,997891.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-03 18:10:00+00:00,997783.65,1273.14,996510.51,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1273.14', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 08:55:00+00:00,997784.08,1271.24,996512.84,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1271.24', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 08:55:00+00:00,997784.08,1271.24,996512.84,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1271.24', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 08:55:00+00:00,998073.12,0.00,998073.12,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-04 08:55:00+00:00,998073.12,0.00,998073.12,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-04 11:05:00+00:00,998073.08,0.49,998072.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.49', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 11:05:00+00:00,998073.08,0.49,998072.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.49', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 11:05:00+00:00,998073.08,0.49,998072.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.49', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-04 11:05:00+00:00,997963.57,1278.11,996685.46,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1278.11', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 08:30:00+00:00,997963.71,1277.52,996686.19,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 08:30:00+00:00,997963.71,1277.52,996686.19,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 08:31:00+00:00,997963.88,1276.75,996687.13,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.75', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 08:31:00+00:00,997963.88,1276.75,996687.13,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.75', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 08:31:00+00:00,998251.42,0.00,998251.42,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 08:31:00+00:00,998251.42,0.00,998251.42,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 11:20:00+00:00,998251.39,0.37,998251.02,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.37', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 11:20:00+00:00,998251.39,0.37,998251.02,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.37', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 11:20:00+00:00,998251.39,0.37,998251.02,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.37', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 11:20:00+00:00,998142.26,1273.51,996868.75,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1273.51', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,998140.64,1266.86,996873.78,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.86', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,998140.64,1266.86,996873.78,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.86', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,997831.31,0.00,997831.31,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 13:30:00+00:00,997831.31,0.00,997831.31,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 13:30:00+00:00,997830.74,6.65,997824.09,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.65', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,997830.74,6.65,997824.09,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.65', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,997830.74,6.65,997824.09,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.65', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:30:00+00:00,997722.50,1269.50,996453.00,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.50', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:34:00+00:00,997721.06,1263.71,996457.35,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1263.71', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:34:00+00:00,997721.06,1263.71,996457.35,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1263.71', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 13:34:00+00:00,997407.49,0.00,997407.49,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 13:34:00+00:00,997407.49,0.00,997407.49,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 14:00:00+00:00,997407.21,3.20,997404.01,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 14:00:00+00:00,997407.21,3.20,997404.01,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 14:00:00+00:00,997407.21,3.20,997404.01,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 14:00:00+00:00,997298.21,1274.89,996023.32,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1274.89', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 15:00:00+00:00,997299.49,1269.26,996030.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.26', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 15:00:00+00:00,997299.49,1269.26,996030.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.26', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 15:00:00+00:00,997587.54,0.00,997587.54,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 15:00:00+00:00,997587.54,0.00,997587.54,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-05 16:55:00+00:00,997587.43,1.23,997586.20,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.23', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 16:55:00+00:00,997587.43,1.23,997586.20,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.23', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 16:55:00+00:00,997587.43,1.23,997586.20,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.23', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-05 16:55:00+00:00,997477.96,1278.35,996199.61,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1278.35', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 16:12:00+00:00,997477.77,1277.56,996200.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 16:12:00+00:00,997477.77,1277.56,996200.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 16:12:00+00:00,997163.19,0.00,997163.19,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-08 16:12:00+00:00,997163.19,0.00,997163.19,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-08 17:35:00+00:00,997163.11,0.88,997162.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.88', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 17:35:00+00:00,997163.11,0.88,997162.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.88', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 17:35:00+00:00,997163.11,0.88,997162.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.88', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-08 17:35:00+00:00,997053.54,1279.19,995774.35,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1279.19', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 15:49:00+00:00,997054.00,1277.14,995776.86,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.14', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 15:49:00+00:00,997054.00,1277.14,995776.86,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.14', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 15:49:00+00:00,997339.29,0.00,997339.29,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-09 15:49:00+00:00,997339.29,0.00,997339.29,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-09 17:10:00+00:00,997339.23,0.78,997338.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.78', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 17:10:00+00:00,997339.23,0.78,997338.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.78', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 17:10:00+00:00,997339.23,0.78,997338.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.78', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-09 17:10:00+00:00,997229.94,1275.83,995954.11,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1275.83', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 00:16:00+00:00,997230.00,1275.54,995954.46,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1275.54', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 00:16:00+00:00,997230.00,1275.54,995954.46,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1275.54', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 00:16:00+00:00,997519.18,0.00,997519.18,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 00:16:00+00:00,997519.18,0.00,997519.18,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 04:45:00+00:00,997519.16,0.20,997518.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 04:45:00+00:00,997519.16,0.20,997518.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 04:45:00+00:00,997519.16,0.20,997518.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.20', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 04:45:00+00:00,997409.40,1280.81,996128.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1280.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:30:00+00:00,997408.45,1276.95,996131.50,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:30:00+00:00,997408.45,1276.95,996131.50,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:30:00+00:00,997094.41,0.00,997094.41,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 13:30:00+00:00,997094.41,0.00,997094.41,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 13:35:00+00:00,997093.90,5.94,997087.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.94', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:35:00+00:00,997093.90,5.94,997087.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.94', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:35:00+00:00,997093.90,5.94,997087.96,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.94', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:35:00+00:00,996984.65,1280.57,995704.08,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1280.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:54:00+00:00,996985.34,1277.47,995707.87,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:54:00+00:00,996985.34,1277.47,995707.87,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 13:54:00+00:00,997271.29,0.00,997271.29,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 13:54:00+00:00,997271.29,0.00,997271.29,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-11 17:50:00+00:00,997271.24,0.54,997270.70,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.54', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 17:50:00+00:00,997271.24,0.54,997270.70,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.54', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 17:50:00+00:00,997271.24,0.54,997270.70,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.54', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-11 17:50:00+00:00,997161.77,1277.71,995884.06,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1277.71', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 00:41:00+00:00,997161.50,1276.61,995884.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.61', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 00:41:00+00:00,997161.50,1276.61,995884.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1276.61', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 00:41:00+00:00,996850.45,0.00,996850.45,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 00:41:00+00:00,996850.45,0.00,996850.45,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 06:35:00+00:00,996850.36,1.08,996849.28,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 06:35:00+00:00,996850.36,1.08,996849.28,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 06:35:00+00:00,996850.36,1.08,996849.28,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.08', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 06:35:00+00:00,996741.24,1274.12,995467.12,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1274.12', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 08:34:00+00:00,996740.78,1272.22,995468.56,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1272.22', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 08:34:00+00:00,996740.78,1272.22,995468.56,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1272.22', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 08:34:00+00:00,996430.24,0.00,996430.24,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 08:34:00+00:00,996430.24,0.00,996430.24,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 11:45:00+00:00,996430.17,0.75,996429.42,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.75', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 11:45:00+00:00,996430.17,0.75,996429.42,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.75', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 11:45:00+00:00,996430.17,0.75,996429.42,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.75', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 11:45:00+00:00,996321.29,1271.04,995050.25,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1271.04', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 13:53:00+00:00,996320.59,1268.15,995052.44,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1268.15', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 13:53:00+00:00,996320.59,1268.15,995052.44,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1268.15', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 13:53:00+00:00,996010.55,0.00,996010.55,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 13:53:00+00:00,996010.55,0.00,996010.55,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-16 15:35:00+00:00,996010.48,0.81,996009.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 15:35:00+00:00,996010.48,0.81,996009.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 15:35:00+00:00,996010.48,0.81,996009.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-16 15:35:00+00:00,995901.75,1269.34,994632.41,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.34', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 06:07:00+00:00,995901.58,1268.65,994632.93,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1268.65', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 06:07:00+00:00,995901.58,1268.65,994632.93,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1268.65', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 06:07:00+00:00,995591.15,0.00,995591.15,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-17 06:07:00+00:00,995591.15,0.00,995591.15,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-17 07:15:00+00:00,995591.09,0.68,995590.41,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.68', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 07:15:00+00:00,995591.09,0.68,995590.41,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.68', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 07:15:00+00:00,995591.09,0.68,995590.41,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.68', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 07:15:00+00:00,995482.49,1267.74,994214.75,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.74', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 15:53:00+00:00,995482.02,1265.81,994216.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 15:53:00+00:00,995482.02,1265.81,994216.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.81', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 15:53:00+00:00,995172.03,0.00,995172.03,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-17 15:53:00+00:00,995172.03,0.00,995172.03,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-17 17:05:00+00:00,995171.92,1.33,995170.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.33', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 17:05:00+00:00,995171.92,1.33,995170.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.33', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 17:05:00+00:00,995171.92,1.33,995170.59,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.33', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-17 17:05:00+00:00,995063.41,1267.22,993796.19,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.22', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 02:19:00+00:00,995063.65,1266.18,993797.47,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.18', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 02:19:00+00:00,995063.65,1266.18,993797.47,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.18', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 02:19:00+00:00,995353.39,0.00,995353.39,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-18 02:19:00+00:00,995353.39,0.00,995353.39,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-18 03:05:00+00:00,995353.32,0.83,995352.49,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.83', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 03:05:00+00:00,995353.32,0.83,995352.49,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.83', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 03:05:00+00:00,995353.32,0.83,995352.49,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.83', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 03:05:00+00:00,995244.47,1270.73,993973.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1270.73', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 13:58:00+00:00,995244.72,1269.63,993975.09,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.63', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 13:58:00+00:00,995244.72,1269.63,993975.09,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.63', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 13:58:00+00:00,995531.95,0.00,995531.95,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-18 13:58:00+00:00,995531.95,0.00,995531.95,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-18 16:25:00+00:00,995531.87,0.90,995530.97,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.90', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 16:25:00+00:00,995531.87,0.90,995530.97,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.90', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 16:25:00+00:00,995531.87,0.90,995530.97,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.90', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-18 16:25:00+00:00,995423.29,1267.71,994155.58,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.71', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 02:18:00+00:00,995423.41,1267.18,994156.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.18', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 02:18:00+00:00,995423.41,1267.18,994156.23,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.18', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 02:18:00+00:00,995713.23,0.00,995713.23,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-22 02:18:00+00:00,995713.23,0.00,995713.23,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-22 03:50:00+00:00,995713.19,0.45,995712.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 03:50:00+00:00,995713.19,0.45,995712.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 03:50:00+00:00,995713.19,0.45,995712.74,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-22 03:50:00+00:00,995604.21,1271.92,994332.29,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1271.92', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 11:27:00+00:00,995604.65,1269.95,994334.70,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 11:27:00+00:00,995604.65,1269.95,994334.70,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 11:27:00+00:00,995890.58,0.00,995890.58,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-23 11:27:00+00:00,995890.58,0.00,995890.58,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-23 13:30:00+00:00,995890.41,1.97,995888.44,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.97', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 13:30:00+00:00,995890.41,1.97,995888.44,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.97', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 13:30:00+00:00,995890.41,1.97,995888.44,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.97', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 13:30:00+00:00,995781.87,1268.26,994513.61,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1268.26', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 14:52:00+00:00,995781.55,1266.95,994514.60,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 14:52:00+00:00,995781.55,1266.95,994514.60,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.95', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 14:52:00+00:00,995471.37,0.00,995471.37,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-23 14:52:00+00:00,995471.37,0.00,995471.37,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-23 18:20:00+00:00,995471.28,1.07,995470.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.07', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 18:20:00+00:00,995471.28,1.07,995470.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.07', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 18:20:00+00:00,995471.28,1.07,995470.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.07', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-23 18:20:00+00:00,995362.99,1264.42,994098.57,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.42', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 07:43:00+00:00,995363.35,1262.85,994100.50,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.85', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 07:43:00+00:00,995363.35,1262.85,994100.50,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.85', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 07:43:00+00:00,995653.21,0.00,995653.21,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 07:43:00+00:00,995653.21,0.00,995653.21,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 08:40:00+00:00,995653.09,1.45,995651.64,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 08:40:00+00:00,995653.09,1.45,995651.64,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 08:40:00+00:00,995653.09,1.45,995651.64,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.45', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 08:40:00+00:00,995544.57,1267.56,994277.01,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 09:14:00+00:00,995544.16,1265.91,994278.25,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.91', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 09:14:00+00:00,995544.16,1265.91,994278.25,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.91', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 09:14:00+00:00,995230.71,0.00,995230.71,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 09:14:00+00:00,995230.71,0.00,995230.71,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 12:05:00+00:00,995230.66,0.67,995229.99,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.67', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 12:05:00+00:00,995230.66,0.67,995229.99,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.67', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 12:05:00+00:00,995230.66,0.67,995229.99,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.67', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 12:05:00+00:00,995121.79,1270.74,993851.05,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1270.74', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 13:29:00+00:00,995121.06,1267.78,993853.28,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.78', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 13:29:00+00:00,995121.06,1267.78,993853.28,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.78', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 13:29:00+00:00,994806.67,0.00,994806.67,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 13:29:00+00:00,994806.67,0.00,994806.67,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-24 15:00:00+00:00,994806.37,3.52,994802.85,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 15:00:00+00:00,994806.37,3.52,994802.85,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 15:00:00+00:00,994806.37,3.52,994802.85,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-24 15:00:00+00:00,994697.64,1271.97,993425.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1271.97', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 14:03:00+00:00,994698.00,1270.39,993427.61,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1270.39', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 14:03:00+00:00,994698.00,1270.39,993427.61,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1270.39', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 14:03:00+00:00,994985.02,0.00,994985.02,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-25 14:03:00+00:00,994985.02,0.00,994985.02,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-25 17:25:00+00:00,994984.96,0.70,994984.26,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.70', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 17:25:00+00:00,994984.96,0.70,994984.26,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.70', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 17:25:00+00:00,994984.96,0.70,994984.26,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.70', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 17:25:00+00:00,994876.54,1265.52,993611.02,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.52', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 19:02:00+00:00,994876.26,1264.37,993611.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.37', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 19:02:00+00:00,994876.26,1264.37,993611.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.37', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 19:02:00+00:00,994566.27,0.00,994566.27,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-25 19:02:00+00:00,994566.27,0.00,994566.27,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-25 20:05:00+00:00,994566.26,0.16,994566.10,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.16', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 20:05:00+00:00,994566.26,0.16,994566.10,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.16', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 20:05:00+00:00,994566.26,0.16,994566.10,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.16', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-25 20:05:00+00:00,994457.90,1264.34,993193.56,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.34', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 07:17:00+00:00,994457.47,1262.56,993194.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 07:17:00+00:00,994457.47,1262.56,993194.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.56', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 07:17:00+00:00,994147.73,0.00,994147.73,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 07:17:00+00:00,994147.73,0.00,994147.73,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 08:40:00+00:00,994147.61,1.48,994146.13,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.48', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 08:40:00+00:00,994147.61,1.48,994146.13,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.48', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 08:40:00+00:00,994147.61,1.48,994146.13,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.48', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 08:40:00+00:00,994039.41,1263.79,992775.62,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1263.79', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 11:11:00+00:00,994039.73,1262.39,992777.34,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.39', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 11:11:00+00:00,994039.73,1262.39,992777.34,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.39', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 11:11:00+00:00,994329.69,0.00,994329.69,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 11:11:00+00:00,994329.69,0.00,994329.69,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 13:35:00+00:00,994329.29,4.57,994324.72,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:35:00+00:00,994329.29,4.57,994324.72,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:35:00+00:00,994329.29,4.57,994324.72,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.57', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:35:00+00:00,994221.08,1267.05,992954.03,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.05', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:48:00+00:00,994220.15,1263.26,992956.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1263.26', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:48:00+00:00,994220.15,1263.26,992956.89,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1263.26', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:48:00+00:00,993908.28,0.00,993908.28,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 13:48:00+00:00,993908.28,0.00,993908.28,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 13:50:00+00:00,993908.14,1.69,993906.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.69', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:50:00+00:00,993908.14,1.69,993906.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.69', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:50:00+00:00,993908.14,1.69,993906.45,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.69', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 13:50:00+00:00,993799.47,1269.40,992530.07,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1269.40', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 15:16:00+00:00,993799.04,1267.64,992531.40,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.64', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 15:16:00+00:00,993799.04,1267.64,992531.40,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.64', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 15:16:00+00:00,993488.87,0.00,993488.87,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 15:16:00+00:00,993488.87,0.00,993488.87,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-26 16:35:00+00:00,993488.83,0.46,993488.37,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.46', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 16:35:00+00:00,993488.83,0.46,993488.37,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.46', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 16:35:00+00:00,993488.83,0.46,993488.37,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.46', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-26 16:35:00+00:00,993380.20,1267.91,992112.29,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.91', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,993380.17,1267.82,992112.35,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.82', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,993380.17,1267.82,992112.35,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1267.82', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,993060.73,0.00,993060.73,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-28 22:00:00+00:00,993060.73,0.00,993060.73,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-28 22:00:00+00:00,993060.72,0.09,993060.63,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,993060.72,0.09,993060.63,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,993060.72,0.09,993060.63,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.09', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-28 22:00:00+00:00,992952.30,1265.00,991687.30,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.00', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 14:34:00+00:00,992952.45,1264.30,991688.15,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.30', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 14:34:00+00:00,992952.45,1264.30,991688.15,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.30', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 14:34:00+00:00,993212.24,0.00,993212.24,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-29 14:34:00+00:00,993212.24,0.00,993212.24,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-29 17:00:00+00:00,993212.21,0.38,993211.83,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.38', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 17:00:00+00:00,993212.21,0.38,993211.83,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.38', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 17:00:00+00:00,993212.21,0.38,993211.83,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '0.38', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-29 17:00:00+00:00,993104.18,1260.70,991843.48,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1260.70', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 11:38:00+00:00,993104.32,1260.11,991844.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1260.11', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 11:38:00+00:00,993104.32,1260.11,991844.21,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1260.11', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 11:38:00+00:00,993394.72,0.00,993394.72,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-30 11:38:00+00:00,993394.72,0.00,993394.72,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-30 13:35:00+00:00,993394.56,1.85,993392.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.85', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 13:35:00+00:00,993394.56,1.85,993392.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.85', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 13:35:00+00:00,993394.56,1.85,993392.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.85', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-30 13:35:00+00:00,993286.34,1264.43,992021.91,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1264.43', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 13:42:00+00:00,993285.86,1262.47,992023.39,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 13:42:00+00:00,993285.86,1262.47,992023.39,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1262.47', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 13:42:00+00:00,992972.76,0.00,992972.76,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-31 13:42:00+00:00,992972.76,0.00,992972.76,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
+2024-01-31 15:45:00+00:00,992972.60,1.89,992970.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.89', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 15:45:00+00:00,992972.60,1.89,992970.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.89', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 15:45:00+00:00,992972.60,1.89,992970.71,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1.89', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 15:45:00+00:00,992864.20,1266.53,991597.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.53', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 18:29:00+00:00,992864.20,1266.53,991597.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.53', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 18:29:00+00:00,992864.20,1266.53,991597.67,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1266.53', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 18:29:00+00:00,992864.18,1265.96,991598.22,USD,FOREX_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '1265.96', 'currency': 'USD', 'instrument_id': 'EURUSD.FOREX_MS'}]",False,{}
+2024-01-31 18:29:00+00:00,992833.72,0.00,992833.72,USD,FOREX_MS-001,MARGIN,USD,[],False,{}
