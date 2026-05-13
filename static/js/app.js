@@ -541,9 +541,11 @@ const App = {
         if (!bt) return "";
         const parts = String(bt).split("-");
         const inst = parts[0] || "";
-        const pt = parts[3] || "";
-        if (!pt || !inst.includes(".")) return inst;
-        return inst.replace(".", `(${pt}).`);
+        const tf   = (parts[1] && parts[2]) ? `${parts[1]}-${parts[2]}` : "";
+        const pt   = parts[3] || "";
+        if (!pt || !inst.includes(".")) return tf ? `${inst} · ${tf}` : inst;
+        const base = inst.replace(".", `(${pt}).`);
+        return tf ? `${base} · ${tf}` : base;
     },
 
     /** Debounce helper — returns a function that fires after `wait` ms of quiet. */

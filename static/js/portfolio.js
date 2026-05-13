@@ -126,7 +126,10 @@ const Portfolio = {
        ═══════════════════════════════════════════════════════════════════════ */
 
     renderApp() {
-        const colCount = 13;
+        const colCount = 10;
+        const chip = (text) => `<span class="pf-chip">${text}</span>`;
+        const chipMore = (n) => `<span class="pf-chip pf-chip-more">+${n}</span>`;
+
         let rows = "";
         if (this.portfolios.length === 0) {
             rows = `<tr><td colspan="${colCount}" style="text-align:center; padding: 40px; color: var(--text-muted);">
@@ -135,42 +138,47 @@ const Portfolio = {
         } else {
             rows = this.portfolios.map((pf, i) => {
                 const enabled = pf._enabled !== false;
-                const statusColor = enabled ? "var(--success)" : "var(--text-muted)";
-                const status = enabled ? "Enabled" : "Disabled";
-                const instruments = (pf.slots || []).map(s => App.barTypeLabel(s.bar_type_str)).filter(Boolean);
-                const instSummary = instruments.length > 0
-                    ? [...new Set(instruments)].slice(0, 3).join(", ") + (instruments.length > 3 ? "..." : "")
-                    : "—";
-                const stratTags = [...new Set((pf.slots || []).map(s => s.strategy_name))];
-                const stratSummary = stratTags.length > 0
-                    ? stratTags.slice(0, 2).join(", ") + (stratTags.length > 2 ? "..." : "")
-                    : "—";
+                const statusBadge = enabled
+                    ? `<span class="badge badge-success">Enabled</span>`
+                    : `<span class="badge" style="background:var(--bg-muted); color:var(--text-muted);">Disabled</span>`;
+
+                const instruments = [...new Set((pf.slots || []).map(s => App.barTypeLabel(s.bar_type_str)).filter(Boolean))];
+                const instHTML = instruments.length === 0
+                    ? `<span style="color:var(--text-muted);">—</span>`
+                    : instruments.slice(0, 2).map(chip).join("") + (instruments.length > 2 ? chipMore(instruments.length - 2) : "");
+
+                const stratTags = [...new Set((pf.slots || []).map(s => s.strategy_name).filter(Boolean))];
+                const stratHTML = stratTags.length === 0
+                    ? `<span style="color:var(--text-muted);">—</span>`
+                    : stratTags.slice(0, 2).map(chip).join("") + (stratTags.length > 2 ? chipMore(stratTags.length - 2) : "");
+
                 const sqOff = pf.squareoff_time || "—";
                 const slotCount = (pf.slots || []).length;
                 const isActive = this.activeIndex === i;
-                const activeCls = isActive ? ' style="background: var(--accent-light);"' : '';
+                const rowCls = isActive ? ' class="pf-row-active"' : '';
 
-                return `<tr${activeCls}>
+                return `<tr${rowCls}>
+                    <td style="text-align:center; color:var(--text-muted); font-size:0.78rem;">${i + 1}</td>
                     <td style="text-align:center;">
-                        ${i + 1}
                         <input type="checkbox" ${enabled ? "checked" : ""}
-                               onchange="Portfolio.togglePortfolio(${i})" style="margin-left:3px;">
+                               onchange="Portfolio.togglePortfolio(${i})">
                     </td>
-                    <td style="color:${statusColor}; font-size:0.78rem;">${status}</td>
+                    <td>${statusBadge}</td>
                     <td><strong style="cursor:pointer; color:var(--accent);" onclick="Portfolio.selectPortfolio(${i})">${pf.name}</strong></td>
-                    <td style="font-size:0.8rem;">${instSummary}</td>
-                    <td><button class="btn btn-xs" onclick="Portfolio.openEditPortfolio(${i})">Edit</button></td>
-                    <td><button class="btn btn-xs" onclick="Portfolio.duplicatePortfolio(${i})">Copy</button></td>
-                    <td><button class="btn btn-xs" style="color:var(--danger);" onclick="Portfolio.deletePortfolio(${i})">X</button></td>
-                    <td>${stratSummary}</td>
-                    <td style="text-align:center;">${slotCount}</td>
-                    <td>$${App.formatNumber(pf.starting_capital || 100000)}</td>
-                    <td>${sqOff}</td>
-                    <td style="text-align:center;">
-                        <button class="btn btn-xs btn-primary" onclick="Portfolio.runBacktestFor(${i})">Run</button>
+                    <td>${instHTML}</td>
+                    <td>${stratHTML}</td>
+                    <td style="text-align:center; font-variant-numeric: tabular-nums;">${slotCount}</td>
+                    <td style="text-align:right;"><span class="pf-num">$${App.formatNumber(pf.starting_capital || 100000)}</span></td>
+                    <td style="text-align:center;">${sqOff}</td>
+                    <td>
+                        <div class="pf-actions">
+                            <button class="btn btn-xs" onclick="Portfolio.openEditPortfolio(${i})">Edit</button>
+                            <button class="btn btn-xs" onclick="Portfolio.duplicatePortfolio(${i})">Copy</button>
+                            <button class="btn btn-xs btn-primary" onclick="Portfolio.runBacktestFor(${i})">Run</button>
+                            <button class="btn btn-xs btn-danger" onclick="Portfolio.deletePortfolio(${i})" title="Delete">&times;</button>
+                        </div>
                     </td>
-                    <td style="font-size:0.75rem; color:var(--text-muted);">${pf.description || ""}</td>
-                </tr>`;
+                </tr>${pf.description ? `<tr${rowCls}><td></td><td colspan="${colCount - 1}" style="font-size:0.74rem; color:var(--text-muted); padding-top:0; padding-bottom:8px; border-bottom:1px solid var(--border-light); white-space:normal;">${pf.description}</td></tr>` : ""}`;
             }).join("");
         }
 
@@ -182,52 +190,51 @@ const Portfolio = {
         const activePf = this.activeIndex !== null ? this.portfolios[this.activeIndex] : null;
         const gStartVal = activePf?.start_date || "";
         const gEndVal = activePf?.end_date || "";
+        const pfCount = this.portfolios.length;
 
         document.getElementById("portfolio-app").innerHTML = `
-            <div style="border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;">
+            <div class="pf-list-wrap">
                 <div style="overflow-x: auto;">
-                    <table style="margin:0;">
+                    <table>
                         <thead><tr>
-                            <th style="width:50px; text-align:center;">Enabled</th>
-                            <th>Status</th>
+                            <th style="width:36px; text-align:center;">#</th>
+                            <th style="width:42px; text-align:center;">On</th>
+                            <th style="width:90px;">Status</th>
                             <th>Portfolio Name</th>
                             <th>Instruments</th>
-                            <th>Edit</th>
-                            <th>Copy</th>
-                            <th>Delete</th>
-                            <th>Strategy Tag</th>
+                            <th>Strategies</th>
                             <th style="text-align:center;">Slots</th>
-                            <th>Capital</th>
-                            <th>Sq-off Time</th>
-                            <th>Backtest</th>
-                            <th>Remarks</th>
+                            <th style="text-align:right;">Capital</th>
+                            <th style="text-align:center;">Sq-off</th>
+                            <th style="text-align:center;">Actions</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
-                <div style="min-height: 100px; background: var(--bg-secondary); border-top: 1px solid var(--border-light);"></div>
+                <div class="pf-list-footer">
+                    ${pfCount} ${pfCount === 1 ? "portfolio" : "portfolios"}${this.activeIndex !== null && activePf ? ` &middot; selected: <strong>${activePf.name}</strong>` : ""}
+                </div>
             </div>
 
-            <div style="border-top: 2px solid var(--border-color);"></div>
-
-            <div style="display: flex; align-items: center; justify-content: center; gap: 16px; padding: 10px 0;">
-                <button class="btn" onclick="Portfolio.openAddPortfolio()" style="padding: 6px 20px;">+ Add Portfolio</button>
-                <button class="btn" onclick="Portfolio.openOptionsMenu(event)" style="padding: 6px 20px;">Options &#9660;</button>
-            </div>
-
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 0 10px 0;">
-                <span style="font-size: 0.84rem; color: var(--text-secondary);">From:</span>
-                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
-                       id="pf-global-start" value="${gStartVal}"
-                       onchange="Portfolio._onGlobalDateChange('start', this.value)">
-                <span style="font-size: 0.84rem; color: var(--text-secondary);">To:</span>
-                <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
-                       id="pf-global-end" value="${gEndVal}"
-                       onchange="Portfolio._onGlobalDateChange('end', this.value)">
-                <button class="btn btn-primary btn-sm" onclick="Portfolio.runSelectedBacktest()" style="padding: 5px 16px;">
-                    &#9654; Start Testing
-                </button>
-                <button class="btn btn-sm" onclick="Portfolio.openGlobalSettings()" style="padding: 5px 14px;">Settings</button>
+            <div class="pf-toolbar">
+                <div class="pf-toolbar-row">
+                    <button class="btn" onclick="Portfolio.openAddPortfolio()" style="padding: 6px 20px;">+ Add Portfolio</button>
+                    <button class="btn" onclick="Portfolio.openOptionsMenu(event)" style="padding: 6px 20px;">Options &#9660;</button>
+                </div>
+                <div class="pf-toolbar-row">
+                    <span style="font-size: 0.84rem; color: var(--text-secondary);">From:</span>
+                    <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
+                           id="pf-global-start" value="${gStartVal}"
+                           onchange="Portfolio._onGlobalDateChange('start', this.value)">
+                    <span style="font-size: 0.84rem; color: var(--text-secondary);">To:</span>
+                    <input type="date" class="form-control" style="width:135px; font-size:0.82rem; padding:4px 8px;"
+                           id="pf-global-end" value="${gEndVal}"
+                           onchange="Portfolio._onGlobalDateChange('end', this.value)">
+                    <button class="btn btn-primary btn-sm" onclick="Portfolio.runSelectedBacktest()" style="padding: 5px 16px;">
+                        &#9654; Start Testing
+                    </button>
+                    <button class="btn btn-sm" onclick="Portfolio.openGlobalSettings()" style="padding: 5px 14px;">Settings</button>
+                </div>
             </div>
 
             <div id="pf-progress"></div>
@@ -516,7 +523,7 @@ const Portfolio = {
 
         // Build inline-editable legs table rows
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
+        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
         let legsRows = "";
         if ((pf.slots || []).length === 0) {
             legsRows = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
@@ -1355,7 +1362,7 @@ const Portfolio = {
     /** Build HTML for a single inline leg row */
     _buildInlineLegRow(slot, i) {
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
+        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];

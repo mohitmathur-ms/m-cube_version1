@@ -552,10 +552,14 @@ select.form-control {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b3bcc7' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
 }
 
-/* Force native form widgets to render with the correct color scheme in dark
- * mode (option dropdowns, date pickers, scrollbars on form-controls). */
+/* Force native widgets (date/number spinners, textarea scrollbars) to follow
+ * dark mode. `color-scheme` on :root already cascades, but Chromium needs an
+ * explicit hint on form elements to repaint their internal chrome.
+ *
+ * Deliberately excludes <select>: setting color-scheme on a <select> makes
+ * Chromium render its native dropdown arrow in addition to the custom SVG
+ * arrow we paint via background-image, producing duplicate arrows. */
 :root[data-theme="dark"] input,
-:root[data-theme="dark"] select,
 :root[data-theme="dark"] textarea {
     color-scheme: dark;
 }
@@ -974,6 +978,97 @@ span.negative { color: var(--danger); }
     font-size: 0.95rem;
 }
 
+/* ─── Portfolio list (Multileg landing page) ─────────────────────────────── */
+.pf-list-wrap {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    background: var(--bg-card);
+}
+
+.pf-list-wrap table { margin: 0; }
+
+.pf-list-wrap tbody tr:nth-child(even) {
+    background: rgba(127, 127, 127, 0.035);
+}
+
+.pf-list-wrap tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.pf-list-wrap tbody tr.pf-row-active,
+.pf-list-wrap tbody tr.pf-row-active:hover {
+    background: var(--accent-light);
+    box-shadow: inset 3px 0 0 0 var(--accent);
+}
+
+.pf-list-footer {
+    padding: 8px 14px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.pf-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    margin: 1px 3px 1px 0;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    background: var(--bg-muted);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.pf-chip-more {
+    color: var(--text-muted);
+    background: transparent;
+    font-weight: 600;
+}
+
+.pf-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.pf-actions {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.pf-actions .btn-xs.btn-danger {
+    padding: 1px 7px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.pf-toolbar {
+    margin-top: 12px;
+    padding: 4px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.pf-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 8px 0;
+    flex-wrap: wrap;
+}
+
+.pf-toolbar-row + .pf-toolbar-row {
+    border-top: 1px solid var(--border-light);
+}
+
 /* ─── Portfolio Page - Single-pane layout ───────────────────────────────── */
 .portfolio-layout {
     display: grid;
@@ -1345,7 +1440,7 @@ span.negative { color: var(--danger); }
     padding: 2px 4px;
     border: 1px solid var(--border-color);
     border-radius: 3px;
-    background: var(--bg-input);
+    background-color: var(--bg-input);
     color: var(--text-primary);
 }
 .leg-inline-table select { min-width: 80px; }
