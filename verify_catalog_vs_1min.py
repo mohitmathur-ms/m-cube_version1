@@ -44,6 +44,7 @@ INSTRUMENTS = ("EURUSD", "GBPUSD", "USDJPY")
 SIDES = ("ASK", "BID")
 TIMEFRAMES = (
     "5-MINUTE",
+    "15-MINUTE",
     "30-MINUTE",
     "1-HOUR",
     "2-HOUR",

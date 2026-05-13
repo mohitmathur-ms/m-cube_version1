@@ -37,6 +37,7 @@ OHLCV_AGG: dict[str, str] = {
 # the ``week_anchor`` kwarg on ``aggregate_ohlcv``.
 TIMEFRAME_TO_RULE: dict[str, str] = {
     "5-MINUTE": "5min",
+    "15-MINUTE": "15min",
     "30-MINUTE": "30min",
     "1-HOUR": "1h",
     "2-HOUR": "2h",

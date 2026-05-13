@@ -349,5 +349,5 @@ def test_empty_input_returns_empty():
 
 def test_timeframe_rule_table_covers_all_advertised_timeframes():
     """The CLI advertises seven timeframes — make sure the rule table has them all."""
-    expected = {"5-MINUTE", "30-MINUTE", "1-HOUR", "2-HOUR", "1-DAY", "1-WEEK", "1-MONTH"}
+    expected = {"5-MINUTE", "15-MINUTE", "30-MINUTE", "1-HOUR", "2-HOUR", "1-DAY", "1-WEEK", "1-MONTH"}
     assert set(TIMEFRAME_TO_RULE) == expected

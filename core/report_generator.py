@@ -606,6 +606,7 @@ def generate_report(
     backtest_name: str = "Backtest",
     template_path: str | None = None,
     user_id: str | None = None,
+    date_range: dict | None = None,
 ) -> str:
     """Generate a self-contained HTML backtest report.
 
@@ -620,6 +621,11 @@ def generate_report(
     user_id : str, optional
         Identity that produced the run; populates USERID/MULTIPLIER columns
         in the embedded orderbook (see ``_build_orderbook``).
+    date_range : dict, optional
+        Configured engine range as ``{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}``.
+        Drives the report's "Date range:" header and the initial values of the
+        date-range filter inputs. Falls back to trade-derived min/max in the
+        template when omitted or when either field is empty.
 
     Returns
     -------
@@ -638,6 +644,7 @@ def generate_report(
     html = template.replace("{{ ORDERBOOK_JSON }}", json.dumps(orderbook, default=str))
     html = html.replace("{{ SUMMARY_JSON }}", json.dumps(summary, default=str))
     html = html.replace("{{ LOGS_JSON }}", json.dumps(logs, default=str))
+    html = html.replace("{{ DATE_RANGE_JSON }}", json.dumps(date_range or {}, default=str))
     html = html.replace("{{BACKTEST_NAME}}", backtest_name)
 
     return html

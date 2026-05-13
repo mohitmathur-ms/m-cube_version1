@@ -899,7 +899,11 @@ def run_backtest_stream():
                         report_name = sanitize_filename(raw_name)
                         try:
                             report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
-                                                          user_id=user_id_for_run)
+                                                          user_id=user_id_for_run,
+                                                          date_range={
+                                                              "start": meta["start_date"] or "",
+                                                              "end": meta["end_date"] or "",
+                                                          })
                             report_path = user_dir / f"{report_name}_report.html"
                             report_path.write_text(report_html, encoding="utf-8")
                         except Exception as e:
@@ -1046,7 +1050,11 @@ def run_backtest_api():
             report_name = sanitize_filename(raw_name)
             try:
                 report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
-                                              user_id=user_id_for_run)
+                                              user_id=user_id_for_run,
+                                              date_range={
+                                                  "start": start_date or "",
+                                                  "end": end_date or "",
+                                              })
                 report_path = user_dir / f"{report_name}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
@@ -1492,7 +1500,11 @@ def api_portfolio_backtest():
             try:
                 report_html = generate_report(all_results_for_reports,
                                               backtest_name=f"Portfolio: {config.name}",
-                                              user_id=user_id_for_run)
+                                              user_id=user_id_for_run,
+                                              date_range={
+                                                  "start": config.start_date or "",
+                                                  "end": config.end_date or "",
+                                              })
                 report_path = user_dir / f"{prefix}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
