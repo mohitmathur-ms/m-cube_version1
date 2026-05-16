@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1-MIN → 15-MIN Aggregation Guide — m-cube_version1</title>
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --panel: #fff;
+      --border: #e1e4e8;
+      --text: #1f2328;
+      --muted: #57606a;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --green-bg: #dafbe1;
+      --red: #cf222e;
+      --red-bg: #ffebe9;
+      --amber: #9a6700;
+      --amber-bg: #fff8c5;
+      --purple: #8250df;
+      --purple-bg: #fbefff;
+      --blue-bg: #ddf4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 32px 40px 80px;
+    }
+
+    header.cover {
+      background: linear-gradient(135deg, #0969da 0%, #8250df 100%);
+      color: white;
+      padding: 36px;
+      margin: -32px -40px 28px;
+      border-radius: 0 0 12px 12px;
+    }
+
+    header.cover h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    header.cover .subtitle {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.92;
+    }
+
+    header.cover .meta {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    h2 {
+      font-size: 21px;
+      margin-top: 36px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-top: 22px;
+    }
+
+    h4 {
+      font-size: 14px;
+      margin-top: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f6f8fa;
+      font-weight: 600;
+      font-size: 11.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    td.center,
+    th.center {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    td.mono {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    code {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      background: #f6f8fa;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #d63384;
+    }
+
+    pre {
+      background: #f6f8fa;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .badge-ok {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .badge-warn {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .badge-info {
+      background: var(--blue-bg);
+      color: var(--accent);
+    }
+
+    .badge-purple {
+      background: var(--purple-bg);
+      color: var(--purple);
+    }
+
+    .callout {
+      background: var(--blue-bg);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-warn {
+      background: var(--amber-bg);
+      border-left: 4px solid var(--amber);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-ok {
+      background: var(--green-bg);
+      border-left: 4px solid var(--green);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech {
+      background: var(--purple-bg);
+      border-left: 4px solid var(--purple);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech strong {
+      color: var(--purple);
+    }
+
+    .simple {
+      background: #f6f8fa;
+      border-left: 4px solid #57606a;
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14.5px;
+    }
+
+    .simple::before {
+      content: "Plain English: ";
+      font-weight: 700;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 20px 0;
+    }
+
+    nav.toc h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    nav.toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    nav.toc ol li {
+      padding: 3px 0;
+      break-inside: avoid;
+    }
+
+    nav.toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    nav.toc a:hover {
+      text-decoration: underline;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .filebox {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 8px 14px;
+      border-radius: 6px 6px 0 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12px;
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
+
+    .filebox+pre,
+    .filebox+table {
+      margin-top: 0;
+      border-radius: 0 0 6px 6px;
+      border-top: none;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bracket-diagram {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin: 14px 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .open-paren {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .close-bracket {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .ts {
+      color: var(--accent);
+    }
+
+    .agg-row td {
+      background: #fffbea;
+      font-weight: 600;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <header class="cover">
+      <h1>1-MIN → 15-MIN Aggregation Guide</h1>
+      <p class="subtitle">How NautilusTrader's <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">TimeBarAggregator</code> turns <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">1-MINUTE-{BID,ASK}-EXTERNAL</code> bars into <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">15-MINUTE-{BID,ASK}-INTERNAL</code> bars.</p>
+      <p class="meta">Worked from real April 2024 EURUSD.FOREX_MS CSVs — every OHLCV number below is reproducible.</p>
+    </header>
+
+    <div class="callout">
+      <strong>What this document shows.</strong> Three things, end-to-end:
+      <ol style="margin: 8px 0 0 18px;">
+        <li>The <em>bracket convention</em> Nautilus uses to slot 1-min source bars into 15-min target windows:
+          <code>(left, right]</code> — left-exclusive, right-inclusive.</li>
+        <li>A sample from the actual <code>raw_engine_data_1min_2024_04.csv</code> source and the
+          <code>sniffer_strategy_15min_2024_04.csv</code> aggregator output (full 12-column schema, OHLCV exposed).</li>
+        <li>A fully worked window where the 15 source bars are listed alongside the single aggregated bar they produced
+          — for both BID and ASK price types.</li>
+      </ol>
+    </div>
+
+    <nav class="toc">
+      <h3>Table of Contents</h3>
+      <ol>
+        <li><a href="#sec-1">Source &amp; target BarTypes</a></li>
+        <li><a href="#sec-2">The bracket: (left, right]</a></li>
+        <li><a href="#sec-3">CSV schema (both files)</a></li>
+        <li><a href="#sec-4">Sample: 1-min EXTERNAL source</a></li>
+        <li><a href="#sec-5">Sample: 15-min INTERNAL output</a></li>
+        <li><a href="#sec-6">Worked window — first <em>full</em> 15-min bar (T=00:15)</a></li>
+        <li><a href="#sec-7">Edge case — the very first bar (T=00:00)</a></li>
+        <li><a href="#sec-8">How to reproduce</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-1">1. Source &amp; target BarTypes</h2>
+
+    <div class="simple">
+      The aggregator's job is to take a stream of 1-minute bars that arrived from outside the engine, and emit a stream
+      of 15-minute bars assembled inside the engine.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> Two BarTypes per side are involved. The <code>EXTERNAL</code> tag means the bars
+      were ingested as already-formed bars (from CSV, in our case). The <code>INTERNAL</code> tag means Nautilus's
+      <code>TimeBarAggregator</code> built them at runtime by buffering the source bars. The composite form
+      <code>…-15-MINUTE-X-INTERNAL@1-MINUTE-EXTERNAL</code> tells Nautilus exactly which feed to listen to.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>BarType string</th>
+          <th>Source</th>
+          <th>Bars in April 2024</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-info">Source</span></td>
+          <td class="mono">EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL</td>
+          <td>CSV → <code>engine.add_data(...)</code></td>
+          <td class="num">31,680</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">Source</span></td>
+          <td class="mono">EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL</td>
+          <td>CSV → <code>engine.add_data(...)</code></td>
+          <td class="num">31,680</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">Target</span></td>
+          <td class="mono">EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL</td>
+          <td>Built by <code>TimeBarAggregator</code></td>
+          <td class="num">2,880</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">Target</span></td>
+          <td class="mono">EURUSD.FOREX_MS-15-MINUTE-ASK-INTERNAL</td>
+          <td>Built by <code>TimeBarAggregator</code></td>
+          <td class="num">2,880</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="small">Counts: April has 30 days × 24 h × 4 fifteen-minute windows = <strong>2,880</strong> bars per side.
+      April has 30 days × 24 h × 60 min = <strong>43,200</strong> minute-slots, but only 31,680 are populated — weekend
+      gaps explain the difference.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-2">2. The bracket: <code>(left, right]</code></h2>
+
+    <div class="simple">
+      A 15-minute bar stamped with time <code>T</code> covers the source bars whose stamp falls <strong>after</strong>
+      <code>T − 15&nbsp;min</code> and <strong>up to and including</strong> <code>T</code> itself. The left endpoint is
+      open (excluded); the right endpoint is closed (included).
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> Nautilus's <code>TimeBarAggregator</code> labels each emitted bar with its
+      <em>close</em> timestamp. A 15-min bar at <code>ts_event=T</code> aggregates every 1-min bar with
+      <code>ts_event ∈ (T − 15&nbsp;min, T]</code>. In set notation: the half-open interval <span
+        style="font-family:monospace;">{x : T−15&nbsp;min &lt; x ≤ T}</span>. The <em>volume</em> is summed;
+      <em>open</em> is the first bar's open; <em>close</em> is the last bar's close; <em>high</em>/<em>low</em> are the
+      extrema across the window.
+    </div>
+
+    <h3>Visual</h3>
+
+    <div class="bracket-diagram">
+      <span class="open-paren">(</span>━━━━━━━━━━━━━━━━━━━━━ window for 15-min bar @ <span class="ts">T=00:15</span>
+      ━━━━━━━━━━━━━━━━━━━━<span class="close-bracket">]</span>
+      source ts: <span class="ts">00:00</span> <span class="ts">00:01</span> <span class="ts">00:02</span> ... <span
+        class="ts">00:13</span> <span class="ts">00:14</span> <span class="ts">00:15</span> <span
+        class="ts">00:16</span> <span class="ts">00:17</span>
+      in window? <span style="color:var(--red); font-weight:700;">NO</span> <span
+        style="color:var(--green); font-weight:700;">YES</span> <span
+        style="color:var(--green); font-weight:700;">YES</span> <span
+        style="color:var(--green); font-weight:700;">YES</span> <span
+        style="color:var(--green); font-weight:700;">YES</span> <span
+        style="color:var(--green); font-weight:700;">YES</span> <span
+        style="color:var(--red); font-weight:700;">NO</span> <span style="color:var(--red); font-weight:700;">NO</span>
+      <span style="color:var(--muted);">↑ left edge,</span> <span style="color:var(--muted);">↑ right edge,</span>
+      <span style="color:var(--muted);"> EXCLUDED</span> <span style="color:var(--muted);"> INCLUDED</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>15-min bar's ts_event</th>
+          <th>Covers 1-min source ts_events…</th>
+          <th class="center">count</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:00</td>
+          <td class="mono">(23:45, 00:00] — partial; only 00:00 exists in the dataset</td>
+          <td class="center num">1</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15</td>
+          <td class="mono">(00:00, 00:15] = {00:01, 00:02, …, 00:15}</td>
+          <td class="center num">15</td>
+        </tr>
+        <tr>
+          <td class="mono">00:30</td>
+          <td class="mono">(00:15, 00:30] = {00:16, 00:17, …, 00:30}</td>
+          <td class="center num">15</td>
+        </tr>
+        <tr>
+          <td class="mono">00:45</td>
+          <td class="mono">(00:30, 00:45] = {00:31, 00:32, …, 00:45}</td>
+          <td class="center num">15</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-warn">
+      <strong>Why the first bar is partial.</strong> The very first 15-min window would nominally start at
+      <code>T − 15&nbsp;min = 23:45</code> on the previous day, but no source data exists before <code>00:00</code>. So
+      the bar at <code>T=00:00</code> aggregates only one 1-min source bar (the one at <code>00:00</code> itself).
+      That's not a bug — it's the (left, right] bracket faithfully consuming whatever bars happen to fall inside it. See
+      section 7.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-3">3. CSV schema (both files)</h2>
+
+    <p>Both CSVs share an identical 12-column schema. The columns most relevant to aggregation are highlighted.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Column</th>
+          <th>Type</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="center">1</td>
+          <td class="mono">stream</td>
+          <td class="mono">str</td>
+          <td><code>raw_engine</code> for the source CSV, <code>sniffer_strategy</code> for the aggregated CSV</td>
+        </tr>
+        <tr>
+          <td class="center">2</td>
+          <td class="mono">price_type</td>
+          <td class="mono">str</td>
+          <td><code>BID</code> or <code>ASK</code></td>
+        </tr>
+        <tr>
+          <td class="center">3</td>
+          <td class="mono">bar_type</td>
+          <td class="mono">str</td>
+          <td>Full Nautilus BarType string — see §1</td>
+        </tr>
+        <tr>
+          <td class="center">4</td>
+          <td class="mono">ts_event_ns</td>
+          <td class="mono">int64</td>
+          <td>Bar close timestamp, ns since epoch. <strong>This is the bracket's right edge.</strong></td>
+        </tr>
+        <tr>
+          <td class="center">5</td>
+          <td class="mono">ts_init_ns</td>
+          <td class="mono">int64</td>
+          <td>When the bar object was constructed (= ts_event_ns in this dataset)</td>
+        </tr>
+        <tr class="agg-row">
+          <td class="center">6</td>
+          <td class="mono">open</td>
+          <td class="mono">float</td>
+          <td><strong>OHLC — Open of the window</strong></td>
+        </tr>
+        <tr class="agg-row">
+          <td class="center">7</td>
+          <td class="mono">high</td>
+          <td class="mono">float</td>
+          <td><strong>OHLC — High of the window</strong></td>
+        </tr>
+        <tr class="agg-row">
+          <td class="center">8</td>
+          <td class="mono">low</td>
+          <td class="mono">float</td>
+          <td><strong>OHLC — Low of the window</strong></td>
+        </tr>
+        <tr class="agg-row">
+          <td class="center">9</td>
+          <td class="mono">close</td>
+          <td class="mono">float</td>
+          <td><strong>OHLC — Close of the window</strong></td>
+        </tr>
+        <tr class="agg-row">
+          <td class="center">10</td>
+          <td class="mono">volume</td>
+          <td class="mono">float</td>
+          <td><strong>Summed volume across the window</strong></td>
+        </tr>
+        <tr>
+          <td class="center">11</td>
+          <td class="mono">ts_event</td>
+          <td class="mono">str (ISO)</td>
+          <td>Human-readable form of <code>ts_event_ns</code></td>
+        </tr>
+        <tr>
+          <td class="center">12</td>
+          <td class="mono">ts_init</td>
+          <td class="mono">str (ISO)</td>
+          <td>Human-readable form of <code>ts_init_ns</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-4">4. Sample: 1-min EXTERNAL source</h2>
+
+    <p>First 16 rows of the 1-min source CSV, showing BID and ASK arriving interleaved at each minute. These are the
+      bars Nautilus's <code>DataEngine</code> dispatches to the <code>TimeBarAggregator</code>.</p>
+
+    <div class="filebox">csv/raw_engine_data_1min_2024_04.csv (31,680 BID + 31,680 ASK = 63,360 rows)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>ts_event (UTC)</th>
+          <th>side</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:00:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07932</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07918</td>
+          <td class="num">1.07921</td>
+          <td class="num">144</td>
+        </tr>
+        <tr>
+          <td class="mono">00:00:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07937</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07924</td>
+          <td class="num">73</td>
+        </tr>
+        <tr>
+          <td class="mono">00:01:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07944</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07933</td>
+          <td class="num">67</td>
+        </tr>
+        <tr>
+          <td class="mono">00:01:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07936</td>
+          <td class="num">135</td>
+        </tr>
+        <tr>
+          <td class="mono">00:02:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.0793</td>
+          <td class="num">1.07933</td>
+          <td class="num">47</td>
+        </tr>
+        <tr>
+          <td class="mono">00:02:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07937</td>
+          <td class="num">1.07938</td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07937</td>
+          <td class="num">119</td>
+        </tr>
+        <tr>
+          <td class="mono">00:03:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07932</td>
+          <td class="num">1.07947</td>
+          <td class="num">94</td>
+        </tr>
+        <tr>
+          <td class="mono">00:03:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07935</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07949</td>
+          <td class="num">122</td>
+        </tr>
+        <tr>
+          <td class="mono">…</td>
+          <td>…</td>
+          <td class="num">…</td>
+          <td class="num">…</td>
+          <td class="num">…</td>
+          <td class="num">…</td>
+          <td class="num">…</td>
+        </tr>
+        <tr>
+          <td class="mono">00:14:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07952</td>
+          <td class="num">52</td>
+        </tr>
+        <tr>
+          <td class="mono">00:14:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07954</td>
+          <td class="num">63</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07954</td>
+          <td class="num">1.07946</td>
+          <td class="num">1.07954</td>
+          <td class="num">55</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07954</td>
+          <td class="num">1.07957</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07957</td>
+          <td class="num">49</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-5">5. Sample: 15-min INTERNAL output</h2>
+
+    <p>First eight rows of the aggregated CSV. Note <code>price_type</code> stays the same ("a BID source produces a BID
+      aggregate, an ASK source produces an ASK aggregate") and the <code>bar_type</code> string flips from
+      <code>EXTERNAL</code> to <code>INTERNAL</code>.</p>
+
+    <div class="filebox">csv/sniffer_strategy_15min_2024_04.csv (2,880 BID + 2,880 ASK = 5,760 rows)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>ts_event (UTC)</th>
+          <th>side</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:00:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07937</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07924</td>
+          <td class="num">73</td>
+        </tr>
+        <tr>
+          <td class="mono">00:00:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07932</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07918</td>
+          <td class="num">1.07921</td>
+          <td class="num">144</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07965</td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07957</td>
+          <td class="num">1122</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07963</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07954</td>
+          <td class="num">844</td>
+        </tr>
+        <tr>
+          <td class="mono">00:30:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07957</td>
+          <td class="num">1.07986</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07975</td>
+          <td class="num">1341</td>
+        </tr>
+        <tr>
+          <td class="mono">00:30:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07982</td>
+          <td class="num">1.07945</td>
+          <td class="num">1.07972</td>
+          <td class="num">940</td>
+        </tr>
+        <tr>
+          <td class="mono">00:45:00</td>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="num">1.07974</td>
+          <td class="num">1.07989</td>
+          <td class="num">1.07945</td>
+          <td class="num">1.07945</td>
+          <td class="num">697</td>
+        </tr>
+        <tr>
+          <td class="mono">00:45:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">1.07971</td>
+          <td class="num">1.07987</td>
+          <td class="num">1.07942</td>
+          <td class="num">1.07942</td>
+          <td class="num">1137</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-6">6. Worked window — first <em>full</em> 15-min bar (T = 00:15)</h2>
+
+    <div class="simple">
+      Pick the 15-min bar at <code>T = 2024-04-01 00:15:00</code>. By the (left, right] rule it should consume exactly
+      15 source bars per side: <code>ts_event ∈ {00:01, 00:02, …, 00:15}</code>. The tables below list each one of those
+      15 source bars and the resulting aggregate row, on both BID and ASK sides. The aggregate's OHLCV must equal:
+      <em>first</em> open, <em>max</em> high, <em>min</em> low, <em>last</em> close, <em>sum</em> volume.
+    </div>
+
+    <h3>6.1 BID side</h3>
+
+    <div class="filebox">15 source rows from raw_engine_data_1min_2024_04.csv → 1 aggregated row in
+      sniffer_strategy_15min_2024_04.csv</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="mono">ts_event</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:01:00</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07944</td>
+          <td class="num">1.07921</td>
+          <td class="num">1.07933</td>
+          <td class="num">67</td>
+        </tr>
+        <tr>
+          <td class="mono">00:02:00</td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.0793</td>
+          <td class="num">1.07933</td>
+          <td class="num">47</td>
+        </tr>
+        <tr>
+          <td class="mono">00:03:00</td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07932</td>
+          <td class="num">1.07947</td>
+          <td class="num">94</td>
+        </tr>
+        <tr>
+          <td class="mono">00:04:00</td>
+          <td class="num">1.07946</td>
+          <td class="num">1.0795</td>
+          <td class="num">1.07944</td>
+          <td class="num">1.07947</td>
+          <td class="num">23</td>
+        </tr>
+        <tr>
+          <td class="mono">00:05:00</td>
+          <td class="num">1.07947</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07947</td>
+          <td class="num">1.07955</td>
+          <td class="num">55</td>
+        </tr>
+        <tr>
+          <td class="mono">00:06:00</td>
+          <td class="num">1.07954</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07945</td>
+          <td class="num">1.07956</td>
+          <td class="num">38</td>
+        </tr>
+        <tr>
+          <td class="mono">00:07:00</td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07947</td>
+          <td class="num">1.0795</td>
+          <td class="num">53</td>
+        </tr>
+        <tr>
+          <td class="mono">00:08:00</td>
+          <td class="num">1.0795</td>
+          <td class="num"><strong>1.07963</strong></td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07956</td>
+          <td class="num">43</td>
+        </tr>
+        <tr>
+          <td class="mono">00:09:00</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07942</td>
+          <td class="num">1.07946</td>
+          <td class="num">54</td>
+        </tr>
+        <tr>
+          <td class="mono">00:10:00</td>
+          <td class="num">1.07946</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.07945</td>
+          <td class="num">1.07948</td>
+          <td class="num">81</td>
+        </tr>
+        <tr>
+          <td class="mono">00:11:00</td>
+          <td class="num">1.07947</td>
+          <td class="num">1.07954</td>
+          <td class="num">1.0794</td>
+          <td class="num">1.07953</td>
+          <td class="num">63</td>
+        </tr>
+        <tr>
+          <td class="mono">00:12:00</td>
+          <td class="num">1.07952</td>
+          <td class="num">1.07957</td>
+          <td class="num">1.0795</td>
+          <td class="num">1.07954</td>
+          <td class="num">65</td>
+        </tr>
+        <tr>
+          <td class="mono">00:13:00</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07953</td>
+          <td class="num">54</td>
+        </tr>
+        <tr>
+          <td class="mono">00:14:00</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07952</td>
+          <td class="num">52</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07954</td>
+          <td class="num">1.07946</td>
+          <td class="num">1.07954</td>
+          <td class="num">55</td>
+        </tr>
+        <tr class="agg-row">
+          <td class="mono">00:15:00 <span class="badge badge-purple">15-min BID</span></td>
+          <td class="num"><strong>1.07921</strong></td>
+          <td class="num"><strong>1.07963</strong></td>
+          <td class="num"><strong>1.07921</strong></td>
+          <td class="num"><strong>1.07954</strong></td>
+          <td class="num"><strong>844</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-ok">
+      <strong>Check.</strong>
+      open = first row's open = <code>1.07921</code> ✓ &nbsp;·&nbsp;
+      close = last row's close = <code>1.07954</code> ✓ &nbsp;·&nbsp;
+      high = max of column = <code>1.07963</code> (at 00:08) ✓ &nbsp;·&nbsp;
+      low = min of column = <code>1.07921</code> (at 00:01) ✓ &nbsp;·&nbsp;
+      volume = 67+47+94+23+55+38+53+43+54+81+63+65+54+52+55 = <code>844</code> ✓
+    </div>
+
+    <h3>6.2 ASK side</h3>
+
+    <div class="filebox">15 source rows from raw_engine_data_1min_2024_04.csv → 1 aggregated row in
+      sniffer_strategy_15min_2024_04.csv</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="mono">ts_event</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:01:00</td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.07923</td>
+          <td class="num">1.07936</td>
+          <td class="num">135</td>
+        </tr>
+        <tr>
+          <td class="mono">00:02:00</td>
+          <td class="num">1.07937</td>
+          <td class="num">1.07938</td>
+          <td class="num">1.07933</td>
+          <td class="num">1.07937</td>
+          <td class="num">119</td>
+        </tr>
+        <tr>
+          <td class="mono">00:03:00</td>
+          <td class="num">1.07935</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07934</td>
+          <td class="num">1.07949</td>
+          <td class="num">122</td>
+        </tr>
+        <tr>
+          <td class="mono">00:04:00</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07952</td>
+          <td class="num">1.07947</td>
+          <td class="num">1.07948</td>
+          <td class="num">32</td>
+        </tr>
+        <tr>
+          <td class="mono">00:05:00</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.0796</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.07958</td>
+          <td class="num">61</td>
+        </tr>
+        <tr>
+          <td class="mono">00:06:00</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07958</td>
+          <td class="num">24</td>
+        </tr>
+        <tr>
+          <td class="mono">00:07:00</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07949</td>
+          <td class="num">1.07953</td>
+          <td class="num">62</td>
+        </tr>
+        <tr>
+          <td class="mono">00:08:00</td>
+          <td class="num">1.07952</td>
+          <td class="num"><strong>1.07965</strong></td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07959</td>
+          <td class="num">68</td>
+        </tr>
+        <tr>
+          <td class="mono">00:09:00</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07959</td>
+          <td class="num">1.07945</td>
+          <td class="num">1.07949</td>
+          <td class="num">53</td>
+        </tr>
+        <tr>
+          <td class="mono">00:10:00</td>
+          <td class="num">1.0795</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07946</td>
+          <td class="num">1.07951</td>
+          <td class="num">145</td>
+        </tr>
+        <tr>
+          <td class="mono">00:11:00</td>
+          <td class="num">1.0795</td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07942</td>
+          <td class="num">1.07955</td>
+          <td class="num">78</td>
+        </tr>
+        <tr>
+          <td class="mono">00:12:00</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07959</td>
+          <td class="num">1.07953</td>
+          <td class="num">1.07956</td>
+          <td class="num">59</td>
+        </tr>
+        <tr>
+          <td class="mono">00:13:00</td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07958</td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07956</td>
+          <td class="num">52</td>
+        </tr>
+        <tr>
+          <td class="mono">00:14:00</td>
+          <td class="num">1.07955</td>
+          <td class="num">1.07956</td>
+          <td class="num">1.07951</td>
+          <td class="num">1.07954</td>
+          <td class="num">63</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15:00</td>
+          <td class="num">1.07954</td>
+          <td class="num">1.07957</td>
+          <td class="num">1.07948</td>
+          <td class="num">1.07957</td>
+          <td class="num">49</td>
+        </tr>
+        <tr class="agg-row">
+          <td class="mono">00:15:00 <span class="badge badge-purple">15-min ASK</span></td>
+          <td class="num"><strong>1.07923</strong></td>
+          <td class="num"><strong>1.07965</strong></td>
+          <td class="num"><strong>1.07923</strong></td>
+          <td class="num"><strong>1.07957</strong></td>
+          <td class="num"><strong>1122</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-ok">
+      <strong>Check.</strong>
+      open = <code>1.07923</code> ✓ &nbsp;·&nbsp;
+      close = <code>1.07957</code> ✓ &nbsp;·&nbsp;
+      high = <code>1.07965</code> (at 00:08) ✓ &nbsp;·&nbsp;
+      low = <code>1.07923</code> (at 00:01) ✓ &nbsp;·&nbsp;
+      volume = 135+119+122+32+61+24+62+68+53+145+78+59+52+63+49 = <code>1122</code> ✓
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-7">7. Edge case — the very first bar (T = 00:00)</h2>
+
+    <div class="simple">
+      The aggregator's bracket for the first 15-min bar is <code>(23:45 on March 31, 00:00 on April 1]</code>. Nothing
+      exists before 00:00 in the source CSV. So only one source row falls inside the window — the bar at 00:00 itself —
+      and the 15-min bar is just a copy of that single 1-min bar.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Side</th>
+          <th class="mono">source bar @ 00:00:00</th>
+          <th class="mono">15-min bar @ 00:00:00</th>
+          <th>Equal?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="mono">o=1.07932 h=1.07934 l=1.07918 c=1.07921 v=144</td>
+          <td class="mono">o=1.07932 h=1.07934 l=1.07918 c=1.07921 v=144</td>
+          <td><span class="badge badge-ok">YES</span></td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-warn">ASK</span></td>
+          <td class="mono">o=1.07934 h=1.07937 l=1.07921 c=1.07924 v=73</td>
+          <td class="mono">o=1.07934 h=1.07937 l=1.07921 c=1.07924 v=73</td>
+          <td><span class="badge badge-ok">YES</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-warn">
+      <strong>Implication for downstream code.</strong> If your strategy treats the first 15-min bar as a "full" 15-min
+      bar (e.g. computes an indicator that assumes 15 minutes of underlying volume), it will be looking at one minute of
+      data wearing a 15-min label. The arithmetic is still <em>correct</em> by the (left, right] rule — it just happens
+      to span a single minute. Either drop the first bar or warm up your indicator past the first window.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-8">8. How to reproduce</h2>
+
+    <p>Run the validation notebook end-to-end:</p>
+
+    <pre><code>jupyter nbconvert --to notebook --execute \
+    ipynb/individual_timeframes_validation_scripts/validate_aggregation_1min_to_15min.ipynb</code></pre>
+
+    <p>It will write three CSVs to <code>output/</code>: the re-serialized source, the
+      <code>DataEngine</code>-dispatched view, and the aggregated 15-min strategy view — and run four explicit
+      assertions (engine.data correctness, sniffer ≡ source row-for-row, 15-min count band, Decimal-exact aggregation
+      math on sampled windows). A passing run prints:</p>
+
+    <pre><code>PASS A1: engine.data has 31,680 BID + 31,680 ASK 1-MIN-EXTERNAL bars
+PASS A2: sniffer_engine row-for-row identical to source CSV (63,360 rows)
+PASS A3: 15-MIN INTERNAL bars received — BID=2880  ASK=2880  (data-driven lower≈2112, clock-driven upper=2885)
+PASS A4: aggregation math exact for 6 sampled 15-min windows (Decimal compare)</code></pre>
+
+    <div class="callout-ok">
+      <strong>Bottom line.</strong> The <code>1-MINUTE-{BID,ASK}-EXTERNAL → 15-MINUTE-{BID,ASK}-INTERNAL</code> pipeline
+      is correct and Decimal-exact under the <code>(left, right]</code> bracket: 15 source bars in, 1 aggregate out
+      (OHLCV preserved, volume summed) — with the single-source-bar first window being a faithful application of the
+      same rule, not a special case.
+    </div>
+
+  </div>
+</body>
+
+</html>

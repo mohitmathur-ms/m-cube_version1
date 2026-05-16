@@ -44,7 +44,8 @@
       "Bash(git -c user.name=mohitmathur-ms -c user.email=mohitmathur-ms@users.noreply.github.com commit -m ' *)",
       "Bash(git config:*)",
       "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Recurse -ErrorAction SilentlyContinue)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(venv/Scripts/python.exe -c \"import pyarrow.parquet as pq; t = pq.read_metadata\\(r'D:\\\\m-cube_version1\\\\catalog\\\\data\\\\bar\\\\EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL\\\\2015-01-01T22-00-00-000000000Z_2025-06-27T20-59-00-000000000Z.parquet'\\); print\\('rows:', t.num_rows\\); print\\('schema:'\\); print\\(pq.read_schema\\(r'D:\\\\m-cube_version1\\\\catalog\\\\data\\\\bar\\\\EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL\\\\2015-01-01T22-00-00-000000000Z_2025-06-27T20-59-00-000000000Z.parquet'\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"
