@@ -34,13 +34,35 @@ class ExitConfig:
     target_lock_trigger: Optional[float] = None
     target_lock_minimum: Optional[float] = None
 
-    # SL Wait (bars to confirm SL before executing)
+    # SL Wait — spec name "SL Wait (sec)". Prefer wall-clock seconds via
+    # sl_wait_sec; sl_wait_bars retained for backward compat with existing
+    # portfolio JSON. If both > 0, sl_wait_sec wins.
+    sl_wait_sec: int = 0
     sl_wait_bars: int = 0
 
-    # On Target/SL Actions
-    on_sl_action: str = "close"      # "close", "re_execute", "reverse"
-    on_target_action: str = "close"  # "close", "re_execute", "reverse"
+    # On Target/SL Actions. Valid values:
+    #   "close"             — SqOff: flatten and stay flat.
+    #   "re_execute"        — flatten + immediately re-arm signal entry (capped by max_re_executions).
+    #   "reverse"           — close + open opposite side.
+    #   "execute"           — flatten + arm execute_target_leg_id sibling slot (spec §1.2 1.2(c)).
+    #   "re_entry"          — flatten + price-wait re-entry (spec §1.2 1.2(d)); see reentry_price.
+    #   "keep_leg_running"  — ignore the trigger; position remains open with SL/TP disarmed for this trade.
+    on_sl_action: str = "close"
+    on_target_action: str = "close"
     max_re_executions: int = 0
+
+    # ── Cross-leg & price-wait re-entry knobs (spec §1.2 1.2(c)/(d)) ──
+    # Sibling slot to arm when this leg's on_sl_action / on_target_action
+    # resolves to "execute". Empty string disables.
+    execute_target_leg_id: str = ""
+    # Price level the re_entry action waits for before re-arming. 0.0 falls
+    # back to the original entry price recorded on the trade that exited.
+    reentry_price: float = 0.0
+    # Optional: limit how many price-wait re-entries can fire per day. 0 = unlimited.
+    max_re_entries: int = 0
+    # When False this leg starts UNARMED — it ignores its own signals until
+    # a sibling slot's "execute" action arms it (spec §1.2 1.2(c)).
+    armed_at_start: bool = True
 
     # Leg-level square-off (most specific). HH:MM, e.g. "17:00".
     # When set, every day at this local time the position is force-closed and
@@ -219,6 +241,14 @@ class PortfolioConfig:
     move_sl_no_buy_legs: bool = False  # adapted: skip move-to-cost on LONG positions
     move_sl_hit_on_leg_sl: bool = False     # cross-slot trigger applied post-hoc
     move_sl_hit_on_leg_target: bool = False # same shape, on any slot's target
+    move_sl_ltp_buffer: float = 0.0  # spec §3 action v3 — LTP + Buffer for loss legs
+
+    # ── Cross-portfolio targets (spec §2.1(m) / §2.4(d)) ──
+    # Name of the other portfolio to act on when on_sl_action / on_target_action
+    # is one of: SqOff Other Portfolio, Execute Other Portfolio, Start Other
+    # Portfolio. Empty string disables cross-portfolio dispatch.
+    pf_sl_target_portfolio: str = ""
+    pf_tgt_target_portfolio: str = ""
 
     # ── Target Settings (spec §4) ──
     pf_tgt_enabled: bool = False

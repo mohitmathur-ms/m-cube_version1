@@ -28,15 +28,19 @@ const Portfolio = {
 
     async loadConfig() {
         try {
-            const [barData, stratData, tmplData] = await Promise.all([
+            const [barData, stratData, tmplData, adData] = await Promise.all([
                 App.api("/api/data/bar_types"),
                 App.api("/api/strategies"),
                 App.api("/api/portfolios/templates"),
+                App.api("/api/configured-adapters"),
             ]);
             this.barTypes = barData.bar_types || [];
             this.barTypeDetails = barData.bar_type_details || {};
             this.strategies = stratData.strategies || {};
             this.templates = tmplData.templates || {};
+            this.assetVenues = (adData && adData.adapters) || {};   // {assetClass: [venue, ...]}
+            this._instIdx = this._buildInstrumentIndex();
+            this._barTypeSet = new Set(this.barTypes);   // O(1) catalog lookup for Final warnings
 
             if (this.barTypes.length === 0) {
                 document.getElementById("portfolio-loading").innerHTML =
@@ -475,6 +479,8 @@ const Portfolio = {
         if (pf.pf_tgt_trail_when_profit_reach !== undefined) pf._ui.trail_when_profit_reach = pf.pf_tgt_trail_when_profit_reach;
         if (pf.pf_tgt_trail_every !== undefined) pf._ui.trail_every = pf.pf_tgt_trail_every;
         if (pf.pf_tgt_trail_by !== undefined) pf._ui.trail_by = pf.pf_tgt_trail_by;
+        if (pf.pf_tgt_target_portfolio !== undefined) pf._ui.target_target_portfolio = pf.pf_tgt_target_portfolio;
+        if (pf.pf_sl_target_portfolio !== undefined) pf._ui.sl_target_portfolio = pf.pf_sl_target_portfolio;
         if (pf.pf_sl_enabled !== undefined) pf._ui.sl_enabled = pf.pf_sl_enabled;
         if (pf.pf_sl_type) pf._ui.sl_type = pf.pf_sl_type;
         if (pf.pf_sl_value !== undefined) pf._ui.sl_value = pf.pf_sl_value;
@@ -515,36 +521,11 @@ const Portfolio = {
         const stratTagSummary = stratTags.length > 0 ? stratTags.join(", ") : "Default";
 
         // Build inline-editable legs table rows
-        const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
         let legsRows = "";
         if ((pf.slots || []).length === 0) {
-            legsRows = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            legsRows = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
-            legsRows = pf.slots.map((slot, i) => {
-                const ec = slot.exit_config || {};
-                const slTypes = ["none", "percentage", "points", "trailing"];
-                const tpTypes = ["none", "percentage", "points"];
-                const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
-                const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
-                const sOpts = stratOpts.replace(`value="${slot.strategy_name}"`, `value="${slot.strategy_name}" selected`);
-                const bOpts = barOpts.replace(`value="${slot.bar_type_str}"`, `value="${slot.bar_type_str}" selected`);
-
-                return `<tr>
-                    <td style="text-align:center;"><button class="leg-del-btn" onclick="Portfolio._deleteLeg(${i})" title="Delete">X</button></td>
-                    <td style="text-align:center;"><button class="leg-copy-btn" onclick="Portfolio._copyLeg(${i})" title="Copy">&#128203;</button></td>
-                    <td style="text-align:center; font-weight:600;">${i + 1}</td>
-                    <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
-                    <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
-                    <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
-                    <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
-                    <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;">${tpTypeOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;"></td>
-                    <td style="text-align:center;"><button class="btn btn-xs" onclick="Portfolio._editLeg(${i})" style="font-size:0.72rem;">&#9881; Edit</button></td>
-                </tr>`;
-            }).join("");
+            legsRows = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
 
         const body = `
@@ -590,7 +571,12 @@ const Portfolio = {
                         <th style="width:28px;">ID</th>
                         <th style="width:36px;">Idle</th>
                         <th>Strategy</th>
-                        <th>Instrument</th>
+                        <th>Asset</th>
+                        <th>Venue</th>
+                        <th>Instrument ID</th>
+                        <th>Timeframe</th>
+                        <th>Price Type</th>
+                        <th>Final Instrument</th>
                         <th style="width:62px;">Lots</th>
                         <th>Stop Loss</th>
                         <th style="width:56px;">SL Val</th>
@@ -1020,7 +1006,7 @@ const Portfolio = {
                                 <input type="checkbox" id="pf-m-tgt-enabled" ${ui.target_enabled?'checked':''}> Enable Target
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
+                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
                             <span class="pf-field-label">Target Type</span>
                             <select class="form-control" id="pf-m-tgt-type" style="flex:1;">
                                 ${["Combined Profit","Combined Premium","Absolute Combined Premium","Underlying Movement"].map(o => {
@@ -1036,7 +1022,7 @@ const Portfolio = {
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On Target</span>
                             <select class="form-control" id="pf-m-tgt-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
+                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute Same Contract at EntryPrice"].map(o => {
                                     const opt = (o!=="SqOff" && o!=="ReExecute");
                                     return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_target||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
                                 }).join("")}
@@ -1049,6 +1035,10 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count (0 = Unlimited)</span>
                             <input type="number" class="form-control" id="pf-m-tgt-reexcount" value="${ui.target_reexecute_count||0}" min="0" step="1" style="width:70px;">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On Target is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-tgt-targetpf" value="${ui.target_target_portfolio||''}" style="flex:1;" placeholder="(other portfolio name)">
                         </div>
                     </fieldset>
                     <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
@@ -1091,7 +1081,7 @@ const Portfolio = {
                                 <input type="checkbox" id="pf-m-sl-enabled" ${ui.sl_enabled?'checked':''}> Enable Stoploss
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
+                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
                             <span class="pf-field-label">Type</span>
                             <select class="form-control" id="pf-m-sl-type" style="flex:1;">
                                 ${["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"].map(o => {
@@ -1107,7 +1097,7 @@ const Portfolio = {
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On SL Action</span>
                             <select class="form-control" id="pf-m-sl-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
+                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute Same Contract at EntryPrice"].map(o => {
                                     const opt = (o!=="SqOff" && o!=="ReExecute");
                                     return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_sl_action||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
                                 }).join("")}
@@ -1120,6 +1110,10 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count</span>
                             <input type="number" class="form-control" id="pf-m-sl-reexcount" value="${ui.sl_reexecute_count||0}" min="0" step="1" style="width:70px;">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On SL Action is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-sl-targetpf" value="${ui.sl_target_portfolio||''}" style="flex:1;" placeholder="(other portfolio name)">
                         </div>
                         <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light);">
                             <div style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="At clip-point, only close slots matching the filter; the others continue running.">On SL Hit — Selective SqOff</div>
@@ -1317,7 +1311,9 @@ const Portfolio = {
         const pf = this.portfolios[idx];
         (pf.slots || []).forEach((slot, i) => {
             const strat = document.getElementById(`leg-il-strat-${i}`);
-            const inst = document.getElementById(`leg-il-inst-${i}`);
+            const instId = document.getElementById(`leg-il-instid-${i}`);
+            const tfSel = document.getElementById(`leg-il-tf-${i}`);
+            const ptSel = document.getElementById(`leg-il-pt-${i}`);
             const size = document.getElementById(`leg-il-size-${i}`);
             const enabled = document.getElementById(`leg-il-enabled-${i}`);
             const sltype = document.getElementById(`leg-il-sltype-${i}`);
@@ -1333,7 +1329,10 @@ const Portfolio = {
                     if (stratDef.params) { for (const [k, info] of Object.entries(stratDef.params)) slot.strategy_params[k] = info.default; }
                 }
             }
-            if (inst) slot.bar_type_str = inst.value;
+            if (instId && tfSel && ptSel) {
+                const composed = this._composeBarType(instId.value, tfSel.value, ptSel.value);
+                if (composed) slot.bar_type_str = composed;
+            }
             if (size) {
                 slot.lots = parseFloat(size.value);
                 if (!Number.isFinite(slot.lots) || slot.lots <= 0) slot.lots = 1;
@@ -1352,17 +1351,159 @@ const Portfolio = {
         this._syncInlineLegs();
     },
 
+    /** Venue token from a bar_type: "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL" -> "FOREX_MS" */
+    _venueOf(bt) {
+        const head = String(bt || "").split("-")[0] || "";
+        const dotIdx = head.indexOf(".");
+        return dotIdx > 0 ? head.slice(dotIdx + 1) : "";
+    },
+
+    /** Asset class for a given venue, derived from /api/configured-adapters.
+     *  Returns "other" for venues with no configured adapter. */
+    _assetClassOf(venue) {
+        for (const [cls, venues] of Object.entries(this.assetVenues || {})) {
+            if ((venues || []).includes(venue)) return cls;
+        }
+        return "other";
+    },
+
+    /** Decompose a bar_type into its {assetClass, venue} hierarchy keys plus
+     *  the spec tail. The assetClass is looked up via configured adapters. */
+    _parseBarType(bt) {
+        const s = String(bt || "");
+        const dashIdx = s.indexOf("-");
+        const head = dashIdx >= 0 ? s.slice(0, dashIdx) : s;
+        const spec = dashIdx >= 0 ? s.slice(dashIdx + 1) : "";
+        const dotIdx = head.indexOf(".");
+        const venue = dotIdx > 0 ? head.slice(dotIdx + 1) : "";
+        const asset = venue ? this._assetClassOf(venue) : "other";
+        return { asset, venue, spec };
+    },
+
+    /** Build {assetClass: {venue: [bar_type_str, ...]}} from catalog bar_types.
+     *  Only venues that actually have data in the catalog are included. */
+    _buildInstrumentIndex() {
+        const idx = {};
+        for (const bt of (this.barTypes || [])) {
+            const venue = this._venueOf(bt);
+            if (!venue) continue;
+            const cls = this._assetClassOf(venue);
+            (idx[cls] = idx[cls] || {});
+            (idx[cls][venue] = idx[cls][venue] || []).push(bt);
+        }
+        return idx;
+    },
+
+    _assetOptions(selected) {
+        const assets = Object.keys(this._instIdx || {}).sort();
+        return assets.map(a => `<option value="${a}" ${a===selected?"selected":""}>${a}</option>`).join("");
+    },
+
+    _venueOptions(asset, selected) {
+        const venues = Object.keys((this._instIdx || {})[asset] || {}).sort();
+        return venues.map(v => `<option value="${v}" ${v===selected?"selected":""}>${v}</option>`).join("");
+    },
+
+    _instrumentOptions(asset, venue, selected) {
+        const list = (((this._instIdx || {})[asset] || {})[venue]) || [];
+        return list.map(bt => `<option value="${bt}" ${bt===selected?"selected":""}>${bt}</option>`).join("");
+    },
+
+    /** Timeframes the user can pick. The `value` is the Nautilus
+     *  "<step>-<aggregation>" tail of the bar_type_str. */
+    TIMEFRAMES: [
+        { label: "1 min",   value: "1-MINUTE"  },
+        { label: "5 min",   value: "5-MINUTE"  },
+        { label: "15 min",  value: "15-MINUTE" },
+        { label: "30 min",  value: "30-MINUTE" },
+        { label: "1 hour",  value: "1-HOUR"    },
+        { label: "2 hours", value: "2-HOUR"    },
+        { label: "1 day",   value: "1-DAY"     },
+        { label: "1 week",  value: "1-WEEK"    },
+        { label: "1 month", value: "1-MONTH"   },
+    ],
+    PRICE_TYPES: ["BID", "ASK", "MID", "LAST"],
+
+    /** Decompose a full bar_type_str into its 4 user-facing pieces.
+     *  "EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL"
+     *    -> { instrumentId: "EURUSD.FOREX_MS", tfValue: "1-MINUTE",
+     *         priceType: "ASK", aggregator: "EXTERNAL" } */
+    _parseBarTypeFull(bt) {
+        const parts = String(bt || "").split("-");
+        const instrumentId = parts[0] || "";
+        const step = parts[1] || "";
+        const aggUnit = parts[2] || "";
+        const priceType = parts[3] || "";
+        const aggregator = parts[4] || "";
+        const tfValue = (step && aggUnit) ? `${step}-${aggUnit}` : "";
+        return { instrumentId, tfValue, priceType, aggregator };
+    },
+
+    /** Distinct "SYMBOL.VENUE" heads available under a given asset/venue in the catalog. */
+    _instrumentIdsFor(asset, venue) {
+        const list = (((this._instIdx || {})[asset] || {})[venue]) || [];
+        const seen = new Set();
+        for (const bt of list) seen.add(bt.split("-")[0]);
+        return [...seen].sort();
+    },
+
+    _instIdOptions(asset, venue, selected) {
+        return this._instrumentIdsFor(asset, venue)
+            .map(id => `<option value="${id}" ${id===selected?"selected":""}>${id}</option>`).join("");
+    },
+
+    _tfOptions(selected) {
+        return this.TIMEFRAMES.map(tf =>
+            `<option value="${tf.value}" ${tf.value===selected?"selected":""}>${tf.label}</option>`).join("");
+    },
+
+    _priceTypeOptions(selected) {
+        return this.PRICE_TYPES.map(p =>
+            `<option value="${p}" ${p===selected?"selected":""}>${p}</option>`).join("");
+    },
+
+    /** Aggregation source is always EXTERNAL in this project — all data is loaded
+     *  from external sources (CSV / catalog), never aggregated internally by the
+     *  engine — so the bar_type_str tail is hardcoded here. */
+    _composeBarType(instId, tfValue, priceType) {
+        if (!instId || !tfValue || !priceType) return "";
+        return `${instId}-${tfValue}-${priceType}-EXTERNAL`;
+    },
+
+    /** True iff the exact composed bar_type_str is present in the loaded catalog. */
+    _barTypeInCatalog(bt) {
+        if (!bt) return false;
+        if (!this._barTypeSet) this._barTypeSet = new Set(this.barTypes || []);
+        return this._barTypeSet.has(bt);
+    },
+
     /** Build HTML for a single inline leg row */
     _buildInlineLegRow(slot, i) {
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${bt}</option>`).join("");
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];
         const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
         const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
         const sOpts = stratOpts.replace(`value="${slot.strategy_name}"`, `value="${slot.strategy_name}" selected`);
-        const bOpts = barOpts.replace(`value="${slot.bar_type_str}"`, `value="${slot.bar_type_str}" selected`);
+
+        const { asset, venue } = this._parseBarType(slot.bar_type_str);
+        const { instrumentId, tfValue, priceType } = this._parseBarTypeFull(slot.bar_type_str);
+        const assetOpts = this._assetOptions(asset);
+        const venueOpts = this._venueOptions(asset, venue);
+        const instIdOpts = this._instIdOptions(asset, venue, instrumentId);
+        const tfOpts = this._tfOptions(tfValue || "1-MINUTE");
+        const ptOpts = this._priceTypeOptions(priceType || "BID");
+        const finalBt = slot.bar_type_str || this._composeBarType(instrumentId, tfValue, priceType);
+        const finalMissing = !!finalBt && !this._barTypeInCatalog(finalBt);
+        const finalOk = !!finalBt && !finalMissing;
+        const finalCls = finalMissing ? "leg-final-missing" : (finalOk ? "leg-final-ok" : "");
+        const finalTitle = !finalBt
+            ? "Composed bar type (Nautilus format)"
+            : finalMissing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        const finalNote = `<span class="leg-final-warn" id="leg-il-warn-${i}" style="${finalMissing ? '' : 'display:none;'}">&#9888; no data in catalog</span>`;
 
         return `<tr>
             <td style="text-align:center;"><button class="leg-del-btn" onclick="Portfolio._deleteLeg(${i})" title="Delete">X</button></td>
@@ -1370,7 +1511,12 @@ const Portfolio = {
             <td style="text-align:center; font-weight:600;">${i + 1}</td>
             <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
             <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
-            <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
+            <td><select class="form-control" id="leg-il-asset-${i}" onchange="Portfolio._onInlineAssetChange(${i})" title="Asset class" style="min-width:110px;">${assetOpts}</select></td>
+            <td><select class="form-control" id="leg-il-venue-${i}" onchange="Portfolio._onInlineVenueChange(${i})" title="Venue" style="min-width:110px;">${venueOpts}</select></td>
+            <td><select class="form-control" id="leg-il-instid-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Instrument ID" style="min-width:170px;">${instIdOpts}</select></td>
+            <td><select class="form-control" id="leg-il-tf-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Timeframe" style="min-width:90px;">${tfOpts}</select></td>
+            <td><select class="form-control" id="leg-il-pt-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Price type" style="min-width:80px;">${ptOpts}</select></td>
+            <td><input type="text" class="form-control ${finalCls}" id="leg-il-final-${i}" value="${finalBt}" readonly title="${finalTitle}" style="min-width:280px; font-size:0.72rem; color:#33485a;">${finalNote}</td>
             <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
             <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
             <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
@@ -1378,6 +1524,84 @@ const Portfolio = {
             <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;"></td>
             <td style="text-align:center;"><button class="btn btn-xs" onclick="Portfolio._editLeg(${i})" style="font-size:0.72rem;">&#9881; Edit</button></td>
         </tr>`;
+    },
+
+    _onInlineAssetChange(i) {
+        const asset = document.getElementById(`leg-il-asset-${i}`).value;
+        const venueSel = document.getElementById(`leg-il-venue-${i}`);
+        venueSel.innerHTML = this._venueOptions(asset, null);
+        this._onInlineVenueChange(i);
+    },
+
+    _onInlineVenueChange(i) {
+        const asset = document.getElementById(`leg-il-asset-${i}`).value;
+        const venue = document.getElementById(`leg-il-venue-${i}`).value;
+        const instIdSel = document.getElementById(`leg-il-instid-${i}`);
+        instIdSel.innerHTML = this._instIdOptions(asset, venue, null);
+        this._onInlineInstChange(i);
+    },
+
+    /** Recompose the Final bar_type_str display whenever any of the
+     *  instrument-defining selects changes. Also flags combinations not in
+     *  the loaded catalog so the user knows the backtest would have no data.
+     *  Aggregation source is always EXTERNAL — see _composeBarType. */
+    _onInlineInstChange(i) {
+        const instId = document.getElementById(`leg-il-instid-${i}`)?.value || "";
+        const tf = document.getElementById(`leg-il-tf-${i}`)?.value || "";
+        const pt = document.getElementById(`leg-il-pt-${i}`)?.value || "";
+        const composed = this._composeBarType(instId, tf, pt);
+        const finalEl = document.getElementById(`leg-il-final-${i}`);
+        const warnEl = document.getElementById(`leg-il-warn-${i}`);
+        if (!finalEl) return;
+        finalEl.value = composed;
+        const missing = !!composed && !this._barTypeInCatalog(composed);
+        const ok = !!composed && !missing;
+        finalEl.classList.toggle("leg-final-missing", missing);
+        finalEl.classList.toggle("leg-final-ok", ok);
+        finalEl.title = !composed
+            ? "Composed bar type (Nautilus format)"
+            : missing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        if (warnEl) warnEl.style.display = missing ? "block" : "none";
+    },
+
+    _onLegModalAssetChange() {
+        const asset = document.getElementById("leg-m-asset").value;
+        const venueSel = document.getElementById("leg-m-venue");
+        venueSel.innerHTML = this._venueOptions(asset, null);
+        this._onLegModalVenueChange();
+    },
+
+    _onLegModalVenueChange() {
+        const asset = document.getElementById("leg-m-asset").value;
+        const venue = document.getElementById("leg-m-venue").value;
+        const instIdSel = document.getElementById("leg-m-instid");
+        instIdSel.innerHTML = this._instIdOptions(asset, venue, null);
+        this._onLegModalInstChange();
+    },
+
+    /** Recompose the leg-modal Final display whenever any of the selects changes.
+     *  Aggregation source is always EXTERNAL — see _composeBarType. */
+    _onLegModalInstChange() {
+        const instId = document.getElementById("leg-m-instid")?.value || "";
+        const tf = document.getElementById("leg-m-tf")?.value || "";
+        const pt = document.getElementById("leg-m-pt")?.value || "";
+        const composed = this._composeBarType(instId, tf, pt);
+        const finalEl = document.getElementById("leg-m-final");
+        const warnEl = document.getElementById("leg-m-warn");
+        if (!finalEl) return;
+        finalEl.value = composed;
+        const missing = !!composed && !this._barTypeInCatalog(composed);
+        const ok = !!composed && !missing;
+        finalEl.classList.toggle("leg-final-missing", missing);
+        finalEl.classList.toggle("leg-final-ok", ok);
+        finalEl.title = !composed
+            ? "Composed Nautilus bar type string"
+            : missing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        if (warnEl) warnEl.style.display = missing ? "block" : "none";
     },
 
     /** Rebuild the entire legs tbody from current slot data (no modal reopen) */
@@ -1388,7 +1612,7 @@ const Portfolio = {
         const tbody = document.getElementById("pf-m-legs-body");
         if (!tbody) return;
         if ((pf.slots || []).length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
             tbody.innerHTML = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
@@ -1519,6 +1743,7 @@ const Portfolio = {
         pf._ui.trail_when_profit_reach = parseFloat(document.getElementById("pf-m-tgt-trail-reach")?.value) || 0;
         pf._ui.trail_every = parseFloat(document.getElementById("pf-m-tgt-trail-every")?.value) || 0;
         pf._ui.trail_by = parseFloat(document.getElementById("pf-m-tgt-trail-by")?.value) || 0;
+        pf._ui.target_target_portfolio = (document.getElementById("pf-m-tgt-targetpf")?.value || "").trim();
         // Stoploss
         pf._ui.sl_enabled = document.getElementById("pf-m-sl-enabled")?.checked || false;
         pf._ui.sl_type = document.getElementById("pf-m-sl-type")?.value || "Combined Loss";
@@ -1526,6 +1751,7 @@ const Portfolio = {
         pf._ui.on_sl_action = document.getElementById("pf-m-sl-action")?.value || "SqOff";
         pf._ui.sl_delay = parseInt(document.getElementById("pf-m-sl-delay")?.value) || 0;
         pf._ui.sl_reexecute_count = parseInt(document.getElementById("pf-m-sl-reexcount")?.value) || 0;
+        pf._ui.sl_target_portfolio = (document.getElementById("pf-m-sl-targetpf")?.value || "").trim();
         pf._ui.trail_sl_enabled = document.getElementById("pf-m-sl-trail-enabled")?.checked || false;
         pf._ui.trail_sl_every = parseFloat(document.getElementById("pf-m-sl-trail-every")?.value) || 0;
         pf._ui.trail_sl_by = parseFloat(document.getElementById("pf-m-sl-trail-by")?.value) || 0;
@@ -1552,6 +1778,8 @@ const Portfolio = {
         pf.pf_tgt_trail_when_profit_reach = pf._ui.trail_when_profit_reach;
         pf.pf_tgt_trail_every = pf._ui.trail_every;
         pf.pf_tgt_trail_by = pf._ui.trail_by;
+        pf.pf_tgt_target_portfolio = pf._ui.target_target_portfolio || "";
+        pf.pf_sl_target_portfolio = pf._ui.sl_target_portfolio || "";
         pf.pf_sl_enabled = pf._ui.sl_enabled;
         pf.pf_sl_type = pf._ui.sl_type;
         pf.pf_sl_value = pf._ui.sl_value;
@@ -1663,8 +1891,9 @@ const Portfolio = {
             strategy_name: firstStrat, strategy_params: defaultParams,
             bar_type_str: this.barTypes[0] || "", lots: 1, allocation_pct: 0,
             exit_config: { stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
-                target_type: "none", target_value: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
-                max_re_executions: 0, squareoff_time: null, squareoff_tz: null },
+                target_type: "none", target_value: 0, sl_wait_sec: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
+                max_re_executions: 0, execute_target_leg_id: "", reentry_price: 0, max_re_entries: 0, armed_at_start: true,
+                squareoff_time: null, squareoff_tz: null },
             enabled: true, squareoff_time: null, squareoff_tz: null,
         });
         // Just refresh the table rows in-place — no modal reopen
@@ -1694,13 +1923,32 @@ const Portfolio = {
 
         const stratOpts = Object.keys(this.strategies).map(n =>
             `<option value="${n}" ${n === slot.strategy_name ? "selected" : ""}>${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt =>
-            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${App.barTypeLabel(bt)}</option>`).join("");
+        const { asset: curAsset, venue: curVenue } = this._parseBarType(slot.bar_type_str);
+        const { instrumentId: curInstId, tfValue: curTf, priceType: curPt } = this._parseBarTypeFull(slot.bar_type_str);
+        const mAssetOpts = this._assetOptions(curAsset);
+        const mVenueOpts = this._venueOptions(curAsset, curVenue);
+        const mInstIdOpts = this._instIdOptions(curAsset, curVenue, curInstId);
+        const mTfOpts = this._tfOptions(curTf || "1-MINUTE");
+        const mPtOpts = this._priceTypeOptions(curPt || "BID");
+        const mFinalBt = slot.bar_type_str || this._composeBarType(curInstId, curTf, curPt);
+        const mFinalMissing = !!mFinalBt && !this._barTypeInCatalog(mFinalBt);
+        const mFinalOk = !!mFinalBt && !mFinalMissing;
+        const mFinalCls = mFinalMissing ? "leg-final-missing" : (mFinalOk ? "leg-final-ok" : "");
+        const mFinalTitle = !mFinalBt
+            ? "Composed Nautilus bar type string"
+            : mFinalMissing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
         const paramsHTML = this._buildParamsHTML(pf, legIndex);
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];
-        const actions = ["close", "re_execute", "reverse"];
+        const actions = ["close", "re_execute", "reverse", "execute", "re_entry", "keep_leg_running"];
+        const allLegIds = (pf.slots || [])
+            .map((s, i) => ({ id: s.slot_id || `slot_${i}`, label: s.strategy_name || `Slot ${i+1}` }))
+            .filter(s => s.id !== (slot.slot_id || `slot_${legIndex}`));
+        const execTargetOpts = `<option value="" ${!ec.execute_target_leg_id?'selected':''}>(none)</option>` +
+            allLegIds.map(s => `<option value="${s.id}" ${ec.execute_target_leg_id===s.id?'selected':''}>${s.label} (${s.id})</option>`).join("");
 
         const body = `
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:#f8f9fa; border:1px solid var(--border-color); border-radius:4px;">
@@ -1708,9 +1956,30 @@ const Portfolio = {
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">STRATEGY</div>
                     <select class="form-control" id="leg-m-strategy" onchange="Portfolio._onLegStratChange()" style="font-size:0.82rem; padding:5px 8px;">${stratOpts}</select>
                 </div>
-                <div style="flex:2; min-width:140px;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT</div>
-                    <select class="form-control" id="leg-m-instrument" style="font-size:0.82rem; padding:5px 8px;">${barOpts}</select>
+                <div style="flex:1.2; min-width:110px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">ASSET</div>
+                    <select class="form-control" id="leg-m-asset" onchange="Portfolio._onLegModalAssetChange()" style="font-size:0.82rem; padding:5px 8px;">${mAssetOpts}</select>
+                </div>
+                <div style="flex:1.2; min-width:110px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">VENUE</div>
+                    <select class="form-control" id="leg-m-venue" onchange="Portfolio._onLegModalVenueChange()" style="font-size:0.82rem; padding:5px 8px;">${mVenueOpts}</select>
+                </div>
+                <div style="flex:1.6; min-width:160px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT ID</div>
+                    <select class="form-control" id="leg-m-instid" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mInstIdOpts}</select>
+                </div>
+                <div style="flex:1; min-width:90px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">TIMEFRAME</div>
+                    <select class="form-control" id="leg-m-tf" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mTfOpts}</select>
+                </div>
+                <div style="flex:0.9; min-width:80px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">PRICE TYPE</div>
+                    <select class="form-control" id="leg-m-pt" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mPtOpts}</select>
+                </div>
+                <div style="flex:2.4; min-width:240px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">FINAL INSTRUMENT (NAUTILUS)</div>
+                    <input type="text" class="form-control ${mFinalCls}" id="leg-m-final" value="${mFinalBt}" readonly title="${mFinalTitle}" style="font-size:0.78rem; padding:5px 8px; color:#33485a;">
+                    <div class="leg-final-warn" id="leg-m-warn" style="display:${mFinalMissing?'block':'none'}; margin-top:3px;">&#9888; no data in catalog for this bar type</div>
                 </div>
                 <div style="flex:0.7; min-width:70px;">
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">LOTS</div>
@@ -1742,12 +2011,31 @@ const Portfolio = {
                         <input type="number" class="form-control" id="leg-m-trailstep" value="${ec.trailing_sl_step||0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Offset</label>
                         <input type="number" class="form-control" id="leg-m-trailoff" value="${ec.trailing_sl_offset||0}" step="0.5" min="0"></div>
-                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Wait</label>
-                        <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_bars||0}" step="1" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:90px;"><label class="form-label">SL Wait (sec)</label>
+                        <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_sec||0}" step="1" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On SL</label>
                         <select class="form-control" id="leg-m-slaction">${actions.map(a => `<option value="${a}" ${(ec.on_sl_action||"close")===a?"selected":""}>${a}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Max Re-ex</label>
                         <input type="number" class="form-control" id="leg-m-maxreex" value="${ec.max_re_executions||0}" step="1" min="0"></div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);">
+                    <div class="form-group" style="flex:1; min-width:180px;" title="Spec §1.2(c): when On SL/TP = 'execute', arm this sibling slot via the cross-slot bus.">
+                        <label class="form-label">Execute Target Leg</label>
+                        <select class="form-control" id="leg-m-exectarget">${execTargetOpts}</select>
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:100px;" title="Spec §1.2(d): price the 're_entry' action waits for. 0 = re-use prior entry price.">
+                        <label class="form-label">ReEntry Price</label>
+                        <input type="number" class="form-control" id="leg-m-reentryprice" value="${ec.reentry_price||0}" step="any" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="Spec §1.2(d): cap re_entry fires per day. 0 = unlimited.">
+                        <label class="form-label">Max Re-Entries</label>
+                        <input type="number" class="form-control" id="leg-m-maxreentries" value="${ec.max_re_entries||0}" step="1" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:140px; display:flex; align-items:flex-end;" title="Spec §1.2(c): when off, leg ignores its own signals until a sibling slot's 'execute' arms it.">
+                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="leg-m-armed" ${ec.armed_at_start===false?'':'checked'}> Armed at start
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-target" style="display:none;">
@@ -1814,7 +2102,11 @@ const Portfolio = {
         const slot = this.portfolios[pfIdx].slots[legIdx];
 
         slot.strategy_name = document.getElementById("leg-m-strategy").value;
-        slot.bar_type_str = document.getElementById("leg-m-instrument").value;
+        const _mInstId = document.getElementById("leg-m-instid")?.value || "";
+        const _mTf = document.getElementById("leg-m-tf")?.value || "";
+        const _mPt = document.getElementById("leg-m-pt")?.value || "";
+        const _composed = this._composeBarType(_mInstId, _mTf, _mPt);
+        if (_composed) slot.bar_type_str = _composed;
         const lotsInput = parseFloat(document.getElementById("leg-m-size").value);
         slot.lots = (Number.isFinite(lotsInput) && lotsInput > 0) ? lotsInput : 1;
         delete slot.trade_size;
@@ -1839,9 +2131,14 @@ const Portfolio = {
         ec.stop_loss_value = parseFloat(document.getElementById("leg-m-slval").value) || 0;
         ec.trailing_sl_step = parseFloat(document.getElementById("leg-m-trailstep").value) || 0;
         ec.trailing_sl_offset = parseFloat(document.getElementById("leg-m-trailoff").value) || 0;
-        ec.sl_wait_bars = parseInt(document.getElementById("leg-m-slwait").value) || 0;
+        ec.sl_wait_sec = parseInt(document.getElementById("leg-m-slwait").value) || 0;
+        ec.sl_wait_bars = 0;
         ec.on_sl_action = document.getElementById("leg-m-slaction").value;
         ec.max_re_executions = parseInt(document.getElementById("leg-m-maxreex").value) || 0;
+        ec.execute_target_leg_id = document.getElementById("leg-m-exectarget")?.value || "";
+        ec.reentry_price = parseFloat(document.getElementById("leg-m-reentryprice")?.value) || 0;
+        ec.max_re_entries = parseInt(document.getElementById("leg-m-maxreentries")?.value) || 0;
+        ec.armed_at_start = document.getElementById("leg-m-armed")?.checked !== false;
         ec.target_type = document.getElementById("leg-m-tptype").value;
         ec.target_value = parseFloat(document.getElementById("leg-m-tpval").value) || 0;
         ec.on_target_action = document.getElementById("leg-m-tpaction").value;

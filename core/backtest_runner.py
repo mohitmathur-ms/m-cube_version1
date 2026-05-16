@@ -663,7 +663,7 @@ class _PfStoplossSettings:
     """
     enabled: bool = False
     value: float = 0.0
-    action: str = "SqOff"  # SqOff | ReExecute
+    action: str = "SqOff"  # SqOff | ReExecute | cross-portfolio variants
     delay_sec: int = 0
     reexecute_count: int = 0  # 0 = unlimited per spec §1.7
     sqoff_only_loss_legs: bool = False
@@ -671,6 +671,7 @@ class _PfStoplossSettings:
     trail_enabled: bool = False
     trail_every: float = 0.0
     trail_by: float = 0.0
+    target_portfolio: str = ""  # spec §2.1(m) — only used for cross-portfolio actions
 
 
 @dataclasses.dataclass(frozen=True)
@@ -686,6 +687,7 @@ class _PfTargetSettings:
     trail_when_profit_reach: float = 0.0
     trail_every: float = 0.0
     trail_by: float = 0.0
+    target_portfolio: str = ""  # spec §2.4(d)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -708,6 +710,12 @@ class _MoveSLConfig:
     trail_after: bool = False
     no_buy_legs: bool = False
     no_reexec_sl_cost: bool = False
+    # LTP-buffer variant (spec §3 action v3, leg-level): on a losing leg, slide
+    # SL toward LTP by this buffer (price units). 0 = exit at current price.
+    ltp_buffer: float = 0.0
+    # Hit-On-Leg cross-slot triggers (spec §3 1.3(f)/(g)).
+    hit_on_leg_sl: bool = False
+    hit_on_leg_target: bool = False
 
 
 _VALID_PF_SL_TYPES_FX = ("Combined Loss",)
@@ -716,13 +724,83 @@ _OPTIONS_ONLY_PF_SL_TYPES = ("Combined Premium", "Absolute Combined Premium",
                              "Underlying Movement", "Loss and Underlying Range")
 _OPTIONS_ONLY_PF_TGT_TYPES = ("Combined Premium", "Absolute Combined Premium",
                               "Underlying Movement")
-_VALID_PF_ACTIONS_FX = ("SqOff", "ReExecute")
-_OPTIONS_ONLY_PF_ACTIONS = ("SqOff Other Portfolio", "Execute Other Portfolio",
-                            "Start Other Portfolio", "ReExecute at Entry Price",
-                            "ReExecute SameStrike at EntryPrice")
+_VALID_PF_ACTIONS_FX = (
+    "SqOff", "ReExecute",
+    # ReExecute-family — accepted; the "at Entry Price" variants currently
+    # fall back to plain ReExecute behavior (full price-wait gating relies on
+    # leg-level ReEntry, now implemented per spec §1.2 1.2(d)).
+    "ReExecute at Entry Price",
+    "ReExecute Same Contract at EntryPrice",
+    # Cross-portfolio actions (spec §2.1(h)/(i)/(j)). Each clip in this
+    # portfolio also writes an event to the cross-portfolio bus; the named
+    # target portfolio reads it at its next run start.
+    "SqOff Other Portfolio",
+    "Execute Other Portfolio",
+    "Start Other Portfolio",
+)
+_OPTIONS_ONLY_PF_ACTIONS: tuple[str, ...] = ()
+_CROSS_PORTFOLIO_ACTIONS = (
+    "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio",
+)
+
+# Cross-portfolio event bus. Keyed by target_portfolio name; each entry is a
+# list of pending events (action, source_portfolio, ts_iso). When portfolio B
+# runs, `consume_cross_portfolio_events("B")` pops its queue and the runner
+# applies the requested action(s) at run start.
+_CROSS_PORTFOLIO_EVENT_BUS: dict[str, list[dict]] = {}
+
+
+def publish_cross_portfolio_event(target_portfolio: str, action: str,
+                                  source_portfolio: str, ts_iso: str) -> None:
+    """Append a cross-portfolio event for later consumption by target_portfolio."""
+    if not target_portfolio:
+        return
+    _CROSS_PORTFOLIO_EVENT_BUS.setdefault(target_portfolio, []).append(
+        {"action": action, "source": source_portfolio, "ts": ts_iso}
+    )
+
+
+def consume_cross_portfolio_events(target_portfolio: str) -> list[dict]:
+    """Pop all pending events targeting this portfolio. Returns [] if none."""
+    if not target_portfolio:
+        return []
+    return _CROSS_PORTFOLIO_EVENT_BUS.pop(target_portfolio, []) or []
+
+
+def clear_cross_portfolio_bus() -> None:
+    """Reset the cross-portfolio bus (used between orchestrator sessions)."""
+    _CROSS_PORTFOLIO_EVENT_BUS.clear()
 _VALID_MOVE_SL_ACTIONS_FX = ("Move Only for Profitable Legs",
-                             "Move SL for All Legs Despite Loss/Profit")
-_OPTIONS_ONLY_MOVE_SL_ACTIONS = ("Move SL to LTP + Buffer for Loss Making Legs",)
+                             "Move SL for All Legs Despite Loss/Profit",
+                             "Move SL to LTP + Buffer for Loss Making Legs")
+_OPTIONS_ONLY_MOVE_SL_ACTIONS: tuple[str, ...] = ()
+
+# D2 rename (locked): "SameStrike" → "Same Contract". Futures use contract month, not strike.
+# Translate legacy config strings on load so existing portfolios keep working.
+_LEGACY_PF_ACTION_ALIASES = {
+    "ReExecute SameStrike at EntryPrice": "ReExecute Same Contract at EntryPrice",
+}
+
+
+def _normalize_pf_action(action: str | None) -> str:
+    """Translate legacy action names (D2) so old configs still resolve correctly."""
+    if not action:
+        return "SqOff"
+    return _LEGACY_PF_ACTION_ALIASES.get(action, action)
+
+
+# ReExecute-family actions all trigger clip-then-replay. The "at Entry Price"
+# variants currently fall back to immediate ReExecute because leg-level
+# price-wait re-entry is not yet wired (spec §1.2 1.2(d)).
+_REEXECUTE_FAMILY_ACTIONS = (
+    "ReExecute",
+    "ReExecute at Entry Price",
+    "ReExecute Same Contract at EntryPrice",
+)
+
+
+def _is_reexec_action(action: str) -> bool:
+    return action in _REEXECUTE_FAMILY_ACTIONS
 
 
 def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
@@ -750,11 +828,11 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
         )
         sl_type = "Combined Loss"
 
-    action = getattr(portfolio, "pf_sl_action", "SqOff") or "SqOff"
+    action = _normalize_pf_action(getattr(portfolio, "pf_sl_action", "SqOff"))
     if action in _OPTIONS_ONLY_PF_ACTIONS:
         warnings.append(
-            f"pf_sl_action={action!r} requires options/cross-portfolio infrastructure "
-            f"not implemented for FX/crypto; downgraded to 'SqOff'."
+            f"pf_sl_action={action!r} requires cross-portfolio dispatch infrastructure "
+            f"that is not yet wired; closing local portfolio only (SqOff fallback)."
         )
         action = "SqOff"
     elif action not in _VALID_PF_ACTIONS_FX:
@@ -783,6 +861,14 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
             "SL will have no effect."
         )
 
+    target_pf = str(getattr(portfolio, "pf_sl_target_portfolio", "") or "")
+    if action in _CROSS_PORTFOLIO_ACTIONS and not target_pf:
+        warnings.append(
+            f"pf_sl_action={action!r} requires pf_sl_target_portfolio to be set — "
+            f"downgrading to 'SqOff' (local close)."
+        )
+        action = "SqOff"
+
     return _PfStoplossSettings(
         enabled=True, value=value, action=action, delay_sec=delay,
         reexecute_count=reexec,
@@ -790,6 +876,7 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
         sqoff_only_profit_legs=sqoff_profit,
         trail_enabled=trail_enabled,
         trail_every=trail_every, trail_by=trail_by,
+        target_portfolio=target_pf,
     ), warnings
 
 
@@ -812,11 +899,11 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
         )
         tgt_type = "Combined Profit"
 
-    action = getattr(portfolio, "pf_tgt_action", "SqOff") or "SqOff"
+    action = _normalize_pf_action(getattr(portfolio, "pf_tgt_action", "SqOff"))
     if action in _OPTIONS_ONLY_PF_ACTIONS:
         warnings.append(
-            f"pf_tgt_action={action!r} requires infrastructure not implemented "
-            f"for FX/crypto; downgraded to 'SqOff'."
+            f"pf_tgt_action={action!r} requires cross-portfolio dispatch infrastructure "
+            f"that is not yet wired; closing local portfolio only (SqOff fallback)."
         )
         action = "SqOff"
     elif action not in _VALID_PF_ACTIONS_FX:
@@ -838,6 +925,14 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
             f"per spec §5.3 the activation threshold should be >= lock_min_profit."
         )
 
+    target_pf = str(getattr(portfolio, "pf_tgt_target_portfolio", "") or "")
+    if action in _CROSS_PORTFOLIO_ACTIONS and not target_pf:
+        warnings.append(
+            f"pf_tgt_action={action!r} requires pf_tgt_target_portfolio to be set — "
+            f"downgrading to 'SqOff' (local close)."
+        )
+        action = "SqOff"
+
     return _PfTargetSettings(
         enabled=True, value=value, action=action, delay_sec=delay,
         reexecute_count=reexec,
@@ -845,6 +940,7 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
         trail_lock_min_profit=trail_lock,
         trail_when_profit_reach=trail_reach,
         trail_every=trail_every, trail_by=trail_by,
+        target_portfolio=target_pf,
     ), warnings
 
 
@@ -876,12 +972,16 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
         action = "Move Only for Profitable Legs"
 
     safety = max(0, int(getattr(portfolio, "move_sl_safety_sec", 0) or 0))
+    ltp_buffer = max(0.0, float(getattr(portfolio, "move_sl_ltp_buffer", 0.0) or 0.0))
 
     return _MoveSLConfig(
         enabled=True, safety_sec=safety, action=action,
         trail_after=bool(getattr(portfolio, "move_sl_trail_after", False)),
         no_buy_legs=bool(getattr(portfolio, "move_sl_no_buy_legs", False)),
         no_reexec_sl_cost=no_reexec_sl_cost,
+        ltp_buffer=ltp_buffer,
+        hit_on_leg_sl=bool(getattr(portfolio, "move_sl_hit_on_leg_sl", False)),
+        hit_on_leg_target=bool(getattr(portfolio, "move_sl_hit_on_leg_target", False)),
     ), warnings
 
 
@@ -893,13 +993,18 @@ class _ClipResult:
     whose trades after clip_ts should be dropped — for full SqOff that's
     every enabled slot, for selective SqOff it's only the matching subset.
     """
-    clip_ts: str | None = None  # ISO UTC string from equity_curve_ts
+    clip_ts: str | None = None  # ISO UTC string from equity_curve_ts (FIRST clip)
     clip_reason: str | None = None  # STOPLOSS | STOPLOSS_TRAIL | TARGET | TARGET_TRAIL
     clip_action: str | None = None  # SqOff | ReExecute
     clipped_slots: tuple[str, ...] = ()
     would_reexecute: bool = False
     reexec_count: int = 0
     logs: tuple[str, ...] = ()
+    # All clip events fired during this portfolio run, in chronological order.
+    # For non-ReExecute actions there's at most one entry. For ReExecute,
+    # honours `pf_sl_reexecute_count` (0 = unlimited; otherwise capped).
+    # Each tuple: (clip_ts_iso, reason, action).
+    clip_events: tuple[tuple[str, str, str], ...] = ()
 
 
 def _ts_iso_to_ns(ts_iso: str | None) -> int:
@@ -966,6 +1071,13 @@ def _apply_portfolio_clip(
             return tgt_trail_active and pnl <= tgt_floor
         return False
 
+    # Cumulative ReExecute clip events. When pf_sl_action == "ReExecute" and
+    # the cap allows, each SL clip resets trailing/pending state and continues
+    # walking instead of stopping. reexecute_count=0 means unlimited;
+    # otherwise the (count+1)-th SL hit ends the run.
+    clip_events_acc: list[tuple[str, str, str]] = []
+    reexec_cap = int(getattr(pf_sl, "reexecute_count", 0) or 0)
+
     for pt in equity_curve_ts:
         ts = pt.get("timestamp")
         if ts is None:
@@ -1029,6 +1141,28 @@ def _apply_portfolio_clip(
         elif tgt_hit_now:
             new_hit_reason = "TARGET"
 
+        def _fire_clip(clip_ts_iso: str, reason: str):
+            """Handle a confirmed clip. Returns a `_ClipResult` to stop the
+            walk, or None to continue (when action=ReExecute and cap allows)."""
+            action_local = pf_sl.action if reason.startswith("STOPLOSS") else (
+                "SqOff" if reason == "TARGET_TRAIL" else pf_tgt.action
+            )
+            # Spec: all ReExecute-family actions replay (subject to cap).
+            if _is_reexec_action(action_local) and (reexec_cap == 0 or len(clip_events_acc) < reexec_cap):
+                clip_events_acc.append((clip_ts_iso, reason, action_local))
+                logs.append(
+                    f"PORTFOLIO_REEXECUTE_REPLAY | Reason={reason} | "
+                    f"ReExec#{len(clip_events_acc)}/{reexec_cap or 'unlimited'}"
+                )
+                return None  # Continue walking
+            # Final clip — stop the walk.
+            return _build_clip_result(
+                clip_ts=clip_ts_iso, reason=reason,
+                pf_sl=pf_sl, pf_tgt=pf_tgt,
+                slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                prior_events=tuple(clip_events_acc),
+            )
+
         if pending_reason is not None:
             # Has the condition cleared?
             if not _condition_holds(pending_reason, pnl):
@@ -1040,12 +1174,17 @@ def _apply_portfolio_clip(
                 # Condition still holds; check if delay elapsed
                 delay_sec = pf_sl.delay_sec if pending_reason.startswith("STOPLOSS") else pf_tgt.delay_sec
                 if delay_sec == 0 or (ts_ns - pending_at_ns) >= delay_sec * 1_000_000_000:
-                    # Fire — clip happens at the original pending_clip_ts
-                    return _build_clip_result(
-                        clip_ts=pending_clip_ts, reason=pending_reason,
-                        pf_sl=pf_sl, pf_tgt=pf_tgt,
-                        slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
-                    )
+                    result = _fire_clip(pending_clip_ts, pending_reason)
+                    if result is not None:
+                        return result
+                    # ReExecute replay: reset trail/pending state and continue.
+                    sl_trail_anchor = pnl
+                    tgt_trail_active = False
+                    tgt_floor = 0.0
+                    tgt_trail_anchor = 0.0
+                    pending_reason = None
+                    pending_at_ns = 0
+                    pending_clip_ts = None
 
         if new_hit_reason is not None and pending_reason is None:
             delay_sec = pf_sl.delay_sec if new_hit_reason.startswith("STOPLOSS") else pf_tgt.delay_sec
@@ -1057,15 +1196,19 @@ def _apply_portfolio_clip(
                     f"PORTFOLIO_DELAY_PENDING | Reason={new_hit_reason} | Delay={delay_sec}s"
                 )
             else:
-                # No delay — clip immediately
-                return _build_clip_result(
-                    clip_ts=ts, reason=new_hit_reason,
-                    pf_sl=pf_sl, pf_tgt=pf_tgt,
-                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
-                )
+                # No delay — clip immediately (or replay if ReExecute + under cap)
+                result = _fire_clip(ts, new_hit_reason)
+                if result is not None:
+                    return result
+                # ReExecute replay: reset trail state and continue.
+                sl_trail_anchor = pnl
+                tgt_trail_active = False
+                tgt_floor = 0.0
+                tgt_trail_anchor = 0.0
 
-    # Walked the whole curve without firing
-    return _ClipResult(logs=tuple(logs))
+    # Walked the whole curve without a final (non-replayed) clip.
+    # Surface any accumulated ReExecute replays for the caller.
+    return _ClipResult(logs=tuple(logs), clip_events=tuple(clip_events_acc))
 
 
 def _build_clip_result(
@@ -1075,6 +1218,7 @@ def _build_clip_result(
     pf_tgt: "_PfTargetSettings",
     slot_pnl_at_clip: dict | None,
     logs: list,
+    prior_events: tuple[tuple[str, str, str], ...] = (),
 ) -> _ClipResult:
     """Construct the ClipResult, applying selective SqOff filtering and
     classifying the action. Trailing-Target hits ignore configured action
@@ -1102,15 +1246,38 @@ def _build_clip_result(
         clipped = tuple(slot_pnl_at_clip.keys()) if slot_pnl_at_clip else ()
         logs = list(logs) + [f"PORTFOLIO_SQOFF | Reason={reason}"]
 
-    would_reexec = action == "ReExecute"
+    would_reexec = _is_reexec_action(action)
+    final_events = prior_events + ((clip_ts, reason, action),)
+    total_reexec = len(prior_events) + (1 if would_reexec else 0)
     if would_reexec:
-        logs.append(f"PORTFOLIO_REEXECUTE | Reason={reason} | Count=1 (v1: clip + flag, no replay)")
+        logs.append(
+            f"PORTFOLIO_REEXECUTE_FINAL | Reason={reason} | TotalReExec={total_reexec} (cap reached → stop)"
+        )
+
+    # Cross-portfolio dispatch (spec §2.1(h)/(i)/(j) and §2.4 mirror). The
+    # event is queued for the target portfolio; the runner consumes it at
+    # its next start. Action name is normalised to a single-word verb the
+    # consumer recognises.
+    if action in _CROSS_PORTFOLIO_ACTIONS:
+        target_pf = pf_sl.target_portfolio if reason.startswith("STOPLOSS") else pf_tgt.target_portfolio
+        verb_map = {
+            "SqOff Other Portfolio": "sqoff",
+            "Execute Other Portfolio": "execute",
+            "Start Other Portfolio": "start",
+        }
+        verb = verb_map.get(action, "sqoff")
+        if target_pf:
+            publish_cross_portfolio_event(target_pf, verb, "", clip_ts)
+            logs.append(
+                f"CROSS_PORTFOLIO_DISPATCH | Action={action!r} | Target={target_pf!r} | Verb={verb}"
+            )
 
     return _ClipResult(
         clip_ts=clip_ts, clip_reason=reason, clip_action=action,
         clipped_slots=clipped,
-        would_reexecute=would_reexec, reexec_count=1 if would_reexec else 0,
+        would_reexecute=would_reexec, reexec_count=total_reexec,
         logs=tuple(logs),
+        clip_events=final_events,
     )
 
 
@@ -1638,6 +1805,8 @@ def _run_single_slot_node(
                     rbo_settings=default_rbo_settings,
                     other_settings=default_other_settings,
                     move_sl_settings=default_move_sl_settings,
+                    portfolio_id=getattr(portfolio, "name", ""),
+                    slot_id=slot.slot_id,
                 )
                 strategy = ManagedExitStrategy(managed_config)
             else:
@@ -1932,6 +2101,8 @@ def _run_single_slot(
                     move_sl_settings=default_move_sl_settings,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
+                    portfolio_id=getattr(portfolio, "name", ""),
+                    slot_id=slot.slot_id,
                 )
                 strategy = ManagedExitStrategy(managed_config)
             else:
@@ -2302,6 +2473,8 @@ def _run_slot_group_node(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        portfolio_id=getattr(portfolio, "name", ""),
+                        slot_id=slot.slot_id,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -2613,6 +2786,8 @@ def _run_slot_group(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        portfolio_id=getattr(portfolio, "name", ""),
+                        slot_id=slot.slot_id,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -2741,6 +2916,39 @@ def run_portfolio_backtest(
     """
     import os
     from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    # Reset the cross-slot event bus for this portfolio so a prior run's
+    # SL/target events don't leak into the new run (spec §3 1.3(f)/(g)).
+    from core.managed_strategy import clear_cross_slot_bus
+    pf_name = getattr(portfolio, "name", "") or "_standalone_"
+    clear_cross_slot_bus(pf_name)
+
+    # Cross-portfolio dispatch consumption (spec §2.1(h)/(i)/(j) + §2.4
+    # mirror). Pending events were written by an earlier portfolio's clip.
+    pending_events = consume_cross_portfolio_events(pf_name)
+    pending_sqoff = any(e["action"] == "sqoff" for e in pending_events)
+    pending_execute = any(e["action"] == "execute" for e in pending_events)
+    if pending_events:
+        for e in pending_events:
+            print(f"[XPF] {pf_name!r} consumed {e['action']!r} from clip @ {e.get('ts')}")
+    if pending_sqoff:
+        # SqOff Other Portfolio from a prior run: short-circuit this run.
+        # Return a zero-trade result that downstream callers handle the same
+        # way they handle an immediately-clipped portfolio.
+        print(f"[XPF] {pf_name!r} suppressed by SqOff Other Portfolio event")
+        return {
+            "portfolio_name": pf_name,
+            "starting_capital": getattr(portfolio, "starting_capital", 0.0),
+            "final_balance": getattr(portfolio, "starting_capital", 0.0),
+            "total_pnl": 0.0,
+            "total_trades": 0,
+            "wins": 0, "losses": 0,
+            "max_loss_hit": False, "max_profit_hit": False,
+            "per_strategy": {},
+            "cross_portfolio_dispatch": {"suppressed_by": "sqoff", "events": pending_events},
+        }
+    # "execute"/"start" verbs just confirm normal run; armed_at_start handles
+    # per-slot activation. The flag is surfaced in results for observability.
 
     enabled_slots = portfolio.enabled_slots
 
@@ -3110,11 +3318,26 @@ def _merge_portfolio_results(
     merged_positions = pd.concat(all_positions_reports, ignore_index=True) if all_positions_reports else pd.DataFrame()
     merged_fills = pd.concat(all_fills_reports, ignore_index=True) if all_fills_reports else pd.DataFrame()
 
-    # Portfolio stop flags (informational user-level caps, separate from the
-    # full Stoploss/Target machinery below — analogous to spec §10 Global
-    # User Limits).
-    max_loss_hit = portfolio.max_loss is not None and total_pnl <= -abs(portfolio.max_loss)
-    max_profit_hit = portfolio.max_profit is not None and total_pnl >= portfolio.max_profit
+    # Global user-level caps (spec §3 Level 3). Prefer user-scoped limits from
+    # config/users.json over the legacy portfolio-level fallback. PnL is the
+    # sum of this portfolio's PnL plus any cumulative PnL the user has
+    # accrued from prior portfolios in the same orchestrator run.
+    from core.users import (
+        get_user_max_loss, get_user_max_profit,
+        get_user_cumulative_pnl, add_user_pnl,
+    )
+    user_max_loss = get_user_max_loss(user_id) if user_id else None
+    user_max_profit = get_user_max_profit(user_id) if user_id else None
+    cum_user_pnl = get_user_cumulative_pnl(user_id) if user_id else 0.0
+    combined_pnl = total_pnl + cum_user_pnl
+    eff_max_loss = user_max_loss if user_max_loss is not None else portfolio.max_loss
+    eff_max_profit = user_max_profit if user_max_profit is not None else portfolio.max_profit
+    max_loss_hit = eff_max_loss is not None and combined_pnl <= -abs(eff_max_loss)
+    max_profit_hit = eff_max_profit is not None and combined_pnl >= eff_max_profit
+    # Roll this portfolio's PnL into the user aggregator so subsequent
+    # portfolios (or repeat runs in the same orchestrator session) see it.
+    if user_id:
+        add_user_pnl(user_id, total_pnl)
 
     # Portfolio-level Stoploss / Target post-hoc clip. Spec:
     # 5. Logics/portfolio_sl_tgt.html. Walks the merged equity curve, finds
@@ -3615,13 +3838,22 @@ def _extract_portfolio_results(
             "trade_pnls": slot_pnls,
         }
 
-    # Portfolio stop flags
-    max_loss_hit = False
-    max_profit_hit = False
-    if portfolio.max_loss is not None and total_pnl_with_unrealized <= -abs(portfolio.max_loss):
-        max_loss_hit = True
-    if portfolio.max_profit is not None and total_pnl_with_unrealized >= portfolio.max_profit:
-        max_profit_hit = True
+    # Global user-level caps (spec §3 Level 3). Same precedence rule as the
+    # path-A site: user-level limits override portfolio-level when present.
+    from core.users import (
+        get_user_max_loss, get_user_max_profit,
+        get_user_cumulative_pnl, add_user_pnl,
+    )
+    user_max_loss = get_user_max_loss(user_id) if user_id else None
+    user_max_profit = get_user_max_profit(user_id) if user_id else None
+    cum_user_pnl = get_user_cumulative_pnl(user_id) if user_id else 0.0
+    combined_pnl = total_pnl_with_unrealized + cum_user_pnl
+    eff_max_loss = user_max_loss if user_max_loss is not None else portfolio.max_loss
+    eff_max_profit = user_max_profit if user_max_profit is not None else portfolio.max_profit
+    max_loss_hit = eff_max_loss is not None and combined_pnl <= -abs(eff_max_loss)
+    max_profit_hit = eff_max_profit is not None and combined_pnl >= eff_max_profit
+    if user_id:
+        add_user_pnl(user_id, total_pnl_with_unrealized)
 
     return {
         "starting_capital": portfolio.starting_capital,

@@ -44,7 +44,13 @@
       "Bash(git -c user.name=mohitmathur-ms -c user.email=mohitmathur-ms@users.noreply.github.com commit -m ' *)",
       "Bash(git config:*)",
       "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Recurse -ErrorAction SilentlyContinue)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(Get-ChildItem -Recurse -Depth 2)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(grep -E \"\\\\.py$\")",
+      "PowerShell(python d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\\\\ipynb\\\\_check_nb.py)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"

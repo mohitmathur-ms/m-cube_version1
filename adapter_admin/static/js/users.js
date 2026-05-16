@@ -48,6 +48,8 @@ const Users = {
                             <th style="width:150px;">User ID</th>
                             <th>Alias</th>
                             <th style="width:100px;">Multiplier</th>
+                            <th style="width:110px;" title="Spec §3 Level 3: cumulative loss cap across all this user's portfolios. Blank = no cap.">Max Loss</th>
+                            <th style="width:110px;" title="Spec §3 Level 3: cumulative profit cap across all this user's portfolios. Blank = no cap.">Max Profit</th>
                             <th>Allowed Instruments</th>
                         </tr>
                     </thead>
@@ -75,6 +77,8 @@ const Users = {
         const allowed = Array.isArray(u.allowed_instruments)
             ? u.allowed_instruments.join(", ")
             : "";
+        const maxLoss = (u.max_loss === null || u.max_loss === undefined) ? "" : u.max_loss;
+        const maxProfit = (u.max_profit === null || u.max_profit === undefined) ? "" : u.max_profit;
         return `
             <tr data-row="${i}">
                 <td style="text-align:center;">
@@ -83,6 +87,8 @@ const Users = {
                 <td><input type="text" class="form-control" data-field="user_id" value="${this._escape(u.user_id || "")}" pattern="[a-z0-9_-]{1,32}"></td>
                 <td><input type="text" class="form-control" data-field="alias" value="${this._escape(u.alias || "")}"></td>
                 <td><input type="number" class="form-control" data-field="multiplier" value="${u.multiplier ?? 1.0}" min="0" step="any"></td>
+                <td><input type="number" class="form-control" data-field="max_loss" value="${maxLoss}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="max_profit" value="${maxProfit}" min="0" step="any" placeholder="(none)"></td>
                 <td><input type="text" class="form-control" data-field="allowed_instruments" value="${this._escape(allowed)}" placeholder="leave blank for all (e.g. EURUSD, BTCUSD)"></td>
             </tr>`;
     },
@@ -95,6 +101,8 @@ const Users = {
             user_id: `u_${Date.now().toString(36)}`,
             alias: "New User",
             multiplier: 1.0,
+            max_loss: null,
+            max_profit: null,
             allowed_instruments: null,
         };
         this._collectFromDOM();
@@ -127,9 +135,13 @@ const Users = {
             const uid = (get("user_id") || "").trim();
             const alias = (get("alias") || "").trim();
             const mraw = get("multiplier");
+            const maxLossRaw = (get("max_loss") || "").trim();
+            const maxProfitRaw = (get("max_profit") || "").trim();
             const allowedRaw = (get("allowed_instruments") || "").trim();
 
             const m = parseFloat(mraw);
+            const ml = maxLossRaw === "" ? null : parseFloat(maxLossRaw);
+            const mp = maxProfitRaw === "" ? null : parseFloat(maxProfitRaw);
             const allowed = allowedRaw
                 ? allowedRaw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
                 : null;
@@ -138,6 +150,8 @@ const Users = {
                 user_id: uid,
                 alias: alias || uid,
                 multiplier: Number.isFinite(m) && m > 0 ? m : 1.0,
+                max_loss: Number.isFinite(ml) ? ml : null,
+                max_profit: Number.isFinite(mp) ? mp : null,
                 allowed_instruments: allowed,
             };
         });

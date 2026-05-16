@@ -1215,6 +1215,7 @@ span.negative { color: var(--danger); }
 /* ─── Inline Leg Table ──────────────────────────────────────────────────── */
 .leg-inline-table {
     width: 100%;
+    min-width: 1860px;
     margin: 0;
     font-size: 0.8rem;
     border-collapse: collapse;
@@ -1262,6 +1263,30 @@ span.negative { color: var(--danger); }
     color: var(--text-secondary);
 }
 .leg-inline-table .leg-copy-btn:hover { background: var(--bg-hover); }
+
+/* ─── Final-instrument missing-data state ──────────────────────────────── */
+/* Composed bar_type_str isn't in the loaded catalog -> the backtest would have
+   no data. Red background + sibling warn note signals this to the user. */
+.leg-final-missing {
+    background: #fde8e8 !important;
+    border-color: #e8a3a3 !important;
+    color: #a02020 !important;
+    font-weight: 600;
+}
+.leg-final-ok {
+    background: #e8f5e9 !important;
+    border-color: #a3d9a3 !important;
+    color: #1e7e34 !important;
+    font-weight: 600;
+}
+.leg-final-warn {
+    color: #a02020;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-top: 2px;
+    display: block;
+    white-space: nowrap;
+}
 
 /* ─── Portfolio Modal Fieldsets ─────────────────────────────────────────── */
 .pf-fieldset {
