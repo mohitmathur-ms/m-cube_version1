@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL &amp; Target — FX/XF Compliance + Fixes</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #1a7f37 100%); color: white; padding: 36px 40px; margin: -32px -40px 28px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 6px; font-size: 26px; }
+  header.cover .subtitle { margin: 0; font-size: 14px; opacity: 0.92; }
+  header.cover .meta { margin-top: 10px; font-size: 12px; opacity: 0.85; }
+  h2 { font-size: 20px; margin-top: 36px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16px; margin-top: 22px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f6f8fa; }
+  td.center, th.center { text-align: center; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; color: #d63384; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok    { background: var(--green-bg); color: var(--green); }
+  .badge-bad   { background: var(--red-bg);   color: var(--red); }
+  .badge-warn  { background: var(--amber-bg); color: var(--amber); }
+  .badge-info  { background: var(--blue-bg);  color: var(--accent); }
+  .badge-na    { background: #eaeef2;         color: var(--muted); }
+  .badge-fixed { background: var(--purple-bg); color: var(--purple); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px; padding: 9px 13px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 11px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout strong { color: var(--accent); }
+  .fix-card { background: var(--purple-bg); border-left: 4px solid var(--purple); padding: 12px 18px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .fix-card h3 { margin-top: 0; color: var(--purple); }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 13px 17px; margin: 18px 0; }
+  nav.toc h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; }
+  .summary-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+  .summary-card .num { font-size: 22px; font-weight: 700; }
+  .summary-card .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .summary-card.ok    .num { color: var(--green); }
+  .summary-card.fixed .num { color: var(--purple); }
+  .summary-card.na    .num { color: var(--muted); }
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>SL &amp; Target — FX/XF Compliance &amp; Implementation Fixes</h1>
+  <p class="subtitle">Per-setting verdict (frontend + backend) against <code>sl_tgt_unified_spec.html</code>, scoped to FX and Crypto (XF). Includes the fixes applied in this pass.</p>
+  <p class="meta">Scope: FX Futures + Crypto · Asset classes outside scope (IF, CF) excluded from this audit.</p>
+</header>
+
+<div class="callout">
+  <strong>Scope:</strong> Only Forex (FX) and Crypto (XF) are in play. IF-only spec items (Underlying Movement, Loss-and-Underlying-Range, Underlying Below/Above) are correctly absent and not audited here.
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card ok"><div class="lbl">Correct (both ends)</div><div class="num">31</div></div>
+  <div class="summary-card fixed"><div class="lbl">Fixed in this pass</div><div class="num">7</div></div>
+  <div class="summary-card na"><div class="lbl">N/A (IF-only, absent)</div><div class="num">1</div></div>
+</div>
+<p style="font-size: 13px; color: var(--muted); margin-top:-6px;">UI policy: every spec value stays visible. Non-FX/XF / options-only / live-only values are kept as selectable options but marked gray (<code>pf-live-only</code> CSS class) with a "(options only)" or "(live/options only)" suffix so users can see the full spec surface while knowing what's wired.</p>
+
+<div class="legend">
+  <span><span class="badge badge-ok">Correct</span> Implemented per spec</span>
+  <span><span class="badge badge-fixed">Fixed</span> Was incorrect/missing — corrected in this pass</span>
+  <span><span class="badge badge-bad">Incorrect</span> Wired wrong</span>
+  <span><span class="badge badge-warn">Missing</span> Spec'd but absent</span>
+  <span><span class="badge badge-na">N/A</span> Not applicable for FX/XF</span>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#level-1">Level 1 — Leg</a></li>
+    <li><a href="#level-2">Level 2 — Portfolio</a></li>
+    <li><a href="#level-3">Level 3 — User (Global Limits)</a></li>
+    <li><a href="#crosscut">Decisions Locked (D1–D4)</a></li>
+    <li><a href="#extras">Extras vs. spec</a></li>
+    <li><a href="#fixes">Fixes applied in this pass</a></li>
+  </ol>
+</nav>
+
+<h2 id="level-1">Level 1 — Leg</h2>
+
+<h3>1.1 Leg SL / Target Parameters</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>SL Type / Target Type</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td><code>none / percentage / points / trailing</code></td></tr>
+    <tr><td>SL Value / Target Value</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>SL Wait (sec)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>UI used <code>sl_wait_bars</code>; switched to <code>sl_wait_sec</code> (spec name).</td></tr>
+    <tr><td>On SL Actions / On Target Actions</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Dropdown was missing <code>execute</code>, <code>re_entry</code>, <code>keep_leg_running</code> — added.</td></tr>
+  </tbody>
+</table>
+
+<h3>1.2 Leg Actions</h3>
+<table>
+  <thead><tr><th>Action</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>SqOff (<code>close</code>)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Re-Execute (<code>re_execute</code>)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Execute (other leg by <code>leg_id</code>)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added option + <code>Execute Target Leg</code> dropdown (sibling slot ids).</td></tr>
+    <tr><td>ReEntry (price-wait)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added option + <code>ReEntry Price</code>, <code>Max Re-Entries</code> inputs.</td></tr>
+    <tr><td>KeepLegRunning</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added to action dropdown.</td></tr>
+    <tr><td><code>armed_at_start</code> (sibling-arm gate)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added "Armed at start" checkbox on leg modal.</td></tr>
+  </tbody>
+</table>
+
+<h3>1.3 Move SL to Cost (leg-level)</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Enabled</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Safety Seconds</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>TBD-1 resolved: anchored to position entry.</td></tr>
+    <tr><td>Action (3 variants)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Trail After Move SL</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>No Move Buy Legs</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Adapted: skip on LONG.</td></tr>
+    <tr><td>Hit On Leg SL</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Hit On Leg Target</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+  </tbody>
+</table>
+
+<h3>1.4 Leg-Level Trail After Move SL (<code>sl_trail</code> every/by)</h3>
+<p><span class="badge badge-ok">Correct</span> on both ends — wired via <code>stop_loss_type="trailing"</code> + <code>trailing_sl_step</code> / <code>trailing_sl_offset</code>.</p>
+
+<h2 id="level-2">Level 2 — Portfolio</h2>
+
+<h3>2.1 Stoploss Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Stoploss</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Type — Combined Loss</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Only universal value for FX/XF.</td></tr>
+    <tr><td>Type — Underlying Movement</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Backend silently downgrades to Combined Loss for FX/XF; UI keeps the option, marked gray "(options only)".</td></tr>
+    <tr><td>Type — Loss and Underlying Range</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Same — backend downgrades; UI keeps it grayed.</td></tr>
+    <tr><td>Stoploss Value</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — SqOff</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — SqOff Other Portfolio</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Cross-portfolio event bus wired.</td></tr>
+    <tr><td>On SL Action — Execute Other Portfolio</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — Start Other Portfolio</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute at Entry Price</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute Same Contract at EntryPrice</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>D2 rename ("SameStrike" → "Same Contract") applied.</td></tr>
+    <tr><td>Target Portfolio (cross-pf name)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added text input wired to <code>pf_sl_target_portfolio</code>.</td></tr>
+    <tr><td>Delay (sec)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>ReExecute Count</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Underlying Below / Above</td><td class="center"><span class="badge badge-na">N/A</span></td><td class="center"><span class="badge badge-na">N/A</span></td><td>IF-only; correctly absent.</td></tr>
+    <tr><td>SqOff Only Loss Making Legs</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>SqOff Only Profit Making Legs</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 Trailing SL Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Trailing SL</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td></tr>
+    <tr><td>For Every Profit of</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td></tr>
+    <tr><td>Tighten SL By</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 Move SL to Cost (portfolio-driven)</h3>
+<p>All seven fields (same shape as §1.3) — <span class="badge badge-ok">Correct</span> on both ends.</p>
+
+<h3>2.4 Target Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Target</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Target Type — Combined Profit</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Only universal value.</td></tr>
+    <tr><td>Target Type — Underlying Movement</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Backend downgrades to Combined Profit for FX/XF; UI keeps the option, marked gray "(options only)".</td></tr>
+    <tr><td>Target Value</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>On Target Action (7 same as SL)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>Target Portfolio</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added input wired to <code>pf_tgt_target_portfolio</code>.</td></tr>
+    <tr><td>Delay (sec)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>ReExecute Count</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+  </tbody>
+</table>
+
+<h3>2.5 Trailing Target Settings</h3>
+<p>Enable Trailing, Lock Minimum Profit, When Profit Reach, For Every Increase By, Trail Profit By — all <span class="badge badge-ok">Correct</span> on both ends.</p>
+
+<h2 id="level-3">Level 3 — User (Global Limits)</h2>
+<table>
+  <thead><tr><th>Field</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Max Loss</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added Max Loss column to the Users admin table.</td></tr>
+    <tr><td>Max Profit</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-fixed">Fixed</span></td><td>Added Max Profit column. Backend validator already accepted both.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="crosscut">Decisions Locked (D1–D4)</h2>
+<table>
+  <thead><tr><th>Decision</th><th class="center">Backend</th><th class="center">Frontend</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>D1 · Currency rule (USD $ for FX/XF)</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td><code>App.currency()</code> already renders <code>$</code>; no INR in FX/XF scope.</td></tr>
+    <tr><td>D2 · "SameStrike" → "Same Contract"</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Engine alias map + UI label updated.</td></tr>
+    <tr><td>D3 · Testing default <code>n_lots = 1</code>, <code>lot_size</code> from metadata</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td></td></tr>
+    <tr><td>D4 · Three-level structure preserved</td><td class="center"><span class="badge badge-ok">Correct</span></td><td class="center"><span class="badge badge-ok">Correct</span></td><td>Level 3 UI now wired (Max Loss / Max Profit on Users page).</td></tr>
+  </tbody>
+</table>
+
+<h2 id="extras">UI policy for options/live-only values</h2>
+<p>All spec values stay visible in the UI; values that don't apply to FX/XF (options-only / IF-only / live-only) are kept as selectable options but marked gray with a "(options only)" or "(live/options only)" suffix and the <code>pf-live-only</code> CSS class. The backend silently downgrades these to the FX/XF universal value with a warning log — choosing a grayed value won't crash a backtest.</p>
+<table>
+  <thead><tr><th>Item</th><th>Disposition</th></tr></thead>
+  <tbody>
+    <tr><td>Leg <code>sl_wait_bars</code></td><td>Legacy field. UI now writes <code>sl_wait_sec</code> (the spec name). Engine still reads both for backward compat — benign extra.</td></tr>
+    <tr><td>Portfolio SL type — "Combined Premium" / "Absolute Combined Premium" / "Underlying Movement" / "Loss and Underlying Range"</td><td>Kept in the dropdown, marked gray <span class="badge badge-info">options only</span>. Backend downgrades to "Combined Loss" for FX/XF.</td></tr>
+    <tr><td>Portfolio Target type — "Combined Premium" / "Absolute Combined Premium" / "Underlying Movement"</td><td>Kept in the dropdown, marked gray <span class="badge badge-info">options only</span>. Backend downgrades to "Combined Profit".</td></tr>
+    <tr><td>On SL / On Target — cross-portfolio variants &amp; "ReExecute at Entry Price" / "Same Contract"</td><td>Kept in the dropdown. Cross-portfolio and the EntryPrice variants are fully wired in the engine; the rest are marked gray "(live/options only)" where appropriate.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="fixes">Fixes applied in this pass</h2>
+
+<div class="fix-card">
+  <h3>F1 · Leg-modal action dropdown completed</h3>
+  <p>Added <code>execute</code>, <code>re_entry</code>, <code>keep_leg_running</code> alongside the existing <code>close</code>, <code>re_execute</code>, <code>reverse</code> on both On-SL and On-TP selects.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F2 · New leg-level inputs for sibling-arm / price-wait re-entry</h3>
+  <p>Added Execute Target Leg (dropdown of sibling slot ids), ReEntry Price, Max Re-Entries, Armed at start (checkbox). Save path writes <code>ec.execute_target_leg_id</code>, <code>ec.reentry_price</code>, <code>ec.max_re_entries</code>, <code>ec.armed_at_start</code>.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F3 · SL Wait switched to seconds</h3>
+  <p>Renamed leg-modal field <code>SL Wait</code> → <code>SL Wait (sec)</code>; UI now writes <code>ec.sl_wait_sec</code> (spec name) and zeroes <code>sl_wait_bars</code>.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F4 · Portfolio SL Type dropdown — visual marker policy</h3>
+  <p>All spec values remain selectable: <code>Combined Loss</code>, <code>Combined Premium</code>, <code>Absolute Combined Premium</code>, <code>Underlying Movement</code>, <code>Loss and Underlying Range</code>. Non-FX/XF values are tagged with the <code>pf-live-only</code> CSS class (gray + "(options only)" suffix). Backend silently downgrades any non-universal value to <code>Combined Loss</code>.</p>
+  <p><strong>Files:</strong> <code>static/js/portfolio.js</code>, <code>config/portfolio_tabs/stoploss.json</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F5 · Portfolio Target Type dropdown — visual marker policy</h3>
+  <p>All spec values remain selectable: <code>Combined Profit</code>, <code>Combined Premium</code>, <code>Absolute Combined Premium</code>, <code>Underlying Movement</code>. Non-FX/XF values marked gray "(options only)". Backend downgrades to <code>Combined Profit</code>.</p>
+  <p><strong>Files:</strong> <code>static/js/portfolio.js</code>, <code>config/portfolio_tabs/target.json</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F6 · Target Portfolio input (cross-portfolio actions)</h3>
+  <p>Added text input on both the portfolio Stoploss tab and Target tab. Wired to <code>pf_sl_target_portfolio</code> and <code>pf_tgt_target_portfolio</code> respectively. Engine already had cross-portfolio dispatch (<code>SqOff / Execute / Start Other Portfolio</code>) wired via the event bus.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F7 · User-level Max Loss / Max Profit UI</h3>
+  <p>Added two columns to the Users admin table (Max Loss, Max Profit), default null on new rows. Posted alongside <code>multiplier</code>/<code>allowed_instruments</code>. Backend validator (<code>users.py:validate_registry_payload</code>) already accepted these; runtime enforcement already in <code>_merge_portfolio_results</code>.</p>
+  <p><strong>File:</strong> <code>adapter_admin/static/js/users.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F8 · New-leg defaults extended</h3>
+  <p>Default <code>exit_config</code> for newly added legs now includes <code>sl_wait_sec</code>, <code>execute_target_leg_id</code>, <code>reentry_price</code>, <code>max_re_entries</code>, <code>armed_at_start: true</code> so legs start spec-compliant.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<div class="fix-card">
+  <h3>F9 · Load/save plumbing for new portfolio fields</h3>
+  <p>Hydration block reads <code>pf_sl_target_portfolio</code> / <code>pf_tgt_target_portfolio</code> from the backend payload; save block writes them back. Round-trip preserved.</p>
+  <p><strong>File:</strong> <code>static/js/portfolio.js</code></p>
+</div>
+
+<h2>Backend verification</h2>
+<p>No backend code changes were required. Every newly-exposed field already existed end-to-end:</p>
+<ul>
+  <li><code>ExitConfig.sl_wait_sec</code>, <code>execute_target_leg_id</code>, <code>reentry_price</code>, <code>max_re_entries</code>, <code>armed_at_start</code> — defined in <code>core/models.py</code>, threaded through <code>config_from_exit</code> in <code>core/managed_strategy.py</code> into <code>ManagedExitConfig</code>, consumed by <code>ManagedExitStrategy</code>.</li>
+  <li><code>PortfolioConfig.pf_sl_target_portfolio</code>, <code>pf_tgt_target_portfolio</code> — defined in <code>core/models.py</code>, resolved in <code>_resolve_pf_stoploss</code> / <code>_resolve_pf_target</code>, dispatched via the cross-portfolio event bus in <code>core/backtest_runner.py</code>.</li>
+  <li>User <code>max_loss</code> / <code>max_profit</code> — validator in <code>core/users.py:validate_registry_payload</code>; getters <code>get_user_max_loss</code> / <code>get_user_max_profit</code>; enforced in <code>_merge_portfolio_results</code>.</li>
+</ul>
+
+<p class="footnote">Generated as part of the FX/XF spec-compliance pass. Companion to <code>html_reports/sl_tgt_unified_spec.html</code>.</p>
+
+</div>
+</body>
+</html>

@@ -52,7 +52,10 @@ class EMACrossStrategy(Strategy):
     def on_bar(self, bar: Bar) -> None:
         # Only trade on the primary bar; extra_bar_types (e.g. higher TFs)
         # feed indicators but must not drive order submission.
-        if bar.bar_type != self.config.bar_type:
+        # Compare via .standard() so composite subscriptions like
+        # `5-MIN-INTERNAL@1-MIN-EXTERNAL` (where the aggregator emits the
+        # standard LHS form) still match config.bar_type.
+        if bar.bar_type.standard() != self.config.bar_type.standard():
             return
         if not self.indicators_initialized():
             return

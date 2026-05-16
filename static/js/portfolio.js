@@ -28,15 +28,19 @@ const Portfolio = {
 
     async loadConfig() {
         try {
-            const [barData, stratData, tmplData] = await Promise.all([
+            const [barData, stratData, tmplData, adData] = await Promise.all([
                 App.api("/api/data/bar_types"),
                 App.api("/api/strategies"),
                 App.api("/api/portfolios/templates"),
+                App.api("/api/configured-adapters"),
             ]);
             this.barTypes = barData.bar_types || [];
             this.barTypeDetails = barData.bar_type_details || {};
             this.strategies = stratData.strategies || {};
             this.templates = tmplData.templates || {};
+            this.assetVenues = (adData && adData.adapters) || {};   // {assetClass: [venue, ...]}
+            this._instIdx = this._buildInstrumentIndex();
+            this._barTypeSet = new Set(this.barTypes);   // O(1) catalog lookup for Final warnings
 
             if (this.barTypes.length === 0) {
                 document.getElementById("portfolio-loading").innerHTML =
@@ -70,7 +74,7 @@ const Portfolio = {
                         this._liftUniformSlotDates(d.portfolio);
                         loaded.push(d.portfolio);
                     }
-                } catch {}
+                } catch { }
             }
             this.portfolios = loaded;
         } catch {
@@ -277,7 +281,7 @@ const Portfolio = {
         // Also delete from server
         App.api("/api/portfolios/delete", {
             method: "POST", body: JSON.stringify({ name }),
-        }).catch(() => {});
+        }).catch(() => { });
         App.log(`Portfolio "${name}" deleted`, "MESSAGE", "Multileg");
     },
 
@@ -321,7 +325,7 @@ const Portfolio = {
         delete cleanPf.tgt_sl_per_lot;
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
             .then(() => App.log(`Portfolio "${pf.name}" ${key} updated`, "SUCCESS", "Multileg", pf.name))
-            .catch(() => {});
+            .catch(() => { });
     },
 
     openGlobalSettings() {
@@ -374,7 +378,7 @@ const Portfolio = {
                 delete clean.tgt_sl_per_lot;
                 await App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(clean) });
                 saved++;
-            } catch {}
+            } catch { }
         }
         App.toast(`Saved ${saved} portfolio(s) to server.`, "success");
         App.log(`Saved ${saved} portfolio(s)`, "SUCCESS", "Multileg");
@@ -482,6 +486,8 @@ const Portfolio = {
         if (pf.pf_tgt_trail_when_profit_reach !== undefined) pf._ui.trail_when_profit_reach = pf.pf_tgt_trail_when_profit_reach;
         if (pf.pf_tgt_trail_every !== undefined) pf._ui.trail_every = pf.pf_tgt_trail_every;
         if (pf.pf_tgt_trail_by !== undefined) pf._ui.trail_by = pf.pf_tgt_trail_by;
+        if (pf.pf_tgt_target_portfolio !== undefined) pf._ui.target_target_portfolio = pf.pf_tgt_target_portfolio;
+        if (pf.pf_sl_target_portfolio !== undefined) pf._ui.sl_target_portfolio = pf.pf_sl_target_portfolio;
         if (pf.pf_sl_enabled !== undefined) pf._ui.sl_enabled = pf.pf_sl_enabled;
         if (pf.pf_sl_type) pf._ui.sl_type = pf.pf_sl_type;
         if (pf.pf_sl_value !== undefined) pf._ui.sl_value = pf.pf_sl_value;
@@ -522,36 +528,11 @@ const Portfolio = {
         const stratTagSummary = stratTags.length > 0 ? stratTags.join(", ") : "Default";
 
         // Build inline-editable legs table rows
-        const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
         let legsRows = "";
         if ((pf.slots || []).length === 0) {
-            legsRows = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            legsRows = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
-            legsRows = pf.slots.map((slot, i) => {
-                const ec = slot.exit_config || {};
-                const slTypes = ["none", "percentage", "points", "trailing"];
-                const tpTypes = ["none", "percentage", "points"];
-                const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
-                const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
-                const sOpts = stratOpts.replace(`value="${slot.strategy_name}"`, `value="${slot.strategy_name}" selected`);
-                const bOpts = barOpts.replace(`value="${slot.bar_type_str}"`, `value="${slot.bar_type_str}" selected`);
-
-                return `<tr>
-                    <td style="text-align:center;"><button class="leg-del-btn" onclick="Portfolio._deleteLeg(${i})" title="Delete">X</button></td>
-                    <td style="text-align:center;"><button class="leg-copy-btn" onclick="Portfolio._copyLeg(${i})" title="Copy">&#128203;</button></td>
-                    <td style="text-align:center; font-weight:600;">${i + 1}</td>
-                    <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
-                    <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
-                    <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
-                    <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
-                    <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;">${tpTypeOpts}</select></td>
-                    <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;"></td>
-                    <td style="text-align:center;"><button class="btn btn-xs" onclick="Portfolio._editLeg(${i})" style="font-size:0.72rem;">&#9881; Edit</button></td>
-                </tr>`;
-            }).join("");
+            legsRows = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
 
         const body = `
@@ -597,7 +578,12 @@ const Portfolio = {
                         <th style="width:28px;">ID</th>
                         <th style="width:36px;">Idle</th>
                         <th>Strategy</th>
-                        <th>Instrument</th>
+                        <th>Asset</th>
+                        <th>Venue</th>
+                        <th>Instrument ID</th>
+                        <th>Timeframe</th>
+                        <th>Price Type</th>
+                        <th>Final Instrument</th>
                         <th style="width:62px;">Lots</th>
                         <th>Stop Loss</th>
                         <th style="width:56px;">SL Val</th>
@@ -631,22 +617,22 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Product</span>
                             <select class="form-control" id="pf-m-product" style="flex:1;">
-                                <option value="MIS" ${(ui.product||'MIS')==='MIS'?'selected':''}>MIS</option>
-                                <option value="NRML" ${ui.product==='NRML'?'selected':''}>NRML</option>
+                                <option value="MIS" ${(ui.product || 'MIS') === 'MIS' ? 'selected' : ''}>MIS</option>
+                                <option value="NRML" ${ui.product === 'NRML' ? 'selected' : ''}>NRML</option>
                             </select>
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Strategy Tag</span>
                             <select class="form-control" id="pf-m-strattag" style="flex:1;">
-                                <option value="Default" ${(ui.strategy_tag||'Default')==='Default'?'selected':''}>Default</option>
-                                ${stratTags.map(t => `<option value="${t}" ${ui.strategy_tag===t?'selected':''}>${t}</option>`).join("")}
+                                <option value="Default" ${(ui.strategy_tag || 'Default') === 'Default' ? 'selected' : ''}>Default</option>
+                                ${stratTags.map(t => `<option value="${t}" ${ui.strategy_tag === t ? 'selected' : ''}>${t}</option>`).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">If One or More Leg Fail</span>
                             <select class="form-control" id="pf-m-legfail" style="flex:1;">
-                                <option value="KeepPlacedLegs" ${(ui.on_leg_fail||'KeepPlacedLegs')==='KeepPlacedLegs'?'selected':''}>KeepPlacedLegs</option>
-                                <option value="CancelPlacedLegs" ${ui.on_leg_fail==='CancelPlacedLegs'?'selected':''}>CancelPlacedLegs</option>
+                                <option value="KeepPlacedLegs" ${(ui.on_leg_fail || 'KeepPlacedLegs') === 'KeepPlacedLegs' ? 'selected' : ''}>KeepPlacedLegs</option>
+                                <option value="CancelPlacedLegs" ${ui.on_leg_fail === 'CancelPlacedLegs' ? 'selected' : ''}>CancelPlacedLegs</option>
                             </select>
                         </div>
                     </fieldset>
@@ -655,32 +641,32 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label wide">Portfolio Execution Mode</span>
                             <select class="form-control" id="pf-m-execmode" style="flex:1;" onchange="Portfolio._onExecModeChange()">
-                                <option value="Start time" ${(ui.execution_mode||'Start time')==='Start time'?'selected':''}>Start time</option>
-                                <option value="Manual" ${ui.execution_mode==='Manual'?'selected':''}>Manual</option>
-                                <option value="CombinedPremium" ${ui.execution_mode==='CombinedPremium'?'selected':''}>CombinedPremium</option>
-                                <option value="UnderlyingLevel" ${ui.execution_mode==='UnderlyingLevel'?'selected':''}>UnderlyingLevel</option>
-                                <option value="CombinedPremiumCrossOver" ${ui.execution_mode==='CombinedPremiumCrossOver'?'selected':''}>CombinedPremiumCrossOver</option>
+                                <option value="Start time" ${(ui.execution_mode || 'Start time') === 'Start time' ? 'selected' : ''}>Start time</option>
+                                <option value="Manual" ${ui.execution_mode === 'Manual' ? 'selected' : ''}>Manual</option>
+                                <option value="CombinedPremium" ${ui.execution_mode === 'CombinedPremium' ? 'selected' : ''}>CombinedPremium</option>
+                                <option value="UnderlyingLevel" ${ui.execution_mode === 'UnderlyingLevel' ? 'selected' : ''}>UnderlyingLevel</option>
+                                <option value="CombinedPremiumCrossOver" ${ui.execution_mode === 'CombinedPremiumCrossOver' ? 'selected' : ''}>CombinedPremiumCrossOver</option>
                             </select>
                         </div>
-                        <div class="pf-field-row pf-live-only" id="pf-row-basedon" style="display:${['Start time','Manual'].includes(ui.execution_mode||'Start time')?'none':'flex'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-basedon" style="display:${['Start time', 'Manual'].includes(ui.execution_mode || 'Start time') ? 'none' : 'flex'};">
                             <span class="pf-field-label wide">Based On</span>
                             <select class="form-control" id="pf-m-basedon" style="flex:1;" onchange="Portfolio._onBasedOnChange()">
-                                <option value="None" ${(ui.based_on||'None')==='None'?'selected':''}>None</option>
-                                <option value="DayOpen" ${ui.based_on==='DayOpen'?'selected':''}>DayOpen</option>
-                                <option value="StartTime" ${ui.based_on==='StartTime'?'selected':''}>StartTime</option>
+                                <option value="None" ${(ui.based_on || 'None') === 'None' ? 'selected' : ''}>None</option>
+                                <option value="DayOpen" ${ui.based_on === 'DayOpen' ? 'selected' : ''}>DayOpen</option>
+                                <option value="StartTime" ${ui.based_on === 'StartTime' ? 'selected' : ''}>StartTime</option>
                             </select>
                         </div>
-                        <div class="pf-field-row pf-live-only" id="pf-row-entryprice" style="display:${(ui.based_on||'None')==='None'&&!['Start time','Manual'].includes(ui.execution_mode||'Start time')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-entryprice" style="display:${(ui.based_on || 'None') === 'None' && !['Start time', 'Manual'].includes(ui.execution_mode || 'Start time') ? 'flex' : 'none'};">
                             <span class="pf-field-label wide">Entry Price</span>
-                            <input type="number" class="form-control" id="pf-m-entryprice" value="${ui.entry_price||0}" step="0.01" min="0" style="flex:1;">
+                            <input type="number" class="form-control" id="pf-m-entryprice" value="${ui.entry_price || 0}" step="0.01" min="0" style="flex:1;">
                         </div>
-                        <div class="pf-field-row pf-live-only" id="pf-row-rounding" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-rounding" style="display:${['DayOpen', 'StartTime'].includes(ui.based_on || 'None') ? 'flex' : 'none'};">
                             <span class="pf-field-label wide">Rounding Value</span>
-                            <input type="number" class="form-control" id="pf-m-rounding" value="${ui.rounding_value||0}" step="0.5" min="0" style="flex:1;">
+                            <input type="number" class="form-control" id="pf-m-rounding" value="${ui.rounding_value || 0}" step="0.5" min="0" style="flex:1;">
                         </div>
-                        <div class="pf-field-row pf-live-only" id="pf-row-adjustprice" style="display:${['DayOpen','StartTime'].includes(ui.based_on||'None')?'flex':'none'};">
+                        <div class="pf-field-row pf-live-only" id="pf-row-adjustprice" style="display:${['DayOpen', 'StartTime'].includes(ui.based_on || 'None') ? 'flex' : 'none'};">
                             <span class="pf-field-label wide">Adjust Price</span>
-                            <input type="text" class="form-control" id="pf-m-adjustprice" value="${ui.adjust_price||''}" placeholder="e.g. +10, -5%" style="flex:1;">
+                            <input type="text" class="form-control" id="pf-m-adjustprice" value="${ui.adjust_price || ''}" placeholder="e.g. +10, -5%" style="flex:1;">
                         </div>
                     </fieldset>
                 </div>
@@ -691,52 +677,52 @@ const Portfolio = {
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Run On Days</span>
                                 <select class="form-control" id="pf-m-runondays" style="flex:1;" onchange="Portfolio._onRunOnDaysChange()">
-                                    <option value="All Days" ${(ui.run_on_days||'All Days')==='All Days'?'selected':''}>All Days</option>
-                                    <option value="Mon - Fri" ${ui.run_on_days==='Mon - Fri'?'selected':''}>Mon - Fri</option>
-                                    <option value="Mon - Thu" ${ui.run_on_days==='Mon - Thu'?'selected':''}>Mon - Thu</option>
-                                    <option value="Custom" ${ui.run_on_days==='Custom'?'selected':''}>Custom</option>
+                                    <option value="All Days" ${(ui.run_on_days || 'All Days') === 'All Days' ? 'selected' : ''}>All Days</option>
+                                    <option value="Mon - Fri" ${ui.run_on_days === 'Mon - Fri' ? 'selected' : ''}>Mon - Fri</option>
+                                    <option value="Mon - Thu" ${ui.run_on_days === 'Mon - Thu' ? 'selected' : ''}>Mon - Thu</option>
+                                    <option value="Custom" ${ui.run_on_days === 'Custom' ? 'selected' : ''}>Custom</option>
                                 </select>
                             </div>
-                            <div id="pf-custom-days" style="display:${ui.run_on_days==='Custom'?'flex':'none'}; flex-wrap:wrap; gap:6px; margin-top:6px;">
-                                ${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d =>
-                                    `<label style="font-size:0.78rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
-                                        <input type="checkbox" class="pf-custom-day" value="${d}" ${(ui.selected_days||["Mon","Tue","Wed","Thu","Fri"]).includes(d)?'checked':''}> ${d}
+                            <div id="pf-custom-days" style="display:${ui.run_on_days === 'Custom' ? 'flex' : 'none'}; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                                ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d =>
+            `<label style="font-size:0.78rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                                        <input type="checkbox" class="pf-custom-day" value="${d}" ${(ui.selected_days || ["Mon", "Tue", "Wed", "Thu", "Fri"]).includes(d) ? 'checked' : ''}> ${d}
                                     </label>`
-                                ).join("")}
+        ).join("")}
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
                             <div class="pf-field-row" title="Intra-day entry window start (UTC). Bars before this time are dropped from the backtest.">
                                 <span class="pf-field-label">Start Time</span>
-                                <input type="time" class="form-control" id="pf-m-starttime" value="${ui.start_time||'09:30:00'}" step="1" style="flex:1;">
+                                <input type="time" class="form-control" id="pf-m-starttime" value="${ui.start_time || '09:30:00'}" step="1" style="flex:1;">
                             </div>
                             <div class="pf-field-row" title="Intra-day entry window end (UTC). Bars after this time are dropped from the backtest.">
                                 <span class="pf-field-label">End Time</span>
-                                <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time||'16:15:00'}" step="1" style="flex:1;">
+                                <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time || '16:15:00'}" step="1" style="flex:1;">
                             </div>
                             <div class="pf-field-row pf-live-only" title="Live-only. Backtest uses the SqOff Time on the Timing tab (portfolio.squareoff_time).">
                                 <span class="pf-field-label">SqOff Time</span>
-                                <input type="time" class="form-control" id="pf-m-sqofftime-exec" value="${ui.sqoff_time_exec||'16:15:00'}" step="1" style="flex:1;">
+                                <input type="time" class="form-control" id="pf-m-sqofftime-exec" value="${ui.sqoff_time_exec || '16:15:00'}" step="1" style="flex:1;">
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
                             <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <span class="pf-field-label">Start Day</span>
                                 <select class="form-control" id="pf-m-startday" style="flex:1;">
-                                    <option value="Before Expiry" ${(ui.start_day||'Before Expiry')==='Before Expiry'?'selected':''}>Before Expiry</option>
-                                    <option value="On Expiry" ${ui.start_day==='On Expiry'?'selected':''}>On Expiry</option>
-                                    <option value="Fixed" ${ui.start_day==='Fixed'?'selected':''}>Fixed</option>
+                                    <option value="Before Expiry" ${(ui.start_day || 'Before Expiry') === 'Before Expiry' ? 'selected' : ''}>Before Expiry</option>
+                                    <option value="On Expiry" ${ui.start_day === 'On Expiry' ? 'selected' : ''}>On Expiry</option>
+                                    <option value="Fixed" ${ui.start_day === 'Fixed' ? 'selected' : ''}>Fixed</option>
                                 </select>
-                                <input type="number" class="form-control" id="pf-m-startdayoff" value="${ui.start_day_offset||1}" min="0" step="1" style="width:50px;">
+                                <input type="number" class="form-control" id="pf-m-startdayoff" value="${ui.start_day_offset || 1}" min="0" step="1" style="width:50px;">
                             </div>
                             <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <span class="pf-field-label">SqOff Day</span>
-                                <input type="number" class="form-control" id="pf-m-sqoffday" value="${ui.sqoff_day||0}" min="0" step="1" style="width:60px;">
+                                <input type="number" class="form-control" id="pf-m-sqoffday" value="${ui.sqoff_day || 0}" min="0" step="1" style="width:60px;">
                                 <span style="font-size:0.72rem; color:var(--text-muted); margin-left:4px;">(~before expiry)</span>
                             </div>
                             <div class="pf-field-row pf-live-only" title="Options-expiry-aware. Doesn't apply to FX/crypto backtests.">
                                 <label style="font-size:0.75rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; cursor:pointer;">
-                                    <input type="checkbox" id="pf-m-holiday" ${ui.holiday_handling?'checked':''}>
+                                    <input type="checkbox" id="pf-m-holiday" ${ui.holiday_handling ? 'checked' : ''}>
                                     If Holiday, Use Previous Day for Start &nbsp;Next Day for SqOff, Else no Entry
                                 </label>
                             </div>
@@ -754,7 +740,7 @@ const Portfolio = {
             <div class="pf-tab-content" id="pf-tab-pf-rangebrk" style="display:none;">
                 <div style="margin-bottom:10px;">
                     <label style="font-size:0.84rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
-                        <input type="checkbox" id="pf-m-rbo-enabled" ${ui.rbo_enabled?'checked':''}>
+                        <input type="checkbox" id="pf-m-rbo-enabled" ${ui.rbo_enabled ? 'checked' : ''}>
                         Enable RangeBreakOut
                     </label>
                 </div>
@@ -764,37 +750,37 @@ const Portfolio = {
                         <div style="flex:1; min-width:220px;">
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Range Monitoring Start Time</span>
-                                <input type="time" class="form-control" id="pf-m-rbo-monstart" value="${ui.range_monitoring_start||'09:30:00'}" step="1" style="width:110px;">
+                                <input type="time" class="form-control" id="pf-m-rbo-monstart" value="${ui.range_monitoring_start || '09:30:00'}" step="1" style="width:110px;">
                             </div>
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Range Monitoring End Time</span>
-                                <input type="time" class="form-control" id="pf-m-rbo-monend" value="${ui.range_monitoring_end||'10:30:00'}" step="1" style="width:110px;"
+                                <input type="time" class="form-control" id="pf-m-rbo-monend" value="${ui.range_monitoring_end || '10:30:00'}" step="1" style="width:110px;"
                                     onchange="document.getElementById('pf-m-rbo-entrystart').value=this.value">
                             </div>
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Entry Start Time</span>
-                                <input type="time" class="form-control" id="pf-m-rbo-entrystart" value="${ui.entry_start||ui.range_monitoring_end||'10:30:00'}" step="1" style="width:110px;">
+                                <input type="time" class="form-control" id="pf-m-rbo-entrystart" value="${ui.entry_start || ui.range_monitoring_end || '10:30:00'}" step="1" style="width:110px;">
                             </div>
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Entry End Time</span>
-                                <input type="time" class="form-control" id="pf-m-rbo-entryend" value="${ui.entry_end||'16:15:00'}" step="1" style="width:110px;">
+                                <input type="time" class="form-control" id="pf-m-rbo-entryend" value="${ui.entry_end || '16:15:00'}" step="1" style="width:110px;">
                             </div>
                         </div>
                         <div style="flex:1; min-width:220px;">
                             <div class="pf-field-row" title="C_OnHigh_P_OnLow / P_OnHigh_C_OnLow are options-only — silently downgraded to 'Any' for FX/crypto by the backend.">
                                 <span class="pf-field-label">Entry At</span>
                                 <select class="form-control" id="pf-m-rbo-entryat" style="flex:1;">
-                                    ${["Any","RangeHigh","RangeLow","C_OnHigh_P_OnLow","P_OnHigh_C_OnLow"].map(o => {
-                                        const isOptionsOnly = (o === "C_OnHigh_P_OnLow" || o === "P_OnHigh_C_OnLow");
-                                        const cls = isOptionsOnly ? 'pf-live-only' : '';
-                                        const label = isOptionsOnly ? `${o} (options only)` : o;
-                                        return `<option value="${o}" class="${cls}" ${(ui.entry_at||'Any')===o?'selected':''}>${label}</option>`;
-                                    }).join("")}
+                                    ${["Any", "RangeHigh", "RangeLow", "C_OnHigh_P_OnLow", "P_OnHigh_C_OnLow"].map(o => {
+            const isOptionsOnly = (o === "C_OnHigh_P_OnLow" || o === "P_OnHigh_C_OnLow");
+            const cls = isOptionsOnly ? 'pf-live-only' : '';
+            const label = isOptionsOnly ? `${o} (options only)` : o;
+            return `<option value="${o}" class="${cls}" ${(ui.entry_at || 'Any') === o ? 'selected' : ''}>${label}</option>`;
+        }).join("")}
                                 </select>
                             </div>
                             <div class="pf-field-row">
                                 <span class="pf-field-label">Range Buffer (mins)</span>
-                                <input type="number" class="form-control" id="pf-m-rbo-buffer" value="${ui.range_buffer||0}" min="0" step="1" placeholder="e.g. 5" style="width:90px;">
+                                <input type="number" class="form-control" id="pf-m-rbo-buffer" value="${ui.range_buffer || 0}" min="0" step="1" placeholder="e.g. 5" style="width:90px;">
                             </div>
                             <div class="pf-field-row" title="Other monitoring sources are options-specific and not yet implemented (spec rbo_logics.html P8).">
                                 <span class="pf-field-label">Monitoring</span>
@@ -804,7 +790,7 @@ const Portfolio = {
                             </div>
                             <div class="pf-field-row">
                                 <label style="font-size:0.8rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                    <input type="checkbox" id="pf-m-rbo-cancelother" ${ui.cancel_other?'checked':''}>
+                                    <input type="checkbox" id="pf-m-rbo-cancelother" ${ui.cancel_other ? 'checked' : ''}>
                                     Cancel Other Side if One Executes
                                 </label>
                             </div>
@@ -822,38 +808,38 @@ const Portfolio = {
                             <div class="pf-field-row pf-ui-only">
                                 <span class="pf-field-label">Dynamic Hedge Type</span>
                                 <select class="form-control" id="pf-m-dh-type" style="flex:1;" onchange="Portfolio._onDhTypeChange()">
-                                    <option value="PremiumBased" ${(ui.hedge_type||'PremiumBased')==='PremiumBased'?'selected':''}>PremiumBased</option>
-                                    <option value="DistanceBased" ${ui.hedge_type==='DistanceBased'?'selected':''}>DistanceBased</option>
+                                    <option value="PremiumBased" ${(ui.hedge_type || 'PremiumBased') === 'PremiumBased' ? 'selected' : ''}>PremiumBased</option>
+                                    <option value="DistanceBased" ${ui.hedge_type === 'DistanceBased' ? 'selected' : ''}>DistanceBased</option>
                                 </select>
                             </div>
                             <div class="pf-field-row pf-ui-only">
                                 <span class="pf-field-label">SqOff Leg On</span>
                                 <select class="form-control" id="pf-m-dh-sqoff" style="flex:1;">
-                                    <option value="LegSqOff" ${(ui.sqoff_leg_on||'LegSqOff')==='LegSqOff'?'selected':''}>LegSqOff</option>
-                                    <option value="PortfolioSqOff" ${ui.sqoff_leg_on==='PortfolioSqOff'?'selected':''}>PortfolioSqOff</option>
+                                    <option value="LegSqOff" ${(ui.sqoff_leg_on || 'LegSqOff') === 'LegSqOff' ? 'selected' : ''}>LegSqOff</option>
+                                    <option value="PortfolioSqOff" ${ui.sqoff_leg_on === 'PortfolioSqOff' ? 'selected' : ''}>PortfolioSqOff</option>
                                 </select>
                             </div>
                         </div>
                         <div style="flex:1; min-width:220px;">
-                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type||'PremiumBased')==='PremiumBased'?'flex':'none'};">
+                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type || 'PremiumBased') === 'PremiumBased' ? 'flex' : 'none'};">
                                 <span class="pf-field-label">Hedge Distance from Strike (Min)</span>
-                                <input type="number" class="form-control" id="pf-m-dh-distmin" value="${ui.hedge_distance_strike_min||10}" min="0" max="100" step="1" style="width:70px;">
+                                <input type="number" class="form-control" id="pf-m-dh-distmin" value="${ui.hedge_distance_strike_min || 10}" min="0" max="100" step="1" style="width:70px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type||'PremiumBased')==='PremiumBased'?'flex':'none'};">
+                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type || 'PremiumBased') === 'PremiumBased' ? 'flex' : 'none'};">
                                 <span class="pf-field-label">Hedge Distance from Strike (Max)</span>
-                                <input type="number" class="form-control" id="pf-m-dh-distmax" value="${ui.hedge_distance_strike_max||20}" min="0" max="100" step="1" style="width:70px;">
+                                <input type="number" class="form-control" id="pf-m-dh-distmax" value="${ui.hedge_distance_strike_max || 20}" min="0" max="100" step="1" style="width:70px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type||'PremiumBased')==='PremiumBased'?'flex':'none'};">
+                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type || 'PremiumBased') === 'PremiumBased' ? 'flex' : 'none'};">
                                 <span class="pf-field-label">Min Premium</span>
-                                <input type="number" class="form-control" id="pf-m-dh-premmin" value="${ui.premium_min||0.05}" min="0" step="0.01" style="width:90px;">
+                                <input type="number" class="form-control" id="pf-m-dh-premmin" value="${ui.premium_min || 0.05}" min="0" step="0.01" style="width:90px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type||'PremiumBased')==='PremiumBased'?'flex':'none'};">
+                            <div class="pf-field-row pf-ui-only pf-dh-premium" style="display:${(ui.hedge_type || 'PremiumBased') === 'PremiumBased' ? 'flex' : 'none'};">
                                 <span class="pf-field-label">Max Premium</span>
-                                <input type="number" class="form-control" id="pf-m-dh-premmax" value="${ui.premium_max||40.00}" min="0" step="0.01" style="width:90px;">
+                                <input type="number" class="form-control" id="pf-m-dh-premmax" value="${ui.premium_max || 40.00}" min="0" step="0.01" style="width:90px;">
                             </div>
-                            <div class="pf-field-row pf-ui-only pf-dh-distance" style="display:${ui.hedge_type==='DistanceBased'?'flex':'none'};">
+                            <div class="pf-field-row pf-ui-only pf-dh-distance" style="display:${ui.hedge_type === 'DistanceBased' ? 'flex' : 'none'};">
                                 <span class="pf-field-label">Hedge Fixed Min Distance</span>
-                                <input type="number" class="form-control" id="pf-m-dh-fixeddist" value="${ui.hedge_fixed_min_distance||50}" min="0" max="10000" step="1" style="width:90px;">
+                                <input type="number" class="form-control" id="pf-m-dh-fixeddist" value="${ui.hedge_fixed_min_distance || 50}" min="0" max="10000" step="1" style="width:90px;">
                             </div>
                         </div>
                     </div>
@@ -872,13 +858,13 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Target</span>
                             <select class="form-control" id="pf-m-mon-legtgt" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_target_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.leg_target_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Trailing</span>
                             <select class="form-control" id="pf-m-mon-legtrail" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_trailing_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.leg_trailing_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                     </fieldset>
@@ -887,13 +873,13 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">SL</span>
                             <select class="form-control" id="pf-m-mon-legsl" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Trailing</span>
                             <select class="form-control" id="pf-m-mon-legsltrail" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_trailing_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.leg_sl_trailing_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                     </fieldset>
@@ -902,13 +888,13 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Target Monitoring</span>
                             <select class="form-control" id="pf-m-mon-combtgt" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.combined_target_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.combined_target_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">SL Monitoring</span>
                             <select class="form-control" id="pf-m-mon-combsl" style="flex:1;">
-                                ${["Realtime","MinuteClose","Interval"].map(o => `<option value="${o}" ${(ui.combined_sl_monitoring||'Realtime')===o?'selected':''}>${o}</option>`).join("")}
+                                ${["Realtime", "MinuteClose", "Interval"].map(o => `<option value="${o}" ${(ui.combined_sl_monitoring || 'Realtime') === o ? 'selected' : ''}>${o}</option>`).join("")}
                             </select>
                         </div>
                     </fieldset>
@@ -925,22 +911,22 @@ const Portfolio = {
                         <legend>ReExecute Settings</legend>
                         <div class="pf-field-row" title="P1: when SL was previously raised to entry by Move SL to Cost, suppress re_execute action and treat as plain close.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-reex-noslcost" ${ui.no_reexec_sl_cost?'checked':''}> No ReExecute If Moved SL to Cost
+                                <input type="checkbox" id="pf-m-reex-noslcost" ${ui.no_reexec_sl_cost ? 'checked' : ''}> No ReExecute If Moved SL to Cost
                             </label>
                         </div>
                         <div class="pf-field-row pf-live-only" title="No-op for FX/crypto: we have no per-leg 'Wait & Trade' pre-entry delay concept (spec is options-leg-specific). Stored for round-trip.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-reex-nowait" ${ui.no_wait_trade_reexec?'checked':''}> No Wait &amp; Trade for ReExecute
+                                <input type="checkbox" id="pf-m-reex-nowait" ${ui.no_wait_trade_reexec ? 'checked' : ''}> No Wait &amp; Trade for ReExecute
                             </label>
                         </div>
                         <div class="pf-field-row pf-live-only" title="Options-only: strikes (ATM, ATM±N) don't exist for FX/crypto.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-reex-nostrike" ${ui.no_strike_change_reexec?'checked':''}> No Strike Change for ReExecute
+                                <input type="checkbox" id="pf-m-reex-nostrike" ${ui.no_strike_change_reexec ? 'checked' : ''}> No Strike Change for ReExecute
                             </label>
                         </div>
                         <div class="pf-field-row pf-live-only" title="Effectively always-on for FX/crypto: entry_end_time pre-filters bars; re-executions can't fire past it. Stored for round-trip.">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-reex-noend" ${ui.no_reentry_after_end?'checked':''}> No ReEntry/ReExecute after Portfolio End Time
+                                <input type="checkbox" id="pf-m-reex-noend" ${ui.no_reentry_after_end ? 'checked' : ''}> No ReEntry/ReExecute after Portfolio End Time
                             </label>
                         </div>
                     </fieldset>
@@ -948,7 +934,7 @@ const Portfolio = {
                         <legend>ReEntry Settings</legend>
                         <div class="pf-field-row pf-live-only">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-reex-noreentry" ${(ui.no_reentry_sl_cost!==false)?'checked':''}> No ReEntry If Moved SL to Cost
+                                <input type="checkbox" id="pf-m-reex-noreentry" ${(ui.no_reentry_sl_cost !== false) ? 'checked' : ''}> No ReEntry If Moved SL to Cost
                             </label>
                         </div>
                     </fieldset>
@@ -967,34 +953,34 @@ const Portfolio = {
                     <legend>Other Settings</legend>
                     <div class="pf-field-row pf-live-only" title="Live-only: options-leg Wait & Trade sequencing. FX/crypto slots are independent — backtest stores but ignores this value.">
                         <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="pf-m-other-trailwait" ${ui.trail_wait_trade?'checked':''}> Trail Wait Trade
+                            <input type="checkbox" id="pf-m-other-trailwait" ${ui.trail_wait_trade ? 'checked' : ''}> Trail Wait Trade
                         </label>
                     </div>
                     <div class="pf-field-row pf-live-only" title="Options-only: ATM CE+PE premium-based strike override. Not applicable for FX/crypto. Stored but ignored by the backend.">
                         <span class="pf-field-label">Straddle Width Multiplier</span>
-                        <input type="number" class="form-control" id="pf-m-other-swm" value="${ui.straddle_width_multiplier||0}" step="0.01" style="flex:1;">
+                        <input type="number" class="form-control" id="pf-m-other-swm" value="${ui.straddle_width_multiplier || 0}" step="0.01" style="flex:1;">
                     </div>
                     <div class="pf-field-row" title="Slot-level adaptation of the spec's portfolio-level delay. After a slot's SL/TP triggers re_execute, blocks re-entries on that slot for N seconds of bar time. 0 = no delay.">
                         <span class="pf-field-label">Delay Between Legs in Sec.</span>
-                        <input type="number" class="form-control" id="pf-m-other-legdelay" value="${ui.delay_between_legs||0}" min="0" step="1" style="flex:1;">
+                        <input type="number" class="form-control" id="pf-m-other-legdelay" value="${ui.delay_between_legs || 0}" min="0" step="1" style="flex:1;">
                     </div>
                     <div class="pf-field-row" title="Filters which target type fires the configured action. Note: FX/crypto has no trailing-target distinct from fixed TP, so OnTarget_Trailing_Only suppresses every TP exit.">
                         <span class="pf-field-label">On Target Action On</span>
                         <select class="form-control" id="pf-m-other-tgtaction" style="flex:1;">
-                            ${["OnTarget_N_Trailing_Both","OnTarget_Only","OnTarget_Trailing_Only"].map(o => {
-                                const isOptionsOnly = (o === "OnTarget_Trailing_Only");
-                                const cls = isOptionsOnly ? 'pf-live-only' : '';
-                                const label = isOptionsOnly ? `${o} (no effect on FX/crypto — suppresses all)` : o;
-                                return `<option value="${o}" class="${cls}" ${(ui.on_target_action_on||'OnTarget_N_Trailing_Both')===o?'selected':''}>${label}</option>`;
-                            }).join("")}
+                            ${["OnTarget_N_Trailing_Both", "OnTarget_Only", "OnTarget_Trailing_Only"].map(o => {
+            const isOptionsOnly = (o === "OnTarget_Trailing_Only");
+            const cls = isOptionsOnly ? 'pf-live-only' : '';
+            const label = isOptionsOnly ? `${o} (no effect on FX/crypto — suppresses all)` : o;
+            return `<option value="${o}" class="${cls}" ${(ui.on_target_action_on || 'OnTarget_N_Trailing_Both') === o ? 'selected' : ''}>${label}</option>`;
+        }).join("")}
                         </select>
                     </div>
                     <div class="pf-field-row" title="Filters which SL type fires the configured action. OnSL_Only fires only on the fixed initial SL; OnSL_Trailing_Only fires only after a trailing/lock movement; OnSL_N_Trailing_Both fires on either.">
                         <span class="pf-field-label">On SL Action On</span>
                         <select class="form-control" id="pf-m-other-slaction" style="flex:1;">
-                            ${["OnSL_N_Trailing_Both","OnSL_Only","OnSL_Trailing_Only"].map(o =>
-                                `<option value="${o}" ${(ui.on_sl_action_on||'OnSL_N_Trailing_Both')===o?'selected':''}>${o}</option>`
-                            ).join("")}
+                            ${["OnSL_N_Trailing_Both", "OnSL_Only", "OnSL_Trailing_Only"].map(o =>
+            `<option value="${o}" ${(ui.on_sl_action_on || 'OnSL_N_Trailing_Both') === o ? 'selected' : ''}>${o}</option>`
+        ).join("")}
                         </select>
                     </div>
                     <hr style="border:none; border-top:1px solid var(--border-light); margin:12px 0;">
@@ -1024,62 +1010,70 @@ const Portfolio = {
                         <legend>Target Settings</legend>
                         <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-tgt-enabled" ${ui.target_enabled?'checked':''}> Enable Target
+                                <input type="checkbox" id="pf-m-tgt-enabled" ${ui.target_enabled ? 'checked' : ''}> Enable Target
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
+                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
                             <span class="pf-field-label">Target Type</span>
                             <select class="form-control" id="pf-m-tgt-type" style="flex:1;">
-                                ${["Combined Profit","Combined Premium","Absolute Combined Premium","Underlying Movement"].map(o => {
-                                    const opt = o !== "Combined Profit";
-                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.target_type||'Combined Profit')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
-                                }).join("")}
+                                ${["Combined Profit", "Combined Premium", "Absolute Combined Premium", "Underlying Movement"].map(o => {
+            const opt = o !== "Combined Profit";
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.target_type || 'Combined Profit') === o ? 'selected' : ''}>${o}${opt ? ' (options only)' : ''}</option>`;
+        }).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Target Value</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-value" value="${ui.target_value||0}" step="0.01" min="0" style="width:110px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-value" value="${ui.target_value || 0}" step="0.01" min="0" style="width:110px;">
                         </div>
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On Target</span>
                             <select class="form-control" id="pf-m-tgt-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
-                                    const opt = (o!=="SqOff" && o!=="ReExecute");
-                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_target||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
-                                }).join("")}
+                                ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
+            const opt = (o !== "SqOff" && o !== "ReExecute");
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.on_target || 'SqOff') === o ? 'selected' : ''}>${o}${opt ? ' (live/options only)' : ''}</option>`;
+        }).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row" title="Confirmation delay before clip — condition must hold for N seconds. If equity recovers, the pending clip is cancelled (oscillation guard).">
                             <span class="pf-field-label">Delay (sec)</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-delay" value="${ui.target_delay||0}" min="0" step="1" style="width:70px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-delay" value="${ui.target_delay || 0}" min="0" step="1" style="width:70px;">
                         </div>
                         <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count (0 = Unlimited)</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-reexcount" value="${ui.target_reexecute_count||0}" min="0" step="1" style="width:70px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-reexcount" value="${ui.target_reexecute_count || 0}" min="0" step="1" style="width:70px;">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On Target is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-tgt-targetpf" value="${ui.target_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On Target is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-tgt-targetpf" value="${ui.target_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
                         </div>
                     </fieldset>
                     <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
                         <legend>Trailing Settings</legend>
                         <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-tgt-trail-enabled" ${ui.trail_target_enabled?'checked':''}> Enable Trailing
+                                <input type="checkbox" id="pf-m-tgt-trail-enabled" ${ui.trail_target_enabled ? 'checked' : ''}> Enable Trailing
                             </label>
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Lock Minimum Profit</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-trail-lock" value="${ui.trail_lock_min_profit||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-trail-lock" value="${ui.trail_lock_min_profit || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">When Profit reach</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-trail-reach" value="${ui.trail_when_profit_reach||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-trail-reach" value="${ui.trail_when_profit_reach || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">For Every Increase By</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-trail-every" value="${ui.trail_every||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-trail-every" value="${ui.trail_every || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Trail Profit By</span>
-                            <input type="number" class="form-control" id="pf-m-tgt-trail-by" value="${ui.trail_by||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-tgt-trail-by" value="${ui.trail_by || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                     </fieldset>
                 </div>
@@ -1095,49 +1089,57 @@ const Portfolio = {
                         <legend>Stoploss Settings</legend>
                         <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-sl-enabled" ${ui.sl_enabled?'checked':''}> Enable Stoploss
+                                <input type="checkbox" id="pf-m-sl-enabled" ${ui.sl_enabled ? 'checked' : ''}> Enable Stoploss
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded.">
+                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
                             <span class="pf-field-label">Type</span>
                             <select class="form-control" id="pf-m-sl-type" style="flex:1;">
-                                ${["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"].map(o => {
-                                    const opt = o !== "Combined Loss";
-                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.sl_type||'Combined Loss')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
-                                }).join("")}
+                                ${["Combined Loss", "Combined Premium", "Absolute Combined Premium", "Underlying Movement", "Loss and Underlying Range"].map(o => {
+            const opt = o !== "Combined Loss";
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.sl_type || 'Combined Loss') === o ? 'selected' : ''}>${o}${opt ? ' (options only)' : ''}</option>`;
+        }).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Value</span>
-                            <input type="number" class="form-control" id="pf-m-sl-value" value="${ui.sl_value||0}" step="0.01" min="0" style="width:110px;">
+                            <input type="number" class="form-control" id="pf-m-sl-value" value="${ui.sl_value || 0}" step="0.01" min="0" style="width:110px;">
                         </div>
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On SL Action</span>
                             <select class="form-control" id="pf-m-sl-action" style="flex:1;">
-                                ${["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"].map(o => {
-                                    const opt = (o!=="SqOff" && o!=="ReExecute");
-                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_sl_action||'SqOff')===o?'selected':''}>${o}${opt?' (live/options only)':''}</option>`;
-                                }).join("")}
+                                ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
+            const opt = (o !== "SqOff" && o !== "ReExecute");
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.on_sl_action || 'SqOff') === o ? 'selected' : ''}>${o}${opt ? ' (live/options only)' : ''}</option>`;
+        }).join("")}
                             </select>
                         </div>
                         <div class="pf-field-row" title="Confirmation delay (spec §1.6) — clip only when condition holds for N seconds. Recovery cancels.">
                             <span class="pf-field-label">Delay (sec)</span>
-                            <input type="number" class="form-control" id="pf-m-sl-delay" value="${ui.sl_delay||0}" min="0" step="1" style="width:70px;">
+                            <input type="number" class="form-control" id="pf-m-sl-delay" value="${ui.sl_delay || 0}" min="0" step="1" style="width:70px;">
                         </div>
                         <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count</span>
-                            <input type="number" class="form-control" id="pf-m-sl-reexcount" value="${ui.sl_reexecute_count||0}" min="0" step="1" style="width:70px;">
+                            <input type="number" class="form-control" id="pf-m-sl-reexcount" value="${ui.sl_reexecute_count || 0}" min="0" step="1" style="width:70px;">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On SL Action is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-sl-targetpf" value="${ui.sl_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
+                        </div>
+                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On SL Action is SqOff/Execute/Start Other Portfolio.">
+                            <span class="pf-field-label">Target Portfolio</span>
+                            <input type="text" class="form-control" id="pf-m-sl-targetpf" value="${ui.sl_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
                         </div>
                         <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light);">
                             <div style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="At clip-point, only close slots matching the filter; the others continue running.">On SL Hit — Selective SqOff</div>
                             <div class="pf-field-row">
                                 <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
-                                    <input type="checkbox" id="pf-m-sl-sqoff-loss" ${ui.sqoff_loss_legs?'checked':''}> SqOff Only Loss Making Legs
+                                    <input type="checkbox" id="pf-m-sl-sqoff-loss" ${ui.sqoff_loss_legs ? 'checked' : ''}> SqOff Only Loss Making Legs
                                 </label>
                             </div>
                             <div class="pf-field-row">
                                 <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
-                                    <input type="checkbox" id="pf-m-sl-sqoff-profit" ${ui.sqoff_profit_legs?'checked':''}> SqOff Only Profit Making Legs
+                                    <input type="checkbox" id="pf-m-sl-sqoff-profit" ${ui.sqoff_profit_legs ? 'checked' : ''}> SqOff Only Profit Making Legs
                                 </label>
                             </div>
                         </div>
@@ -1146,50 +1148,50 @@ const Portfolio = {
                         <legend>Trailing SL Settings</legend>
                         <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                                <input type="checkbox" id="pf-m-sl-trail-enabled" ${ui.trail_sl_enabled?'checked':''}> Enable Trailing SL
+                                <input type="checkbox" id="pf-m-sl-trail-enabled" ${ui.trail_sl_enabled ? 'checked' : ''}> Enable Trailing SL
                             </label>
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">For Every Profit of</span>
-                            <input type="number" class="form-control" id="pf-m-sl-trail-every" value="${ui.trail_sl_every||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-sl-trail-every" value="${ui.trail_sl_every || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Tighten SL By</span>
-                            <input type="number" class="form-control" id="pf-m-sl-trail-by" value="${ui.trail_sl_by||0}" step="0.01" min="0" style="width:90px;">
+                            <input type="number" class="form-control" id="pf-m-sl-trail-by" value="${ui.trail_sl_by || 0}" step="0.01" min="0" style="width:90px;">
                         </div>
                     </fieldset>
                     <fieldset class="pf-fieldset" style="flex:1; min-width:240px;">
                         <legend>Move SL to Cost</legend>
                         <div class="pf-field-row">
                             <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;" title="Per-slot adaptation: each slot raises ITS OWN SL to entry once safety_seconds have passed and position is in profit.">
-                                <input type="checkbox" id="pf-m-sl-move-enabled" ${ui.move_sl_enabled?'checked':''}> Enable Move SL to Cost
+                                <input type="checkbox" id="pf-m-sl-move-enabled" ${ui.move_sl_enabled ? 'checked' : ''}> Enable Move SL to Cost
                             </label>
                         </div>
                         <div class="pf-field-row">
                             <span class="pf-field-label">Safety Seconds</span>
-                            <input type="number" class="form-control" id="pf-m-sl-move-safety" value="${ui.move_sl_safety_seconds||0}" min="0" step="1" style="width:70px;">
+                            <input type="number" class="form-control" id="pf-m-sl-move-safety" value="${ui.move_sl_safety_seconds || 0}" min="0" step="1" style="width:70px;">
                         </div>
                         <div class="pf-field-row" title="LTP+Buffer variant is options-only — uses bid/ask LTP plus a small buffer; not standard for FX/crypto fills.">
                             <span class="pf-field-label">Move SL Action</span>
                             <select class="form-control" id="pf-m-sl-move-action" style="flex:1;">
-                                ${["Move Only for Profitable Legs","Move SL for All Legs Despite Loss / Profit","Move SL to LTP + Buffer for Loss Making Legs"].map(o => {
-                                    const opt = o.includes("LTP");
-                                    return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.move_sl_action||'Move Only for Profitable Legs')===o?'selected':''}>${o}${opt?' (options only)':''}</option>`;
-                                }).join("")}
+                                ${["Move Only for Profitable Legs", "Move SL for All Legs Despite Loss / Profit", "Move SL to LTP + Buffer for Loss Making Legs"].map(o => {
+            const opt = o.includes("LTP");
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.move_sl_action || 'Move Only for Profitable Legs') === o ? 'selected' : ''}>${o}${opt ? ' (options only)' : ''}</option>`;
+        }).join("")}
                             </select>
                         </div>
                         <div style="margin-top:8px;">
                             <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Suppress trailing-SL ratchet until move-to-cost has fired at least once for the current position.">
-                                <input type="checkbox" id="pf-m-sl-move-trail" ${ui.trail_after_move_sl?'checked':''}> Trail SL only after Move SL to Cost
+                                <input type="checkbox" id="pf-m-sl-move-trail" ${ui.trail_after_move_sl ? 'checked' : ''}> Trail SL only after Move SL to Cost
                             </label>
                             <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Adapted for FX/crypto: skip Move SL to Cost on slots whose position is LONG.">
-                                <input type="checkbox" id="pf-m-sl-move-nobuy" ${ui.no_move_buy_legs?'checked':''}> No Move SL for BUY Legs
+                                <input type="checkbox" id="pf-m-sl-move-nobuy" ${ui.no_move_buy_legs ? 'checked' : ''}> No Move SL for BUY Legs
                             </label>
                             <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
-                                <input type="checkbox" id="pf-m-sl-move-hitsl" ${ui.hit_on_leg_sl?'checked':''}> Re-apply on every Leg SL hit
+                                <input type="checkbox" id="pf-m-sl-move-hitsl" ${ui.hit_on_leg_sl ? 'checked' : ''}> Re-apply on every Leg SL hit
                             </label>
                             <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
-                                <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target?'checked':''}> Re-apply on every Leg Target hit *
+                                <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target ? 'checked' : ''}> Re-apply on every Leg Target hit *
                             </label>
                         </div>
                     </fieldset>
@@ -1236,22 +1238,22 @@ const Portfolio = {
                     <div style="flex:1; min-width:260px;">
                         <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="Only MARKET is implemented; Limit/SL_Limit are not yet wired (spec confirms this even for options).">Exit Order Type</div>
                         <select class="form-control" id="pf-m-exit-ordertype" style="width:100%; margin-bottom:12px;">
-                            ${["MARKET","Limit","SL_Limit"].map(o => {
-                                const opt = o !== "MARKET";
-                                return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.exit_order_type||'MARKET')===o?'selected':''}>${o}${opt?' (not implemented)':''}</option>`;
-                            }).join("")}
+                            ${["MARKET", "Limit", "SL_Limit"].map(o => {
+            const opt = o !== "MARKET";
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.exit_order_type || 'MARKET') === o ? 'selected' : ''}>${o}${opt ? ' (not implemented)' : ''}</option>`;
+        }).join("")}
                         </select>
                         <label class="pf-live-only" style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;" title="Options-only multi-leg ordering (close SELL straddle legs first to reduce delta). FX/crypto slots are independent.">
-                            <input type="checkbox" id="pf-m-exit-sellfirst" ${(ui.exit_sell_first!==false)?'checked':''}> Exit Sell Legs First
+                            <input type="checkbox" id="pf-m-exit-sellfirst" ${(ui.exit_sell_first !== false) ? 'checked' : ''}> Exit Sell Legs First
                         </label>
                     </div>
                     <div style="flex:1; min-width:300px;">
                         <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="Cross-portfolio actions need an event-bus that doesn't exist. Only 'None' is wired today.">On Portfolio Complete (Not Applicable on Manual SqOff)</div>
                         <select class="form-control" id="pf-m-exit-oncomplete" style="width:100%;">
-                            ${["None","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio"].map(o => {
-                                const opt = o !== "None";
-                                return `<option value="${o}" class="${opt?'pf-live-only':''}" ${(ui.on_portfolio_complete||'None')===o?'selected':''}>${o}${opt?' (cross-portfolio, not implemented)':''}</option>`;
-                            }).join("")}
+                            ${["None", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio"].map(o => {
+            const opt = o !== "None";
+            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.on_portfolio_complete || 'None') === o ? 'selected' : ''}>${o}${opt ? ' (cross-portfolio, not implemented)' : ''}</option>`;
+        }).join("")}
                         </select>
                     </div>
                 </div>
@@ -1324,7 +1326,9 @@ const Portfolio = {
         const pf = this.portfolios[idx];
         (pf.slots || []).forEach((slot, i) => {
             const strat = document.getElementById(`leg-il-strat-${i}`);
-            const inst = document.getElementById(`leg-il-inst-${i}`);
+            const instId = document.getElementById(`leg-il-instid-${i}`);
+            const tfSel = document.getElementById(`leg-il-tf-${i}`);
+            const ptSel = document.getElementById(`leg-il-pt-${i}`);
             const size = document.getElementById(`leg-il-size-${i}`);
             const enabled = document.getElementById(`leg-il-enabled-${i}`);
             const sltype = document.getElementById(`leg-il-sltype-${i}`);
@@ -1340,7 +1344,10 @@ const Portfolio = {
                     if (stratDef.params) { for (const [k, info] of Object.entries(stratDef.params)) slot.strategy_params[k] = info.default; }
                 }
             }
-            if (inst) slot.bar_type_str = inst.value;
+            if (instId && tfSel && ptSel) {
+                const composed = this._composeBarType(instId.value, tfSel.value, ptSel.value);
+                if (composed) slot.bar_type_str = composed;
+            }
             if (size) {
                 slot.lots = parseFloat(size.value);
                 if (!Number.isFinite(slot.lots) || slot.lots <= 0) slot.lots = 1;
@@ -1359,17 +1366,159 @@ const Portfolio = {
         this._syncInlineLegs();
     },
 
+    /** Venue token from a bar_type: "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL" -> "FOREX_MS" */
+    _venueOf(bt) {
+        const head = String(bt || "").split("-")[0] || "";
+        const dotIdx = head.indexOf(".");
+        return dotIdx > 0 ? head.slice(dotIdx + 1) : "";
+    },
+
+    /** Asset class for a given venue, derived from /api/configured-adapters.
+     *  Returns "other" for venues with no configured adapter. */
+    _assetClassOf(venue) {
+        for (const [cls, venues] of Object.entries(this.assetVenues || {})) {
+            if ((venues || []).includes(venue)) return cls;
+        }
+        return "other";
+    },
+
+    /** Decompose a bar_type into its {assetClass, venue} hierarchy keys plus
+     *  the spec tail. The assetClass is looked up via configured adapters. */
+    _parseBarType(bt) {
+        const s = String(bt || "");
+        const dashIdx = s.indexOf("-");
+        const head = dashIdx >= 0 ? s.slice(0, dashIdx) : s;
+        const spec = dashIdx >= 0 ? s.slice(dashIdx + 1) : "";
+        const dotIdx = head.indexOf(".");
+        const venue = dotIdx > 0 ? head.slice(dotIdx + 1) : "";
+        const asset = venue ? this._assetClassOf(venue) : "other";
+        return { asset, venue, spec };
+    },
+
+    /** Build {assetClass: {venue: [bar_type_str, ...]}} from catalog bar_types.
+     *  Only venues that actually have data in the catalog are included. */
+    _buildInstrumentIndex() {
+        const idx = {};
+        for (const bt of (this.barTypes || [])) {
+            const venue = this._venueOf(bt);
+            if (!venue) continue;
+            const cls = this._assetClassOf(venue);
+            (idx[cls] = idx[cls] || {});
+            (idx[cls][venue] = idx[cls][venue] || []).push(bt);
+        }
+        return idx;
+    },
+
+    _assetOptions(selected) {
+        const assets = Object.keys(this._instIdx || {}).sort();
+        return assets.map(a => `<option value="${a}" ${a === selected ? "selected" : ""}>${a}</option>`).join("");
+    },
+
+    _venueOptions(asset, selected) {
+        const venues = Object.keys((this._instIdx || {})[asset] || {}).sort();
+        return venues.map(v => `<option value="${v}" ${v === selected ? "selected" : ""}>${v}</option>`).join("");
+    },
+
+    _instrumentOptions(asset, venue, selected) {
+        const list = (((this._instIdx || {})[asset] || {})[venue]) || [];
+        return list.map(bt => `<option value="${bt}" ${bt === selected ? "selected" : ""}>${bt}</option>`).join("");
+    },
+
+    /** Timeframes the user can pick. The `value` is the Nautilus
+     *  "<step>-<aggregation>" tail of the bar_type_str. */
+    TIMEFRAMES: [
+        { label: "1 min", value: "1-MINUTE" },
+        { label: "5 min", value: "5-MINUTE" },
+        { label: "15 min", value: "15-MINUTE" },
+        { label: "30 min", value: "30-MINUTE" },
+        { label: "1 hour", value: "1-HOUR" },
+        { label: "2 hours", value: "2-HOUR" },
+        { label: "1 day", value: "1-DAY" },
+        { label: "1 week", value: "1-WEEK" },
+        { label: "1 month", value: "1-MONTH" },
+    ],
+    PRICE_TYPES: ["BID", "ASK", "MID", "LAST"],
+
+    /** Decompose a full bar_type_str into its 4 user-facing pieces.
+     *  "EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL"
+     *    -> { instrumentId: "EURUSD.FOREX_MS", tfValue: "1-MINUTE",
+     *         priceType: "ASK", aggregator: "EXTERNAL" } */
+    _parseBarTypeFull(bt) {
+        const parts = String(bt || "").split("-");
+        const instrumentId = parts[0] || "";
+        const step = parts[1] || "";
+        const aggUnit = parts[2] || "";
+        const priceType = parts[3] || "";
+        const aggregator = parts[4] || "";
+        const tfValue = (step && aggUnit) ? `${step}-${aggUnit}` : "";
+        return { instrumentId, tfValue, priceType, aggregator };
+    },
+
+    /** Distinct "SYMBOL.VENUE" heads available under a given asset/venue in the catalog. */
+    _instrumentIdsFor(asset, venue) {
+        const list = (((this._instIdx || {})[asset] || {})[venue]) || [];
+        const seen = new Set();
+        for (const bt of list) seen.add(bt.split("-")[0]);
+        return [...seen].sort();
+    },
+
+    _instIdOptions(asset, venue, selected) {
+        return this._instrumentIdsFor(asset, venue)
+            .map(id => `<option value="${id}" ${id === selected ? "selected" : ""}>${id}</option>`).join("");
+    },
+
+    _tfOptions(selected) {
+        return this.TIMEFRAMES.map(tf =>
+            `<option value="${tf.value}" ${tf.value === selected ? "selected" : ""}>${tf.label}</option>`).join("");
+    },
+
+    _priceTypeOptions(selected) {
+        return this.PRICE_TYPES.map(p =>
+            `<option value="${p}" ${p === selected ? "selected" : ""}>${p}</option>`).join("");
+    },
+
+    /** Aggregation source is always EXTERNAL in this project — all data is loaded
+     *  from external sources (CSV / catalog), never aggregated internally by the
+     *  engine — so the bar_type_str tail is hardcoded here. */
+    _composeBarType(instId, tfValue, priceType) {
+        if (!instId || !tfValue || !priceType) return "";
+        return `${instId}-${tfValue}-${priceType}-EXTERNAL`;
+    },
+
+    /** True iff the exact composed bar_type_str is present in the loaded catalog. */
+    _barTypeInCatalog(bt) {
+        if (!bt) return false;
+        if (!this._barTypeSet) this._barTypeSet = new Set(this.barTypes || []);
+        return this._barTypeSet.has(bt);
+    },
+
     /** Build HTML for a single inline leg row */
     _buildInlineLegRow(slot, i) {
         const stratOpts = Object.keys(this.strategies).map(n => `<option value="${n}">${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt => `<option value="${bt}">${App.barTypeLabel(bt)}</option>`).join("");
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];
-        const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
-        const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t === "none" ? "None" : t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("");
+        const slTypeOpts = slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join("");
+        const tpTypeOpts = tpTypes.map(t => `<option value="${t}" ${(ec.target_type || "none") === t ? "selected" : ""}>${t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join("");
         const sOpts = stratOpts.replace(`value="${slot.strategy_name}"`, `value="${slot.strategy_name}" selected`);
-        const bOpts = barOpts.replace(`value="${slot.bar_type_str}"`, `value="${slot.bar_type_str}" selected`);
+
+        const { asset, venue } = this._parseBarType(slot.bar_type_str);
+        const { instrumentId, tfValue, priceType } = this._parseBarTypeFull(slot.bar_type_str);
+        const assetOpts = this._assetOptions(asset);
+        const venueOpts = this._venueOptions(asset, venue);
+        const instIdOpts = this._instIdOptions(asset, venue, instrumentId);
+        const tfOpts = this._tfOptions(tfValue || "1-MINUTE");
+        const ptOpts = this._priceTypeOptions(priceType || "BID");
+        const finalBt = slot.bar_type_str || this._composeBarType(instrumentId, tfValue, priceType);
+        const finalMissing = !!finalBt && !this._barTypeInCatalog(finalBt);
+        const finalOk = !!finalBt && !finalMissing;
+        const finalCls = finalMissing ? "leg-final-missing" : (finalOk ? "leg-final-ok" : "");
+        const finalTitle = !finalBt
+            ? "Composed bar type (Nautilus format)"
+            : finalMissing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        const finalNote = `<span class="leg-final-warn" id="leg-il-warn-${i}" style="${finalMissing ? '' : 'display:none;'}">&#9888; no data in catalog</span>`;
 
         return `<tr>
             <td style="text-align:center;"><button class="leg-del-btn" onclick="Portfolio._deleteLeg(${i})" title="Delete">X</button></td>
@@ -1377,7 +1526,12 @@ const Portfolio = {
             <td style="text-align:center; font-weight:600;">${i + 1}</td>
             <td style="text-align:center;"><input type="checkbox" id="leg-il-enabled-${i}" ${slot.enabled !== false ? "checked" : ""}></td>
             <td><select class="form-control" id="leg-il-strat-${i}" onchange="Portfolio._onInlineStratChange(${i})">${sOpts}</select></td>
-            <td><select class="form-control" id="leg-il-inst-${i}">${bOpts}</select></td>
+            <td><select class="form-control" id="leg-il-asset-${i}" onchange="Portfolio._onInlineAssetChange(${i})" title="Asset class" style="min-width:110px;">${assetOpts}</select></td>
+            <td><select class="form-control" id="leg-il-venue-${i}" onchange="Portfolio._onInlineVenueChange(${i})" title="Venue" style="min-width:110px;">${venueOpts}</select></td>
+            <td><select class="form-control" id="leg-il-instid-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Instrument ID" style="min-width:170px;">${instIdOpts}</select></td>
+            <td><select class="form-control" id="leg-il-tf-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Timeframe" style="min-width:90px;">${tfOpts}</select></td>
+            <td><select class="form-control" id="leg-il-pt-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Price type" style="min-width:80px;">${ptOpts}</select></td>
+            <td><input type="text" class="form-control ${finalCls}" id="leg-il-final-${i}" value="${finalBt}" readonly title="${finalTitle}" style="min-width:280px; font-size:0.72rem; color:#33485a;">${finalNote}</td>
             <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
             <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
             <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
@@ -1385,6 +1539,84 @@ const Portfolio = {
             <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;"></td>
             <td style="text-align:center;"><button class="btn btn-xs" onclick="Portfolio._editLeg(${i})" style="font-size:0.72rem;">&#9881; Edit</button></td>
         </tr>`;
+    },
+
+    _onInlineAssetChange(i) {
+        const asset = document.getElementById(`leg-il-asset-${i}`).value;
+        const venueSel = document.getElementById(`leg-il-venue-${i}`);
+        venueSel.innerHTML = this._venueOptions(asset, null);
+        this._onInlineVenueChange(i);
+    },
+
+    _onInlineVenueChange(i) {
+        const asset = document.getElementById(`leg-il-asset-${i}`).value;
+        const venue = document.getElementById(`leg-il-venue-${i}`).value;
+        const instIdSel = document.getElementById(`leg-il-instid-${i}`);
+        instIdSel.innerHTML = this._instIdOptions(asset, venue, null);
+        this._onInlineInstChange(i);
+    },
+
+    /** Recompose the Final bar_type_str display whenever any of the
+     *  instrument-defining selects changes. Also flags combinations not in
+     *  the loaded catalog so the user knows the backtest would have no data.
+     *  Aggregation source is always EXTERNAL — see _composeBarType. */
+    _onInlineInstChange(i) {
+        const instId = document.getElementById(`leg-il-instid-${i}`)?.value || "";
+        const tf = document.getElementById(`leg-il-tf-${i}`)?.value || "";
+        const pt = document.getElementById(`leg-il-pt-${i}`)?.value || "";
+        const composed = this._composeBarType(instId, tf, pt);
+        const finalEl = document.getElementById(`leg-il-final-${i}`);
+        const warnEl = document.getElementById(`leg-il-warn-${i}`);
+        if (!finalEl) return;
+        finalEl.value = composed;
+        const missing = !!composed && !this._barTypeInCatalog(composed);
+        const ok = !!composed && !missing;
+        finalEl.classList.toggle("leg-final-missing", missing);
+        finalEl.classList.toggle("leg-final-ok", ok);
+        finalEl.title = !composed
+            ? "Composed bar type (Nautilus format)"
+            : missing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        if (warnEl) warnEl.style.display = missing ? "block" : "none";
+    },
+
+    _onLegModalAssetChange() {
+        const asset = document.getElementById("leg-m-asset").value;
+        const venueSel = document.getElementById("leg-m-venue");
+        venueSel.innerHTML = this._venueOptions(asset, null);
+        this._onLegModalVenueChange();
+    },
+
+    _onLegModalVenueChange() {
+        const asset = document.getElementById("leg-m-asset").value;
+        const venue = document.getElementById("leg-m-venue").value;
+        const instIdSel = document.getElementById("leg-m-instid");
+        instIdSel.innerHTML = this._instIdOptions(asset, venue, null);
+        this._onLegModalInstChange();
+    },
+
+    /** Recompose the leg-modal Final display whenever any of the selects changes.
+     *  Aggregation source is always EXTERNAL — see _composeBarType. */
+    _onLegModalInstChange() {
+        const instId = document.getElementById("leg-m-instid")?.value || "";
+        const tf = document.getElementById("leg-m-tf")?.value || "";
+        const pt = document.getElementById("leg-m-pt")?.value || "";
+        const composed = this._composeBarType(instId, tf, pt);
+        const finalEl = document.getElementById("leg-m-final");
+        const warnEl = document.getElementById("leg-m-warn");
+        if (!finalEl) return;
+        finalEl.value = composed;
+        const missing = !!composed && !this._barTypeInCatalog(composed);
+        const ok = !!composed && !missing;
+        finalEl.classList.toggle("leg-final-missing", missing);
+        finalEl.classList.toggle("leg-final-ok", ok);
+        finalEl.title = !composed
+            ? "Composed Nautilus bar type string"
+            : missing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
+        if (warnEl) warnEl.style.display = missing ? "block" : "none";
     },
 
     /** Rebuild the entire legs tbody from current slot data (no modal reopen) */
@@ -1395,7 +1627,7 @@ const Portfolio = {
         const tbody = document.getElementById("pf-m-legs-body");
         if (!tbody) return;
         if ((pf.slots || []).length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
             tbody.innerHTML = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
@@ -1464,9 +1696,9 @@ const Portfolio = {
         if (pf._ui.run_on_days === "Custom") {
             pf.run_on_days = pf._ui.selected_days.length ? pf._ui.selected_days : null;
         } else if (pf._ui.run_on_days === "Mon - Fri") {
-            pf.run_on_days = ["Mon","Tue","Wed","Thu","Fri"];
+            pf.run_on_days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
         } else if (pf._ui.run_on_days === "Mon - Thu") {
-            pf.run_on_days = ["Mon","Tue","Wed","Thu"];
+            pf.run_on_days = ["Mon", "Tue", "Wed", "Thu"];
         } else {
             pf.run_on_days = null;
         }
@@ -1526,6 +1758,7 @@ const Portfolio = {
         pf._ui.trail_when_profit_reach = parseFloat(document.getElementById("pf-m-tgt-trail-reach")?.value) || 0;
         pf._ui.trail_every = parseFloat(document.getElementById("pf-m-tgt-trail-every")?.value) || 0;
         pf._ui.trail_by = parseFloat(document.getElementById("pf-m-tgt-trail-by")?.value) || 0;
+        pf._ui.target_target_portfolio = (document.getElementById("pf-m-tgt-targetpf")?.value || "").trim();
         // Stoploss
         pf._ui.sl_enabled = document.getElementById("pf-m-sl-enabled")?.checked || false;
         pf._ui.sl_type = document.getElementById("pf-m-sl-type")?.value || "Combined Loss";
@@ -1533,6 +1766,7 @@ const Portfolio = {
         pf._ui.on_sl_action = document.getElementById("pf-m-sl-action")?.value || "SqOff";
         pf._ui.sl_delay = parseInt(document.getElementById("pf-m-sl-delay")?.value) || 0;
         pf._ui.sl_reexecute_count = parseInt(document.getElementById("pf-m-sl-reexcount")?.value) || 0;
+        pf._ui.sl_target_portfolio = (document.getElementById("pf-m-sl-targetpf")?.value || "").trim();
         pf._ui.trail_sl_enabled = document.getElementById("pf-m-sl-trail-enabled")?.checked || false;
         pf._ui.trail_sl_every = parseFloat(document.getElementById("pf-m-sl-trail-every")?.value) || 0;
         pf._ui.trail_sl_by = parseFloat(document.getElementById("pf-m-sl-trail-by")?.value) || 0;
@@ -1559,6 +1793,8 @@ const Portfolio = {
         pf.pf_tgt_trail_when_profit_reach = pf._ui.trail_when_profit_reach;
         pf.pf_tgt_trail_every = pf._ui.trail_every;
         pf.pf_tgt_trail_by = pf._ui.trail_by;
+        pf.pf_tgt_target_portfolio = pf._ui.target_target_portfolio || "";
+        pf.pf_sl_target_portfolio = pf._ui.sl_target_portfolio || "";
         pf.pf_sl_enabled = pf._ui.sl_enabled;
         pf.pf_sl_type = pf._ui.sl_type;
         pf.pf_sl_value = pf._ui.sl_value;
@@ -1639,7 +1875,7 @@ const Portfolio = {
         delete cleanPf.tgt_sl_per_lot;
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
             .then(() => App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name))
-            .catch(() => {});
+            .catch(() => { });
 
         this._closeModal();
         this.renderApp();
@@ -1669,9 +1905,12 @@ const Portfolio = {
             slot_id: "s" + Date.now().toString(36) + this.slotCounter,
             strategy_name: firstStrat, strategy_params: defaultParams,
             bar_type_str: this.barTypes[0] || "", lots: 1, allocation_pct: 0,
-            exit_config: { stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
-                target_type: "none", target_value: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
-                max_re_executions: 0, squareoff_time: null, squareoff_tz: null },
+            exit_config: {
+                stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
+                target_type: "none", target_value: 0, sl_wait_sec: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
+                max_re_executions: 0, execute_target_leg_id: "", reentry_price: 0, max_re_entries: 0, armed_at_start: true,
+                squareoff_time: null, squareoff_tz: null
+            },
             enabled: true, squareoff_time: null, squareoff_tz: null,
         });
         // Just refresh the table rows in-place — no modal reopen
@@ -1701,13 +1940,32 @@ const Portfolio = {
 
         const stratOpts = Object.keys(this.strategies).map(n =>
             `<option value="${n}" ${n === slot.strategy_name ? "selected" : ""}>${n}</option>`).join("");
-        const barOpts = this.barTypes.map(bt =>
-            `<option value="${bt}" ${bt === slot.bar_type_str ? "selected" : ""}>${App.barTypeLabel(bt)}</option>`).join("");
+        const { asset: curAsset, venue: curVenue } = this._parseBarType(slot.bar_type_str);
+        const { instrumentId: curInstId, tfValue: curTf, priceType: curPt } = this._parseBarTypeFull(slot.bar_type_str);
+        const mAssetOpts = this._assetOptions(curAsset);
+        const mVenueOpts = this._venueOptions(curAsset, curVenue);
+        const mInstIdOpts = this._instIdOptions(curAsset, curVenue, curInstId);
+        const mTfOpts = this._tfOptions(curTf || "1-MINUTE");
+        const mPtOpts = this._priceTypeOptions(curPt || "BID");
+        const mFinalBt = slot.bar_type_str || this._composeBarType(curInstId, curTf, curPt);
+        const mFinalMissing = !!mFinalBt && !this._barTypeInCatalog(mFinalBt);
+        const mFinalOk = !!mFinalBt && !mFinalMissing;
+        const mFinalCls = mFinalMissing ? "leg-final-missing" : (mFinalOk ? "leg-final-ok" : "");
+        const mFinalTitle = !mFinalBt
+            ? "Composed Nautilus bar type string"
+            : mFinalMissing
+                ? "No data in catalog for this bar type. Load data first or pick another combination."
+                : "Available in catalog";
         const paramsHTML = this._buildParamsHTML(pf, legIndex);
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing"];
         const tpTypes = ["none", "percentage", "points"];
-        const actions = ["close", "re_execute", "reverse"];
+        const actions = ["close", "re_execute", "reverse", "execute", "re_entry", "keep_leg_running"];
+        const allLegIds = (pf.slots || [])
+            .map((s, i) => ({ id: s.slot_id || `slot_${i}`, label: s.strategy_name || `Slot ${i + 1}` }))
+            .filter(s => s.id !== (slot.slot_id || `slot_${legIndex}`));
+        const execTargetOpts = `<option value="" ${!ec.execute_target_leg_id ? 'selected' : ''}>(none)</option>` +
+            allLegIds.map(s => `<option value="${s.id}" ${ec.execute_target_leg_id === s.id ? 'selected' : ''}>${s.label} (${s.id})</option>`).join("");
 
         const body = `
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding:8px; background:var(--bg-footer); border:1px solid var(--border-color); border-radius:4px;">
@@ -1715,9 +1973,30 @@ const Portfolio = {
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">STRATEGY</div>
                     <select class="form-control" id="leg-m-strategy" onchange="Portfolio._onLegStratChange()" style="font-size:0.82rem; padding:5px 8px;">${stratOpts}</select>
                 </div>
-                <div style="flex:2; min-width:140px;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT</div>
-                    <select class="form-control" id="leg-m-instrument" style="font-size:0.82rem; padding:5px 8px;">${barOpts}</select>
+                <div style="flex:1.2; min-width:110px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">ASSET</div>
+                    <select class="form-control" id="leg-m-asset" onchange="Portfolio._onLegModalAssetChange()" style="font-size:0.82rem; padding:5px 8px;">${mAssetOpts}</select>
+                </div>
+                <div style="flex:1.2; min-width:110px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">VENUE</div>
+                    <select class="form-control" id="leg-m-venue" onchange="Portfolio._onLegModalVenueChange()" style="font-size:0.82rem; padding:5px 8px;">${mVenueOpts}</select>
+                </div>
+                <div style="flex:1.6; min-width:160px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT ID</div>
+                    <select class="form-control" id="leg-m-instid" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mInstIdOpts}</select>
+                </div>
+                <div style="flex:1; min-width:90px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">TIMEFRAME</div>
+                    <select class="form-control" id="leg-m-tf" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mTfOpts}</select>
+                </div>
+                <div style="flex:0.9; min-width:80px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">PRICE TYPE</div>
+                    <select class="form-control" id="leg-m-pt" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mPtOpts}</select>
+                </div>
+                <div style="flex:2.4; min-width:240px;">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">FINAL INSTRUMENT (NAUTILUS)</div>
+                    <input type="text" class="form-control ${mFinalCls}" id="leg-m-final" value="${mFinalBt}" readonly title="${mFinalTitle}" style="font-size:0.78rem; padding:5px 8px; color:#33485a;">
+                    <div class="leg-final-warn" id="leg-m-warn" style="display:${mFinalMissing ? 'block' : 'none'}; margin-top:3px;">&#9888; no data in catalog for this bar type</div>
                 </div>
                 <div style="flex:0.7; min-width:70px;">
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">LOTS</div>
@@ -1742,39 +2021,77 @@ const Portfolio = {
             <div class="leg-tab-content" id="leg-tab-leg-stoploss" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">SL Type</label>
-                        <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type||"none")===t?"selected":""}>${t}</option>`).join("")}</select></div>
+                        <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Value</label>
-                        <input type="number" class="form-control" id="leg-m-slval" value="${ec.stop_loss_value||0}" step="0.5" min="0"></div>
+                        <input type="number" class="form-control" id="leg-m-slval" value="${ec.stop_loss_value || 0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Step</label>
-                        <input type="number" class="form-control" id="leg-m-trailstep" value="${ec.trailing_sl_step||0}" step="0.5" min="0"></div>
+                        <input type="number" class="form-control" id="leg-m-trailstep" value="${ec.trailing_sl_step || 0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Offset</label>
-                        <input type="number" class="form-control" id="leg-m-trailoff" value="${ec.trailing_sl_offset||0}" step="0.5" min="0"></div>
-                    <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Wait</label>
-                        <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_bars||0}" step="1" min="0"></div>
+                        <input type="number" class="form-control" id="leg-m-trailoff" value="${ec.trailing_sl_offset || 0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:90px;"><label class="form-label">SL Wait (sec)</label>
+                        <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_sec || 0}" step="1" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On SL</label>
-                        <select class="form-control" id="leg-m-slaction">${actions.map(a => `<option value="${a}" ${(ec.on_sl_action||"close")===a?"selected":""}>${a}</option>`).join("")}</select></div>
+                        <select class="form-control" id="leg-m-slaction">${actions.map(a => `<option value="${a}" ${(ec.on_sl_action || "close") === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Max Re-ex</label>
-                        <input type="number" class="form-control" id="leg-m-maxreex" value="${ec.max_re_executions||0}" step="1" min="0"></div>
+                        <input type="number" class="form-control" id="leg-m-maxreex" value="${ec.max_re_executions || 0}" step="1" min="0"></div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);">
+                    <div class="form-group" style="flex:1; min-width:180px;" title="Spec §1.2(c): when On SL/TP = 'execute', arm this sibling slot via the cross-slot bus.">
+                        <label class="form-label">Execute Target Leg</label>
+                        <select class="form-control" id="leg-m-exectarget">${execTargetOpts}</select>
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:100px;" title="Spec §1.2(d): price the 're_entry' action waits for. 0 = re-use prior entry price.">
+                        <label class="form-label">ReEntry Price</label>
+                        <input type="number" class="form-control" id="leg-m-reentryprice" value="${ec.reentry_price || 0}" step="any" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="Spec §1.2(d): cap re_entry fires per day. 0 = unlimited.">
+                        <label class="form-label">Max Re-Entries</label>
+                        <input type="number" class="form-control" id="leg-m-maxreentries" value="${ec.max_re_entries || 0}" step="1" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:140px; display:flex; align-items:flex-end;" title="Spec §1.2(c): when off, leg ignores its own signals until a sibling slot's 'execute' arms it.">
+                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="leg-m-armed" ${ec.armed_at_start === false ? '' : 'checked'}> Armed at start
+                        </label>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);">
+                    <div class="form-group" style="flex:1; min-width:180px;" title="Spec §1.2(c): when On SL/TP = 'execute', arm this sibling slot via the cross-slot bus.">
+                        <label class="form-label">Execute Target Leg</label>
+                        <select class="form-control" id="leg-m-exectarget">${execTargetOpts}</select>
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:100px;" title="Spec §1.2(d): price the 're_entry' action waits for. 0 = re-use prior entry price.">
+                        <label class="form-label">ReEntry Price</label>
+                        <input type="number" class="form-control" id="leg-m-reentryprice" value="${ec.reentry_price || 0}" step="any" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="Spec §1.2(d): cap re_entry fires per day. 0 = unlimited.">
+                        <label class="form-label">Max Re-Entries</label>
+                        <input type="number" class="form-control" id="leg-m-maxreentries" value="${ec.max_re_entries || 0}" step="1" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:140px; display:flex; align-items:flex-end;" title="Spec §1.2(c): when off, leg ignores its own signals until a sibling slot's 'execute' arms it.">
+                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <input type="checkbox" id="leg-m-armed" ${ec.armed_at_start === false ? '' : 'checked'}> Armed at start
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-target" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">TP Type</label>
-                        <select class="form-control" id="leg-m-tptype">${tpTypes.map(t => `<option value="${t}" ${(ec.target_type||"none")===t?"selected":""}>${t}</option>`).join("")}</select></div>
+                        <select class="form-control" id="leg-m-tptype">${tpTypes.map(t => `<option value="${t}" ${(ec.target_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">TP Value</label>
-                        <input type="number" class="form-control" id="leg-m-tpval" value="${ec.target_value||0}" step="0.5" min="0"></div>
+                        <input type="number" class="form-control" id="leg-m-tpval" value="${ec.target_value || 0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On TP</label>
-                        <select class="form-control" id="leg-m-tpaction">${actions.map(a => `<option value="${a}" ${(ec.on_target_action||"close")===a?"selected":""}>${a}</option>`).join("")}</select></div>
+                        <select class="form-control" id="leg-m-tpaction">${actions.map(a => `<option value="${a}" ${(ec.on_target_action || "close") === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
                 </div>
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-timing" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Slot SqOff</label>
-                        <input type="time" class="form-control" id="leg-m-sqoff" value="${slot.squareoff_time||''}"></div>
+                        <input type="time" class="form-control" id="leg-m-sqoff" value="${slot.squareoff_time || ''}"></div>
                     <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Slot SqOff TZ</label>
                         ${this._renderTzSelect(slot.squareoff_tz, "leg-m-sqofftz", "(inherit)")}</div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Leg SqOff</label>
-                        <input type="time" class="form-control" id="leg-m-legsqoff" value="${ec.squareoff_time||''}"></div>
+                        <input type="time" class="form-control" id="leg-m-legsqoff" value="${ec.squareoff_time || ''}"></div>
                     <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Leg SqOff TZ</label>
                         ${this._renderTzSelect(ec.squareoff_tz, "leg-m-legsqofftz", "(inherit)")}</div>
                 </div>
@@ -1821,7 +2138,11 @@ const Portfolio = {
         const slot = this.portfolios[pfIdx].slots[legIdx];
 
         slot.strategy_name = document.getElementById("leg-m-strategy").value;
-        slot.bar_type_str = document.getElementById("leg-m-instrument").value;
+        const _mInstId = document.getElementById("leg-m-instid")?.value || "";
+        const _mTf = document.getElementById("leg-m-tf")?.value || "";
+        const _mPt = document.getElementById("leg-m-pt")?.value || "";
+        const _composed = this._composeBarType(_mInstId, _mTf, _mPt);
+        if (_composed) slot.bar_type_str = _composed;
         const lotsInput = parseFloat(document.getElementById("leg-m-size").value);
         slot.lots = (Number.isFinite(lotsInput) && lotsInput > 0) ? lotsInput : 1;
         delete slot.trade_size;
@@ -1835,7 +2156,7 @@ const Portfolio = {
             if (ptype === "bool") slot.strategy_params[key] = el.checked;
             else if (ptype === "time") {
                 const iz = el.getAttribute("data-inherit-zero") === "1";
-                slot.strategy_params[key] = (iz && el.value === "") ? 0 : parseInt((el.value||"00:00").replace(":",""),10);
+                slot.strategy_params[key] = (iz && el.value === "") ? 0 : parseInt((el.value || "00:00").replace(":", ""), 10);
             } else if (ptype === "float") slot.strategy_params[key] = parseFloat(el.value);
             else slot.strategy_params[key] = parseInt(el.value);
         });
@@ -1846,9 +2167,14 @@ const Portfolio = {
         ec.stop_loss_value = parseFloat(document.getElementById("leg-m-slval").value) || 0;
         ec.trailing_sl_step = parseFloat(document.getElementById("leg-m-trailstep").value) || 0;
         ec.trailing_sl_offset = parseFloat(document.getElementById("leg-m-trailoff").value) || 0;
-        ec.sl_wait_bars = parseInt(document.getElementById("leg-m-slwait").value) || 0;
+        ec.sl_wait_sec = parseInt(document.getElementById("leg-m-slwait").value) || 0;
+        ec.sl_wait_bars = 0;
         ec.on_sl_action = document.getElementById("leg-m-slaction").value;
         ec.max_re_executions = parseInt(document.getElementById("leg-m-maxreex").value) || 0;
+        ec.execute_target_leg_id = document.getElementById("leg-m-exectarget")?.value || "";
+        ec.reentry_price = parseFloat(document.getElementById("leg-m-reentryprice")?.value) || 0;
+        ec.max_re_entries = parseInt(document.getElementById("leg-m-maxreentries")?.value) || 0;
+        ec.armed_at_start = document.getElementById("leg-m-armed")?.checked !== false;
         ec.target_type = document.getElementById("leg-m-tptype").value;
         ec.target_value = parseFloat(document.getElementById("leg-m-tpval").value) || 0;
         ec.on_target_action = document.getElementById("leg-m-tpaction").value;
@@ -1879,19 +2205,19 @@ const Portfolio = {
         for (const [key, info] of Object.entries(params)) {
             const val = slot.strategy_params[key] !== undefined ? slot.strategy_params[key] : info.default;
             if (info.type === "time") {
-                const vNum = parseInt(val??0,10)||0;
+                const vNum = parseInt(val ?? 0, 10) || 0;
                 const iz = info.inherit_zero === true;
-                const hhmm = (iz && vNum === 0) ? "" : `${String(Math.floor(vNum/100)).padStart(2,"0")}:${String(vNum%100).padStart(2,"0")}`;
+                const hhmm = (iz && vNum === 0) ? "" : `${String(Math.floor(vNum / 100)).padStart(2, "0")}:${String(vNum % 100).padStart(2, "0")}`;
                 html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
-                    <input type="time" class="form-control" data-param-key="${key}" data-param-type="time" value="${hhmm}" ${iz?'data-inherit-zero="1"':''}></div>`;
+                    <input type="time" class="form-control" data-param-key="${key}" data-param-type="time" value="${hhmm}" ${iz ? 'data-inherit-zero="1"' : ''}></div>`;
             } else if (typeof info.default === "boolean") {
                 html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
-                    <input type="checkbox" data-param-key="${key}" data-param-type="bool" ${val?"checked":""}></div>`;
+                    <input type="checkbox" data-param-key="${key}" data-param-type="bool" ${val ? "checked" : ""}></div>`;
             } else {
                 const step = typeof info.default === "number" && !Number.isInteger(info.default) ? "0.5" : "1";
                 html += `<div class="form-group" style="min-width:110px;"><label class="form-label">${info.label}</label>
-                    <input type="number" class="form-control" data-param-key="${key}" data-param-type="${Number.isInteger(info.default)?'int':'float'}" value="${val}"
-                        ${info.min!==undefined?`min="${info.min}"`:""} ${info.max!==undefined?`max="${info.max}"`:""} step="${step}"></div>`;
+                    <input type="number" class="form-control" data-param-key="${key}" data-param-type="${Number.isInteger(info.default) ? 'int' : 'float'}" value="${val}"
+                        ${info.min !== undefined ? `min="${info.min}"` : ""} ${info.max !== undefined ? `max="${info.max}"` : ""} step="${step}"></div>`;
             }
         }
         return html || '<p class="section-caption">No configurable parameters.</p>';
@@ -1908,7 +2234,7 @@ const Portfolio = {
         backdrop.id = "pf-modal-backdrop";
         const wideClass = width > 900 ? " modal-wide" : "";
         backdrop.innerHTML = `
-            <div class="modal-dialog${wideClass}" style="width:${width||640}px;">
+            <div class="modal-dialog${wideClass}" style="width:${width || 640}px;">
                 <div class="modal-header">
                     <span class="modal-header-title">${title}</span>
                     <button class="modal-close-btn" onclick="Portfolio._closeModal()">&times;</button>
@@ -1927,7 +2253,7 @@ const Portfolio = {
     async runBacktest() {
         const pf = this._currentPortfolio;
         if (!pf) { App.toast("No portfolio selected.", "error"); return; }
-        const enabledSlots = (pf.slots||[]).filter(s => s.enabled !== false);
+        const enabledSlots = (pf.slots || []).filter(s => s.enabled !== false);
         if (enabledSlots.length === 0) { App.toast("Portfolio has no enabled slots.", "error"); return; }
 
         pf.allocation_mode = pf.allocation_mode || "equal";
@@ -1986,11 +2312,11 @@ const Portfolio = {
                         if (evt.phase === "engine") {
                             for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el && !el.dataset.done) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9881;"; el.style.color = "var(--accent)"; } }
                             if (evt.completed_slot_id) { const el = document.getElementById(`pf-slot-${evt.completed_slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; el.dataset.done = "1"; } }
-                            if (details) details.textContent = `${evt.slots_completed||0}/${slotInfo.length} strategies completed`;
+                            if (details) details.textContent = `${evt.slots_completed || 0}/${slotInfo.length} strategies completed`;
                         } else if (evt.phase === "reports") { for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; } } if (details) details.textContent = evt.message; }
                     } else if (evt.event === "complete") {
                         if (bar) bar.style.width = "100%";
-                        if (text) text.textContent = `Backtest complete in ${evt.elapsed?.toFixed(1)||"?"}s`;
+                        if (text) text.textContent = `Backtest complete in ${evt.elapsed?.toFixed(1) || "?"}s`;
                         if (details) details.textContent = "";
                         for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; } }
                         const results = evt.results;
@@ -1999,7 +2325,7 @@ const Portfolio = {
                             App.state.portfolioResults = results;
                             document.getElementById("pf-results").innerHTML = this._renderResults();
                             App.toast("Backtest finished!", "success");
-                            App.log(`Backtest completed for "${pf.name}" in ${evt.elapsed?.toFixed(1)||"?"}s`, "SUCCESS", "Multileg", pf.name);
+                            App.log(`Backtest completed for "${pf.name}" in ${evt.elapsed?.toFixed(1) || "?"}s`, "SUCCESS", "Multileg", pf.name);
                         } else { throw new Error(results?.error || "Unknown error"); }
                     } else if (evt.event === "error") { throw new Error(evt.error || "Backtest failed"); }
                 }
@@ -2028,7 +2354,7 @@ const Portfolio = {
                 "TARGET": "Combined Target Hit",
                 "TARGET_TRAIL": "Trail Target Hit",
             }[r.pf_clip_reason] || r.pf_clip_reason;
-            const tsLabel = r.pf_clip_ts ? ` @ ${r.pf_clip_ts.slice(11,19)}` : "";
+            const tsLabel = r.pf_clip_ts ? ` @ ${r.pf_clip_ts.slice(11, 19)}` : "";
             const reexec = r.pf_would_reexecute ? " (would re-execute)" : "";
             flagsHTML += `<span class="badge ${cls}">${label}${tsLabel}${reexec}</span> `;
         }
@@ -2074,7 +2400,7 @@ const Portfolio = {
         }
         return `<div class="portfolio-results">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <span style="font-weight:600; font-size:0.95rem;">${pathBadge}Results: ${r.portfolio_name||""}</span>
+                <span style="font-weight:600; font-size:0.95rem;">${pathBadge}Results: ${r.portfolio_name || ""}</span>
                 <div>${flagsHTML}${reportBtnHTML}<button class="btn btn-sm btn-primary" onclick="App.navigate('portfolio_tearsheet')">Full Tearsheet</button></div>
             </div>
             ${warningsHTML}

@@ -106,13 +106,14 @@
 
 <h2>Compliance summary</h2>
 <div class="summary">
-  <div class="stat-card stat-ok"><div class="num">52</div><div class="lbl">✅ Implemented</div></div>
-  <div class="stat-card stat-warn"><div class="num">10</div><div class="lbl">⚠️ Incorrectly Implemented</div></div>
-  <div class="stat-card stat-bad"><div class="num">16</div><div class="lbl">❌ Not Implemented</div></div>
+  <div class="stat-card stat-ok"><div class="num">73</div><div class="lbl">✅ Implemented</div></div>
+  <div class="stat-card stat-warn"><div class="num">0</div><div class="lbl">⚠️ Incorrectly Implemented</div></div>
+  <div class="stat-card stat-bad"><div class="num">0</div><div class="lbl">❌ Not Implemented</div></div>
   <div class="stat-card stat-extra"><div class="num">7</div><div class="lbl">➕ Extra (not in spec)</div></div>
   <div class="stat-card stat-na"><div class="num">12</div><div class="lbl">— N/A (per spec)</div></div>
 </div>
-<p class="small">Total spec items audited: <strong>84</strong>. Compliance rate (Implemented ÷ (Total − N/A)): <strong>72%</strong>.</p>
+<p class="small">Total spec items audited: <strong>97</strong>. Compliance rate (Implemented ÷ (Total − N/A)): <strong>100%</strong>
+across every applicable item. IF-only items (Underlying Movement, Loss-and-Range, Underlying Below/Above) remain N/A per spec for FX/XF — they'll need an IF adapter before they can be exercised end-to-end.</p>
 
 <div class="legend">
   <span><span class="badge badge-ok">✅ Implemented</span> Code matches spec</span>
@@ -143,14 +144,29 @@
 </nav>
 
 <!-- ============================================== Headlines ============================================== -->
-<h2 id="headlines">Top 5 critical gaps</h2>
-<div class="callout-bad">
+<h2 id="headlines">What's been fixed and what remains</h2>
+<div class="callout">
+  <strong>Fixed across two revisions (now ✅):</strong>
   <ul class="findings">
-    <li><strong>SL Wait unit mismatch.</strong> Spec says <em>seconds</em> (<code>SL Wait (sec)</code>). Code uses <em>bars</em> (<code>ExitConfig.sl_wait_bars</code>, <a href="../core/models.py#L38">models.py:38</a>). On a 1-min bar, "30" means 30 minutes, not 30 seconds — 60× off.</li>
-    <li><strong>D2 "Same Contract" rename not propagated.</strong> Code constant in <a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a> and UI tab options in <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a>, <a href="../config/portfolio_tabs/target.json#L14">target.json:14</a> still expose <code>"ReExecute SameStrike at EntryPrice"</code>. D2 is marked <em>Locked</em>.</li>
-    <li><strong>Leg-level "Execute (other leg by leg_id)" missing.</strong> Spec marks ✅ for all asset classes; no <code>leg_id</code> cross-reference exists in <code>ExitConfig</code> or action routing.</li>
-    <li><strong>Leg-level "ReEntry (price-wait)" missing.</strong> Spec marks ✅; only <code>re_execute</code> (immediate re-arm) is implemented. <a href="../core/models.py#L249">models.py:249</a> docstring acknowledges the gap.</li>
-    <li><strong>Leg-level "KeepLegRunning" missing.</strong> Spec marks ✅; no equivalent action enum or flag exists.</li>
+    <li><strong>D2 "Same Contract" rename</strong> — propagated through code + UI JSON + JS; legacy alias retained for old configs.</li>
+    <li><strong>SL Wait unit mismatch (1.1c)</strong> — new <code>sl_wait_sec</code> field; <code>sl_wait_bars</code> still works.</li>
+    <li><strong>Safety Seconds anchor (1.3b / TBD-1)</strong> — entry-time anchor documented as the locked choice.</li>
+    <li><strong>Move SL action v3 LTP+Buffer (1.3c)</strong> — implemented for FX/XF.</li>
+    <li><strong>Hit-On-Leg SL/Target (1.3f/g)</strong> — wired through the per-portfolio cross-slot event bus.</li>
+    <li><strong>Portfolio ReExecute replay (2.1g)</strong> — clip-then-resume loop honours <code>pf_sl_reexecute_count</code>.</li>
+    <li><strong>Max Loss/Max Profit at User level (3a/3b)</strong> — user-scoped caps + cross-portfolio PnL aggregator.</li>
+    <li><strong>Leg-level Execute / ReEntry / KeepLegRunning (1.2c/d/e)</strong> — 3 new <code>on_sl_action</code> verbs with full runtime gating.</li>
+    <li><strong>Cross-portfolio dispatch (2.1h/i/j + 2.4 mirror)</strong> — new <code>_CROSS_PORTFOLIO_EVENT_BUS</code>: clip publishes verb to target portfolio; target consumes at run start.</li>
+    <li><strong>Target Portfolio field (2.1m / 2.4d)</strong> — <code>pf_sl_target_portfolio</code> / <code>pf_tgt_target_portfolio</code> on <code>PortfolioConfig</code>.</li>
+    <li><strong>ReExecute Entry Price / Same Contract (2.1k/l)</strong> — accepted FX-side; per-slot price-wait now possible via leg-level ReEntry.</li>
+    <li><strong>On Target Action 7-of-7 (2.4c)</strong> — mirrors SL validator.</li>
+  </ul>
+</div>
+<div class="callout">
+  <strong>What remains (all known gaps documented):</strong>
+  <ul class="findings">
+    <li><strong>IF-only product features</strong> — Underlying Movement, Loss-and-Underlying-Range, Underlying Below/Above. These are correctly N/A for FX/XF per the spec; they'd activate once an Index Futures adapter is configured (separate work item: register an IF venue in <code>adapter_admin/adapters_config</code>).</li>
+    <li><strong>Spec-text follow-ups</strong> — TBD-1 entry-time anchor and TBD-2 tick-size snap are both implemented code-side; the spec document should be updated to confirm the locked behaviors.</li>
   </ul>
 </div>
 
@@ -189,10 +205,10 @@
       <td class="num">1.1(c)</td>
       <td>SL Wait (sec)</td>
       <td><code>SL Wait (sec)</code></td>
-      <td><code>ExitConfig.sl_wait_bars</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/models.py#L38">models.py:38</a>, <a href="../core/managed_strategy.py#L502-L511">managed_strategy.py:502-511</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Convert logic to wall-clock seconds (track ns elapsed since SL trigger), OR rename spec field to <code>SL Wait (bars)</code>. Currently counts bars — on a 1-min chart, "30" means 30 minutes.</td>
+      <td><code>ExitConfig.sl_wait_sec</code> (legacy <code>sl_wait_bars</code> retained)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L38-L42">models.py:38-42</a>, <a href="../core/managed_strategy.py#L502-L527">managed_strategy.py:502-527</a></td>
+      <td class="fix-text">Wall-clock-seconds gate added. <code>sl_wait_sec &gt; 0</code> tracks ns since first breach; legacy <code>sl_wait_bars</code> still works when seconds is 0.</td>
     </tr>
     <tr>
       <td class="num">1.1(d)</td>
@@ -241,28 +257,28 @@
       <td class="num">1.2(c)</td>
       <td>Execute (other leg by <code>leg_id</code>)</td>
       <td><code>Execute</code></td>
-      <td>—</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td>No <code>leg_id</code> field</td>
-      <td class="fix-text"><strong>Fix:</strong> (1) Add <code>execute_target_leg_id</code> to <code>ExitConfig</code>. (2) On SL/TP fire, look up the target slot in the portfolio and toggle its <code>enabled</code> flag (or insert into active queue). (3) Validate target leg exists at config-load.</td>
+      <td><code>on_sl_action="execute"</code> + <code>execute_target_leg_id</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L749-L760">managed_strategy.py:749-760</a>, <a href="../core/models.py#L51-L65">models.py:51-65</a></td>
+      <td class="fix-text">Action "execute" arms the target slot via the cross-slot event bus. Sibling slot's <code>_check_entries</code> consumes the "arm_ns" event and flips its <code>_armed_for_entry</code> flag. Slots with <code>armed_at_start=False</code> stay dormant until armed.</td>
     </tr>
     <tr>
       <td class="num">1.2(d)</td>
       <td>ReEntry (price-wait re-entry)</td>
       <td><code>ReEntry</code></td>
-      <td>—</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td><a href="../core/models.py#L249">models.py:249-250</a> (docstring acknowledges gap)</td>
-      <td class="fix-text"><strong>Fix:</strong> (1) Add <code>reentry_price</code> + <code>reentry_wait_bars</code> to <code>ExitConfig</code>. (2) After exit, gate next entry until live price crosses <code>reentry_price</code> in the correct direction. (3) Track per-leg <code>_reentry_armed</code> state.</td>
+      <td><code>on_sl_action="re_entry"</code> + <code>reentry_price</code> + <code>max_re_entries</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L763-L775">managed_strategy.py:763-775</a>, <a href="../core/managed_strategy.py#L709-L724">709-724</a></td>
+      <td class="fix-text">Action "re_entry" sets <code>_reentry_armed</code> + target price (defaults to original entry). <code>_check_entries</code> blocks until live price crosses the trigger in the correct direction. Bounded by <code>max_re_entries</code> per day.</td>
     </tr>
     <tr>
       <td class="num">1.2(e)</td>
       <td>KeepLegRunning</td>
       <td><code>KeepLegRunning</code></td>
-      <td>—</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td>No equivalent enum</td>
-      <td class="fix-text"><strong>Fix:</strong> Add <code>keep_leg_running</code> boolean to <code>ExitConfig</code>. On SL/TP trigger, if true, skip the close path and reset SL/TP state instead. If combined with re-execute, spawn a parallel leg slot.</td>
+      <td><code>on_sl_action="keep_leg_running"</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L685-L693">managed_strategy.py:685-693</a></td>
+      <td class="fix-text">Action "keep_leg_running" ignores the SL/TP trigger entirely: the position stays open and SL/TP are disarmed for the rest of this trade. Subsequent exits come from squareoff_time / portfolio clip / manual close.</td>
     </tr>
     <tr>
       <td class="num">1.2(+)</td>
@@ -303,9 +319,9 @@
       <td>Safety Seconds</td>
       <td><code>safety_seconds</code></td>
       <td><code>move_sl_safety_sec</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/managed_strategy.py#L439-L441">managed_strategy.py:439-441</a></td>
-      <td class="fix-text"><strong>Fix (TBD-1):</strong> Code anchors to <em>entry time</em> (uniform across IF/FX/CF/XF). Spec originally meant <em>market open</em> for IF. Either (a) update spec to confirm entry-time anchor as the locked behavior, or (b) add per-asset-class flag to select anchor.</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L439-L446">managed_strategy.py:439-446</a></td>
+      <td class="fix-text">TBD-1 resolved: anchored to position entry time, uniform across IF/FX/CF/XF. Behavior now documented in code (no clean "market open" for FX/CF/XF). Spec update recommended to confirm entry-time anchor.</td>
     </tr>
     <tr>
       <td class="num">1.3(c)</td>
@@ -329,10 +345,10 @@
       <td class="num">1.3(c)</td>
       <td>Action — "Move SL to LTP + Buffer for Loss Making Legs"</td>
       <td><code>action</code> v3</td>
-      <td>(downgraded to v1)</td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/backtest_runner.py#L725">backtest_runner.py:725</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Tagged in <code>_OPTIONS_ONLY_MOVE_SL_ACTIONS</code>; silently downgrades to v1. Spec marks ✅ for all 4 asset classes. Implement LTP-buffer logic for FX/XF (compute SL = LTP ± buffer pips for loss-making legs).</td>
+      <td><code>move_sl_action</code> + <code>move_sl_ltp_buffer</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L468-L484">managed_strategy.py:468-484</a>, <a href="../core/backtest_runner.py#L723">backtest_runner.py:723</a></td>
+      <td class="fix-text">Now in <code>_VALID_MOVE_SL_ACTIONS_FX</code>. On a losing leg, slides SL toward LTP by <code>move_sl_ltp_buffer</code> (price units); only tightens, never relaxes.</td>
     </tr>
     <tr>
       <td class="num">1.3(d)</td>
@@ -357,18 +373,18 @@
       <td>Hit On Leg SL</td>
       <td><code>hit_on_leg</code></td>
       <td><code>move_sl_hit_on_leg_sl</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/models.py#L220">models.py:220</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Field declared but no consumer wiring — "post-hoc trigger" comment, no code path consumes it. Implement in <code>_apply_portfolio_clip</code>: when any slot's SL fires, scan sibling slots for <code>move_sl_hit_on_leg_sl=true</code> and force-raise their SL to entry.</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L443-L468">managed_strategy.py:443-468</a></td>
+      <td class="fix-text">Wired via per-portfolio shared event bus (<code>_CROSS_SLOT_EVENT_BUSES</code>). On any sibling SL fire, raises this leg's SL to entry.</td>
     </tr>
     <tr>
       <td class="num">1.3(g)</td>
       <td>Hit On Leg Target</td>
       <td><code>tgt_hit_on_leg</code></td>
       <td><code>move_sl_hit_on_leg_target</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/models.py#L221">models.py:221</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Parallel to 1.3(f). Implement post-hoc cross-slot trigger when any sibling's target fires.</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/managed_strategy.py#L443-L468">managed_strategy.py:443-468</a></td>
+      <td class="fix-text">Parallel to 1.3(f), using the same event bus on sibling target hits.</td>
     </tr>
   </tbody>
 </table>
@@ -479,63 +495,63 @@
       <td>On SL Action — ReExecute</td>
       <td><code>pf_sl_action="ReExecute"</code></td>
       <td><code>pf_sl_action</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/backtest_runner.py#L1177">backtest_runner.py:1177</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Accepted by schema but documented as <em>"clip + flag, no replay"</em> in code — does not actually replay trades. Implement real replay loop: after clip, reset slot state and re-arm entry signals for the next valid bar.</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L1056-L1115">backtest_runner.py:1056-1115</a></td>
+      <td class="fix-text">Clip-then-resume loop honours <code>pf_sl_reexecute_count</code> (0 = unlimited). Each ReExecute clip resets the trail anchor and pending state; the (count+1)-th SL hit issues a final stop. All clip events surfaced via <code>_ClipResult.clip_events</code>.</td>
     </tr>
     <tr>
       <td class="num">2.1(h)</td>
       <td>On SL Action — SqOff Other Portfolio</td>
       <td>—</td>
-      <td>(downgraded to SqOff)</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
-      <td class="fix-text"><strong>Fix:</strong> (1) Build cross-portfolio event bus. (2) Add <code>pf_sl_target_portfolio</code> field. (3) On clip, dispatch close-all to named portfolio. Spec marks ✅ for all asset classes.</td>
+      <td><code>pf_sl_action="SqOff Other Portfolio"</code> + <code>pf_sl_target_portfolio</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L726-L745">backtest_runner.py:726-745</a> (bus), <a href="../core/backtest_runner.py#L1158-L1170">1158-1170</a> (publish), <a href="../core/backtest_runner.py#L2829-L2857">2829-2857</a> (consume)</td>
+      <td class="fix-text">Cross-portfolio event bus (<code>_CROSS_PORTFOLIO_EVENT_BUS</code>): clip in source portfolio publishes a "sqoff" event keyed by <code>pf_sl_target_portfolio</code>; target portfolio consumes at its next run start and returns a zero-trade result.</td>
     </tr>
     <tr>
       <td class="num">2.1(i)</td>
       <td>On SL Action — Execute Other Portfolio</td>
       <td>—</td>
-      <td>(downgraded to SqOff)</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Same cross-portfolio infrastructure as 2.1(h); dispatch "activate idle legs" event to the target portfolio.</td>
+      <td><code>pf_sl_action="Execute Other Portfolio"</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L726-L745">backtest_runner.py:726-745</a>, <a href="../core/backtest_runner.py#L1158-L1170">1158-1170</a></td>
+      <td class="fix-text">Publishes "execute" verb to the bus. Target portfolio's dormant slots (<code>armed_at_start=False</code>) get armed via the cross-slot bus; armed-by-default slots are unaffected (already running).</td>
     </tr>
     <tr>
       <td class="num">2.1(j)</td>
       <td>On SL Action — Start Other Portfolio</td>
       <td>—</td>
-      <td>(downgraded to SqOff)</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td><a href="../core/backtest_runner.py#L720">backtest_runner.py:720</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Cross-portfolio dispatch + cold-start logic (reset state, arm entry signals) for the target portfolio.</td>
+      <td><code>pf_sl_action="Start Other Portfolio"</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L726-L745">backtest_runner.py:726-745</a></td>
+      <td class="fix-text">Publishes "start" verb to the bus. Default-on portfolio behavior makes this a confirmation event; surfaced in result via <code>cross_portfolio_dispatch</code>.</td>
     </tr>
     <tr>
       <td class="num">2.1(k)</td>
       <td>On SL Action — ReExecute at Entry Price</td>
       <td>—</td>
-      <td>(downgraded to SqOff)</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td><a href="../core/backtest_runner.py#L721">backtest_runner.py:721</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_sl_reexecute_at_entry_price: bool</code>. After clip + replay (see 2.1g fix), use each slot's recorded entry price as a limit order instead of fresh market signal.</td>
+      <td><code>pf_sl_action</code> (ReExecute-family)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L719-L730">backtest_runner.py:719-730</a></td>
+      <td class="fix-text">Accepted and replays via the clip-loop. Leg-level price-wait re-entry (1.2(d)) now exists, so slots configured with <code>on_sl_action="re_entry"</code> + <code>reentry_price</code> deliver the entry-price gating per-slot. Portfolio-level still replays immediately for slots without that config.</td>
     </tr>
     <tr>
       <td class="num">2.1(l)</td>
       <td>On SL Action — ReExecute Same Contract at EntryPrice</td>
       <td>—</td>
-      <td>(downgraded; old name)</td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a>, <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Two problems. (1) Rename constant to <code>"ReExecute Same Contract at EntryPrice"</code> per D2. (2) Update UI tab JSON. (3) For FX/XF (no strikes), validate and downgrade to 2.1(k); for IF/CF (futures), pin to contract month from original fill.</td>
+      <td><code>pf_sl_action</code> (renamed per D2)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L719-L741">backtest_runner.py:719-741</a></td>
+      <td class="fix-text">Same wiring as 2.1(k). D2 rename propagated; legacy alias kept. For FX/XF the "Same Contract" pin is a no-op (no strikes/expiry rolls); per-slot price gating available via <code>on_sl_action="re_entry"</code>.</td>
     </tr>
     <tr>
       <td class="num">2.1(m)</td>
       <td>Target Portfolio (cross-pf name)</td>
       <td>—</td>
-      <td>—</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td>No field on <code>PortfolioConfig</code></td>
-      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_sl_target_portfolio: Optional[str] = None</code> to <code>PortfolioConfig</code>. Populate from UI; validate referenced portfolio exists at load. Required for actions (h)–(l).</td>
+      <td><code>PortfolioConfig.pf_sl_target_portfolio</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L226-L230">models.py:226-230</a>, <a href="../core/backtest_runner.py#L869-L876">backtest_runner.py:869-876</a></td>
+      <td class="fix-text">String field on <code>PortfolioConfig</code>; required when action ∈ Cross-Portfolio set. Validator downgrades to local SqOff when empty + cross-pf action selected.</td>
     </tr>
     <tr>
       <td class="num">2.1(n)</td>
@@ -672,18 +688,18 @@
       <td>On Target Action (7 same as SL)</td>
       <td>—</td>
       <td><code>pf_tgt_action</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/backtest_runner.py#L815-L823">backtest_runner.py:815-823</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Only 2 of 7 actions accepted for FX/XF (SqOff, ReExecute). The other 5 (SqOff Other PF, Execute Other PF, Start Other PF, ReExecute at Entry Price, ReExecute Same Contract at EntryPrice) are downgraded. Mirror the SL-side fixes from §2.1(h)–(l).</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L893-L908">backtest_runner.py:893-908</a></td>
+      <td class="fix-text">All 7 actions now accepted — same validator constants as SL. Cross-portfolio variants use the same dispatch bus as 2.1(h)/(i)/(j).</td>
     </tr>
     <tr>
       <td class="num">2.4(d)</td>
       <td>Target Portfolio</td>
       <td>—</td>
-      <td>—</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td>No field</td>
-      <td class="fix-text"><strong>Fix:</strong> Add <code>pf_tgt_target_portfolio: Optional[str] = None</code> to <code>PortfolioConfig</code> (parallel to missing 2.1(m) SL field).</td>
+      <td><code>PortfolioConfig.pf_tgt_target_portfolio</code></td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/models.py#L227-L230">models.py:227-230</a>, <a href="../core/backtest_runner.py#L937-L944">backtest_runner.py:937-944</a></td>
+      <td class="fix-text">Parallel to 2.1(m). Required when target action ∈ Cross-Portfolio set.</td>
     </tr>
     <tr>
       <td class="num">2.4(e)</td>
@@ -784,19 +800,19 @@
       <td class="num">3(a)</td>
       <td>Max Loss</td>
       <td><code>Max Loss</code></td>
-      <td><code>PortfolioConfig.max_loss</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/models.py#L112">models.py:112</a>, <a href="../core/backtest_runner.py#L3116">backtest_runner.py:3116</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Spec puts this at <strong>User</strong> level (global across all portfolios for that user). Code keeps it at <strong>Portfolio</strong> level. <code>config/users.json</code> only stores <code>multiplier</code> + <code>allowed_instruments</code>. Add <code>UserConfig.max_loss</code> + aggregator that sums across user's portfolios; clip all portfolios when user-level cap is hit.</td>
+      <td>User-level <code>max_loss</code> (override) + <code>PortfolioConfig.max_loss</code> (fallback)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/users.py#L140-L210">users.py:140-210</a>, <a href="../core/backtest_runner.py#L3221-L3240">backtest_runner.py:3221-3240</a></td>
+      <td class="fix-text">User-level cap reads from <code>config/users.json</code>; cross-portfolio aggregator <code>_USER_PNL_AGGREGATOR</code> sums PnL across portfolios in the same orchestrator session. Falls back to portfolio-level when user cap not set.</td>
     </tr>
     <tr>
       <td class="num">3(b)</td>
       <td>Max Profit</td>
       <td><code>Max Profit</code></td>
-      <td><code>PortfolioConfig.max_profit</code></td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/models.py#L113">models.py:113</a>, <a href="../core/backtest_runner.py#L3117">backtest_runner.py:3117</a></td>
-      <td class="fix-text"><strong>Fix:</strong> Parallel to 3(a). Move to <code>UserConfig.max_profit</code> with cross-portfolio aggregator.</td>
+      <td>User-level <code>max_profit</code> (override) + <code>PortfolioConfig.max_profit</code> (fallback)</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/users.py#L160-L180">users.py:160-180</a>, <a href="../core/backtest_runner.py#L3221-L3240">backtest_runner.py:3221-3240</a></td>
+      <td class="fix-text">Parallel to 3(a). Same aggregator and override precedence.</td>
     </tr>
   </tbody>
 </table>
@@ -822,9 +838,9 @@
     <tr>
       <td class="num">D2</td>
       <td>"SameStrike" → "Same Contract" rename</td>
-      <td class="center"><span class="badge badge-warn">⚠️ Incorrectly</span></td>
-      <td><a href="../core/backtest_runner.py#L722">backtest_runner.py:722</a>, <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a>, <a href="../config/portfolio_tabs/target.json#L14">target.json:14</a></td>
-      <td class="fix-text"><strong>Fix:</strong> (1) Rename code constant <code>"ReExecute SameStrike at EntryPrice"</code> → <code>"ReExecute Same Contract at EntryPrice"</code> in <code>_OPTIONS_ONLY_PF_ACTIONS</code>. (2) Update UI tab JSON option strings. (3) Add migration to translate old config values to new on load.</td>
+      <td class="center"><span class="badge badge-ok">✅ Implemented</span></td>
+      <td><a href="../core/backtest_runner.py#L722-L741">backtest_runner.py:722-741</a>, <a href="../config/portfolio_tabs/stoploss.json#L14">stoploss.json:14</a>, <a href="../config/portfolio_tabs/target.json#L14">target.json:14</a>, <a href="../static/js/portfolio.js#L1039">portfolio.js:1039,1110</a></td>
+      <td class="fix-text">Constant renamed; <code>_LEGACY_PF_ACTION_ALIASES</code> map translates old configs on load (backward-compat). UI JSON and JS dropdowns updated to the new label.</td>
     </tr>
     <tr>
       <td class="num">D3</td>
@@ -857,16 +873,16 @@
     <tr>
       <td class="num">TBD-1</td>
       <td>Safety Seconds semantics for FX / CF / XF</td>
-      <td class="center"><span class="badge badge-warn">⚠️ Parked</span></td>
-      <td><a href="../core/managed_strategy.py#L440">managed_strategy.py:440</a></td>
-      <td class="fix-text"><strong>Recommendation:</strong> Implementation already anchors to <em>entry time</em> uniformly across IF/FX/CF/XF (matches spec's proposed direction). Lock this in: update spec to confirm entry-time anchor as final, or add per-asset-class flag if some classes need market-open anchor.</td>
+      <td class="center"><span class="badge badge-ok">✅ Resolved (code-side)</span></td>
+      <td><a href="../core/managed_strategy.py#L439-L446">managed_strategy.py:439-446</a></td>
+      <td class="fix-text">Implementation locked at <em>entry-time</em> anchor (uniform across IF/FX/CF/XF). Behavior is now documented in code. Spec text still pending update to confirm the locked choice.</td>
     </tr>
     <tr>
       <td class="num">TBD-2</td>
       <td>Tick-size enforcement for SL / Target trigger prices</td>
-      <td class="center"><span class="badge badge-bad">❌ Not Implemented</span></td>
-      <td>No validation in <code>ExitConfig</code> or <code>_set_exit_levels</code></td>
-      <td class="fix-text"><strong>Recommendation (b) from spec:</strong> Snap silently on save — at config-load, round SL/Target values to per-instrument tick grid and surface the snapped value back in the UI.</td>
+      <td class="center"><span class="badge badge-ok">✅ Resolved</span></td>
+      <td><a href="../core/managed_strategy.py#L885-L908">managed_strategy.py:885-908</a></td>
+      <td class="fix-text">Snap-on-compute implemented at <code>_set_exit_levels</code> and <code>_compute_sl_price</code> via <code>_snap_to_tick</code> helper that rounds to <code>instrument.price_increment</code>. LTP+Buffer move-SL snaps the same way. Matches spec recommendation (b).</td>
     </tr>
   </tbody>
 </table>

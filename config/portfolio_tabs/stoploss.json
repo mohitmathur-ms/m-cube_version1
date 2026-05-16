@@ -11,7 +11,7 @@
         { "key": "sl_enabled", "label": "Enable Stoploss", "type": "checkbox", "default": false, "html_id": "pf-m-sl-enabled", "backend_enabled": false },
         { "key": "sl_type", "label": "Type", "type": "select", "default": "Combined Loss", "options": ["Combined Loss","Combined Premium","Absolute Combined Premium","Underlying Movement","Loss and Underlying Range"], "html_id": "pf-m-sl-type", "backend_enabled": false },
         { "key": "sl_value", "label": "Value", "type": "number", "default": 0, "min": 0, "step": 0.01, "html_id": "pf-m-sl-value", "backend_enabled": false },
-        { "key": "on_sl_action", "label": "On SL Action", "type": "select", "default": "SqOff", "options": ["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"], "html_id": "pf-m-sl-action", "backend_enabled": false },
+        { "key": "on_sl_action", "label": "On SL Action", "type": "select", "default": "SqOff", "options": ["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute Same Contract at EntryPrice"], "html_id": "pf-m-sl-action", "backend_enabled": false },
         { "key": "sl_delay", "label": "Delay (sec)", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-sl-delay", "backend_enabled": false },
         { "key": "sl_reexecute_count", "label": "ReExecute Count", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-sl-reexcount", "backend_enabled": false }
       ]

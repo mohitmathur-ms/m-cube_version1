@@ -21,13 +21,13 @@ const App = {
     /** Map of page id → module. Single source of truth for the router. */
     _pageModules() {
         return {
-            dashboard:           Dashboard,
-            load_data:           LoadData,
-            view_data:           ViewData,
-            backtest:            Backtest,
-            tearsheet:           Tearsheet,
-            orderbook:           Orderbook,
-            portfolio:           Portfolio,
+            dashboard: Dashboard,
+            load_data: LoadData,
+            view_data: ViewData,
+            backtest: Backtest,
+            tearsheet: Tearsheet,
+            orderbook: Orderbook,
+            portfolio: Portfolio,
             portfolio_tearsheet: PortfolioTearsheet,
         };
     },
@@ -69,7 +69,7 @@ const App = {
     setTheme(theme) {
         const t = theme === "dark" ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", t);
-        try { localStorage.setItem("theme", t); } catch {}
+        try { localStorage.setItem("theme", t); } catch { }
         this._repaintPlotlyCharts();
     },
 
@@ -197,7 +197,7 @@ const App = {
         if (known) return;
         // Stored id no longer exists in the registry → clear and re-prompt.
         if (stored && !known) {
-            try { localStorage.removeItem("user_id"); } catch {}
+            try { localStorage.removeItem("user_id"); } catch { }
         }
         await this._showUserPicker(/*allowCancel*/ false);
     },
@@ -299,7 +299,7 @@ const App = {
             modal.querySelector("#user-picker-ok").onclick = async () => {
                 const picked = sel.value;
                 if (!picked) return;
-                try { localStorage.setItem("user_id", picked); } catch {}
+                try { localStorage.setItem("user_id", picked); } catch { }
                 document.body.removeChild(overlay);
                 // Refresh the active-user row so the chip reflects the new
                 // multiplier / allowed_instruments before the next render.
@@ -537,12 +537,20 @@ const App = {
         }
     },
 
+    /*     barTypeLabel(bt) {
+            if (!bt) return "";
+            const parts = String(bt).split("-");
+            const inst = parts[0] || "";
+            const pt = parts[3] || "";
+            if (!pt || !inst.includes(".")) return inst;
+            return inst.replace(".", `(${pt}).`);
+        }, */
     barTypeLabel(bt) {
         if (!bt) return "";
         const parts = String(bt).split("-");
         const inst = parts[0] || "";
-        const tf   = (parts[1] && parts[2]) ? `${parts[1]}-${parts[2]}` : "";
-        const pt   = parts[3] || "";
+        const tf = (parts[1] && parts[2]) ? `${parts[1]}-${parts[2]}` : "";
+        const pt = parts[3] || "";
         if (!pt || !inst.includes(".")) return tf ? `${inst} · ${tf}` : inst;
         const base = inst.replace(".", `(${pt}).`);
         return tf ? `${base} · ${tf}` : base;
@@ -588,7 +596,7 @@ const App = {
         // so per-chart settings (title, range, etc.) survive.
         merged.xaxis = { ...theme.xaxis, ...(layout.xaxis || {}) };
         merged.yaxis = { ...theme.yaxis, ...(layout.yaxis || {}) };
-        merged.font  = { ...theme.font,  ...(layout.font  || {}) };
+        merged.font = { ...theme.font, ...(layout.font || {}) };
         merged.legend = { ...theme.legend, ...(layout.legend || {}) };
         return merged;
     },
