@@ -21,24 +21,65 @@ class ExitConfig:
     """Exit management settings for a strategy slot."""
 
     # Stop Loss
-    stop_loss_type: str = "none"  # "none", "percentage", "points", "trailing"
+    stop_loss_type: str = "none"  # "none", "percentage", "points", "trailing", "atr"
     stop_loss_value: float = 0.0
     trailing_sl_step: float = 0.0
     trailing_sl_offset: float = 0.0
 
+    # ATR-based SL (spec sl_features.html §1.1 footnote 4). When
+    # stop_loss_type == "atr", the leg SL is sized from the bar series'
+    # Average True Range at entry rather than a fixed distance:
+    #   BUY leg : sl = entry_price − sl_atr_multiplier × ATR
+    #   SELL leg: sl = entry_price + sl_atr_multiplier × ATR
+    # sl_atr_period is the ATR lookback in bars. Both default 0 → feature off.
+    sl_atr_period: int = 0
+    sl_atr_multiplier: float = 0.0
+
     # Target / Take Profit
-    target_type: str = "none"  # "none", "percentage", "points"
+    target_type: str = "none"  # "none", "percentage", "points", "atr"
     target_value: float = 0.0
 
-    # Target Locking
+    # ATR-based Target (spec sl_features.html §1.1 footnote 4). When
+    # target_type == "atr", the leg TP is sized from the bar series' Average
+    # True Range at entry rather than a fixed distance:
+    #   BUY leg : tp = entry_price + tgt_atr_multiplier × ATR
+    #   SELL leg: tp = entry_price − tgt_atr_multiplier × ATR
+    # tgt_atr_period is the ATR lookback in bars. Both default 0 → feature off.
+    # Independent of the SL-side ATR knobs — SL and Target can each be ATR-sized
+    # with their own period/multiplier (spec: "applies symmetrically").
+    tgt_atr_period: int = 0
+    tgt_atr_multiplier: float = 0.0
+
+    # Target Locking (one-shot SL upgrade once a profit threshold is reached).
     target_lock_trigger: Optional[float] = None
     target_lock_minimum: Optional[float] = None
+
+    # Leg-Level Trailing Target / Profit-Lock (spec execution_logic_target.html
+    # §4.7). A ratcheting profit-lock at the leg level: once leg profit reaches
+    # tgt_trail_when_profit_reach the lock activates at tgt_trail_lock_min_profit;
+    # thereafter the locked floor ratchets up by tgt_trail_by for every
+    # tgt_trail_every of further profit. If profit falls back to the floor the
+    # leg exits (reason TARGET_TRAIL). All thresholds are in profit-% units
+    # (consistent with target_lock_* and the leg trailing-SL ratchet).
+    tgt_trail_enabled: bool = False
+    tgt_trail_when_profit_reach: float = 0.0
+    tgt_trail_lock_min_profit: float = 0.0
+    tgt_trail_every: float = 0.0
+    tgt_trail_by: float = 0.0
 
     # SL Wait — spec name "SL Wait (sec)". Prefer wall-clock seconds via
     # sl_wait_sec; sl_wait_bars retained for backward compat with existing
     # portfolio JSON. If both > 0, sl_wait_sec wins.
     sl_wait_sec: int = 0
     sl_wait_bars: int = 0
+
+    # Target Wait — spec execution_logic_target.html §4.3. Mirror of SL Wait
+    # on the target side: a target trigger must persist for the configured
+    # duration before the exit fires; resets if price retreats inside the TP.
+    # tgt_wait_sec is wall-clock seconds (preferred); tgt_wait_bars is the
+    # legacy bar-count gate. If both > 0, tgt_wait_sec wins.
+    tgt_wait_sec: int = 0
+    tgt_wait_bars: int = 0
 
     # On Target/SL Actions. Valid values:
     #   "close"             — SqOff: flatten and stay flat.
@@ -47,6 +88,10 @@ class ExitConfig:
     #   "execute"           — flatten + arm execute_target_leg_id sibling slot (spec §1.2 1.2(c)).
     #   "re_entry"          — flatten + price-wait re-entry (spec §1.2 1.2(d)); see reentry_price.
     #   "keep_leg_running"  — ignore the trigger; position remains open with SL/TP disarmed for this trade.
+    # Action combinations (spec execution_logic.html §4.8): up to 3 actions may
+    # be combined as a comma-separated string (e.g. "re_execute,execute").
+    # ``validate_leg_actions`` rejects invalid combos. A bare single value (no
+    # comma) is the legacy form and still parses to a 1-element list.
     on_sl_action: str = "close"
     on_target_action: str = "close"
     max_re_executions: int = 0
@@ -74,6 +119,7 @@ class ExitConfig:
         return (
             self.stop_loss_type != "none"
             or self.target_type != "none"
+            or self.tgt_trail_enabled
             or self.squareoff_time is not None
         )
 
@@ -220,8 +266,16 @@ class PortfolioConfig:
 
     # ── Stoploss Settings (spec §1) ──
     pf_sl_enabled: bool = False
-    pf_sl_type: str = "Combined Loss"  # only universal value for FX/crypto
+    # pf_sl_type accepts (FX/crypto): "Combined Loss", "Underlying Movement",
+    # "Loss and Underlying Range". Underlying-based types default the underlying
+    # to the portfolio's primary slot instrument (D5 "underlying = self").
+    pf_sl_type: str = "Combined Loss"
     pf_sl_value: float = 0.0
+    # Underlying price bounds for the "Underlying Movement" / "Loss and
+    # Underlying Range" SL types. The SL fires when the primary instrument's
+    # price crosses out of [below, above]. 0.0 on a bound disables that side.
+    pf_sl_underlying_below: float = 0.0
+    pf_sl_underlying_above: float = 0.0
     pf_sl_action: str = "SqOff"        # SqOff | ReExecute (others options-only)
     pf_sl_delay_sec: int = 0
     pf_sl_reexecute_count: int = 0     # 0 = unlimited per spec §1.7
@@ -242,6 +296,15 @@ class PortfolioConfig:
     move_sl_hit_on_leg_sl: bool = False     # cross-slot trigger applied post-hoc
     move_sl_hit_on_leg_target: bool = False # same shape, on any slot's target
     move_sl_ltp_buffer: float = 0.0  # spec §3 action v3 — LTP + Buffer for loss legs
+    # Portfolio-aggregate Move SL trigger (spec §2.3). When enabled, the
+    # two-pass runner (gated by _USE_PF_AGG_MOVE_SL) finds the first time the
+    # whole portfolio's combined P&L crosses ``move_sl_agg_pnl_threshold`` and
+    # snaps every open leg's SL to its entry price from that point on.
+    # ``direction`` = "loss" → trigger when combined PnL ≤ -threshold;
+    # "profit" → trigger when combined PnL ≥ +threshold.
+    move_sl_agg_pnl_enabled: bool = False
+    move_sl_agg_pnl_threshold: float = 0.0
+    move_sl_agg_pnl_direction: str = "loss"
 
     # ── Cross-portfolio targets (spec §2.1(m) / §2.4(d)) ──
     # Name of the other portfolio to act on when on_sl_action / on_target_action
@@ -337,6 +400,55 @@ def resolve_squareoff(
     tz = next((getattr(lvl, "squareoff_tz", None) for lvl in levels
                if getattr(lvl, "squareoff_tz", None)), None)
     return time, tz
+
+
+# Valid leg-level exit actions (spec execution_logic.html §4.7).
+VALID_LEG_ACTIONS = (
+    "close", "re_execute", "reverse", "execute", "re_entry", "keep_leg_running",
+)
+
+
+def parse_leg_actions(action_str: str | None) -> list[str]:
+    """Split a leg action config string into an ordered, de-duplicated list.
+
+    Accepts the legacy bare single value ("close") and the new comma-separated
+    combination form ("re_execute,execute"). Empty / None → ["close"].
+    """
+    if not action_str:
+        return ["close"]
+    seen: list[str] = []
+    for tok in str(action_str).split(","):
+        a = tok.strip()
+        if a and a not in seen:
+            seen.append(a)
+    return seen or ["close"]
+
+
+def validate_leg_actions(
+    action_str: str | None, has_execute_target: bool = False
+) -> tuple[bool, str]:
+    """Validate a leg action combination per spec execution_logic.html §4.8.
+
+    Returns ``(ok, error_message)``. Rules enforced:
+      • every token is a known action
+      • at most 3 actions
+      • ``keep_leg_running`` must be the only action
+      • ``re_execute`` + ``re_entry`` is contradictory
+      • ``execute`` requires a configured ``execute_target_leg_id``
+    """
+    actions = parse_leg_actions(action_str)
+    unknown = [a for a in actions if a not in VALID_LEG_ACTIONS]
+    if unknown:
+        return False, f"unknown leg action(s): {', '.join(unknown)}"
+    if len(actions) > 3:
+        return False, "at most 3 leg actions may be combined"
+    if "keep_leg_running" in actions and len(actions) > 1:
+        return False, "'keep_leg_running' cannot be combined with other actions"
+    if "re_execute" in actions and "re_entry" in actions:
+        return False, "'re_execute' and 're_entry' cannot be combined"
+    if "execute" in actions and not has_execute_target:
+        return False, "'execute' action requires an execute_target_leg_id"
+    return True, ""
 
 
 def portfolio_to_dict(config: PortfolioConfig) -> dict:

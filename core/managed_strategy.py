@@ -11,14 +11,18 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from nautilus_trader.config import StrategyConfig
-from nautilus_trader.indicators import ExponentialMovingAverage, SimpleMovingAverage
+from nautilus_trader.indicators import (
+    AverageTrueRange,
+    ExponentialMovingAverage,
+    SimpleMovingAverage,
+)
 from nautilus_trader.model.data import Bar, BarType
 from nautilus_trader.model.enums import OrderSide, TimeInForce
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
-from core.models import ExitConfig
+from core.models import ExitConfig, parse_leg_actions
 from core.signals import SIGNAL_REGISTRY
 
 
@@ -43,6 +47,83 @@ def get_cross_slot_bus(portfolio_id: str) -> dict[str, dict[str, int]]:
 def clear_cross_slot_bus(portfolio_id: str) -> None:
     """Reset the cross-slot event bus between portfolio runs."""
     _CROSS_SLOT_EVENT_BUSES.pop(portfolio_id, None)
+
+
+def advance_trailing_target(
+    active: bool,
+    stop: float,
+    anchor: float,
+    profit_pct: float,
+    when_reach: float,
+    lock_min: float,
+    every: float,
+    by: float,
+) -> tuple[bool, float, float, bool]:
+    """Pure one-bar step of the leg-level Trailing Target / Profit-Lock.
+
+    Spec execution_logic_target.html §4.7. Works in profit-% units.
+
+    * Before activation: the lock arms the first time ``profit_pct`` reaches
+      ``when_reach``; the floor starts at ``lock_min`` and the ratchet anchor
+      at ``when_reach``.
+    * Once armed: if profit falls back to (or below) the locked floor the leg
+      must exit (``hit=True``); otherwise the floor ratchets up by ``by`` for
+      every ``every`` of further profit gained past the anchor.
+
+    Returns the updated ``(active, stop, anchor, hit)`` tuple. Pure — no engine
+    state — so it is unit-testable in isolation.
+    """
+    if not active:
+        if when_reach > 0 and profit_pct >= when_reach:
+            active = True
+            stop = lock_min
+            anchor = when_reach
+    hit = False
+    if active:
+        if profit_pct <= stop:
+            hit = True
+        elif every > 0:
+            gain = profit_pct - anchor
+            if gain >= every:
+                steps = int(gain / every)
+                stop += steps * by
+                anchor += steps * every
+    return active, stop, anchor, hit
+
+
+# Exit-type name aliases (spec §4.4 / §4.4 target). The spec names SL/Target
+# types "Premium" (% of entry), "PremiumBased" and "AbsolutePremium" (absolute
+# distance); the engine's canonical values are "percentage" / "points". Accept
+# the spec names as input and normalise to canonical so portfolios authored
+# against either vocabulary run identically. Keys are lower-cased and stripped
+# of spaces/underscores before lookup.
+_SL_TYPE_CANON = {
+    "none": "none",
+    "percentage": "percentage", "premium": "percentage", "premiumbased": "percentage",
+    "points": "points", "absolutepremium": "points", "absolute": "points",
+    "trailing": "trailing",
+    "atr": "atr",
+}
+_TGT_TYPE_CANON = {
+    "none": "none",
+    "percentage": "percentage", "premium": "percentage", "premiumbased": "percentage",
+    "points": "points", "absolutepremium": "points", "absolute": "points",
+    "atr": "atr",
+}
+
+
+def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
+    """Normalise an SL/Target type string to the engine's canonical value.
+
+    Accepts the spec vocabulary ("Premium", "AbsolutePremium", …) and the
+    engine vocabulary ("percentage", "points", …), case- and spacing-
+    insensitively. Unknown values pass through unchanged so a typo fails
+    loudly downstream rather than being silently coerced.
+    """
+    if not value:
+        return "none"
+    key = str(value).strip().lower().replace(" ", "").replace("_", "")
+    return table.get(key, str(value).strip())
 
 
 def _parse_squareoff_minute(squareoff_time: str | None) -> int:
@@ -72,12 +153,33 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     stop_loss_value: float = 0.0
     trailing_sl_step: float = 0.0
     trailing_sl_offset: float = 0.0
+    # ATR-based SL sizing (spec sl_features.html §1.1 fn.4). Active when
+    # stop_loss_type == "atr": SL distance = sl_atr_multiplier × ATR(period),
+    # computed from the bar series at entry.
+    sl_atr_period: int = 0
+    sl_atr_multiplier: float = 0.0
     target_type: str = "none"
     target_value: float = 0.0
+    # ATR-based Target sizing (spec sl_features.html §1.1 fn.4). Active when
+    # target_type == "atr": TP distance = tgt_atr_multiplier × ATR(period),
+    # computed from the bar series at entry. Independent of the SL ATR knobs.
+    tgt_atr_period: int = 0
+    tgt_atr_multiplier: float = 0.0
     target_lock_trigger: float = 0.0
     target_lock_minimum: float = 0.0
+    # Leg-Level Trailing Target / Profit-Lock (spec execution_logic_target.html
+    # §4.7). Ratcheting profit-lock; all thresholds in profit-% units.
+    tgt_trail_enabled: bool = False
+    tgt_trail_when_profit_reach: float = 0.0
+    tgt_trail_lock_min_profit: float = 0.0
+    tgt_trail_every: float = 0.0
+    tgt_trail_by: float = 0.0
     sl_wait_sec: int = 0  # Spec name "SL Wait (sec)". Wins over sl_wait_bars if > 0.
     sl_wait_bars: int = 0
+    # Target Wait (spec execution_logic_target.html §4.3). Mirror of SL Wait.
+    # tgt_wait_sec (wall-clock) wins over tgt_wait_bars when both > 0.
+    tgt_wait_sec: int = 0
+    tgt_wait_bars: int = 0
     # Valid actions: close | re_execute | reverse | execute | re_entry | keep_leg_running
     on_sl_action: str = "close"
     on_target_action: str = "close"
@@ -136,6 +238,17 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Consumed via the module-level _CROSS_SLOT_EVENT_BUSES registry.
     move_sl_hit_on_leg_sl: bool = False
     move_sl_hit_on_leg_target: bool = False
+    # Portfolio-aggregate Move SL trigger (spec §2.3). The two-pass runner
+    # (gated by _USE_PF_AGG_MOVE_SL) computes a single trigger timestamp from
+    # pass 1's merged combined-P&L curve and injects it here for pass 2; any
+    # leg open at/after this UTC-ns timestamp snaps its SL to entry. 0 = no
+    # aggregate trigger (pass 1, or feature off).
+    move_sl_agg_trigger_ns: int = 0
+    # Pre-seeded cross-slot event bus for pass 2: {slot_id: {"sl_ns","tgt_ns"}}.
+    # The module-level _CROSS_SLOT_EVENT_BUSES dict does not survive a process
+    # boundary, so the runner threads pass-1's SL/target hit timestamps through
+    # the (picklable) config instead. Merged into _sibling_bus in __init__.
+    move_sl_preseeded_bus: dict = {}
     # Portfolio + slot identifiers for the cross-slot event bus. Empty strings
     # disable the bus (single-leg or unscoped strategies). Set by config_from_exit.
     portfolio_id: str = ""
@@ -147,6 +260,13 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Cost (i.e. _move_sl_fired_this_position is True at exit time). The
     # action downgrades to plain "close" — position stays flat; no re-entry.
     no_reexec_sl_cost: bool = False
+    # ReExecute Tab P2: when True, the slot re-execution delay
+    # (delay_between_legs_sec) is skipped for re-executions (exec_count >= 1).
+    no_wait_trade_reexec: bool = False
+    # ReExecute Tab P5: when True, the re_entry action is suppressed (→ "close")
+    # if the SL that fired had been raised to entry by Move SL to Cost.
+    # Spec default ON.
+    no_reentry_sl_cost: bool = True
 
 
 class ManagedExitStrategy(Strategy):
@@ -156,17 +276,55 @@ class ManagedExitStrategy(Strategy):
         super().__init__(config)
         self.instrument: Instrument = None
         self.indicators = {}
+        # ATR indicator for stop_loss_type == "atr" (spec §1.1 fn.4). Registered
+        # for bars in on_start; read once at entry-fill time to size the SL.
+        self._atr: AverageTrueRange | None = None
+        # Separate ATR indicator for target_type == "atr" (spec §1.1 fn.4) so
+        # SL and Target can each have their own lookback period.
+        self._tgt_atr: AverageTrueRange | None = None
         self.entry_price = 0.0
         self.highest_profit = 0.0
         self.current_sl = 0.0
         self.current_tp = 0.0
         self.sl_wait_count = 0
         self._sl_wait_started_ns: int = 0  # First-breach timestamp for sl_wait_sec
+        # Target Wait (spec §4.3) — mirror of the SL-wait state.
+        self.tp_wait_count = 0
+        self._tp_wait_started_ns: int = 0
+        # Leg-Level Trailing Target (spec §4.7) — per-position profit-lock state.
+        # _tgt_trail_active flips True once profit first reaches the activation
+        # threshold; _tgt_trail_stop is the locked profit-% floor; _tgt_trail_anchor
+        # tracks the profit level the next ratchet step measures from.
+        self._tgt_trail_active: bool = False
+        self._tgt_trail_stop: float = 0.0
+        self._tgt_trail_anchor: float = 0.0
+        # True when the TP exit currently being dispatched came from the
+        # trailing-target floor (drives the on_target_action_on filter and the
+        # exit-reason label). Reset on each new entry.
+        self._tp_was_trail: bool = False
         self.re_execution_count = 0
         # Cross-slot bus reference (shared dict). Empty portfolio_id → standalone bus.
         self._sibling_bus: dict[str, dict[str, int]] = get_cross_slot_bus(
             getattr(config, "portfolio_id", "") or "_standalone_"
         )
+        # Pass-2 pre-seed (spec §2.3): the module-level bus is per-process, so
+        # the runner injects pass-1's cross-slot SL/target hit timestamps via
+        # config.move_sl_preseeded_bus. Merge them in (keep the latest ns per
+        # key) so the existing Hit-On-Leg branch in _check_exits reacts to
+        # siblings that ran in *other* worker processes.
+        for sid, ev in (getattr(config, "move_sl_preseeded_bus", {}) or {}).items():
+            cur = self._sibling_bus.setdefault(sid, {})
+            for k, v in (ev or {}).items():
+                try:
+                    iv = int(v)
+                except (TypeError, ValueError):
+                    continue
+                if iv > cur.get(k, 0):
+                    cur[k] = iv
+        # This leg's own SL/target hit timestamps, surfaced in the result dict
+        # so the two-pass runner can build pass 2's pre-seeded bus. {} until a
+        # SL or target fires.
+        self._exit_events_self: dict[str, int] = {}
         # 1.2(c) Execute (other leg): per-slot ARM flag. Slots configured with
         # armed_at_start=False start dormant and only fire entries after a
         # sibling slot's "execute" action arms them via the bus.
@@ -238,6 +396,9 @@ class ManagedExitStrategy(Strategy):
         # for the current position; gates the trail_after suppression.
         self._entry_filled_at_ns: int = 0
         self._move_sl_fired_this_position: bool = False
+        # Profit anchor for the dedicated post-move trail (spec §4.6); set to
+        # profit_pct on the bar Move SL to Cost fires.
+        self._move_sl_trail_anchor: float = 0.0
 
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
@@ -272,6 +433,19 @@ class ManagedExitStrategy(Strategy):
 
             self.indicators[ind_name] = indicator
             self.register_indicator_for_bars(self.config.bar_type, indicator)
+
+        # ATR-based SL: register a dedicated ATR indicator so it warms up
+        # alongside the signal indicators. indicators_initialized() also waits
+        # on it, so the leg won't enter until ATR has a valid value.
+        if self.config.stop_loss_type == "atr" and self.config.sl_atr_period > 0:
+            self._atr = AverageTrueRange(int(self.config.sl_atr_period))
+            self.register_indicator_for_bars(self.config.bar_type, self._atr)
+
+        # ATR-based Target: dedicated indicator (spec §1.1 fn.4). Registered so
+        # indicators_initialized() also waits on it before the leg may enter.
+        if self.config.target_type == "atr" and self.config.tgt_atr_period > 0:
+            self._tgt_atr = AverageTrueRange(int(self.config.tgt_atr_period))
+            self.register_indicator_for_bars(self.config.bar_type, self._tgt_atr)
 
         self.subscribe_bars(self.config.bar_type)
 
@@ -327,7 +501,7 @@ class ManagedExitStrategy(Strategy):
                 return
 
         if not is_flat:
-            self._check_exits(close, is_long, is_short)
+            self._check_exits(close, is_long, is_short, float(bar.high), float(bar.low))
         else:
             self._check_entries(close, is_flat, is_long, is_short)
 
@@ -470,9 +644,23 @@ class ManagedExitStrategy(Strategy):
             kwargs["tags"] = [reason]
         self.close_all_positions(instrument_id, **kwargs)
 
-    def _check_exits(self, close: float, is_long: bool, is_short: bool) -> None:
+    def _check_exits(
+        self,
+        close: float,
+        is_long: bool,
+        is_short: bool,
+        high: float | None = None,
+        low: float | None = None,
+    ) -> None:
         if self.entry_price == 0:
             return
+
+        # Intrabar SL/TP triggering (spec execution_logic.html §4.1). A bar
+        # whose range straddles the SL/TP level fires even if the bar CLOSE
+        # did not cross it — Format-B "high/low" semantics. Falls back to
+        # close when high/low aren't supplied (defensive; on_bar always does).
+        bar_high = close if high is None else high
+        bar_low = close if low is None else low
 
         # Calculate current profit
         if is_long:
@@ -490,6 +678,7 @@ class ManagedExitStrategy(Strategy):
         # Skipped on long positions when no_buy_legs is set. Action variant
         # "Move SL for All Legs Despite Loss/Profit" raises SL even when not
         # in profit (which immediately closes the trade — same as spec).
+        _move_fired_before = self._move_sl_fired_this_position
         if self.config.move_sl_enabled and not self._move_sl_fired_this_position:
             # Hit-On-Leg cross-slot trigger (spec §3 1.3(f)/(g)): if any sibling
             # leg in this portfolio fired SL or target AFTER this leg entered,
@@ -532,17 +721,20 @@ class ManagedExitStrategy(Strategy):
                     move_all = self.config.move_sl_action == "Move SL for All Legs Despite Loss/Profit"
                     ltp_buffer_action = self.config.move_sl_action == "Move SL to LTP + Buffer for Loss Making Legs"
                     if ltp_buffer_action and not in_profit:
-                        # Action v3: on a losing leg, slide SL toward LTP by the
-                        # configured buffer. Tighter loss limit than the original SL.
+                        # Action v3 (spec execution_logic.html §4.5): on a losing
+                        # leg slide SL toward LTP by a MULTIPLICATIVE buffer —
+                        # Loss BUY → sl = ltp × (1 − buf); Loss SELL → sl = ltp ×
+                        # (1 + buf). move_sl_ltp_buffer is a fraction (0.0005 ≈
+                        # the spec's ×0.9995 / ×1.0005).
                         buf = max(0.0, float(self.config.move_sl_ltp_buffer))
                         if is_long:
-                            new_sl = self._snap_to_tick(close - buf)
+                            new_sl = self._snap_to_tick(close * (1.0 - buf))
                             if new_sl > self.current_sl:
                                 self.current_sl = new_sl
                                 self._was_trailed = True
                                 self._move_sl_fired_this_position = True
                         else:
-                            new_sl = self._snap_to_tick(close + buf)
+                            new_sl = self._snap_to_tick(close * (1.0 + buf))
                             if self.current_sl == 0 or new_sl < self.current_sl:
                                 self.current_sl = new_sl
                                 self._was_trailed = True
@@ -559,6 +751,34 @@ class ManagedExitStrategy(Strategy):
                             self._was_trailed = True
                             self._move_sl_fired_this_position = True
 
+        # Portfolio-aggregate Move SL trigger (spec §2.3). The two-pass runner
+        # injects move_sl_agg_trigger_ns — the bar timestamp at which the whole
+        # portfolio's combined P&L first crossed the configured threshold.
+        # Every leg open when that fired (entry at/before the trigger, still in
+        # position) snaps its SL to entry on the first bar at/after it.
+        # Independent of move_sl_enabled — it is a portfolio-level trigger, not
+        # a sub-option of per-slot Move SL to Cost.
+        agg_ns = self.config.move_sl_agg_trigger_ns
+        if (agg_ns > 0 and not self._move_sl_fired_this_position
+                and self._entry_filled_at_ns > 0
+                and self._current_bar_ts_ns >= agg_ns
+                and agg_ns >= self._entry_filled_at_ns):
+            new_sl = self.entry_price
+            if is_long and new_sl > self.current_sl:
+                self.current_sl = new_sl
+                self._was_trailed = True
+                self._move_sl_fired_this_position = True
+            elif is_short and (self.current_sl == 0 or new_sl < self.current_sl):
+                self.current_sl = new_sl
+                self._was_trailed = True
+                self._move_sl_fired_this_position = True
+
+        # When Move SL to Cost just fired this bar, anchor the dedicated
+        # post-move trail (spec §4.6) at the current profit so subsequent
+        # ratchet steps measure gain from the move point, not from entry.
+        if not _move_fired_before and self._move_sl_fired_this_position:
+            self._move_sl_trail_anchor = profit_pct
+
         # Target locking. When triggered, raises (long) or lowers (short)
         # current_sl to the target_lock_minimum. Sets _was_trailed for the
         # on_sl_action_on filter — a hit on the locked level is classified as
@@ -573,15 +793,29 @@ class ManagedExitStrategy(Strategy):
                     self.current_sl = lock_sl
                     self._was_trailed = True
 
-        # Trailing SL — same was_trailed semantics as target lock. Per spec
-        # §3.4 (move_sl_trail_after), trailing is gated until move-to-cost
-        # has fired at least once for the current position.
-        if (
-            self.config.move_sl_trail_after
-            and self.config.move_sl_enabled
-            and not self._move_sl_fired_this_position
-        ):
-            pass  # trailing suppressed
+        # Trailing SL — same was_trailed semantics as target lock.
+        if self.config.move_sl_trail_after and self.config.move_sl_enabled:
+            # Spec §4.6 — dedicated "Trail After Move SL". Trailing stays
+            # suppressed until Move SL to Cost fires; afterwards a dedicated
+            # ratchet, anchored at the move-fire profit, tightens the SL
+            # further into profit by trailing_sl_offset for every
+            # trailing_sl_step of profit gained past that anchor.
+            if self._move_sl_fired_this_position and self.config.trailing_sl_step > 0:
+                gain = profit_pct - self._move_sl_trail_anchor
+                if gain >= self.config.trailing_sl_step:
+                    steps = int(gain / self.config.trailing_sl_step)
+                    # Negative pct in _compute_sl_price places the SL on the
+                    # profit side of entry (above for long, below for short).
+                    locked = self._compute_sl_price(
+                        is_long, -steps * self.config.trailing_sl_offset
+                    )
+                    if is_long and locked > self.current_sl:
+                        self.current_sl = locked
+                        self._was_trailed = True
+                    elif is_short and (self.current_sl == 0 or locked < self.current_sl):
+                        self.current_sl = locked
+                        self._was_trailed = True
+            # else: move not fired yet → trailing suppressed (spec §3.4).
         elif self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
             steps = int(self.highest_profit / self.config.trailing_sl_step)
             if steps > 0:
@@ -594,12 +828,13 @@ class ManagedExitStrategy(Strategy):
                     self.current_sl = trail_sl
                     self._was_trailed = True
 
-        # Check SL hit
+        # Check SL hit — intrabar (spec §4.1): a LONG leg's SL fires when the
+        # bar LOW pierces it; a SHORT leg's SL fires when the bar HIGH does.
         sl_hit = False
         if self.current_sl > 0:
-            if is_long and close <= self.current_sl:
+            if is_long and bar_low <= self.current_sl:
                 sl_hit = True
-            elif is_short and close >= self.current_sl:
+            elif is_short and bar_high >= self.current_sl:
                 sl_hit = True
 
         if sl_hit:
@@ -623,57 +858,115 @@ class ManagedExitStrategy(Strategy):
             self.sl_wait_count = 0
             self._sl_wait_started_ns = 0
 
-        # Check TP hit
-        if self.current_tp > 0:
-            tp_hit = False
-            if is_long and close >= self.current_tp:
-                tp_hit = True
-            elif is_short and close <= self.current_tp:
-                tp_hit = True
+        # ── Leg-Level Trailing Target / Profit-Lock (spec §4.7) ──
+        # Ratcheting profit-lock evaluated in profit-% terms. Activation arms
+        # the lock once profit first reaches the threshold; once armed, a fall
+        # back to the locked floor exits the leg (reason TARGET_TRAIL).
+        tgt_trail_hit = False
+        if self.config.tgt_trail_enabled:
+            (self._tgt_trail_active, self._tgt_trail_stop,
+             self._tgt_trail_anchor, tgt_trail_hit) = advance_trailing_target(
+                self._tgt_trail_active, self._tgt_trail_stop,
+                self._tgt_trail_anchor, profit_pct,
+                self.config.tgt_trail_when_profit_reach,
+                self.config.tgt_trail_lock_min_profit,
+                self.config.tgt_trail_every, self.config.tgt_trail_by,
+            )
 
-            if tp_hit:
+        # Check TP hit — intrabar, mirrored: LONG TP fires on bar HIGH,
+        # SHORT TP fires on bar LOW. A trailing-target floor breach also
+        # routes through the TP exit path.
+        tp_condition = tgt_trail_hit
+        if not tp_condition and self.current_tp > 0:
+            if is_long and bar_high >= self.current_tp:
+                tp_condition = True
+            elif is_short and bar_low <= self.current_tp:
+                tp_condition = True
+
+        if tp_condition:
+            fire = True
+            # Target Wait (spec §4.3): a FIXED-TP trigger must persist for the
+            # configured duration before firing; resets if price retreats.
+            # A trailing-target floor breach is profit-protective — not delayed.
+            if not tgt_trail_hit:
+                if self.config.tgt_wait_sec > 0:
+                    if self._tp_wait_started_ns == 0:
+                        self._tp_wait_started_ns = self._current_bar_ts_ns
+                    elapsed_ns = self._current_bar_ts_ns - self._tp_wait_started_ns
+                    if elapsed_ns < int(self.config.tgt_wait_sec) * 1_000_000_000:
+                        fire = False
+                elif self.config.tgt_wait_bars > 0:
+                    self.tp_wait_count += 1
+                    if self.tp_wait_count < self.config.tgt_wait_bars:
+                        fire = False
+            if fire:
+                self._tp_was_trail = tgt_trail_hit
                 self._handle_exit("tp", is_long, close=close)
+        else:
+            # No TP condition this bar — clear the Target-Wait counters.
+            self.tp_wait_count = 0
+            self._tp_wait_started_ns = 0
 
     def _handle_exit(self, exit_type: str, was_long: bool, close: float = 0.0) -> None:
         # Publish this leg's exit event to the cross-slot bus so sibling legs
         # with Hit-On-Leg-SL / Hit-On-Leg-Target can react (spec §3).
+        # _exit_events_self mirrors the publish so the two-pass runner can
+        # surface this leg's hit timestamps into pass 2's pre-seeded bus.
         if self.config.slot_id:
             entry = self._sibling_bus.setdefault(self.config.slot_id, {})
-            entry["sl_ns" if exit_type == "sl" else "tgt_ns"] = self._current_bar_ts_ns
+            _evt_key = "sl_ns" if exit_type == "sl" else "tgt_ns"
+            entry[_evt_key] = self._current_bar_ts_ns
+            self._exit_events_self[_evt_key] = self._current_bar_ts_ns
 
-        action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
+        raw_action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
+        # Action combinations (spec §4.8): on_sl_action / on_target_action may
+        # carry up to 3 comma-separated actions. Parse into an ordered list and
+        # dispatch each below.
+        actions = parse_leg_actions(raw_action)
 
         # Apply on_sl_action_on / on_target_action_on filter per
         # Other_Settings_Logic.html. "Suppression" downgrades the configured
-        # action to plain "close" — position is already squared off, just
-        # don't fire re_execute or reverse follow-up.
+        # action(s) to plain "close" — position is already squared off, just
+        # don't fire re_execute / reverse / execute / re_entry follow-ups.
         if exit_type == "sl":
             filter_cfg = self.config.on_sl_action_on
             if filter_cfg == "OnSL_Only" and self._was_trailed:
                 # SL was trailed; OnSL_Only suppresses the action.
-                action = "close"
+                actions = ["close"]
             elif filter_cfg == "OnSL_Trailing_Only" and not self._was_trailed:
                 # SL was the fixed initial value; OnSL_Trailing_Only suppresses.
-                action = "close"
+                actions = ["close"]
 
             # ReExecute_Logics.html P1: suppress re_execute when SL was
             # previously raised to entry by Move SL to Cost. Position is
             # already breakeven; allowing re-execute would re-open exposure.
+            # Only the re_execute member is dropped — siblings (e.g. execute)
+            # still fire.
             if (
                 self.config.no_reexec_sl_cost
                 and self._move_sl_fired_this_position
-                and action == "re_execute"
+                and "re_execute" in actions
             ):
-                action = "close"
+                actions = [a for a in actions if a != "re_execute"] or ["close"]
+
+            # ReExecute_Logics.html P5: same guard for the re_entry action —
+            # block price-wait re-entry when SL was moved to cost. Default ON.
+            if (
+                self.config.no_reentry_sl_cost
+                and self._move_sl_fired_this_position
+                and "re_entry" in actions
+            ):
+                actions = [a for a in actions if a != "re_entry"] or ["close"]
         else:  # exit_type == "tp"
             filter_cfg = self.config.on_target_action_on
-            # Note for FX/crypto: we have no "trailing target" exit path
-            # distinct from fixed TP (target_lock raises SL → routes through
-            # the SL exit path). So OnTarget_Only behaves identically to
-            # OnTarget_N_Trailing_Both, and OnTarget_Trailing_Only ALWAYS
-            # suppresses (every TP exit is fixed). Documented in spec adapter.
-            if filter_cfg == "OnTarget_Trailing_Only":
-                action = "close"
+            # _tp_was_trail distinguishes a leg Trailing-Target (profit-lock)
+            # exit from a fixed-TP exit, per Other_Settings_Logic.html:
+            #   OnTarget_Only          → suppress action on trailing-target exits
+            #   OnTarget_Trailing_Only → suppress action on fixed-TP exits
+            if filter_cfg == "OnTarget_Only" and self._tp_was_trail:
+                actions = ["close"]
+            elif filter_cfg == "OnTarget_Trailing_Only" and not self._tp_was_trail:
+                actions = ["close"]
 
         # Build a structured reason for the close order's `tags` so the
         # orderbook's EXIT REASON column shows "Stop Loss" / "Take Profit" /
@@ -688,21 +981,31 @@ class ManagedExitStrategy(Strategy):
         if exit_type == "sl":
             op = "≤" if was_long else "≥"
             label = "Trailing SL" if self._was_trailed else "Stop Loss"
-            if action == "reverse":
+            if "reverse" in actions:
                 label = "Reverse on SL"
             reason = (f"{label}: price={close:.4f} {op} SL={self.current_sl:.4f} "
                       f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
         else:  # tp
             op = "≥" if was_long else "≤"
-            label = "Reverse on TP" if action == "reverse" else "Take Profit"
-            reason = (f"{label}: price={close:.4f} {op} TP={self.current_tp:.4f} "
-                      f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
+            if "reverse" in actions:
+                label = "Reverse on TP"
+            elif self._tp_was_trail:
+                label = "Trailing Target"
+            else:
+                label = "Take Profit"
+            if self._tp_was_trail:
+                reason = (f"{label}: profit {pct:+.2f}% fell to locked floor "
+                          f"{self._tgt_trail_stop:+.2f}% (entry {self.entry_price:.4f})")
+            else:
+                reason = (f"{label}: price={close:.4f} {op} TP={self.current_tp:.4f} "
+                          f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
 
         # 1.2(e) KeepLegRunning: ignore the trigger entirely. Position remains
         # open; SL/TP are disarmed for the rest of this trade so we don't
         # immediately re-fire on the next bar. The next exit only happens via
-        # squareoff_time / portfolio clip / manual close.
-        if action == "keep_leg_running":
+        # squareoff_time / portfolio clip / manual close. Validation forbids
+        # combining it with other actions, so it short-circuits here.
+        if "keep_leg_running" in actions:
             self.current_sl = 0.0
             self.current_tp = 0.0
             return
@@ -715,42 +1018,48 @@ class ManagedExitStrategy(Strategy):
         self._close_with_reason(reason)
         self._reset_exit_state()
 
-        if action == "re_execute":
-            if self.re_execution_count < self.config.max_re_executions:
-                self.re_execution_count += 1
-                # Arm the slot-level re-execution delay (Other Settings spec
-                # §2). Counts from the current bar's timestamp; _check_entries
-                # checks this before allowing the fresh entry on subsequent
-                # bars. delay_between_legs_sec=0 (default) → no block.
-                if self.config.delay_between_legs_sec > 0:
-                    self._reentry_blocked_until_ns = (
-                        self._current_bar_ts_ns
-                        + int(self.config.delay_between_legs_sec) * 1_000_000_000
-                    )
-                # Allow re-entry on next signal
-        elif action == "reverse":
-            side = OrderSide.SELL if was_long else OrderSide.BUY
-            self._submit_order(side)
-            self._set_exit_levels(side)
-        elif action == "execute":
-            # 1.2(c) Execute (other leg by leg_id): arm the target slot via
-            # the cross-slot bus. The target's _check_entries sees the arm
-            # event and flips its _armed_for_entry flag.
-            target = self.config.execute_target_leg_id
-            if target:
-                entry = self._sibling_bus.setdefault(target, {})
-                entry["arm_ns"] = self._current_bar_ts_ns
-        elif action == "re_entry":
-            # 1.2(d) ReEntry (price-wait re-entry): set a price trigger; the
-            # next signal entry is gated until live price crosses it in the
-            # correct direction (back through original entry, by default).
-            cap = self.config.max_re_entries
-            if cap == 0 or self.re_entry_count < cap:
-                trigger = self.config.reentry_price or saved_entry_price
-                if trigger > 0:
-                    self._reentry_armed = True
-                    self._reentry_target_price = float(trigger)
-                    self._reentry_was_long = was_long
+        # Dispatch each action in the combination (spec §4.8). "close" is a
+        # no-op here — the position is already flat. The others can co-exist
+        # (e.g. "re_execute,execute" re-arms this leg AND a sibling).
+        for action in actions:
+            if action == "re_execute":
+                if self.re_execution_count < self.config.max_re_executions:
+                    self.re_execution_count += 1
+                    # Arm the slot-level re-execution delay (Other Settings spec
+                    # §2). Counts from the current bar's timestamp; _check_entries
+                    # checks this before allowing the fresh entry on subsequent
+                    # bars. delay_between_legs_sec=0 (default) → no block.
+                    # ReExecute_Logics.html P2: no_wait_trade_reexec skips the
+                    # delay entirely on re-executions.
+                    if self.config.delay_between_legs_sec > 0 and not self.config.no_wait_trade_reexec:
+                        self._reentry_blocked_until_ns = (
+                            self._current_bar_ts_ns
+                            + int(self.config.delay_between_legs_sec) * 1_000_000_000
+                        )
+                    # Allow re-entry on next signal
+            elif action == "reverse":
+                side = OrderSide.SELL if was_long else OrderSide.BUY
+                self._submit_order(side)
+                self._set_exit_levels(side)
+            elif action == "execute":
+                # 1.2(c) Execute (other leg by leg_id): arm the target slot via
+                # the cross-slot bus. The target's _check_entries sees the arm
+                # event and flips its _armed_for_entry flag.
+                target = self.config.execute_target_leg_id
+                if target:
+                    entry = self._sibling_bus.setdefault(target, {})
+                    entry["arm_ns"] = self._current_bar_ts_ns
+            elif action == "re_entry":
+                # 1.2(d) ReEntry (price-wait re-entry): set a price trigger; the
+                # next signal entry is gated until live price crosses it in the
+                # correct direction (back through original entry, by default).
+                cap = self.config.max_re_entries
+                if cap == 0 or self.re_entry_count < cap:
+                    trigger = self.config.reentry_price or saved_entry_price
+                    if trigger > 0:
+                        self._reentry_armed = True
+                        self._reentry_target_price = float(trigger)
+                        self._reentry_was_long = was_long
 
     def _check_entries(self, close: float, is_flat: bool, is_long: bool, is_short: bool) -> None:
         # 1.2(c) Execute: consume any pending arm event from a sibling slot.
@@ -843,6 +1152,13 @@ class ManagedExitStrategy(Strategy):
         self.highest_profit = 0.0
         self.sl_wait_count = 0
         self._sl_wait_started_ns = 0
+        # Target Wait + leg Trailing-Target state — fresh per position.
+        self.tp_wait_count = 0
+        self._tp_wait_started_ns = 0
+        self._tgt_trail_active = False
+        self._tgt_trail_stop = 0.0
+        self._tgt_trail_anchor = 0.0
+        self._tp_was_trail = False
         # Fresh trade — reset the trailed flag so on_sl_action_on classifies
         # this trade's eventual SL hit independently of the prior trade.
         self._was_trailed = False
@@ -853,6 +1169,7 @@ class ManagedExitStrategy(Strategy):
         # and reset the per-position fire flag.
         self._entry_filled_at_ns = self._current_bar_ts_ns
         self._move_sl_fired_this_position = False
+        self._move_sl_trail_anchor = 0.0
 
         is_buy = event.order_side == OrderSide.BUY
         self.position_side = "LONG" if is_buy else "SHORT"
@@ -865,6 +1182,18 @@ class ManagedExitStrategy(Strategy):
                 self.current_sl = self._snap_to_tick(self.entry_price - self.config.stop_loss_value)
             else:
                 self.current_sl = self._snap_to_tick(self.entry_price + self.config.stop_loss_value)
+        elif self.config.stop_loss_type == "atr":
+            # Volatility-adaptive SL (spec §1.1 fn.4): distance = k × ATR.
+            # BUY  → SL below entry; SELL → SL above entry.
+            atr_val = float(self._atr.value) if self._atr is not None and self._atr.initialized else 0.0
+            dist = atr_val * float(self.config.sl_atr_multiplier)
+            if dist > 0:
+                if is_buy:
+                    self.current_sl = self._snap_to_tick(self.entry_price - dist)
+                else:
+                    self.current_sl = self._snap_to_tick(self.entry_price + dist)
+            else:
+                self.current_sl = 0.0
         else:
             self.current_sl = 0.0
 
@@ -879,6 +1208,18 @@ class ManagedExitStrategy(Strategy):
                 self.current_tp = self._snap_to_tick(self.entry_price + self.config.target_value)
             else:
                 self.current_tp = self._snap_to_tick(self.entry_price - self.config.target_value)
+        elif self.config.target_type == "atr":
+            # Volatility-adaptive Target (spec §1.1 fn.4): distance = k × ATR.
+            # BUY  → TP above entry; SELL → TP below entry.
+            atr_val = float(self._tgt_atr.value) if self._tgt_atr is not None and self._tgt_atr.initialized else 0.0
+            dist = atr_val * float(self.config.tgt_atr_multiplier)
+            if dist > 0:
+                if is_buy:
+                    self.current_tp = self._snap_to_tick(self.entry_price + dist)
+                else:
+                    self.current_tp = self._snap_to_tick(self.entry_price - dist)
+            else:
+                self.current_tp = 0.0
         else:
             self.current_tp = 0.0
 
@@ -913,6 +1254,11 @@ class ManagedExitStrategy(Strategy):
         self.current_tp = 0.0
         self.sl_wait_count = 0
         self._sl_wait_started_ns = 0
+        self.tp_wait_count = 0
+        self._tp_wait_started_ns = 0
+        self._tgt_trail_active = False
+        self._tgt_trail_stop = 0.0
+        self._tgt_trail_anchor = 0.0
         self.position_side = None
 
     def _submit_order(self, side: OrderSide) -> None:
@@ -969,16 +1315,27 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         trade_size=Decimal(str(trade_size)),
         signal_name=signal_name,
         signal_params=signal_params,
-        stop_loss_type=exit_config.stop_loss_type,
+        stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,
         trailing_sl_offset=exit_config.trailing_sl_offset,
-        target_type=exit_config.target_type,
+        sl_atr_period=int(getattr(exit_config, "sl_atr_period", 0) or 0),
+        sl_atr_multiplier=float(getattr(exit_config, "sl_atr_multiplier", 0.0) or 0.0),
+        target_type=_canon_exit_type(exit_config.target_type, _TGT_TYPE_CANON),
         target_value=exit_config.target_value,
+        tgt_atr_period=int(getattr(exit_config, "tgt_atr_period", 0) or 0),
+        tgt_atr_multiplier=float(getattr(exit_config, "tgt_atr_multiplier", 0.0) or 0.0),
         target_lock_trigger=exit_config.target_lock_trigger or 0.0,
         target_lock_minimum=exit_config.target_lock_minimum or 0.0,
+        tgt_trail_enabled=bool(getattr(exit_config, "tgt_trail_enabled", False)),
+        tgt_trail_when_profit_reach=float(getattr(exit_config, "tgt_trail_when_profit_reach", 0.0) or 0.0),
+        tgt_trail_lock_min_profit=float(getattr(exit_config, "tgt_trail_lock_min_profit", 0.0) or 0.0),
+        tgt_trail_every=float(getattr(exit_config, "tgt_trail_every", 0.0) or 0.0),
+        tgt_trail_by=float(getattr(exit_config, "tgt_trail_by", 0.0) or 0.0),
         sl_wait_sec=getattr(exit_config, "sl_wait_sec", 0),
         sl_wait_bars=exit_config.sl_wait_bars,
+        tgt_wait_sec=int(getattr(exit_config, "tgt_wait_sec", 0) or 0),
+        tgt_wait_bars=int(getattr(exit_config, "tgt_wait_bars", 0) or 0),
         on_sl_action=exit_config.on_sl_action,
         on_target_action=exit_config.on_target_action,
         max_re_executions=exit_config.max_re_executions,
@@ -1011,9 +1368,25 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
             on_target_action_on=other_settings.on_target_action_on,
         )
     if move_sl_settings is not None:
-        # no_reexec_sl_cost (ReExecute_Logics.html P1) is wired regardless of
-        # move_sl_enabled — it's a no-op until Move SL fires anyway.
+        # ReExecute gating flags (ReExecute_Logics.html P1/P2/P5) are wired
+        # regardless of move_sl_enabled — no-ops until the relevant condition.
         kwargs["no_reexec_sl_cost"] = bool(move_sl_settings.no_reexec_sl_cost)
+        # Portfolio-aggregate Move SL trigger (spec §2.3). agg_trigger_ns and
+        # preseeded_bus are pass-2 inputs the two-pass runner injects; they are
+        # 0 / empty during pass 1 and whenever the feature is off. Threaded
+        # regardless of move_sl_enabled — the aggregate trigger is independent.
+        kwargs["move_sl_agg_trigger_ns"] = int(
+            getattr(move_sl_settings, "agg_trigger_ns", 0) or 0
+        )
+        kwargs["move_sl_preseeded_bus"] = dict(
+            getattr(move_sl_settings, "preseeded_bus", None) or {}
+        )
+        kwargs["no_wait_trade_reexec"] = bool(
+            getattr(move_sl_settings, "no_wait_trade_reexec", False)
+        )
+        kwargs["no_reentry_sl_cost"] = bool(
+            getattr(move_sl_settings, "no_reentry_sl_cost", True)
+        )
         if move_sl_settings.enabled:
             kwargs.update(
                 move_sl_enabled=True,

@@ -157,6 +157,56 @@ def get_user_max_loss(user_id: Optional[str]) -> Optional[float]:
     return abs(v) if v else None
 
 
+def get_user_trailing_sl(user_id: Optional[str]) -> Optional[dict]:
+    """User-level Trailing SL config (spec execution_logic.html §6.1).
+
+    Returns ``{"every": float, "by": float}`` when the user has enabled a
+    trailing SL with positive ratchet parameters, else None. The runner
+    walks the user's combined equity curve, ratcheting the Max-Loss cap
+    tighter by ``by`` for every ``every`` of combined profit gained.
+    """
+    user = get_user(user_id)
+    if not user:
+        return None
+    if not user.get("trailing_sl_enabled"):
+        return None
+    try:
+        every = float(user.get("trailing_sl_every") or 0.0)
+        by = float(user.get("trailing_sl_by") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if every <= 0 or by <= 0:
+        return None
+    return {"every": every, "by": by}
+
+
+def get_user_trailing_target(user_id: Optional[str]) -> Optional[dict]:
+    """User-level Trailing Target / Profit-Lock config (spec §6.1, target doc).
+
+    Returns ``{"when_reach": float, "lock": float, "every": float, "by": float}``
+    when the user has enabled a trailing target with a positive activation
+    threshold, else None. The runner walks the user's combined equity curve:
+    once combined profit reaches ``when_reach`` a floor is locked at ``lock``
+    and ratcheted up by ``by`` for every ``every`` of further combined profit;
+    a fall back to the floor force-sqoffs all the user's portfolios.
+    """
+    user = get_user(user_id)
+    if not user:
+        return None
+    if not user.get("trailing_tgt_enabled"):
+        return None
+    try:
+        when_reach = float(user.get("trailing_tgt_when_reach") or 0.0)
+        lock = float(user.get("trailing_tgt_lock") or 0.0)
+        every = float(user.get("trailing_tgt_every") or 0.0)
+        by = float(user.get("trailing_tgt_by") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if when_reach <= 0:
+        return None
+    return {"when_reach": when_reach, "lock": lock, "every": every, "by": by}
+
+
 def get_user_max_profit(user_id: Optional[str]) -> Optional[float]:
     """User-level Max Profit cap (spec §3 Level 3). Mirrors Max Loss."""
     user = get_user(user_id)
@@ -294,4 +344,33 @@ def validate_registry_payload(payload: dict) -> tuple[bool, str]:
                 return False, f"users[{i}].{cap_field} must be numeric or null"
             if cf != cf:  # NaN check
                 return False, f"users[{i}].{cap_field} must be a finite number"
+        # User-level Trailing SL (spec execution_logic.html §6.1). All optional.
+        tsl_enabled = u.get("trailing_sl_enabled")
+        if tsl_enabled is not None and not isinstance(tsl_enabled, bool):
+            return False, f"users[{i}].trailing_sl_enabled must be a boolean or omitted"
+        for tsl_field in ("trailing_sl_every", "trailing_sl_by"):
+            tsl_val = u.get(tsl_field)
+            if tsl_val is None:
+                continue
+            try:
+                tv = float(tsl_val)
+            except (TypeError, ValueError):
+                return False, f"users[{i}].{tsl_field} must be numeric or null"
+            if tv != tv or tv < 0:
+                return False, f"users[{i}].{tsl_field} must be a non-negative number"
+        # User-level Trailing Target / Profit-Lock (spec §6.1 target doc).
+        ttg_enabled = u.get("trailing_tgt_enabled")
+        if ttg_enabled is not None and not isinstance(ttg_enabled, bool):
+            return False, f"users[{i}].trailing_tgt_enabled must be a boolean or omitted"
+        for ttg_field in ("trailing_tgt_when_reach", "trailing_tgt_lock",
+                          "trailing_tgt_every", "trailing_tgt_by"):
+            ttg_val = u.get(ttg_field)
+            if ttg_val is None:
+                continue
+            try:
+                gv = float(ttg_val)
+            except (TypeError, ValueError):
+                return False, f"users[{i}].{ttg_field} must be numeric or null"
+            if gv != gv or gv < 0:
+                return False, f"users[{i}].{ttg_field} must be a non-negative number"
     return True, ""

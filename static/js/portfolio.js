@@ -491,6 +491,8 @@ const Portfolio = {
         if (pf.pf_sl_enabled !== undefined) pf._ui.sl_enabled = pf.pf_sl_enabled;
         if (pf.pf_sl_type) pf._ui.sl_type = pf.pf_sl_type;
         if (pf.pf_sl_value !== undefined) pf._ui.sl_value = pf.pf_sl_value;
+        if (pf.pf_sl_underlying_below !== undefined) pf._ui.sl_underlying_below = pf.pf_sl_underlying_below;
+        if (pf.pf_sl_underlying_above !== undefined) pf._ui.sl_underlying_above = pf.pf_sl_underlying_above;
         if (pf.pf_sl_action) pf._ui.on_sl_action = pf.pf_sl_action;
         if (pf.pf_sl_delay_sec !== undefined) pf._ui.sl_delay = pf.pf_sl_delay_sec;
         if (pf.pf_sl_reexecute_count !== undefined) pf._ui.sl_reexecute_count = pf.pf_sl_reexecute_count;
@@ -506,6 +508,9 @@ const Portfolio = {
         if (pf.move_sl_no_buy_legs !== undefined) pf._ui.no_move_buy_legs = pf.move_sl_no_buy_legs;
         if (pf.move_sl_hit_on_leg_sl !== undefined) pf._ui.hit_on_leg_sl = pf.move_sl_hit_on_leg_sl;
         if (pf.move_sl_hit_on_leg_target !== undefined) pf._ui.hit_on_leg_target = pf.move_sl_hit_on_leg_target;
+        if (pf.move_sl_agg_pnl_enabled !== undefined) pf._ui.move_sl_agg_pnl_enabled = pf.move_sl_agg_pnl_enabled;
+        if (pf.move_sl_agg_pnl_threshold !== undefined) pf._ui.move_sl_agg_pnl_threshold = pf.move_sl_agg_pnl_threshold;
+        if (pf.move_sl_agg_pnl_direction) pf._ui.move_sl_agg_pnl_direction = pf.move_sl_agg_pnl_direction;
         // Monitoring + ReExecute + Exit Settings hydration
         if (pf.leg_target_monitoring) pf._ui.leg_target_monitoring = pf.leg_target_monitoring;
         if (pf.leg_trailing_monitoring) pf._ui.leg_trailing_monitoring = pf.leg_trailing_monitoring;
@@ -1013,17 +1018,17 @@ const Portfolio = {
                                 <input type="checkbox" id="pf-m-tgt-enabled" ${ui.target_enabled ? 'checked' : ''}> Enable Target
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Profit' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
+                        <div class="pf-field-row" title="'Combined Profit' (PnL) and 'Underlying Movement' (primary instrument price crosses Target Value) are wired for FX/crypto. Premium types are options-only and silently downgraded by the backend.">
                             <span class="pf-field-label">Target Type</span>
-                            <select class="form-control" id="pf-m-tgt-type" style="flex:1;">
-                                ${["Combined Profit", "Combined Premium", "Absolute Combined Premium", "Underlying Movement"].map(o => {
-            const opt = o !== "Combined Profit";
+                            <select class="form-control" id="pf-m-tgt-type" style="flex:1;" onchange="Portfolio._onPfTgtTypeChange()">
+                                ${["Combined Profit", "Underlying Movement", "Combined Premium", "Absolute Combined Premium"].map(o => {
+            const opt = (o === "Combined Premium" || o === "Absolute Combined Premium");
             return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.target_type || 'Combined Profit') === o ? 'selected' : ''}>${o}${opt ? ' (options only)' : ''}</option>`;
         }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row">
-                            <span class="pf-field-label">Target Value</span>
+                        <div class="pf-field-row" title="Combined Profit: PnL amount. Underlying Movement: the underlying price level the primary instrument must cross.">
+                            <span class="pf-field-label" id="pf-m-tgt-value-label">Target Value</span>
                             <input type="number" class="form-control" id="pf-m-tgt-value" value="${ui.target_value || 0}" step="0.01" min="0" style="width:110px;">
                         </div>
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
@@ -1092,18 +1097,23 @@ const Portfolio = {
                                 <input type="checkbox" id="pf-m-sl-enabled" ${ui.sl_enabled ? 'checked' : ''}> Enable Stoploss
                             </label>
                         </div>
-                        <div class="pf-field-row" title="Only 'Combined Loss' is wired for FX/crypto. Premium/Underlying types are options-only and silently downgraded by the backend.">
+                        <div class="pf-field-row" title="Combined Loss = PnL-based. Underlying Movement / Loss and Underlying Range fire on the primary instrument's price (D5: underlying = self). Premium types remain options-only.">
                             <span class="pf-field-label">Type</span>
-                            <select class="form-control" id="pf-m-sl-type" style="flex:1;">
-                                ${["Combined Loss", "Combined Premium", "Absolute Combined Premium", "Underlying Movement", "Loss and Underlying Range"].map(o => {
-            const opt = o !== "Combined Loss";
+                            <select class="form-control" id="pf-m-sl-type" style="flex:1;" onchange="Portfolio._onPfSlTypeChange()">
+                                ${["Combined Loss", "Underlying Movement", "Loss and Underlying Range", "Combined Premium", "Absolute Combined Premium"].map(o => {
+            const opt = (o === "Combined Premium" || o === "Absolute Combined Premium");
             return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.sl_type || 'Combined Loss') === o ? 'selected' : ''}>${o}${opt ? ' (options only)' : ''}</option>`;
         }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row">
+                        <div class="pf-field-row" title="For 'Combined Loss' this is the loss amount. For 'Underlying Movement' it is the underlying price level to fire at. For 'Loss and Underlying Range' it is the loss amount.">
                             <span class="pf-field-label">Value</span>
                             <input type="number" class="form-control" id="pf-m-sl-value" value="${ui.sl_value || 0}" step="0.01" min="0" style="width:110px;">
+                        </div>
+                        <div class="pf-field-row" id="pf-m-sl-urow" title="Underlying price bounds for 'Loss and Underlying Range' — the SL arms when price falls to/below 'Below' or rises to/above 'Above'. 0 disables that side." style="display:${(ui.sl_type === 'Underlying Movement' || ui.sl_type === 'Loss and Underlying Range') ? 'flex' : 'none'};">
+                            <span class="pf-field-label">Underlying Below / Above</span>
+                            <input type="number" class="form-control" id="pf-m-sl-ubelow" value="${ui.sl_underlying_below || 0}" step="any" min="0" style="width:90px;" placeholder="below">
+                            <input type="number" class="form-control" id="pf-m-sl-uabove" value="${ui.sl_underlying_above || 0}" step="any" min="0" style="width:90px;" placeholder="above">
                         </div>
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On SL Action</span>
@@ -1121,10 +1131,6 @@ const Portfolio = {
                         <div class="pf-field-row pf-live-only" title="Live-only: backtest's post-hoc clip cannot replay disposed engines, so this count has no effect. Reactivate after a replay-capable redesign.">
                             <span class="pf-field-label">ReExecute Count</span>
                             <input type="number" class="form-control" id="pf-m-sl-reexcount" value="${ui.sl_reexecute_count || 0}" min="0" step="1" style="width:70px;">
-                        </div>
-                        <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On SL Action is SqOff/Execute/Start Other Portfolio.">
-                            <span class="pf-field-label">Target Portfolio</span>
-                            <input type="text" class="form-control" id="pf-m-sl-targetpf" value="${ui.sl_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
                         </div>
                         <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On SL Action is SqOff/Execute/Start Other Portfolio.">
                             <span class="pf-field-label">Target Portfolio</span>
@@ -1187,12 +1193,27 @@ const Portfolio = {
                             <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Adapted for FX/crypto: skip Move SL to Cost on slots whose position is LONG.">
                                 <input type="checkbox" id="pf-m-sl-move-nobuy" ${ui.no_move_buy_legs ? 'checked' : ''}> No Move SL for BUY Legs
                             </label>
-                            <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its SL. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
                                 <input type="checkbox" id="pf-m-sl-move-hitsl" ${ui.hit_on_leg_sl ? 'checked' : ''}> Re-apply on every Leg SL hit
                             </label>
-                            <label class="pf-field-row pf-live-only" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Live-only: cross-slot trigger. FX/crypto slots run in independent engines with no cross-slot event bus, so this checkbox has no backtest effect.">
-                                <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target ? 'checked' : ''}> Re-apply on every Leg Target hit *
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its Target. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
+                                <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target ? 'checked' : ''}> Re-apply on every Leg Target hit
                             </label>
+                        </div>
+                        <div style="margin-top:8px; border-top:1px solid var(--border, #ddd); padding-top:6px;">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Portfolio-aggregate trigger: when the whole portfolio's combined P&L crosses the threshold, move every open leg's SL to entry. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
+                                <input type="checkbox" id="pf-m-sl-agg-enabled" ${ui.move_sl_agg_pnl_enabled ? 'checked' : ''}> Move SL on aggregate portfolio P&amp;L
+                            </label>
+                            <div class="pf-field-row">
+                                <span class="pf-field-label">Aggregate P&amp;L Threshold</span>
+                                <input type="number" class="form-control" id="pf-m-sl-agg-threshold" value="${ui.move_sl_agg_pnl_threshold || 0}" min="0" step="any" style="width:90px;">
+                            </div>
+                            <div class="pf-field-row" title="Loss: trigger when combined P&L falls to -threshold. Profit: trigger when it rises to +threshold.">
+                                <span class="pf-field-label">Trigger Direction</span>
+                                <select class="form-control" id="pf-m-sl-agg-direction" style="flex:1;">
+                                    ${["loss", "profit"].map(o => `<option value="${o}" ${(ui.move_sl_agg_pnl_direction || 'loss') === o ? 'selected' : ''}>${o === 'loss' ? 'Loss (combined P&L ≤ -threshold)' : 'Profit (combined P&L ≥ +threshold)'}</option>`).join("")}
+                                </select>
+                            </div>
                         </div>
                     </fieldset>
                 </div>
@@ -1763,6 +1784,8 @@ const Portfolio = {
         pf._ui.sl_enabled = document.getElementById("pf-m-sl-enabled")?.checked || false;
         pf._ui.sl_type = document.getElementById("pf-m-sl-type")?.value || "Combined Loss";
         pf._ui.sl_value = parseFloat(document.getElementById("pf-m-sl-value")?.value) || 0;
+        pf._ui.sl_underlying_below = parseFloat(document.getElementById("pf-m-sl-ubelow")?.value) || 0;
+        pf._ui.sl_underlying_above = parseFloat(document.getElementById("pf-m-sl-uabove")?.value) || 0;
         pf._ui.on_sl_action = document.getElementById("pf-m-sl-action")?.value || "SqOff";
         pf._ui.sl_delay = parseInt(document.getElementById("pf-m-sl-delay")?.value) || 0;
         pf._ui.sl_reexecute_count = parseInt(document.getElementById("pf-m-sl-reexcount")?.value) || 0;
@@ -1777,6 +1800,9 @@ const Portfolio = {
         pf._ui.no_move_buy_legs = document.getElementById("pf-m-sl-move-nobuy")?.checked || false;
         pf._ui.hit_on_leg_sl = document.getElementById("pf-m-sl-move-hitsl")?.checked || false;
         pf._ui.hit_on_leg_target = document.getElementById("pf-m-sl-move-hittgt")?.checked || false;
+        pf._ui.move_sl_agg_pnl_enabled = document.getElementById("pf-m-sl-agg-enabled")?.checked || false;
+        pf._ui.move_sl_agg_pnl_threshold = parseFloat(document.getElementById("pf-m-sl-agg-threshold")?.value) || 0;
+        pf._ui.move_sl_agg_pnl_direction = document.getElementById("pf-m-sl-agg-direction")?.value || "loss";
         pf._ui.sqoff_loss_legs = document.getElementById("pf-m-sl-sqoff-loss")?.checked || false;
         pf._ui.sqoff_profit_legs = document.getElementById("pf-m-sl-sqoff-profit")?.checked || false;
         // Persisted copies for the backend (Target tab + Stoploss tab).
@@ -1798,6 +1824,8 @@ const Portfolio = {
         pf.pf_sl_enabled = pf._ui.sl_enabled;
         pf.pf_sl_type = pf._ui.sl_type;
         pf.pf_sl_value = pf._ui.sl_value;
+        pf.pf_sl_underlying_below = pf._ui.sl_underlying_below;
+        pf.pf_sl_underlying_above = pf._ui.sl_underlying_above;
         pf.pf_sl_action = pf._ui.on_sl_action;
         pf.pf_sl_delay_sec = pf._ui.sl_delay;
         pf.pf_sl_reexecute_count = pf._ui.sl_reexecute_count;
@@ -1813,6 +1841,9 @@ const Portfolio = {
         pf.move_sl_no_buy_legs = pf._ui.no_move_buy_legs;
         pf.move_sl_hit_on_leg_sl = pf._ui.hit_on_leg_sl;
         pf.move_sl_hit_on_leg_target = pf._ui.hit_on_leg_target;
+        pf.move_sl_agg_pnl_enabled = pf._ui.move_sl_agg_pnl_enabled;
+        pf.move_sl_agg_pnl_threshold = pf._ui.move_sl_agg_pnl_threshold;
+        pf.move_sl_agg_pnl_direction = pf._ui.move_sl_agg_pnl_direction;
         // Monitoring
         pf._ui.leg_target_monitoring = document.getElementById("pf-m-mon-legtgt")?.value || "Realtime";
         pf._ui.leg_trailing_monitoring = document.getElementById("pf-m-mon-legtrail")?.value || "Realtime";
@@ -1958,9 +1989,16 @@ const Portfolio = {
                 : "Available in catalog";
         const paramsHTML = this._buildParamsHTML(pf, legIndex);
         const ec = slot.exit_config || {};
-        const slTypes = ["none", "percentage", "points", "trailing"];
-        const tpTypes = ["none", "percentage", "points"];
+        const slTypes = ["none", "percentage", "points", "trailing", "atr"];
+        const tpTypes = ["none", "percentage", "points", "atr"];
         const actions = ["close", "re_execute", "reverse", "execute", "re_entry", "keep_leg_running"];
+        // SL action(s) currently selected — supports comma-separated combos
+        // (spec execution_logic.html §4.8). On TP stays a single value.
+        const slActsSet = String(ec.on_sl_action || "close").split(",").map(s => s.trim()).filter(Boolean);
+        const slActChecks = actions.map(a =>
+            `<label style="display:inline-flex; align-items:center; gap:3px; margin-right:10px; font-size:0.8rem; cursor:pointer;">
+                <input type="checkbox" class="leg-m-slact" value="${a}" ${slActsSet.includes(a) ? "checked" : ""}> ${a}</label>`
+        ).join("");
         const allLegIds = (pf.slots || [])
             .map((s, i) => ({ id: s.slot_id || `slot_${i}`, label: s.strategy_name || `Slot ${i + 1}` }))
             .filter(s => s.id !== (slot.slot_id || `slot_${legIndex}`));
@@ -2020,39 +2058,29 @@ const Portfolio = {
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-stoploss" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">SL Type</label>
+                    <div class="form-group" style="flex:1; min-width:110px;" title="'atr' sizes the SL from Average True Range at entry (spec §1.1 fn.4).">
+                        <label class="form-label">SL Type</label>
                         <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">SL Value</label>
                         <input type="number" class="form-control" id="leg-m-slval" value="${ec.stop_loss_value || 0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="ATR lookback in bars — used only when SL Type = atr.">
+                        <label class="form-label">ATR Period</label>
+                        <input type="number" class="form-control" id="leg-m-atrperiod" value="${ec.sl_atr_period || 0}" step="1" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="SL distance = multiplier × ATR — used only when SL Type = atr.">
+                        <label class="form-label">ATR Mult</label>
+                        <input type="number" class="form-control" id="leg-m-atrmult" value="${ec.sl_atr_multiplier || 0}" step="0.1" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Step</label>
                         <input type="number" class="form-control" id="leg-m-trailstep" value="${ec.trailing_sl_step || 0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Trail Offset</label>
                         <input type="number" class="form-control" id="leg-m-trailoff" value="${ec.trailing_sl_offset || 0}" step="0.5" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:90px;"><label class="form-label">SL Wait (sec)</label>
                         <input type="number" class="form-control" id="leg-m-slwait" value="${ec.sl_wait_sec || 0}" step="1" min="0"></div>
-                    <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On SL</label>
-                        <select class="form-control" id="leg-m-slaction">${actions.map(a => `<option value="${a}" ${(ec.on_sl_action || "close") === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">Max Re-ex</label>
                         <input type="number" class="form-control" id="leg-m-maxreex" value="${ec.max_re_executions || 0}" step="1" min="0"></div>
                 </div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);">
-                    <div class="form-group" style="flex:1; min-width:180px;" title="Spec §1.2(c): when On SL/TP = 'execute', arm this sibling slot via the cross-slot bus.">
-                        <label class="form-label">Execute Target Leg</label>
-                        <select class="form-control" id="leg-m-exectarget">${execTargetOpts}</select>
-                    </div>
-                    <div class="form-group" style="flex:1; min-width:100px;" title="Spec §1.2(d): price the 're_entry' action waits for. 0 = re-use prior entry price.">
-                        <label class="form-label">ReEntry Price</label>
-                        <input type="number" class="form-control" id="leg-m-reentryprice" value="${ec.reentry_price || 0}" step="any" min="0">
-                    </div>
-                    <div class="form-group" style="flex:1; min-width:80px;" title="Spec §1.2(d): cap re_entry fires per day. 0 = unlimited.">
-                        <label class="form-label">Max Re-Entries</label>
-                        <input type="number" class="form-control" id="leg-m-maxreentries" value="${ec.max_re_entries || 0}" step="1" min="0">
-                    </div>
-                    <div class="form-group" style="flex:1; min-width:140px; display:flex; align-items:flex-end;" title="Spec §1.2(c): when off, leg ignores its own signals until a sibling slot's 'execute' arms it.">
-                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="leg-m-armed" ${ec.armed_at_start === false ? '' : 'checked'}> Armed at start
-                        </label>
-                    </div>
+                <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);" title="Spec execution_logic.html §4.8: combine up to 3 actions. Invalid combos (keep_leg_running with others, re_execute+re_entry) are rejected on save.">
+                    <label class="form-label" style="display:block; margin-bottom:4px;">On SL Action(s)</label>
+                    <div id="leg-m-slaction-group">${slActChecks}</div>
                 </div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);">
                     <div class="form-group" style="flex:1; min-width:180px;" title="Spec §1.2(c): when On SL/TP = 'execute', arm this sibling slot via the cross-slot bus.">
@@ -2076,12 +2104,33 @@ const Portfolio = {
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-target" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <div class="form-group" style="flex:1; min-width:110px;"><label class="form-label">TP Type</label>
+                    <div class="form-group" style="flex:1; min-width:110px;" title="'atr' sizes the TP from Average True Range at entry (spec §1.1 fn.4)."><label class="form-label">TP Type</label>
                         <select class="form-control" id="leg-m-tptype">${tpTypes.map(t => `<option value="${t}" ${(ec.target_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:80px;"><label class="form-label">TP Value</label>
                         <input type="number" class="form-control" id="leg-m-tpval" value="${ec.target_value || 0}" step="0.5" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="ATR lookback in bars — used only when TP Type = atr."><label class="form-label">ATR Period</label>
+                        <input type="number" class="form-control" id="leg-m-tgtatrperiod" value="${ec.tgt_atr_period || 0}" step="1" min="0"></div>
+                    <div class="form-group" style="flex:1; min-width:80px;" title="TP distance = multiplier × ATR — used only when TP Type = atr."><label class="form-label">ATR Mult</label>
+                        <input type="number" class="form-control" id="leg-m-tgtatrmult" value="${ec.tgt_atr_multiplier || 0}" step="0.1" min="0"></div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">On TP</label>
                         <select class="form-control" id="leg-m-tpaction">${actions.map(a => `<option value="${a}" ${(ec.on_target_action || "close") === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+                    <div class="form-group" style="flex:1; min-width:90px;" title="Spec §4.3: a fixed-TP trigger must persist this many seconds before firing."><label class="form-label">TP Wait (sec)</label>
+                        <input type="number" class="form-control" id="leg-m-tpwait" value="${ec.tgt_wait_sec || 0}" step="1" min="0"></div>
+                </div>
+                <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border-light, #eee);" title="Spec execution_logic_target.html §4.7: ratcheting profit-lock at the leg level. All thresholds are profit-% values.">
+                    <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer; margin-bottom:6px;">
+                        <input type="checkbox" id="leg-m-tgttrail-enabled" ${ec.tgt_trail_enabled ? 'checked' : ''}> Enable Leg Trailing Target (Profit-Lock)
+                    </label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:100px;" title="Profit-% at which the lock activates."><label class="form-label">When Profit Reach %</label>
+                            <input type="number" class="form-control" id="leg-m-tgttrail-reach" value="${ec.tgt_trail_when_profit_reach || 0}" step="0.1" min="0"></div>
+                        <div class="form-group" style="flex:1; min-width:100px;" title="Profit-% floor guaranteed once the lock activates."><label class="form-label">Lock Min Profit %</label>
+                            <input type="number" class="form-control" id="leg-m-tgttrail-lock" value="${ec.tgt_trail_lock_min_profit || 0}" step="0.1" min="0"></div>
+                        <div class="form-group" style="flex:1; min-width:90px;" title="Profit-% step that ratchets the locked floor up."><label class="form-label">Trail Every %</label>
+                            <input type="number" class="form-control" id="leg-m-tgttrail-every" value="${ec.tgt_trail_every || 0}" step="0.1" min="0"></div>
+                        <div class="form-group" style="flex:1; min-width:90px;" title="Profit-% the locked floor rises per ratchet step."><label class="form-label">Trail By %</label>
+                            <input type="number" class="form-control" id="leg-m-tgttrail-by" value="${ec.tgt_trail_by || 0}" step="0.1" min="0"></div>
+                    </div>
                 </div>
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-timing" style="display:none;">
@@ -2115,6 +2164,27 @@ const Portfolio = {
         if (content) content.style.display = "";
         const btn = document.querySelector(`.slot-tab-btn[data-tab="${tabName}"]`);
         if (btn) btn.classList.add("active");
+    },
+
+    _onPfSlTypeChange() {
+        // Show the underlying price-bound inputs only for the underlying SL types.
+        const t = document.getElementById("pf-m-sl-type")?.value || "Combined Loss";
+        const row = document.getElementById("pf-m-sl-urow");
+        if (row) {
+            row.style.display = (t === "Underlying Movement" || t === "Loss and Underlying Range")
+                ? "flex" : "none";
+        }
+    },
+
+    _onPfTgtTypeChange() {
+        // Relabel "Target Value" when the underlying-movement Target type is
+        // selected — the field then means an underlying price level, not PnL.
+        const t = document.getElementById("pf-m-tgt-type")?.value || "Combined Profit";
+        const lbl = document.getElementById("pf-m-tgt-value-label");
+        if (lbl) {
+            lbl.textContent = (t === "Underlying Movement")
+                ? "Underlying Price Level" : "Target Value";
+        }
     },
 
     _onLegStratChange() {
@@ -2165,11 +2235,25 @@ const Portfolio = {
         const ec = slot.exit_config = slot.exit_config || {};
         ec.stop_loss_type = document.getElementById("leg-m-sltype").value;
         ec.stop_loss_value = parseFloat(document.getElementById("leg-m-slval").value) || 0;
+        ec.sl_atr_period = parseInt(document.getElementById("leg-m-atrperiod").value) || 0;
+        ec.sl_atr_multiplier = parseFloat(document.getElementById("leg-m-atrmult").value) || 0;
         ec.trailing_sl_step = parseFloat(document.getElementById("leg-m-trailstep").value) || 0;
         ec.trailing_sl_offset = parseFloat(document.getElementById("leg-m-trailoff").value) || 0;
         ec.sl_wait_sec = parseInt(document.getElementById("leg-m-slwait").value) || 0;
         ec.sl_wait_bars = 0;
-        ec.on_sl_action = document.getElementById("leg-m-slaction").value;
+        // On SL Action(s) — comma-joined combination (spec §4.8).
+        const _slActs = Array.from(document.querySelectorAll(".leg-m-slact:checked")).map(el => el.value);
+        // Client-side combo validation — mirrors core.models.validate_leg_actions.
+        if (_slActs.length > 3) {
+            App.toast("At most 3 SL actions can be combined.", "error"); return;
+        }
+        if (_slActs.includes("keep_leg_running") && _slActs.length > 1) {
+            App.toast("'keep_leg_running' cannot be combined with other SL actions.", "error"); return;
+        }
+        if (_slActs.includes("re_execute") && _slActs.includes("re_entry")) {
+            App.toast("'re_execute' and 're_entry' cannot be combined.", "error"); return;
+        }
+        ec.on_sl_action = _slActs.length ? _slActs.join(",") : "close";
         ec.max_re_executions = parseInt(document.getElementById("leg-m-maxreex").value) || 0;
         ec.execute_target_leg_id = document.getElementById("leg-m-exectarget")?.value || "";
         ec.reentry_price = parseFloat(document.getElementById("leg-m-reentryprice")?.value) || 0;
@@ -2177,6 +2261,15 @@ const Portfolio = {
         ec.armed_at_start = document.getElementById("leg-m-armed")?.checked !== false;
         ec.target_type = document.getElementById("leg-m-tptype").value;
         ec.target_value = parseFloat(document.getElementById("leg-m-tpval").value) || 0;
+        ec.tgt_atr_period = parseInt(document.getElementById("leg-m-tgtatrperiod")?.value) || 0;
+        ec.tgt_atr_multiplier = parseFloat(document.getElementById("leg-m-tgtatrmult")?.value) || 0;
+        ec.tgt_wait_sec = parseInt(document.getElementById("leg-m-tpwait")?.value) || 0;
+        ec.tgt_wait_bars = 0;
+        ec.tgt_trail_enabled = document.getElementById("leg-m-tgttrail-enabled")?.checked || false;
+        ec.tgt_trail_when_profit_reach = parseFloat(document.getElementById("leg-m-tgttrail-reach")?.value) || 0;
+        ec.tgt_trail_lock_min_profit = parseFloat(document.getElementById("leg-m-tgttrail-lock")?.value) || 0;
+        ec.tgt_trail_every = parseFloat(document.getElementById("leg-m-tgttrail-every")?.value) || 0;
+        ec.tgt_trail_by = parseFloat(document.getElementById("leg-m-tgttrail-by")?.value) || 0;
         ec.on_target_action = document.getElementById("leg-m-tpaction").value;
         ec.squareoff_time = document.getElementById("leg-m-legsqoff").value || null;
         ec.squareoff_tz = document.getElementById("leg-m-legsqofftz").value || null;

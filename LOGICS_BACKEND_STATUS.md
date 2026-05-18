@@ -27,8 +27,9 @@ CSS rules at [static/css/style.css:1156-1209](static/css/style.css#L1156-L1209).
 
 | Field | Status | Location |
 |---|---|---|
-| `exit_order_type` (MARKET / Limit / SL_Limit) | ❌ Missing | UI accepts; backend has no order-type routing. Limit/SL_Limit blocked at portfolio save. |
+| `exit_order_type` (MARKET / Limit / SL_Limit) | ⚠️ Partial | MARKET wired (engine default). Limit / SL_Limit now **blocked at portfolio save** — `server.py:_validate_portfolio_sl` returns 400 (spec §8.1). |
 | `exit_sell_first` | ❌ Missing | UI flag; backend doesn't sort exit batches. |
+| VWAP enhancement on SL/Target fills (§4.2) | ✅ **Wired (flag-gated)** | `_USE_VWAP_FILL=1` reprices SL/Target exit fills to the conservative VWAP-proxy price (`exit = max(vwap, hit_price)`, spec `sl_tgt.html`). Per-bar VWAP is proxied by typical price `(H+L+C)/3` of the opposite quote side — the catalog has no intra-bar tick data. Runner-side post-run report surgery: `core/backtest_runner.py:_build_vwap_lookup` + `_apply_vwap_fill`, applied in `_extract_results` and `_extract_slot_from_group_reports`. Result dict carries `vwap_fill_applied` / `vwap_fill_adjustments`. Path A (single-slot + grouped) only; Path B (`_USE_BACKTEST_NODE`) is a no-op. |
 
 **Backend layer:** L4 (Execution layer — doesn't exist yet)
 **UI tab:** `pf-tab-pf-exit` (line 1075 in `static/js/portfolio.js`) &mdash; **already marked `pf-ui-only`**
@@ -118,15 +119,28 @@ All fields missing — no hedge logic exists in backend.
 
 | Field | Status | Location |
 |---|---|---|
-| `max_loss` (User-level cap) | ✅ Wired (soft halt only) | `core/models.py:104`, `core/backtest_runner.py:1286` |
+| `max_loss` (User-level cap) | ✅ Wired (soft halt only) | `core/users.py`, `core/backtest_runner.py:_merge_portfolio_results` |
 | `max_profit` (User-level cap) | ✅ Wired (soft halt only) | Same |
+| User-level Trailing SL (`trailing_sl_enabled/every/by`) | ✅ Wired (detection) | `core/users.py:get_user_trailing_sl`; runner ratchets the cap, reports `user_trail_sl_hit` (spec exec §6.1) |
 | **Hard halt mid-bar** | ❌ Missing | Currently slots run to completion regardless of cap |
-| `stoploss.type` (5 types) | ❌ Missing | Combined Loss / Combined Premium / Absolute / Underlying / Loss+Range |
-| `stoploss.trailing.*` | ❌ Missing | No portfolio-level trailing |
+| `stoploss.type` — Combined Loss | ✅ Wired | `core/backtest_runner.py:_apply_portfolio_clip` |
+| `stoploss.type` — Underlying Movement | ✅ Wired | `_underlying_sl_clip` — fires on the primary slot's price crossing `pf_sl_value` (D5 underlying = self) |
+| `stoploss.type` — Loss and Underlying Range | ✅ Wired | `_underlying_sl_clip` — hybrid PnL + `pf_sl_underlying_below/above` |
+| `stoploss.type` — Combined / Absolute Premium | ❌ Missing | Options-only; downgraded to Combined Loss with a warning |
+| `stoploss.trailing.*` | ✅ Wired | `_apply_portfolio_clip` PnL-step ratchet |
 | `target.type` (4 types) | ❌ Missing |
 | `target.trailing.*` | ❌ Missing |
 | `portfolio_action_on_sl` / `portfolio_action_on_target` | ❌ Missing | 7 action types including cross-portfolio |
 | `portfolio_delay_sl` / `portfolio_delay_target` | ❌ Missing |
+| `move_sl_hit_on_leg_sl` / `move_sl_hit_on_leg_target` (cross-slot) | ✅ **Wired (flag-gated)** | Previously `pf-live-only`. Now wired in backtest via the two-pass runner: pass 1 records every leg's SL/target hit timestamps, the parent unions them into a cross-process event bus, pass 2 pre-seeds each worker's `_CROSS_SLOT_EVENT_BUSES`. `core/backtest_runner.py:_compute_agg_coordination`, `core/managed_strategy.py` `__init__` bus pre-seed + existing Hit-On-Leg branch in `_check_exits`. Gated by `_USE_PF_AGG_MOVE_SL=1`. |
+| `move_sl_agg_pnl_enabled` / `move_sl_agg_pnl_threshold` / `move_sl_agg_pnl_direction` (§2.3 portfolio-aggregate trigger) | ✅ **Wired (flag-gated)** | New: when the whole portfolio's combined P&L crosses the threshold, every open leg snaps its SL to entry. Pass 1 builds the merged combined-P&L curve, the parent finds the first crossing timestamp, pass 2 injects it via `_MoveSLConfig.agg_trigger_ns` → `ManagedExitConfig.move_sl_agg_trigger_ns` → aggregate branch in `_check_exits`. `core/models.py` PortfolioConfig fields. Gated by `_USE_PF_AGG_MOVE_SL=1`. |
+
+Two-pass note: when `_USE_PF_AGG_MOVE_SL=1` and an aggregate / cross-slot
+trigger is configured, the portfolio runs **twice** (~2× runtime) — a
+discovery pass then a deterministic replay pass. No fixpoint iteration: pass 2
+is a pure function of pass 1 + the bar data. Path B (`_USE_BACKTEST_NODE`) is
+not wired for the cross-slot leg-event surfacing; the aggregate-P&L trigger
+still works there (it reads only equity curves).
 
 **Backend layer:** L3 (Portfolio runner) for halts + simple types; new schema for advanced types
 **UI tabs:** `pf-tab-pf-target` (line 875), `pf-tab-pf-stoploss` (line 941) &mdash; **partially marked**
@@ -150,14 +164,37 @@ All fields missing — no hedge logic exists in backend.
 |---|---|---|
 | `stop_loss_type`, `stop_loss_value` | ✅ Wired | `core/models.py:23-24`, `core/managed_strategy.py:200-256` |
 | `trailing_sl_step`, `trailing_sl_offset` | ✅ Wired | Same |
-| `target_type`, `target_value` | ✅ Wired | `core/models.py:29-30` |
-| `target_lock_trigger`, `target_lock_minimum` | ✅ Wired | Same |
-| `on_sl_action`, `on_target_action` (close/re_execute/reverse) | ✅ Wired | `core/managed_strategy.py:257-274` |
-| `max_re_executions` | ✅ Wired | `core/managed_strategy.py:268` |
-| `sl_wait_bars` | ✅ Wired | `core/managed_strategy.py:236-240` |
-| `squareoff_time`, `squareoff_tz` (with leg > slot > portfolio priority) | ✅ Wired | `core/models.py:127-141`, `core/managed_strategy.py:159-178` |
-| Underlying SL/Target | ❌ Missing | Engine has no underlying-based exit |
-| Re-Execute + ReEntry combos | ❌ Missing | Multi-leg coordination not implemented |
+| `target_type`, `target_value` (`none`/`percentage`/`points`/`atr`) | ✅ Wired | `core/models.py`, `core/managed_strategy.py:on_order_filled` |
+| `target_lock_trigger`, `target_lock_minimum` (one-shot SL upgrade) | ✅ Wired | Same |
+| `on_sl_action`, `on_target_action` (close/re_execute/reverse/execute/re_entry/keep_leg_running) | ✅ Wired | `core/managed_strategy.py:_handle_exit` |
+| `on_sl_action` **combinations** (up to 3, comma-separated) | ✅ Wired | `parse_leg_actions` / `validate_leg_actions` (spec §4.8); validated at save |
+| `stop_loss_type = "atr"` (ATR-based SL) | ✅ Wired | `sl_atr_period` / `sl_atr_multiplier` — `AverageTrueRange` indicator sized at entry |
+| `target_type = "atr"` (ATR-based Target) — **new** | ✅ Wired | `tgt_atr_period` / `tgt_atr_multiplier` — dedicated `AverageTrueRange` (spec §1.1 fn.4) |
+| **Target Wait / Delay** (`tgt_wait_sec` / `tgt_wait_bars`) — **new** | ✅ Wired | `_check_exits` TP branch — mirror of SL Wait (spec §4.3) |
+| **Leg-level Trailing Target** (`tgt_trail_*` ratcheting profit-lock) — **new** | ✅ Wired | `advance_trailing_target` + `_check_exits` (spec §4.7); `_tp_was_trail` drives `on_target_action_on` |
+| SL/Target type **spec-name aliases** (`Premium`/`AbsolutePremium`) — **new** | ✅ Wired | `_canon_exit_type` in `config_from_exit` (spec §4.4) |
+| Intrabar high/low SL/TP triggering | ✅ Wired | `_check_exits` — engine default (spec §4.1) |
+| `max_re_executions` | ✅ Wired | `core/managed_strategy.py` |
+| `sl_wait_sec` / `sl_wait_bars` | ✅ Wired | `core/managed_strategy.py` |
+| `squareoff_time`, `squareoff_tz` (with leg > slot > portfolio priority) | ✅ Wired | `core/models.py`, `core/managed_strategy.py` |
+| Underlying SL/Target (leg level) | ❌ Missing | Per spec, leg-level Underlying uses the portfolio level instead |
+| Conservative VWAP exit fill (SL/Target hits) | ✅ Wired | `_build_vwap_lookup` / `_apply_vwap_fill` — post-hoc reprice, excludes time-squareoff (spec §4.2/§8) |
+
+#### User-level SL/Target (spec §6) — ✅ Wired
+
+| Field | Status | Location |
+|---|---|---|
+| User Max Loss + Trailing SL | ✅ Wired | `_user_sl_clip` — real equity-curve clip |
+| **User Max Profit** (`max_profit`) — **new clip** | ✅ Wired | `_user_tgt_clip` — real force-sqoff (was flag-only) |
+| **User Trailing Target / Profit-Lock** (`trailing_tgt_*`) — **new** | ✅ Wired | `get_user_trailing_target` + `_user_tgt_clip`; admin UI in `adapter_admin` users panel |
+
+#### Portfolio-level Target (spec §5) — ✅ Wired
+
+| Field | Status | Location |
+|---|---|---|
+| `pf_tgt_type = "Combined Profit"` | ✅ Wired | `_apply_portfolio_clip` |
+| **`pf_tgt_type = "Underlying Movement"`** — **new** | ✅ Wired | `_underlying_tgt_clip` — primary-instrument price crossing (was downgraded) |
+| Trailing Target / Profit-Lock (`pf_tgt_trail_*`) | ✅ Wired | `_apply_portfolio_clip` step 3 |
 
 **Backend layer:** L2 (ManagedExitStrategy)
 **UI tab:** N/A (per-leg config in slot editor) &mdash; **NOT marked** (since base SL/TGT is wired)

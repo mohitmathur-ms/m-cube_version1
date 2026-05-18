@@ -32,7 +32,11 @@ import numpy as np
 
 from core.strategies import STRATEGY_REGISTRY
 from core.models import PortfolioConfig, StrategySlotConfig, effective_slot_qty
-from core.managed_strategy import ManagedExitStrategy, config_from_exit
+from core.managed_strategy import (
+    ManagedExitStrategy,
+    advance_trailing_target,
+    config_from_exit,
+)
 from core.fx_rates import FxRateResolver, parse_money_string
 from core.venue_config import load_adapter_config_for_bar_type
 
@@ -672,12 +676,21 @@ class _PfStoplossSettings:
     trail_every: float = 0.0
     trail_by: float = 0.0
     target_portfolio: str = ""  # spec §2.1(m) — only used for cross-portfolio actions
+    # SL type (spec §2.1): "Combined Loss" (PnL-based) | "Underlying Movement"
+    # (price-cross) | "Loss and Underlying Range" (hybrid). Underlying-based
+    # types default the underlying to the portfolio's primary instrument.
+    sl_type: str = "Combined Loss"
+    underlying_below: float = 0.0
+    underlying_above: float = 0.0
 
 
 @dataclasses.dataclass(frozen=True)
 class _PfTargetSettings:
     """Validated portfolio-level Target config."""
     enabled: bool = False
+    # Target type (spec §5.1): "Combined Profit" (PnL-based) or
+    # "Underlying Movement" (primary-instrument price crosses ``value``).
+    tgt_type: str = "Combined Profit"
     value: float = 0.0
     action: str = "SqOff"
     delay_sec: int = 0
@@ -710,20 +723,41 @@ class _MoveSLConfig:
     trail_after: bool = False
     no_buy_legs: bool = False
     no_reexec_sl_cost: bool = False
+    # ReExecute_Logics.html P2 / P5 — wired regardless of move_sl_enabled.
+    # no_wait_trade_reexec: skip the slot re-execution delay on re-executions.
+    # no_reentry_sl_cost: block the re_entry action when SL was moved to cost.
+    no_wait_trade_reexec: bool = False
+    no_reentry_sl_cost: bool = True
     # LTP-buffer variant (spec §3 action v3, leg-level): on a losing leg, slide
     # SL toward LTP by this buffer (price units). 0 = exit at current price.
     ltp_buffer: float = 0.0
     # Hit-On-Leg cross-slot triggers (spec §3 1.3(f)/(g)).
     hit_on_leg_sl: bool = False
     hit_on_leg_target: bool = False
+    # Portfolio-aggregate Move SL trigger (spec §2.3). agg_pnl_* mirror the
+    # PortfolioConfig fields. agg_trigger_ns / preseeded_bus are the pass-2
+    # inputs the two-pass runner injects (0 / None during pass 1 and whenever
+    # the feature is off — both are benign no-ops in ManagedExitStrategy).
+    agg_pnl_enabled: bool = False
+    agg_pnl_threshold: float = 0.0
+    agg_pnl_direction: str = "loss"
+    agg_trigger_ns: int = 0
+    preseeded_bus: dict | None = None
 
 
-_VALID_PF_SL_TYPES_FX = ("Combined Loss",)
-_VALID_PF_TGT_TYPES_FX = ("Combined Profit",)
-_OPTIONS_ONLY_PF_SL_TYPES = ("Combined Premium", "Absolute Combined Premium",
-                             "Underlying Movement", "Loss and Underlying Range")
-_OPTIONS_ONLY_PF_TGT_TYPES = ("Combined Premium", "Absolute Combined Premium",
-                              "Underlying Movement")
+# Underlying-based SL types are now universal for FX/crypto — D5 "underlying
+# defaults to self" makes them apply against the portfolio's primary
+# instrument price. Only the premium-based types remain options-only.
+_VALID_PF_SL_TYPES_FX = (
+    "Combined Loss", "Underlying Movement", "Loss and Underlying Range",
+)
+_UNDERLYING_PF_SL_TYPES = ("Underlying Movement", "Loss and Underlying Range")
+# Underlying-based Target is now universal (D5 "underlying = self"), mirroring
+# the SL side. Only the premium-based types remain options-only.
+_VALID_PF_TGT_TYPES_FX = ("Combined Profit", "Underlying Movement")
+_UNDERLYING_PF_TGT_TYPES = ("Underlying Movement",)
+_OPTIONS_ONLY_PF_SL_TYPES = ("Combined Premium", "Absolute Combined Premium")
+_OPTIONS_ONLY_PF_TGT_TYPES = ("Combined Premium", "Absolute Combined Premium")
 _VALID_PF_ACTIONS_FX = (
     "SqOff", "ReExecute",
     # ReExecute-family — accepted; the "at Entry Price" variants currently
@@ -869,6 +903,23 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
         )
         action = "SqOff"
 
+    # Underlying-based SL bounds (spec §2.1). Only meaningful for the two
+    # underlying SL types; for "Combined Loss" they're inert.
+    u_below = max(0.0, float(getattr(portfolio, "pf_sl_underlying_below", 0.0) or 0.0))
+    u_above = max(0.0, float(getattr(portfolio, "pf_sl_underlying_above", 0.0) or 0.0))
+    if sl_type == "Underlying Movement" and value <= 0:
+        warnings.append(
+            "pf_sl_type='Underlying Movement' needs a non-zero pf_sl_value "
+            "(the underlying price level to fire at) — SL disabled."
+        )
+        return _PfStoplossSettings(enabled=False), warnings
+    if sl_type == "Loss and Underlying Range" and u_below <= 0 and u_above <= 0:
+        warnings.append(
+            "pf_sl_type='Loss and Underlying Range' needs pf_sl_underlying_below "
+            "or pf_sl_underlying_above to be set — SL disabled."
+        )
+        return _PfStoplossSettings(enabled=False), warnings
+
     return _PfStoplossSettings(
         enabled=True, value=value, action=action, delay_sec=delay,
         reexecute_count=reexec,
@@ -877,6 +928,9 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
         trail_enabled=trail_enabled,
         trail_every=trail_every, trail_by=trail_by,
         target_portfolio=target_pf,
+        sl_type=sl_type,
+        underlying_below=u_below,
+        underlying_above=u_above,
     ), warnings
 
 
@@ -933,8 +987,17 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
         )
         action = "SqOff"
 
+    # Underlying-Movement Target (spec §5.1) needs a non-zero price level
+    # (pf_tgt_value is the underlying price to fire at, not a PnL amount).
+    if tgt_type == "Underlying Movement" and value <= 0:
+        warnings.append(
+            "pf_tgt_type='Underlying Movement' needs a non-zero pf_tgt_value "
+            "(the underlying price level to fire at) — Target disabled."
+        )
+        return _PfTargetSettings(enabled=False), warnings
+
     return _PfTargetSettings(
-        enabled=True, value=value, action=action, delay_sec=delay,
+        enabled=True, tgt_type=tgt_type, value=value, action=action, delay_sec=delay,
         reexecute_count=reexec,
         trail_enabled=trail_enabled,
         trail_lock_min_profit=trail_lock,
@@ -951,11 +1014,37 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
     is the no-op state.
     """
     warnings: list[str] = []
-    # no_reexec_sl_cost is read regardless of move_sl_enabled — see dataclass docs.
+    # ReExecute gating flags are read regardless of move_sl_enabled — see dataclass docs.
     no_reexec_sl_cost = bool(getattr(portfolio, "no_reexec_sl_cost", False))
+    no_wait_trade_reexec = bool(getattr(portfolio, "no_wait_trade_reexec", False))
+    no_reentry_sl_cost = bool(getattr(portfolio, "no_reentry_sl_cost", True))
+
+    # Portfolio-aggregate Move SL trigger (spec §2.3). Read regardless of
+    # move_sl_enabled — it is an independent portfolio-level trigger, not a
+    # sub-option of the per-slot Move SL to Cost feature.
+    agg_pnl_enabled = bool(getattr(portfolio, "move_sl_agg_pnl_enabled", False))
+    agg_pnl_threshold = float(getattr(portfolio, "move_sl_agg_pnl_threshold", 0.0) or 0.0)
+    agg_pnl_direction = str(getattr(portfolio, "move_sl_agg_pnl_direction", "loss") or "loss").lower()
+    if agg_pnl_direction not in ("loss", "profit"):
+        warnings.append(
+            f"Invalid move_sl_agg_pnl_direction={agg_pnl_direction!r} — falling back to 'loss'."
+        )
+        agg_pnl_direction = "loss"
+    if agg_pnl_enabled and agg_pnl_threshold <= 0:
+        warnings.append(
+            "move_sl_agg_pnl_enabled but threshold <= 0 - aggregate Move SL trigger disabled."
+        )
+        agg_pnl_enabled = False
 
     if not getattr(portfolio, "move_sl_enabled", False):
-        return _MoveSLConfig(enabled=False, no_reexec_sl_cost=no_reexec_sl_cost), warnings
+        return _MoveSLConfig(
+            enabled=False, no_reexec_sl_cost=no_reexec_sl_cost,
+            no_wait_trade_reexec=no_wait_trade_reexec,
+            no_reentry_sl_cost=no_reentry_sl_cost,
+            agg_pnl_enabled=agg_pnl_enabled,
+            agg_pnl_threshold=agg_pnl_threshold,
+            agg_pnl_direction=agg_pnl_direction,
+        ), warnings
 
     action = getattr(portfolio, "move_sl_action", "Move Only for Profitable Legs") \
         or "Move Only for Profitable Legs"
@@ -979,10 +1068,103 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
         trail_after=bool(getattr(portfolio, "move_sl_trail_after", False)),
         no_buy_legs=bool(getattr(portfolio, "move_sl_no_buy_legs", False)),
         no_reexec_sl_cost=no_reexec_sl_cost,
+        no_wait_trade_reexec=no_wait_trade_reexec,
+        no_reentry_sl_cost=no_reentry_sl_cost,
         ltp_buffer=ltp_buffer,
         hit_on_leg_sl=bool(getattr(portfolio, "move_sl_hit_on_leg_sl", False)),
         hit_on_leg_target=bool(getattr(portfolio, "move_sl_hit_on_leg_target", False)),
+        agg_pnl_enabled=agg_pnl_enabled,
+        agg_pnl_threshold=agg_pnl_threshold,
+        agg_pnl_direction=agg_pnl_direction,
     ), warnings
+
+
+@dataclasses.dataclass(frozen=True)
+class _AggCoordination:
+    """Pass-1 → pass-2 hand-off for the portfolio-aggregate Move SL trigger
+    (spec §2.3). ``agg_trigger_ns`` is the UTC-ns timestamp at which the
+    combined portfolio P&L first crossed the configured threshold (0 = never).
+    ``event_bus`` is the union of every leg's pass-1 SL/target hit timestamps,
+    ``{slot_id: {"sl_ns","tgt_ns"}}`` — pre-seeded into each pass-2 worker so
+    the cross-slot Hit-On-Leg trigger works across process boundaries.
+    """
+    agg_trigger_ns: int = 0
+    agg_trigger_ts: str | None = None
+    event_bus: dict = dataclasses.field(default_factory=dict)
+    logs: tuple[str, ...] = ()
+
+
+def _compute_agg_coordination(portfolio, pass1_results: dict, move_sl) -> _AggCoordination:
+    """Build the pass-2 coordination payload from pass-1 slot results.
+
+    Merges every slot's per-bar equity curve into one combined-P&L timeline,
+    finds the first timestamp the combined P&L crosses ``agg_pnl_threshold``
+    in the configured direction, and unions every leg's SL/target hit
+    timestamps into a cross-process event bus. Pure function of pass-1 output
+    — keeps the two-pass run deterministic.
+    """
+    logs: list[str] = []
+
+    # Cross-process event bus: union of pass-1 per-leg SL/target hits.
+    event_bus: dict[str, dict[str, int]] = {}
+    for r in pass1_results.values():
+        if not r:
+            continue
+        sid = r.get("slot_id")
+        ev = r.get("leg_exit_events") or {}
+        if not sid or not ev:
+            continue
+        entry = event_bus.setdefault(str(sid), {})
+        for k, v in ev.items():
+            try:
+                iv = int(v)
+            except (TypeError, ValueError):
+                continue
+            if iv > entry.get(k, 0):
+                entry[k] = iv
+
+    agg_trigger_ns = 0
+    agg_trigger_ts: str | None = None
+    if move_sl.agg_pnl_enabled and move_sl.agg_pnl_threshold > 0:
+        curves = [
+            r.get("equity_curve_ts", [])
+            for r in pass1_results.values()
+            if r and r.get("equity_curve_ts")
+        ]
+        merged = _merge_equity_curves(curves)
+        start_cap = float(getattr(portfolio, "starting_capital", 0.0) or 0.0)
+        thr = abs(float(move_sl.agg_pnl_threshold))
+        is_loss = move_sl.agg_pnl_direction == "loss"
+        for pt in merged:
+            ts_iso = pt.get("timestamp")
+            if not ts_iso:
+                continue  # seed point carries no timestamp
+            pnl = float(pt.get("balance", start_cap)) - start_cap
+            crossed = (pnl <= -thr) if is_loss else (pnl >= thr)
+            if crossed:
+                agg_trigger_ns = _ts_iso_to_ns(ts_iso)
+                agg_trigger_ts = ts_iso
+                break
+        if agg_trigger_ns:
+            logs.append(
+                f"aggregate {move_sl.agg_pnl_direction} trigger: combined PnL crossed "
+                f"{thr:g} at {agg_trigger_ts} — open legs move SL to cost from there"
+            )
+        else:
+            logs.append(
+                f"aggregate {move_sl.agg_pnl_direction} trigger: combined PnL never "
+                f"crossed {thr:g} — no aggregate Move SL applied"
+            )
+    if event_bus:
+        logs.append(
+            f"cross-slot bus: {len(event_bus)} slot(s) published SL/target hits to pass 2"
+        )
+    return _AggCoordination(
+        agg_trigger_ns=agg_trigger_ns,
+        agg_trigger_ts=agg_trigger_ts,
+        event_bus=event_bus,
+        logs=tuple(logs),
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1025,6 +1207,7 @@ def _apply_portfolio_clip(
     pf_sl: "_PfStoplossSettings",
     pf_tgt: "_PfTargetSettings",
     slot_pnl_at_clip: dict | None = None,  # slot_id -> pnl_at_clip (for selective sqoff)
+    slot_curves: dict | None = None,       # slot_id -> equity_curve_ts (selective at clip ts)
 ) -> _ClipResult:
     """Walk the unified equity curve in time order and decide where the
     portfolio-level Stoploss/Target would have triggered. Returns a
@@ -1161,6 +1344,7 @@ def _apply_portfolio_clip(
                 pf_sl=pf_sl, pf_tgt=pf_tgt,
                 slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
                 prior_events=tuple(clip_events_acc),
+                slot_curves=slot_curves,
             )
 
         if pending_reason is not None:
@@ -1211,6 +1395,24 @@ def _apply_portfolio_clip(
     return _ClipResult(logs=tuple(logs), clip_events=tuple(clip_events_acc))
 
 
+def _slot_pnl_at_ts(curve: list[dict] | None, clip_ns: int) -> float:
+    """Per-slot PnL as of ``clip_ns`` — the slot's balance at the last equity
+    point at-or-before the clip timestamp, minus its seed capital."""
+    if not curve:
+        return 0.0
+    seed = float(curve[0].get("balance", 0.0) or 0.0)
+    last = seed
+    for pt in curve:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue
+        if _ts_iso_to_ns(ts) <= clip_ns:
+            last = float(pt.get("balance", last) or last)
+        else:
+            break
+    return last - seed
+
+
 def _build_clip_result(
     clip_ts: str,
     reason: str,
@@ -1219,10 +1421,15 @@ def _build_clip_result(
     slot_pnl_at_clip: dict | None,
     logs: list,
     prior_events: tuple[tuple[str, str, str], ...] = (),
+    slot_curves: dict | None = None,
 ) -> _ClipResult:
     """Construct the ClipResult, applying selective SqOff filtering and
     classifying the action. Trailing-Target hits ignore configured action
-    (always SqOff per spec §5)."""
+    (always SqOff per spec §5).
+
+    When ``slot_curves`` (slot_id → equity_curve_ts) is supplied, the
+    loss/profit selective filter uses each slot's PnL **at the clip timestamp**
+    rather than its end-of-run PnL — spec-accurate per §1.9-§1.10."""
     if reason.startswith("STOPLOSS"):
         action = pf_sl.action
         sqoff_loss = pf_sl.sqoff_only_loss_legs
@@ -1231,6 +1438,14 @@ def _build_clip_result(
         action = "SqOff" if reason == "TARGET_TRAIL" else pf_tgt.action
         sqoff_loss = False  # selective filters are SL-only per spec §1.9-§1.10
         sqoff_profit = False
+
+    # Prefer per-slot PnL evaluated at the clip timestamp when slot curves are
+    # available; fall back to the end-of-run proxy in slot_pnl_at_clip.
+    if slot_curves and (sqoff_loss or sqoff_profit):
+        _clip_ns = _ts_iso_to_ns(clip_ts)
+        slot_pnl_at_clip = {
+            sid: _slot_pnl_at_ts(curve, _clip_ns) for sid, curve in slot_curves.items()
+        }
 
     # Determine which slots are clipped
     if slot_pnl_at_clip is not None and (sqoff_loss or sqoff_profit):
@@ -1279,6 +1494,312 @@ def _build_clip_result(
         logs=tuple(logs),
         clip_events=final_events,
     )
+
+
+def _build_underlying_curve(engine, bar_type) -> list[dict]:
+    """Extract the (timestamp, close) price series the engine processed.
+
+    Used by the portfolio-level "Underlying Movement" / "Loss and Underlying
+    Range" SL types (spec §2.1). The underlying defaults to the slot's own
+    instrument (D5 "underlying = self"). Returns ``[]`` when bars can't be
+    read — the caller degrades to "underlying SL not enforced" with a warning.
+    """
+    try:
+        bars = engine.cache.bars(bar_type)
+    except Exception:
+        return []
+    if not bars:
+        return []
+    out: list[dict] = []
+    for b in bars:
+        try:
+            out.append({
+                "timestamp": pd.Timestamp(b.ts_event, unit="ns", tz="UTC").isoformat(),
+                "close": float(b.close),
+            })
+        except Exception:
+            continue
+    # cache.bars() returns most-recent-first; sort ascending by ts.
+    out.sort(key=lambda p: p["timestamp"])
+    return out
+
+
+def _underlying_sl_clip(
+    underlying_curve: list[dict] | None,
+    equity_curve_ts: list[dict],
+    pf_sl: "_PfStoplossSettings",
+    pf_tgt: "_PfTargetSettings",
+    slot_pnl_at_clip: dict | None,
+    starting_capital: float,
+    slot_curves: dict | None = None,
+) -> _ClipResult:
+    """Portfolio SL for the underlying-price-based types (spec §2.1).
+
+    • "Underlying Movement"      → fire when the primary instrument price
+      crosses ``pf_sl.value``.
+    • "Loss and Underlying Range" → fire when combined PnL ≤ −value AND the
+      underlying price is outside [underlying_below, underlying_above].
+
+    ``Delay (sec)`` shifts the clip timestamp forward by that many seconds
+    (a confirmed-after-N-seconds approximation). Returns a ``_ClipResult``;
+    ``clip_ts is None`` means the SL never fired.
+    """
+    logs: list[str] = []
+    if not underlying_curve:
+        logs.append(
+            "UNDERLYING_SL_SKIPPED | no underlying price series available "
+            "(grouped / Path-B run, or missing data) — underlying SL not enforced"
+        )
+        return _ClipResult(logs=tuple(logs))
+
+    # Underlying price series, ascending by ts.
+    u: list[tuple[int, float]] = []
+    for pt in underlying_curve:
+        ts_ns = _ts_iso_to_ns(pt.get("timestamp"))
+        if ts_ns:
+            u.append((ts_ns, float(pt.get("close", 0.0) or 0.0)))
+    u.sort()
+    if not u:
+        return _ClipResult(logs=tuple(logs))
+
+    # Combined-PnL step series from the merged equity curve.
+    eq: list[tuple[int, float]] = []
+    for pt in equity_curve_ts:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue
+        eq.append((_ts_iso_to_ns(ts), float(pt.get("balance", starting_capital)) - starting_capital))
+    eq.sort()
+
+    is_movement = pf_sl.sl_type == "Underlying Movement"
+    level = pf_sl.value
+    below = pf_sl.underlying_below
+    above = pf_sl.underlying_above
+    delay_ns = int(pf_sl.delay_sec) * 1_000_000_000
+
+    prev_close: float | None = None
+    eq_idx = 0
+    cur_pnl = 0.0
+    for ts_ns, close in u:
+        while eq_idx < len(eq) and eq[eq_idx][0] <= ts_ns:
+            cur_pnl = eq[eq_idx][1]
+            eq_idx += 1
+
+        hit = False
+        if is_movement:
+            if prev_close is not None and (
+                (prev_close <= level <= close) or (prev_close >= level >= close)
+            ):
+                hit = True
+        else:  # Loss and Underlying Range
+            range_breached = (below > 0 and close <= below) or (above > 0 and close >= above)
+            if cur_pnl <= -level and range_breached:
+                hit = True
+        prev_close = close
+
+        if hit:
+            clip_ns = ts_ns + delay_ns
+            clip_iso = pd.Timestamp(clip_ns, unit="ns", tz="UTC").isoformat()
+            logs.append(
+                f"UNDERLYING_SL_HIT | type={pf_sl.sl_type!r} | underlying={close:.5f} "
+                f"| pnl={cur_pnl:.2f} | clip_ts={clip_iso}"
+            )
+            return _build_clip_result(
+                clip_ts=clip_iso, reason="STOPLOSS",
+                pf_sl=pf_sl, pf_tgt=pf_tgt,
+                slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                slot_curves=slot_curves,
+            )
+
+    return _ClipResult(logs=tuple(logs))
+
+
+def _user_sl_clip(
+    equity_curve_ts: list[dict],
+    starting_capital: float,
+    cum_user_pnl: float,
+    eff_max_loss: float | None,
+    user_trail_sl: dict | None,
+    all_slot_ids: list[str],
+) -> _ClipResult:
+    """User-level SL clip (spec §3 Level 3 / execution_logic.html §6).
+
+    Walks the merged equity curve in combined-PnL terms (this portfolio's PnL
+    plus the user's cumulative PnL from earlier portfolios). The user Max-Loss
+    cap — optionally ratcheted tighter each bar by the user Trailing SL — is a
+    real force-sqoff: at the first breaching bar the whole portfolio is clipped
+    (every slot), and post-clip trades are dropped by the caller.
+    """
+    if eff_max_loss is None:
+        return _ClipResult()
+    u_sl = abs(float(eff_max_loss))
+    anchor = 0.0
+    logs: list[str] = []
+    for pt in equity_curve_ts:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue
+        combined = float(pt.get("balance", starting_capital)) - starting_capital + cum_user_pnl
+        if user_trail_sl:
+            gain = combined - anchor
+            if gain >= user_trail_sl["every"]:
+                steps = int(gain / user_trail_sl["every"])
+                u_sl = max(0.0, u_sl - steps * user_trail_sl["by"])
+                anchor += steps * user_trail_sl["every"]
+        if combined <= -u_sl:
+            ratcheted = bool(user_trail_sl) and u_sl < abs(float(eff_max_loss))
+            reason = "USER_TRAIL_STOPLOSS" if ratcheted else "USER_STOPLOSS"
+            logs.append(
+                f"USER_SL_HIT | reason={reason} | combined_pnl={combined:.2f} "
+                f"| effective_sl={u_sl:.2f} | clip_ts={ts}"
+            )
+            return _ClipResult(
+                clip_ts=ts, clip_reason=reason, clip_action="SqOff",
+                clipped_slots=tuple(all_slot_ids), logs=tuple(logs),
+            )
+    return _ClipResult()
+
+
+def _underlying_tgt_clip(
+    underlying_curve: list[dict] | None,
+    equity_curve_ts: list[dict],
+    pf_sl: "_PfStoplossSettings",
+    pf_tgt: "_PfTargetSettings",
+    slot_pnl_at_clip: dict | None,
+    starting_capital: float,
+    slot_curves: dict | None = None,
+) -> _ClipResult:
+    """Portfolio Target for the "Underlying Movement" type (spec §5.1).
+
+    Mirror of the ``is_movement`` branch of ``_underlying_sl_clip`` on the
+    profit side: fires the first time the primary instrument's price crosses
+    ``pf_tgt.value``. ``Delay (sec)`` shifts the clip timestamp forward.
+    Returns a ``_ClipResult``; ``clip_ts is None`` means the Target never fired.
+    """
+    logs: list[str] = []
+    if not underlying_curve:
+        logs.append(
+            "UNDERLYING_TGT_SKIPPED | no underlying price series available "
+            "(grouped / Path-B run, or missing data) — underlying Target not enforced"
+        )
+        return _ClipResult(logs=tuple(logs))
+
+    u: list[tuple[int, float]] = []
+    for pt in underlying_curve:
+        ts_ns = _ts_iso_to_ns(pt.get("timestamp"))
+        if ts_ns:
+            u.append((ts_ns, float(pt.get("close", 0.0) or 0.0)))
+    u.sort()
+    if not u:
+        return _ClipResult(logs=tuple(logs))
+
+    level = pf_tgt.value
+    delay_ns = int(pf_tgt.delay_sec) * 1_000_000_000
+    prev_close: float | None = None
+    for ts_ns, close in u:
+        hit = (
+            prev_close is not None
+            and ((prev_close <= level <= close) or (prev_close >= level >= close))
+        )
+        prev_close = close
+        if hit:
+            clip_ns = ts_ns + delay_ns
+            clip_iso = pd.Timestamp(clip_ns, unit="ns", tz="UTC").isoformat()
+            logs.append(
+                f"UNDERLYING_TGT_HIT | underlying={close:.5f} | level={level:.5f} "
+                f"| clip_ts={clip_iso}"
+            )
+            return _build_clip_result(
+                clip_ts=clip_iso, reason="TARGET",
+                pf_sl=pf_sl, pf_tgt=pf_tgt,
+                slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                slot_curves=slot_curves,
+            )
+
+    return _ClipResult(logs=tuple(logs))
+
+
+def _user_tgt_clip(
+    equity_curve_ts: list[dict],
+    starting_capital: float,
+    cum_user_pnl: float,
+    eff_max_profit: float | None,
+    user_trail_tgt: dict | None,
+    all_slot_ids: list[str],
+) -> _ClipResult:
+    """User-level Target clip (spec §3 Level 3 / execution_logic_target.html §6).
+
+    Mirror of ``_user_sl_clip`` on the profit side. Walks the merged equity
+    curve in combined-PnL terms (this portfolio's PnL plus the user's
+    cumulative PnL from earlier portfolios). Two ceilings, checked per bar:
+
+      * **Max Profit** — fixed cap; first bar combined PnL ≥ cap force-sqoffs
+        every slot.
+      * **Trailing Target / Profit-Lock** — once combined PnL reaches the
+        activation threshold a floor is locked and ratcheted up; a fall back
+        to the floor force-sqoffs every slot.
+
+    Fixed Max Profit is checked before the trailing lock within a bar so the
+    hard ceiling always wins a tie. Returns a ``_ClipResult``; ``clip_ts is
+    None`` means neither ceiling fired.
+    """
+    if eff_max_profit is None and not user_trail_tgt:
+        return _ClipResult()
+    cap = abs(float(eff_max_profit)) if eff_max_profit is not None else None
+    logs: list[str] = []
+    tt_active = False
+    tt_stop = 0.0
+    tt_anchor = 0.0
+    for pt in equity_curve_ts:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue
+        combined = float(pt.get("balance", starting_capital)) - starting_capital + cum_user_pnl
+
+        # Fixed Max Profit ceiling.
+        if cap is not None and cap > 0 and combined >= cap:
+            logs.append(
+                f"USER_TARGET_HIT | reason=USER_TARGET | combined_pnl={combined:.2f} "
+                f"| max_profit={cap:.2f} | clip_ts={ts}"
+            )
+            return _ClipResult(
+                clip_ts=ts, clip_reason="USER_TARGET", clip_action="SqOff",
+                clipped_slots=tuple(all_slot_ids), logs=tuple(logs),
+            )
+
+        # Trailing Target / Profit-Lock — reuses the leg-level pure ratchet.
+        if user_trail_tgt:
+            tt_active, tt_stop, tt_anchor, tt_hit = advance_trailing_target(
+                tt_active, tt_stop, tt_anchor, combined,
+                user_trail_tgt["when_reach"], user_trail_tgt["lock"],
+                user_trail_tgt["every"], user_trail_tgt["by"],
+            )
+            if tt_hit:
+                logs.append(
+                    f"USER_TARGET_HIT | reason=USER_TRAIL_TARGET | combined_pnl={combined:.2f} "
+                    f"| locked_floor={tt_stop:.2f} | clip_ts={ts}"
+                )
+                return _ClipResult(
+                    clip_ts=ts, clip_reason="USER_TRAIL_TARGET", clip_action="SqOff",
+                    clipped_slots=tuple(all_slot_ids), logs=tuple(logs),
+                )
+    return _ClipResult()
+
+
+def _earliest_clip(*results: _ClipResult) -> _ClipResult:
+    """Return the _ClipResult with the earliest non-None clip_ts.
+
+    Logs from every result are merged onto the winner so nothing is lost.
+    When no result fired, returns the first with merged logs.
+    """
+    merged_logs: tuple[str, ...] = ()
+    for r in results:
+        merged_logs += r.logs
+    fired = [r for r in results if r.clip_ts is not None]
+    if not fired:
+        return _ClipResult(logs=merged_logs)
+    winner = min(fired, key=lambda r: _ts_iso_to_ns(r.clip_ts))
+    return dataclasses.replace(winner, logs=merged_logs)
 
 
 def _path_b_supports_filters(
@@ -1805,7 +2326,10 @@ def _run_single_slot_node(
                     rbo_settings=default_rbo_settings,
                     other_settings=default_other_settings,
                     move_sl_settings=default_move_sl_settings,
-                    portfolio_id=getattr(portfolio, "name", ""),
+                    # Per-slot path: own process, no in-process siblings — the
+                    # cross-slot bus is empty here (cross-process events arrive
+                    # via the two-pass preseeded_bus inside _MoveSLConfig).
+                    portfolio_id="",
                     slot_id=slot.slot_id,
                 )
                 strategy = ManagedExitStrategy(managed_config)
@@ -1895,6 +2419,7 @@ def _run_single_slot(
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
+    default_capture_underlying: bool = False,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -2063,6 +2588,14 @@ def _run_single_slot(
             )
             engine.add_instrument(instrument)
             engine.add_data(all_bars)
+            # VWAP proxy-fill (spec §4.2): index ASK/BID bars by ts before the
+            # bar list is dropped, so _extract_results can reprice SL/Target
+            # exits. None when the flag is off or no ASK/BID data is present.
+            vwap_lookup = (
+                _build_vwap_lookup(all_bars)
+                if os.environ.get("_USE_VWAP_FILL", "0") == "1"
+                else None
+            )
             # Free the bar list reference; Nautilus has copied into its internal cache.
             del all_bars
 
@@ -2101,7 +2634,11 @@ def _run_single_slot(
                     move_sl_settings=default_move_sl_settings,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
-                    portfolio_id=getattr(portfolio, "name", ""),
+                    # Per-slot runs each get their own process/engine, so the
+                    # module-level cross-slot bus has no siblings to reach —
+                    # an empty portfolio_id routes to the standalone bus.
+                    # (Cross-slot wiring is meaningful only in _run_slot_group.)
+                    portfolio_id="",
                     slot_id=slot.slot_id,
                 )
                 strategy = ManagedExitStrategy(managed_config)
@@ -2137,7 +2674,20 @@ def _run_single_slot(
             fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
 
         with _phase("extract_results", phase_times):
-            results = _extract_results(engine, capital, fx_resolver)
+            results = _extract_results(engine, capital, fx_resolver, vwap_lookup)
+            # Capture the underlying price series for portfolio-level
+            # Underlying-Movement / Loss-and-Range SL (spec §2.1). Only built
+            # when the portfolio actually uses an underlying SL type — keeps
+            # the result dict small for the common case. engine is still live
+            # here (disposed in the finally below).
+            if default_capture_underlying:
+                results["underlying_curve"] = _build_underlying_curve(engine, primary_bt)
+            # Per-leg SL/target hit timestamps (spec §2.3) — surfaced so the
+            # two-pass aggregate-Move-SL runner can pre-seed pass 2's bus.
+            # Empty {} for raw (non-ManagedExit) strategies.
+            results["leg_exit_events"] = dict(
+                getattr(strategy, "_exit_events_self", {}) or {}
+            )
 
         # Add slot metadata
         results["slot_id"] = slot.slot_id
@@ -2205,6 +2755,7 @@ def _extract_slot_from_group_reports(
     slot,
     capital: float,
     fx_resolver,
+    vwap_lookup: dict | None = None,
 ) -> dict:
     """Build one slot's result dict by filtering a shared-engine's reports by strategy_id.
 
@@ -2212,6 +2763,9 @@ def _extract_slot_from_group_reports(
     can consume it identically. Equity curve is synthesized from this slot's
     position closes (running balance = capital + cumulative realized PnL) since
     the shared engine only has one account-balance history.
+
+    ``vwap_lookup`` enables the VWAP proxy-fill model on this slot's filtered
+    reports (see ``_apply_vwap_fill``); ``None`` leaves fills unchanged.
     """
     slot_id_str = str(strategy_id)
 
@@ -2227,6 +2781,17 @@ def _extract_slot_from_group_reports(
             and "strategy_id" in fills_report.columns:
         mask = fills_report["strategy_id"].astype(str) == slot_id_str
         slot_fills = fills_report.loc[mask].copy()
+
+    # VWAP proxy-fill (spec §4.2): reprice this slot's SL/Target exits before
+    # any per-slot metric is derived from slot_positions.
+    vwap_fill_adjustments = 0
+    if vwap_lookup:
+        try:
+            vwap_fill_adjustments = _apply_vwap_fill(
+                slot_positions, slot_fills, vwap_lookup,
+            )
+        except Exception:
+            vwap_fill_adjustments = 0
 
     # Per-trade realized PnL in base currency
     pnl_col = _pick_col(slot_positions, ["realized_pnl", "RealizedPnl", "pnl"]) if not slot_positions.empty else None
@@ -2343,6 +2908,8 @@ def _extract_slot_from_group_reports(
         "positions_report": positions_report_with_base(slot_positions, fx_resolver),
         "fills_report": slot_fills,
         "account_report": None,  # shared in a group, not per-slot
+        "vwap_fill_applied": bool(vwap_fill_adjustments),
+        "vwap_fill_adjustments": vwap_fill_adjustments,
     }
 
 
@@ -2362,6 +2929,7 @@ def _run_slot_group_node(
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
+    portfolio_name: str = "",
 ) -> list[dict]:
     """Path B variant of _run_slot_group.
 
@@ -2473,7 +3041,9 @@ def _run_slot_group_node(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
-                        portfolio_id=getattr(portfolio, "name", ""),
+                        # Shared-engine group: all slots in this process share
+                        # one cross-slot bus keyed by the portfolio name.
+                        portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
                     )
                     strategy = ManagedExitStrategy(managed_config)
@@ -2580,6 +3150,7 @@ def _run_slot_group(
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
+    portfolio_name: str = "",
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -2626,6 +3197,7 @@ def _run_slot_group(
             default_other_settings=default_other_settings,
             default_move_sl_settings=default_move_sl_settings,
             user_id=user_id,
+            portfolio_name=portfolio_name,
         )
 
     import os
@@ -2749,6 +3321,14 @@ def _run_slot_group(
             )
             engine.add_instrument(instrument)
             engine.add_data(all_bars)
+            # VWAP proxy-fill (spec §4.2): index ASK/BID bars before the list
+            # is dropped, so each slot's _extract_slot_from_group_reports can
+            # reprice SL/Target exits. None when the flag is off / no ASK-BID.
+            vwap_lookup = (
+                _build_vwap_lookup(all_bars)
+                if os.environ.get("_USE_VWAP_FILL", "0") == "1"
+                else None
+            )
             del all_bars
 
         # Build and attach N strategies with deterministic unique order_id_tags
@@ -2786,7 +3366,9 @@ def _run_slot_group(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
-                        portfolio_id=getattr(portfolio, "name", ""),
+                        # Shared-engine group: all slots in this process share
+                        # one cross-slot bus keyed by the portfolio name.
+                        portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
                     )
                     strategy = ManagedExitStrategy(managed_config)
@@ -2846,7 +3428,15 @@ def _run_slot_group(
                 )
                 r = _extract_slot_from_group_reports(
                     positions_report, fills_report, strategy_id, slot, capital, fx_resolver,
+                    vwap_lookup,
                 )
+                # Per-leg SL/target hit timestamps (spec §2.3) — read from the
+                # strategy instance (same insertion index as strategy_id) so
+                # the two-pass aggregate-Move-SL runner can pre-seed pass 2.
+                if i < len(actual_strategies):
+                    r["leg_exit_events"] = dict(
+                        getattr(actual_strategies[i], "_exit_events_self", {}) or {}
+                    )
                 r["elapsed_seconds"] = group_elapsed  # group-level wall time; per-slot isn't meaningful in a shared run
                 r["worker_pid"] = os.getpid()
                 r["group_index"] = group_index
@@ -2992,9 +3582,7 @@ def run_portfolio_backtest(
         for slot in enabled_slots:
             capitals[slot.slot_id] = per_slot
 
-    # Run all slots in parallel
-    slot_results = {}
-    errors = []
+    # Run all slots in parallel (executor block lives in _run_all_slots below).
 
     # Raise cap from 8 → 32 so 16-core boxes actually utilize their cores.
     max_workers = min(n, (os.cpu_count() or 2), 32)
@@ -3033,6 +3621,17 @@ def run_portfolio_backtest(
     # _run_slot_group. Gated behind _USE_GROUPING env flag for safe rollout.
     use_grouping = os.environ.get("_USE_GROUPING", "0") == "1"
 
+    # Capture each slot's underlying price series only when the portfolio uses
+    # an underlying-price-based SL or Target type (spec §2.1 / §5.1) — otherwise
+    # the result dict stays lean. Resolved here so it threads into slot workers.
+    _capture_underlying = (
+        bool(getattr(portfolio, "pf_sl_enabled", False))
+        and str(getattr(portfolio, "pf_sl_type", "") or "") in _UNDERLYING_PF_SL_TYPES
+    ) or (
+        bool(getattr(portfolio, "pf_tgt_enabled", False))
+        and str(getattr(portfolio, "pf_tgt_type", "") or "") in _UNDERLYING_PF_TGT_TYPES
+    )
+
     if use_grouping:
         groups = _group_slots(
             enabled_slots, capitals,
@@ -3049,25 +3648,81 @@ def run_portfolio_backtest(
     else:
         sorted_slots = sorted(enabled_slots, key=_duration_estimate, reverse=True)
 
-    with ProcessPoolExecutor(
-        max_workers=max_workers,
-        initializer=_worker_init_ignore_sigint,
-    ) as executor:
-        futures = {}
+    def _run_all_slots(active_move_sl, fire_callbacks: bool):
+        """Submit every slot/group to a fresh ProcessPoolExecutor and collect
+        results into ``{slot_id: result}``.
 
-        if use_grouping:
-            # One future per group. Size-1 groups route to _run_single_slot (unchanged path);
-            # size-≥2 groups route to _run_slot_group (new shared-engine path).
-            for group_idx, group in enumerate(sorted_groups):
-                if len(group) == 1:
-                    slot, capital = group[0]
+        The two-pass aggregate-Move-SL feature (spec §2.3) calls this twice
+        with a different ``active_move_sl``; a normal run calls it once.
+        ``fire_callbacks`` gates ``on_slot_complete`` and runtime-history
+        recording so only the final (reported) pass drives the UI / history.
+        Returns ``(slot_results, errors)``.
+        """
+        slot_results: dict = {}
+        errors: list = []
+        with ProcessPoolExecutor(
+            max_workers=max_workers,
+            initializer=_worker_init_ignore_sigint,
+        ) as executor:
+            futures = {}
+
+            if use_grouping:
+                # One future per group. Size-1 groups route to _run_single_slot (unchanged path);
+                # size-≥2 groups route to _run_slot_group (new shared-engine path).
+                for group_idx, group in enumerate(sorted_groups):
+                    if len(group) == 1:
+                        slot, capital = group[0]
+                        future = executor.submit(
+                            _run_single_slot,
+                            catalog_path=catalog_path,
+                            slot=slot,
+                            capital=capital,
+                            custom_strategies_dir=custom_strategies_dir,
+                            slot_index=group_idx,
+                            default_start_date=portfolio.start_date,
+                            default_end_date=portfolio.end_date,
+                            default_squareoff_time=portfolio.squareoff_time,
+                            default_squareoff_tz=portfolio.squareoff_tz,
+                            default_run_on_days=portfolio.run_on_days,
+                            default_entry_start_time=portfolio.entry_start_time,
+                            default_entry_end_time=portfolio.entry_end_time,
+                            default_rbo_settings=rbo_settings,
+                            default_other_settings=other_settings,
+                            default_move_sl_settings=active_move_sl,
+                            user_id=user_id,
+                            default_capture_underlying=_capture_underlying,
+                        )
+                        futures[future] = ("single", [slot])
+                    else:
+                        future = executor.submit(
+                            _run_slot_group,
+                            catalog_path=catalog_path,
+                            group=group,
+                            custom_strategies_dir=custom_strategies_dir,
+                            group_index=group_idx,
+                            default_start_date=portfolio.start_date,
+                            default_end_date=portfolio.end_date,
+                            default_squareoff_time=portfolio.squareoff_time,
+                            default_squareoff_tz=portfolio.squareoff_tz,
+                            default_run_on_days=portfolio.run_on_days,
+                            default_entry_start_time=portfolio.entry_start_time,
+                            default_entry_end_time=portfolio.entry_end_time,
+                            default_rbo_settings=rbo_settings,
+                            default_other_settings=other_settings,
+                            default_move_sl_settings=active_move_sl,
+                            user_id=user_id,
+                            portfolio_name=pf_name,
+                        )
+                        futures[future] = ("group", [slot for slot, _cap in group])
+            else:
+                for i, slot in enumerate(sorted_slots):
                     future = executor.submit(
                         _run_single_slot,
                         catalog_path=catalog_path,
                         slot=slot,
-                        capital=capital,
+                        capital=capitals[slot.slot_id],
                         custom_strategies_dir=custom_strategies_dir,
-                        slot_index=group_idx,
+                        slot_index=i,
                         default_start_date=portfolio.start_date,
                         default_end_date=portfolio.end_date,
                         default_squareoff_time=portfolio.squareoff_time,
@@ -3077,100 +3732,93 @@ def run_portfolio_backtest(
                         default_entry_end_time=portfolio.entry_end_time,
                         default_rbo_settings=rbo_settings,
                         default_other_settings=other_settings,
-                        default_move_sl_settings=move_sl_settings,
+                        default_move_sl_settings=active_move_sl,
                         user_id=user_id,
+                        default_capture_underlying=_capture_underlying,
                     )
                     futures[future] = ("single", [slot])
-                else:
-                    future = executor.submit(
-                        _run_slot_group,
-                        catalog_path=catalog_path,
-                        group=group,
-                        custom_strategies_dir=custom_strategies_dir,
-                        group_index=group_idx,
-                        default_start_date=portfolio.start_date,
-                        default_end_date=portfolio.end_date,
-                        default_squareoff_time=portfolio.squareoff_time,
-                        default_squareoff_tz=portfolio.squareoff_tz,
-                        default_run_on_days=portfolio.run_on_days,
-                        default_entry_start_time=portfolio.entry_start_time,
-                        default_entry_end_time=portfolio.entry_end_time,
-                        default_rbo_settings=rbo_settings,
-                        default_other_settings=other_settings,
-                        default_move_sl_settings=move_sl_settings,
-                        user_id=user_id,
-                    )
-                    futures[future] = ("group", [slot for slot, _cap in group])
-        else:
-            for i, slot in enumerate(sorted_slots):
-                future = executor.submit(
-                    _run_single_slot,
-                    catalog_path=catalog_path,
-                    slot=slot,
-                    capital=capitals[slot.slot_id],
-                    custom_strategies_dir=custom_strategies_dir,
-                    slot_index=i,
-                    default_start_date=portfolio.start_date,
-                    default_end_date=portfolio.end_date,
-                    default_squareoff_time=portfolio.squareoff_time,
-                    default_squareoff_tz=portfolio.squareoff_tz,
-                    default_run_on_days=portfolio.run_on_days,
-                    default_entry_start_time=portfolio.entry_start_time,
-                    default_entry_end_time=portfolio.entry_end_time,
-                    default_rbo_settings=rbo_settings,
-                    default_other_settings=other_settings,
-                    default_move_sl_settings=move_sl_settings,
-                    user_id=user_id,
-                )
-                futures[future] = ("single", [slot])
 
-        try:
-            for future in as_completed(futures):
-                kind, slots_in_future = futures[future]
-                try:
-                    result = future.result()
-                    if kind == "group":
-                        # _run_slot_group returns list[dict], one per slot in insertion order
-                        for slot, r in zip(slots_in_future, result):
-                            slot_results[slot.slot_id] = r
-                            elapsed = r.get("elapsed_seconds")
-                            if elapsed is not None:
+            try:
+                for future in as_completed(futures):
+                    kind, slots_in_future = futures[future]
+                    try:
+                        result = future.result()
+                        if kind == "group":
+                            # _run_slot_group returns list[dict], one per slot in insertion order
+                            for slot, r in zip(slots_in_future, result):
+                                slot_results[slot.slot_id] = r
+                                elapsed = r.get("elapsed_seconds")
+                                if fire_callbacks and elapsed is not None:
+                                    runtime_history.record(
+                                        history, slot.bar_type_str, slot.strategy_name,
+                                        float(elapsed), _span_days(slot),
+                                    )
+                                if fire_callbacks and on_slot_complete:
+                                    try:
+                                        on_slot_complete(slot.slot_id)
+                                    except Exception:
+                                        pass
+                        else:
+                            slot = slots_in_future[0]
+                            slot_results[slot.slot_id] = result
+                            elapsed = result.get("elapsed_seconds")
+                            if fire_callbacks and elapsed is not None:
                                 runtime_history.record(
                                     history, slot.bar_type_str, slot.strategy_name,
                                     float(elapsed), _span_days(slot),
                                 )
-                            if on_slot_complete:
+                            if fire_callbacks and on_slot_complete:
                                 try:
                                     on_slot_complete(slot.slot_id)
                                 except Exception:
                                     pass
-                    else:
-                        slot = slots_in_future[0]
-                        slot_results[slot.slot_id] = result
-                        elapsed = result.get("elapsed_seconds")
-                        if elapsed is not None:
-                            runtime_history.record(
-                                history, slot.bar_type_str, slot.strategy_name,
-                                float(elapsed), _span_days(slot),
-                            )
-                        if on_slot_complete:
-                            try:
-                                on_slot_complete(slot.slot_id)
-                            except Exception:
-                                pass
-                except Exception as e:
-                    for slot in slots_in_future:
-                        errors.append({
-                            "slot_id": slot.slot_id,
-                            "display_name": slot.display_name,
-                            "error": str(e),
-                        })
-        except KeyboardInterrupt:
-            # Parent main thread saw Ctrl+C. Cancel queued futures; in-flight
-            # workers (which ignore SIGINT) finish their current engine.run()
-            # and the pool drains cleanly. Re-raise so the caller sees the KI.
-            executor.shutdown(wait=False, cancel_futures=True)
-            raise
+                    except Exception as e:
+                        for slot in slots_in_future:
+                            errors.append({
+                                "slot_id": slot.slot_id,
+                                "display_name": slot.display_name,
+                                "error": str(e),
+                            })
+            except KeyboardInterrupt:
+                # Parent main thread saw Ctrl+C. Cancel queued futures; in-flight
+                # workers (which ignore SIGINT) finish their current engine.run()
+                # and the pool drains cleanly. Re-raise so the caller sees the KI.
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise
+        return slot_results, errors
+
+    # Two-pass portfolio-aggregate Move SL (spec §2.3). When active: pass 1
+    # discovers the combined-P&L timeline + per-leg SL/target hits, the parent
+    # computes the aggregate trigger ts and a cross-process event bus, then
+    # pass 2 replays with those injected. ~2x runtime; gated by
+    # _USE_PF_AGG_MOVE_SL and only when an aggregate / cross-slot trigger is
+    # actually configured. Default off → single pass, zero behavior change.
+    agg_active = (
+        os.environ.get("_USE_PF_AGG_MOVE_SL", "0") == "1"
+        and (move_sl_settings.agg_pnl_enabled
+             or move_sl_settings.hit_on_leg_sl
+             or move_sl_settings.hit_on_leg_target)
+    )
+    if not agg_active:
+        slot_results, errors = _run_all_slots(move_sl_settings, fire_callbacks=True)
+    else:
+        print("[PF_AGG_MOVE_SL] two-pass active — running discovery pass 1")
+        pass1_results, pass1_errors = _run_all_slots(move_sl_settings, fire_callbacks=False)
+        coord = _compute_agg_coordination(portfolio, pass1_results, move_sl_settings)
+        for log_line in coord.logs:
+            print(f"[PF_AGG_MOVE_SL] {log_line}")
+        # Pass-1 wrote live SL/target events into the per-process bus; clear it
+        # so pass 2 starts from only the explicitly pre-seeded events.
+        clear_cross_slot_bus(pf_name)
+        move_sl_pass2 = dataclasses.replace(
+            move_sl_settings,
+            agg_trigger_ns=coord.agg_trigger_ns,
+            preseeded_bus=coord.event_bus,
+        )
+        slot_results, errors = _run_all_slots(move_sl_pass2, fire_callbacks=True)
+        # If pass 2 produced nothing, surface pass-1's errors for diagnostics.
+        if not slot_results and not errors:
+            errors = pass1_errors
 
     # Persist once after the whole run — cheap single JSON write.
     try:
@@ -3182,7 +3830,7 @@ def run_portfolio_backtest(
         raise ValueError(f"All slots failed: {errors}")
 
     # Merge results into portfolio-level metrics
-    return _merge_portfolio_results(portfolio, slot_results, capitals, errors)
+    return _merge_portfolio_results(portfolio, slot_results, capitals, errors, user_id=user_id)
 
 
 def _merge_portfolio_results(
@@ -3190,6 +3838,7 @@ def _merge_portfolio_results(
     slot_results: dict,
     capitals: dict,
     errors: list,
+    user_id: str | None = None,
 ) -> dict:
     """Merge individual slot results into portfolio-level metrics."""
     total_pnl = 0.0
@@ -3269,6 +3918,10 @@ def _merge_portfolio_results(
             # the slot stayed on Path A — either because _USE_BACKTEST_NODE
             # wasn't set, or the gate auto-fell-back due to filter config.
             "path_b": bool(r.get("path_b")),
+            # VWAP proxy-fill provenance (spec §4.2) — count of SL/Target exit
+            # fills repriced for this slot; 0 / False when _USE_VWAP_FILL off.
+            "vwap_fill_applied": bool(r.get("vwap_fill_applied")),
+            "vwap_fill_adjustments": int(r.get("vwap_fill_adjustments", 0) or 0),
         }
 
     # Merge equity curves — sum balances at each timestamp
@@ -3324,7 +3977,8 @@ def _merge_portfolio_results(
     # accrued from prior portfolios in the same orchestrator run.
     from core.users import (
         get_user_max_loss, get_user_max_profit,
-        get_user_cumulative_pnl, add_user_pnl,
+        get_user_cumulative_pnl, add_user_pnl, get_user_trailing_sl,
+        get_user_trailing_target,
     )
     user_max_loss = get_user_max_loss(user_id) if user_id else None
     user_max_profit = get_user_max_profit(user_id) if user_id else None
@@ -3334,6 +3988,17 @@ def _merge_portfolio_results(
     eff_max_profit = user_max_profit if user_max_profit is not None else portfolio.max_profit
     max_loss_hit = eff_max_loss is not None and combined_pnl <= -abs(eff_max_loss)
     max_profit_hit = eff_max_profit is not None and combined_pnl >= eff_max_profit
+
+    # User-level SL (spec §3 Level 3 / execution_logic.html §6) — Max Loss,
+    # optionally ratcheted tighter by the user Trailing SL. Resolved into a
+    # real equity-curve clip below (_user_sl_clip); the result drives an
+    # actual force-sqoff, not just a flag.
+    user_trail_sl = get_user_trailing_sl(user_id) if user_id else None
+    # User-level Target — Max Profit ceiling, optionally with a Trailing
+    # Target / Profit-Lock (spec §6 target doc). Resolved into a real
+    # equity-curve clip below (_user_tgt_clip), same as the SL side.
+    user_trail_tgt = get_user_trailing_target(user_id) if user_id else None
+
     # Roll this portfolio's PnL into the user aggregator so subsequent
     # portfolios (or repeat runs in the same orchestrator session) see it.
     if user_id:
@@ -3349,8 +4014,26 @@ def _merge_portfolio_results(
     for w in pf_tgt_warnings:
         print(f"[PF_TGT] {w}")
 
+    # User-level SL clip (spec §3 / §6) — evaluated regardless of portfolio SL.
+    _user_clip_slot_ids = [
+        s.slot_id for s in portfolio.enabled_slots if slot_results.get(s.slot_id)
+    ]
+    user_clip = _user_sl_clip(
+        equity_curve_ts, portfolio.starting_capital, cum_user_pnl,
+        eff_max_loss, user_trail_sl, _user_clip_slot_ids,
+    )
+    user_trail_sl_hit = user_clip.clip_reason == "USER_TRAIL_STOPLOSS"
+    user_trail_sl_effective = None  # surfaced via the clip log when it fires
+    # User-level Target clip — Max Profit ceiling + Trailing Target.
+    user_tgt_clip = _user_tgt_clip(
+        equity_curve_ts, portfolio.starting_capital, cum_user_pnl,
+        eff_max_profit, user_trail_tgt, _user_clip_slot_ids,
+    )
+    user_trail_tgt_hit = user_tgt_clip.clip_reason == "USER_TRAIL_TARGET"
+
     clip_result = _ClipResult()
-    if pf_sl_settings.enabled or pf_tgt_settings.enabled:
+    if (pf_sl_settings.enabled or pf_tgt_settings.enabled
+            or user_clip.clip_ts is not None or user_tgt_clip.clip_ts is not None):
         # Compute per-slot final P&L for selective sqoff (used at clip-point
         # to decide which slots to clip — uses end-of-run P&L as a proxy for
         # P&L at clip_ts, which is close enough for v1 since selective sqoff
@@ -3360,10 +4043,67 @@ def _merge_portfolio_results(
             for slot in portfolio.enabled_slots
             if slot_results.get(slot.slot_id) is not None
         }
-        clip_result = _apply_portfolio_clip(
-            equity_curve_ts, portfolio.starting_capital,
-            pf_sl_settings, pf_tgt_settings, slot_pnl_at_clip,
+        # Per-slot equity curves let the selective SqOff filter use each slot's
+        # PnL *at the clip timestamp* rather than the end-of-run proxy.
+        slot_curves = {
+            slot.slot_id: slot_results[slot.slot_id].get("equity_curve_ts", [])
+            for slot in portfolio.enabled_slots
+            if slot_results.get(slot.slot_id) is not None
+        }
+        # Underlying-based SL/Target types (spec §2.1 / §5.1) are evaluated
+        # against the primary slot's price series, separately from the PnL
+        # clip. For each side that is underlying-based we disable its branch
+        # in _apply_portfolio_clip and run the dedicated underlying clip, then
+        # keep whichever clip fires first.
+        sl_is_underlying = (
+            pf_sl_settings.enabled
+            and pf_sl_settings.sl_type in _UNDERLYING_PF_SL_TYPES
         )
+        tgt_is_underlying = (
+            pf_tgt_settings.enabled
+            and pf_tgt_settings.tgt_type in _UNDERLYING_PF_TGT_TYPES
+        )
+        if sl_is_underlying or tgt_is_underlying:
+            underlying_curve = next(
+                (slot_results[s.slot_id].get("underlying_curve")
+                 for s in portfolio.enabled_slots
+                 if slot_results.get(s.slot_id)
+                 and slot_results[s.slot_id].get("underlying_curve")),
+                None,
+            )
+            # The PnL clip handles whichever side is NOT underlying-based.
+            pf_sl_for_clip = (dataclasses.replace(pf_sl_settings, enabled=False)
+                              if sl_is_underlying else pf_sl_settings)
+            pf_tgt_for_clip = (dataclasses.replace(pf_tgt_settings, enabled=False)
+                               if tgt_is_underlying else pf_tgt_settings)
+            candidates = [_apply_portfolio_clip(
+                equity_curve_ts, portfolio.starting_capital,
+                pf_sl_for_clip, pf_tgt_for_clip, slot_pnl_at_clip,
+                slot_curves=slot_curves,
+            )]
+            if sl_is_underlying:
+                candidates.append(_underlying_sl_clip(
+                    underlying_curve, equity_curve_ts, pf_sl_settings,
+                    pf_tgt_settings, slot_pnl_at_clip, portfolio.starting_capital,
+                    slot_curves=slot_curves,
+                ))
+            if tgt_is_underlying:
+                candidates.append(_underlying_tgt_clip(
+                    underlying_curve, equity_curve_ts, pf_sl_settings,
+                    pf_tgt_settings, slot_pnl_at_clip, portfolio.starting_capital,
+                    slot_curves=slot_curves,
+                ))
+            clip_result = _earliest_clip(*candidates)
+        else:
+            clip_result = _apply_portfolio_clip(
+                equity_curve_ts, portfolio.starting_capital,
+                pf_sl_settings, pf_tgt_settings, slot_pnl_at_clip,
+                slot_curves=slot_curves,
+            )
+        # Merge the user-level SL and Target clips — whichever (portfolio vs
+        # user SL vs user Target) fires earliest wins; the user caps are the
+        # outer ceiling (spec §8 evaluation order).
+        clip_result = _earliest_clip(clip_result, user_clip, user_tgt_clip)
         for log_line in clip_result.logs:
             print(f"[PF_CLIP] {log_line}")
 
@@ -3505,6 +4245,12 @@ def _merge_portfolio_results(
         "per_strategy": per_strategy,
         "max_loss_hit": max_loss_hit,
         "max_profit_hit": max_profit_hit,
+        # User-level Trailing SL (spec execution_logic.html §6.1) — detection
+        # flag + the ratcheted-tighter effective Max-Loss cap.
+        "user_trail_sl_hit": user_trail_sl_hit,
+        "user_trail_sl_effective": user_trail_sl_effective,
+        # User-level Trailing Target / Profit-Lock (spec §6.1 target doc).
+        "user_trail_tgt_hit": user_trail_tgt_hit,
         # Portfolio-level Stoploss/Target post-hoc clip (spec
         # 5. Logics/portfolio_sl_tgt.html). Null/empty when not enabled or
         # when the clip never triggered. clip_action is informational —
@@ -3884,12 +4630,17 @@ def _extract_results(
     engine: BacktestEngine,
     starting_capital: float,
     fx_resolver: FxRateResolver | None = None,
+    vwap_lookup: dict | None = None,
 ) -> dict:
     """Extract backtest results from the engine, converting per-position PnL
     into the account base currency via the supplied FX resolver.
 
     Without a resolver, results use engine-native numbers (identical to the
     pre-FX-aware behavior) — safe default for USD-only catalogs.
+
+    ``vwap_lookup`` (from ``_build_vwap_lookup``) enables the VWAP proxy-fill
+    model: SL/Target exit fills are repriced before any metric is computed.
+    ``None`` (the default) leaves fills as the engine produced them.
     """
     trader = engine.trader
 
@@ -3905,6 +4656,18 @@ def _extract_results(
         positions_report = trader.generate_positions_report()
     except Exception:
         pass
+
+    # VWAP proxy-fill (spec §4.2): reprice SL/Target exits before any metric
+    # is derived from positions_report, so win/loss, daily PnL, totals and the
+    # base-currency column all reflect the adjusted fills.
+    vwap_fill_adjustments = 0
+    if vwap_lookup:
+        try:
+            vwap_fill_adjustments = _apply_vwap_fill(
+                positions_report, fills_report, vwap_lookup,
+            )
+        except Exception:
+            vwap_fill_adjustments = 0
 
     account_report = None
     try:
@@ -4083,6 +4846,8 @@ def _extract_results(
         "fills_report": fills_report,
         "positions_report": positions_report_with_base(positions_report, fx_resolver),
         "account_report": account_report,
+        "vwap_fill_applied": bool(vwap_fill_adjustments),
+        "vwap_fill_adjustments": vwap_fill_adjustments,
     }
 
 
@@ -4259,3 +5024,219 @@ def _ensure_final_equity_point(
         "timestamp": last.get("timestamp"),
         "balance": float(final_balance),
     })
+
+
+# ─── VWAP proxy-fill model (spec §4.2 / 5. Logics/sl_tgt.html) ───────────────
+#
+# Gated by the _USE_VWAP_FILL env flag. When on, SL/Target exit fills are
+# repriced to the conservative VWAP-proxy fill described in
+# "5. Logics/sl_tgt.html" — exit_price = vwap if vwap > hit_price else
+# hit_price. The catalog carries no intra-bar tick data, so the per-bar VWAP
+# is *proxied* by the bar's typical price (H+L+C)/3 of the opposite quote
+# side. All of this is runner-side post-run report surgery (same idiom as
+# _apply_portfolio_clip) — the engine and ManagedExitStrategy are untouched.
+
+# Close-order tag prefixes that mark an SL / Target exit (set by
+# ManagedExitStrategy._handle_exit). Squareoff and entry fills are excluded.
+_VWAP_SL_PREFIXES = ("Stop Loss", "Trailing SL", "Reverse on SL")
+_VWAP_TP_PREFIXES = ("Take Profit", "Reverse on TP")
+
+
+def _build_vwap_lookup(bars) -> dict | None:
+    """Index ASK/BID bars by ts_event for the VWAP proxy-fill model.
+
+    Returns ``{"ask": {ts_ns: (typical, high, low)}, "bid": {...}}`` where
+    ``typical = (high + low + close) / 3`` is the per-bar VWAP proxy. Returns
+    ``None`` when no ASK/BID bars are present (LAST / crypto-only slots) —
+    callers treat ``None`` as "VWAP fill not applicable, leave fills as-is".
+    """
+    ask: dict[int, tuple] = {}
+    bid: dict[int, tuple] = {}
+    for bar in bars:
+        bt = str(bar.bar_type)
+        if "-ASK-" in bt:
+            side = ask
+        elif "-BID-" in bt:
+            side = bid
+        else:
+            continue
+        try:
+            h = float(bar.high)
+            l = float(bar.low)
+            c = float(bar.close)
+        except (TypeError, ValueError):
+            continue
+        side[int(bar.ts_event)] = ((h + l + c) / 3.0, h, l)
+    if not ask and not bid:
+        return None
+    return {"ask": ask, "bid": bid}
+
+
+def _vwap_normalize_tag(tg) -> str:
+    """Unwrap a fills_report ``tags`` cell to its verbatim string.
+
+    Nautilus stores tags as ``['Stop Loss: …']``; mirror report_generator's
+    _normalize_tags so the prefix match sees the raw reason.
+    """
+    if isinstance(tg, (list, tuple)):
+        return str(tg[0]) if tg else ""
+    if tg is None:
+        return ""
+    return str(tg)
+
+
+def _vwap_ts_to_ns(raw) -> int:
+    """Best-effort conversion of a report timestamp cell to UTC nanoseconds.
+
+    Handles nanosecond ints, pandas.Timestamp and ISO strings identically so
+    a positions_report ``ts_closed`` matches a _build_vwap_lookup key (which
+    is a raw ``bar.ts_event`` int)."""
+    if raw is None:
+        return 0
+    try:
+        if isinstance(raw, float) and pd.isna(raw):
+            return 0
+    except Exception:
+        pass
+    try:
+        ts = pd.Timestamp(raw)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        return int(ts.value)
+    except Exception:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return 0
+
+
+def _vwap_row_is_long(report, idx, sqty_col, entry_col, side_col):
+    """Return True/False for a positions_report row's direction, or None.
+
+    Prefers ``signed_qty`` (positive = long), then the ``entry`` order side,
+    then the ``side`` position-side column."""
+    if sqty_col:
+        try:
+            v = float(report.at[idx, sqty_col])
+            if v > 0:
+                return True
+            if v < 0:
+                return False
+        except (TypeError, ValueError):
+            pass
+    if entry_col:
+        e = str(report.at[idx, entry_col]).upper()
+        if "BUY" in e:
+            return True
+        if "SELL" in e:
+            return False
+    if side_col:
+        s = str(report.at[idx, side_col]).upper()
+        if "LONG" in s:
+            return True
+        if "SHORT" in s:
+            return False
+    return None
+
+
+def _vwap_adjust_pnl_cell(report, idx, pnl_col, delta: float) -> None:
+    """Add ``delta`` (quote currency) to a realized_pnl cell, preserving its
+    ``"<amount> <ccy>"`` Money-string shape so downstream parsing is unchanged."""
+    amount, ccy = parse_money_string(report.at[idx, pnl_col])
+    new_amount = amount + delta
+    report.at[idx, pnl_col] = f"{new_amount} {ccy}" if ccy else new_amount
+
+
+def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
+    """Reprice SL/Target exit fills to the conservative VWAP-proxy price.
+
+    Spec: 5. Logics/sl_tgt.html "SL & Target Fill Price Formula" —
+    ``exit_price = vwap if vwap > hit_price else hit_price``. ``vwap`` is the
+    opposite-quote-side per-bar typical price; ``hit_price`` is the
+    trigger-side bar extreme:
+
+      * long  leg (closed by selling at BID): vwap=bid typical,
+        hit = ask_low (SL) / ask_high (Target)
+      * short leg (closed by buying  at ASK): vwap=ask typical,
+        hit = bid_high (SL) / bid_low (Target)
+
+    Mutates ``positions_report``'s realized_pnl column in place (quote
+    currency); the caller's existing FX conversion / metric code picks the
+    change up. Returns the number of positions adjusted.
+    """
+    if not vwap_lookup or positions_report is None or fills_report is None:
+        return 0
+    if positions_report.empty or fills_report.empty:
+        return 0
+    pnl_col = _pick_col(positions_report, ["realized_pnl", "RealizedPnl", "pnl"])
+    ts_col = _pick_col(positions_report, ["ts_closed", "ts_last"])
+    close_col = _pick_col(positions_report, ["avg_px_close", "AvgPxClose", "avg_close"])
+    if not pnl_col or not ts_col or not close_col:
+        return 0
+
+    # Map exit timestamp -> "sl" | "tp" from the close fills' structured tags.
+    fill_ts_col = _pick_col(fills_report, ["ts_init", "ts_last", "ts_event"])
+    tags_col = _pick_col(fills_report, ["tags", "Tags"])
+    if not fill_ts_col or not tags_col:
+        return 0
+    exit_kind: dict[int, str] = {}
+    for ts_raw, tg in zip(fills_report[fill_ts_col].tolist(),
+                          fills_report[tags_col].tolist()):
+        reason = _vwap_normalize_tag(tg).strip()
+        if not reason:
+            continue
+        if reason.startswith(_VWAP_SL_PREFIXES):
+            kind = "sl"
+        elif reason.startswith(_VWAP_TP_PREFIXES):
+            kind = "tp"
+        else:
+            continue
+        ts_ns = _vwap_ts_to_ns(ts_raw)
+        if ts_ns:
+            exit_kind[ts_ns] = kind
+    if not exit_kind:
+        return 0
+
+    ask = vwap_lookup.get("ask", {})
+    bid = vwap_lookup.get("bid", {})
+    qty_col = _pick_col(positions_report, ["peak_qty", "quantity", "Quantity"])
+    sqty_col = _pick_col(positions_report, ["signed_qty", "SignedQty"])
+    entry_col = _pick_col(positions_report, ["entry", "Entry"])
+    side_col = _pick_col(positions_report, ["side", "Side"])
+
+    adjusted = 0
+    for idx in positions_report.index:
+        ts_ns = _vwap_ts_to_ns(positions_report.at[idx, ts_col])
+        kind = exit_kind.get(ts_ns)
+        if kind is None:
+            continue
+        a = ask.get(ts_ns)
+        b = bid.get(ts_ns)
+        if a is None or b is None:
+            continue  # one quote side missing for this bar — fall back
+        was_long = _vwap_row_is_long(positions_report, idx, sqty_col, entry_col, side_col)
+        if was_long is None:
+            continue
+        try:
+            actual_px = float(positions_report.at[idx, close_col])
+            qty = abs(float(positions_report.at[idx, qty_col])) if qty_col else 0.0
+        except (TypeError, ValueError):
+            continue
+        if qty <= 0 or actual_px <= 0:
+            continue
+        ask_typ, ask_hi, ask_lo = a
+        bid_typ, bid_hi, bid_lo = b
+        if was_long:
+            vwap = bid_typ
+            hit = ask_lo if kind == "sl" else ask_hi
+        else:
+            vwap = ask_typ
+            hit = bid_hi if kind == "sl" else bid_lo
+        exit_px = vwap if vwap > hit else hit
+        # Long pnl rises with the exit price; short pnl falls with it.
+        delta = (exit_px - actual_px) * qty if was_long else (actual_px - exit_px) * qty
+        if delta == 0.0:
+            continue
+        _vwap_adjust_pnl_cell(positions_report, idx, pnl_col, delta)
+        adjusted += 1
+    return adjusted

@@ -1103,6 +1103,7 @@ from core.models import (
     PortfolioConfig, StrategySlotConfig, ExitConfig,
     portfolio_to_dict, portfolio_from_dict,
     save_portfolio, load_portfolio, list_portfolios, delete_portfolio,
+    validate_leg_actions,
 )
 from core.templates import get_templates, build_template
 
@@ -1198,6 +1199,31 @@ def _check_portfolio_allowlist(portfolio_config, user) -> tuple[bool, str]:
     return True, ""
 
 
+def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
+    """Validate SL-related config before a portfolio is saved.
+
+    Returns ``(ok, error_message)``. Blocks:
+      • Exit Order Type = Limit / SL_Limit — not implemented in the backtest
+        engine (spec execution_logic.html §8.1; only MARKET is wired).
+      • Invalid leg-level On SL / On Target action combinations
+        (spec §4.8 — see ``core.models.validate_leg_actions``).
+    """
+    order_type = str(getattr(portfolio_config, "exit_order_type", "MARKET") or "MARKET")
+    if order_type.upper() != "MARKET":
+        return False, (
+            f"Exit Order Type '{order_type}' is not implemented in the backtest "
+            f"engine — only MARKET exits are supported (spec §8.1)."
+        )
+    for slot in portfolio_config.slots:
+        ec = slot.exit_config
+        has_target = bool(getattr(ec, "execute_target_leg_id", "") or "")
+        for label, action in (("On SL", ec.on_sl_action), ("On Target", ec.on_target_action)):
+            ok, err = validate_leg_actions(action, has_execute_target=has_target)
+            if not ok:
+                return False, f"Slot '{slot.strategy_name}' {label} action: {err}"
+    return True, ""
+
+
 @app.route("/api/users/list")
 def api_users_list():
     """Public-safe user list for the frontend picker.
@@ -1271,6 +1297,9 @@ def api_save_portfolio():
         ok, err = _check_portfolio_allowlist(config, user_or_resp)
         if not ok:
             return jsonify({"error": err}), 403
+        ok, err = _validate_portfolio_sl(config)
+        if not ok:
+            return jsonify({"error": err}), 400
         path = save_portfolio(config, _user_portfolios_dir(user_or_resp["user_id"]))
         return jsonify({"success": True, "message": f"Portfolio '{config.name}' saved.", "path": str(path)})
     except Exception as e:

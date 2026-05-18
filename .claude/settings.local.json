@@ -50,7 +50,11 @@
       "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Force)",
       "Bash(Select-Object Name, FullName)",
       "Bash(grep -E \"\\\\.py$\")",
-      "PowerShell(python d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\\\\ipynb\\\\_check_nb.py)"
+      "PowerShell(python d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\\\\ipynb\\\\_check_nb.py)",
+      "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py'\\).read\\(\\)\\); print\\('backtest_runner.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/managed_strategy.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/models.py'\\).read\\(\\)\\); print\\('all syntax OK'\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"
