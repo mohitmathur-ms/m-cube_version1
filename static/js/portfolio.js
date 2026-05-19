@@ -1937,6 +1937,7 @@ const Portfolio = {
             strategy_name: firstStrat, strategy_params: defaultParams,
             bar_type_str: this.barTypes[0] || "", lots: 1, allocation_pct: 0,
             exit_config: {
+                exit_price_format: "ohlcv",
                 stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
                 target_type: "none", target_value: 0, sl_wait_sec: 0, sl_wait_bars: 0, on_sl_action: "close", on_target_action: "close",
                 max_re_executions: 0, execute_target_leg_id: "", reentry_price: 0, max_re_entries: 0, armed_at_start: true,
@@ -2058,6 +2059,9 @@ const Portfolio = {
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-stoploss" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:150px;" title="Three-format engine (spec §3). OHLCV: trigger on this slot's bar high/low. LTP: single price — trigger on close only. Bid/Ask: SELL exits trigger on the BID series, BUY on the ASK series (needs paired ASK/BID data).">
+                        <label class="form-label">Exit Price Format</label>
+                        <select class="form-control" id="leg-m-exitfmt">${[["ohlcv","OHLCV (Format B)"],["ltp","LTP (Format C)"],["bidask","Bid/Ask (Format A)"]].map(([v,l]) => `<option value="${v}" ${(ec.exit_price_format || "ohlcv") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:110px;" title="'atr' sizes the SL from Average True Range at entry (spec §1.1 fn.4).">
                         <label class="form-label">SL Type</label>
                         <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>
@@ -2233,6 +2237,7 @@ const Portfolio = {
 
         // Exit config
         const ec = slot.exit_config = slot.exit_config || {};
+        ec.exit_price_format = document.getElementById("leg-m-exitfmt")?.value || "ohlcv";
         ec.stop_loss_type = document.getElementById("leg-m-sltype").value;
         ec.stop_loss_value = parseFloat(document.getElementById("leg-m-slval").value) || 0;
         ec.sl_atr_period = parseInt(document.getElementById("leg-m-atrperiod").value) || 0;

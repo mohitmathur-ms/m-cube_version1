@@ -3,14 +3,17 @@
     {
       "user_id": "_default",
       "alias": "Default",
-      "multiplier": 6,
+      "multiplier": 1,
       "allowed_instruments": null
     },
     {
-      "user_id": "u_mownziwo",
-      "alias": "New User",
-      "multiplier": 1,
-      "allowed_instruments": null
+      "user_id": "u_stress",
+      "multiplier": 2.5,
+      "max_loss": 8000,
+      "max_profit": 12000,
+      "trailing_sl_enabled": true,
+      "trailing_sl_every": 2000,
+      "trailing_sl_by": 500
     }
   ]
 }
