@@ -182,7 +182,7 @@ const Portfolio = {
                             <button class="btn btn-xs btn-danger" onclick="Portfolio.deletePortfolio(${i})" title="Delete">&times;</button>
                         </div>
                     </td>
-                </tr>${pf.description ? `<tr${rowCls}><td></td><td colspan="${colCount - 1}" style="font-size:0.74rem; color:var(--text-muted); padding-top:0; padding-bottom:8px; border-bottom:1px solid var(--border-light); white-space:normal;">${pf.description}</td></tr>` : ""}`;
+                </tr>${pf.description ? `<tr${rowCls}><td></td><td colspan="${colCount - 1}" style="font-size:0.74rem; color:var(--text-muted); padding-top:0; padding-bottom:12px; border-bottom:1px solid var(--border-light); white-space:normal;">${pf.description}</td></tr>` : ""}`;
             }).join("");
         }
 

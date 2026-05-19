@@ -1,20 +1,36 @@
 {
   "label": "Commodity",
   "csv": {
-    "filename_pattern": null,
-    "filename_description": null,
-    "required_columns": null,
-    "timestamp_column": null,
-    "timestamp_format": null,
+    "filename_pattern": "^[A-Z]+_[A-Z]+_\\d{2}[A-Z]{3}\\d{4}_\\d{2}[A-Z]{3}\\d{4}_(ASK|BID|MID)_OHLCV\\.csv$",
+    "filename_description": "Commodity daily ASK and BID CSVs laid out as <COMMODITY>/YYYY/MM/DD/DD.MM.YYYY_(ASK|BID)_OHLCV.csv. Scanner aggregates per symbol and exposes ASK/BID/MID entries (MID synthesised at ingest). Required columns: timestamp, open, high, low, close, volume. ASK files carry ask_vwap and BID files carry bid_vwap; both are loaded as optional columns and preserved through to the returned dataframe (MID frames carry both).",
+    "required_columns": [
+      "timestamp",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "optional_columns": [
+      "ask_vwap",
+      "bid_vwap"
+    ],
+    "timestamp_column": "timestamp",
+    "timestamp_format": "auto",
     "delimiter": ","
   },
   "instrument": {
-    "type": null,
-    "quote_currency": null,
-    "price_precision": null,
-    "size_precision": null,
-    "currency_type": null,
-    "timeframe": null
+    "type": "CurrencyPair",
+    "quote_currency": "USD",
+    "expose_sides": [
+      "ASK",
+      "BID",
+      "MID"
+    ],
+    "price_precision": 3,
+    "size_precision": 2,
+    "currency_type": 0,
+    "timeframe": "1-MINUTE"
   },
   "trading": {
     "maker_fee": null,

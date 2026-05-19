@@ -51,6 +51,12 @@ _FX_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
 _FX_SCAN_CACHE_TTL_SECONDS = 600.0
 _FX_SCAN_CACHE_LOCK = threading.Lock()
 
+# Parallel cache for :func:`_scan_commodity_daily_layout`. Same mtime + TTL
+# safety-net shape as the FX cache above; see that block for the rationale.
+_COMMODITY_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
+_COMMODITY_SCAN_CACHE_TTL_SECONDS = 600.0
+_COMMODITY_SCAN_CACHE_LOCK = threading.Lock()
+
 
 # Default path to the user's crypto CSV data
 DEFAULT_CSV_FOLDER = r"D:\Data_all\Fx"
@@ -69,6 +75,11 @@ _DAILY_FX_PATTERN = re.compile(
     r"^(\d{2})\.(\d{2})\.(\d{4})_(BID|ASK)_OHLCV\.csv$",
     re.IGNORECASE,
 )
+
+# Commodity daily-file naming: bare "ASK.csv" / "BID.csv". The date is encoded
+# in the parent directory path (<COMMODITY>/YYYY/MM/DD/), not the filename, so
+# the regex captures only the side.
+_DAILY_COMMODITY_PATTERN = re.compile(r"^(ASK|BID)\.csv$", re.IGNORECASE)
 
 # Consolidated-FX naming: "{PAIR}_{PAIR}_DDMMMYYYY_DDMMMYYYY_{ASK|BID|MID}_OHLCV.csv"
 # (matches the pattern documented in adapter_admin/data_formats/fx.json). One file
@@ -206,12 +217,100 @@ def _scan_fx_daily_layout(root: Path) -> list[dict]:
     return entries
 
 
+def _scan_commodity_daily_layout(root: Path) -> list[dict]:
+    """Aggregate daily commodity CSVs (<root>/<COMMODITY>/YYYY/MM/DD/(ASK|BID).csv)
+    into three entries per symbol: ASK, BID and MID.
+
+    Mirrors :func:`_scan_fx_daily_layout` so the produced entry shape feeds
+    cleanly into :func:`core.nautilus_loader.load_csv_and_store` (it dispatches
+    on ``entry["side"]`` + ``ask_files`` / ``bid_files`` + ``aggregated``).
+    The only structural differences from the FX scanner:
+
+    * The filename pattern (:data:`_DAILY_COMMODITY_PATTERN`) captures only
+      the side — the date lives in the parent dirs instead of the filename.
+    * No symbol normalisation: commodities don't share the FX misspelling
+      quirks that :data:`_SYMBOL_NORMALIZE` handles.
+    """
+    key = str(root)
+    try:
+        root_mtime = root.stat().st_mtime
+    except OSError:
+        return []
+
+    now = time.monotonic()
+    cached = _COMMODITY_SCAN_CACHE.get(key)
+    if (cached is not None
+            and cached[1] == root_mtime
+            and now - cached[0] < _COMMODITY_SCAN_CACHE_TTL_SECONDS):
+        return list(cached[2])
+
+    aggregated: dict[tuple[str, str], list[str]] = {}
+    for csv_file in root.rglob("*.csv"):
+        match = _DAILY_COMMODITY_PATTERN.match(csv_file.name)
+        if not match:
+            continue
+        try:
+            rel_parts = csv_file.relative_to(root).parts
+        except ValueError:
+            continue
+        if len(rel_parts) < 2:
+            # File directly in root — not a daily-layout file.
+            continue
+        symbol = rel_parts[0].upper()
+        side = match.group(1).upper()
+        aggregated.setdefault((symbol, side), []).append(str(csv_file))
+
+    pairs: dict[str, dict[str, list[str]]] = {}
+    for (symbol, side), files in aggregated.items():
+        pairs.setdefault(symbol, {})[side] = sorted(files)
+
+    entries: list[dict] = []
+    auto_id = 0
+    for symbol in sorted(pairs):
+        sides = pairs[symbol]
+        ask_files = sides.get("ASK", [])
+        bid_files = sides.get("BID", [])
+        if not ask_files or not bid_files:
+            missing = "ASK" if not ask_files else "BID"
+            logger.warning("commodity_scan skip %s: missing %s side", symbol, missing)
+            continue
+        total_files = len(ask_files) + len(bid_files)
+        for entry_side in ("ASK", "BID", "MID"):
+            auto_id -= 1
+            # Shape the synthetic filename like the consolidated FX naming so the
+            # commodity.json filename_pattern (and the FX-style UI filter) still
+            # accept it. The date range is a display placeholder — actual files
+            # are loaded via ask_files / bid_files.
+            synth_filename = (
+                f"{symbol}_{symbol}_01JAN2015_31DEC2025_{entry_side}_OHLCV.csv"
+            )
+            nominal_path = (bid_files if entry_side == "BID" else ask_files)[0]
+            entries.append({
+                "path": nominal_path,
+                "filename": synth_filename,
+                "id": auto_id,
+                "symbol": symbol,
+                "side": entry_side,
+                "name": f"{symbol} {entry_side} ({total_files:,} daily files)",
+                "ask_files": ask_files,
+                "bid_files": bid_files,
+                "aggregated": True,
+            })
+
+    with _COMMODITY_SCAN_CACHE_LOCK:
+        _COMMODITY_SCAN_CACHE[key] = (now, root_mtime, list(entries))
+    return entries
+
+
 def clear_fx_scan_cache() -> None:
-    """Drop the FX-tree scan cache. Call after manually adding new pair
-    directories if you want the next ``scan_csv_folder`` to see them
-    immediately rather than waiting for the TTL to expire."""
+    """Drop the daily-layout scan caches (FX + commodity). Call after manually
+    adding new pair / commodity directories if you want the next
+    ``scan_csv_folder`` to see them immediately rather than waiting for the
+    TTL to expire."""
     with _FX_SCAN_CACHE_LOCK:
         _FX_SCAN_CACHE.clear()
+    with _COMMODITY_SCAN_CACHE_LOCK:
+        _COMMODITY_SCAN_CACHE.clear()
 
 
 def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
@@ -226,14 +325,18 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
     When the folder contains no direct CSV files but does contain the
     FX daily-file layout (<PAIR>/YYYY/MM/DD/*.csv), files are aggregated
     by pair and returned as **three entries per pair** (ASK, BID, MID)
-    so each side is independently selectable in the UI.
+    so each side is independently selectable in the UI. The same
+    aggregation also applies to the commodity daily-file layout
+    (<COMMODITY>/YYYY/MM/DD/(ASK|BID).csv), which is tried as a final
+    fallback after the FX scanners return empty.
 
     Returns
     -------
     list[dict]
         Each dict has keys: path, filename, id, symbol, name.
-        Aggregated FX entries also carry: side ("ASK"|"BID"|"MID"),
-        ask_files (list), bid_files (list), aggregated (True).
+        Aggregated FX/commodity entries also carry:
+        side ("ASK"|"BID"|"MID"), ask_files (list), bid_files (list),
+        aggregated (True).
     """
     folder_path = Path(folder)
     if not folder_path.exists():
@@ -279,6 +382,12 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
     if not results:
         results = _scan_fx_daily_layout(folder_path)
 
+    # Final fallback: commodity daily layout (<COMMODITY>/YYYY/MM/DD/(ASK|BID).csv).
+    # Runs only when neither flat nor FX-daily produced anything, so existing
+    # roots stay on their current code path.
+    if not results:
+        results = _scan_commodity_daily_layout(folder_path)
+
     return results
 
 
@@ -319,6 +428,7 @@ _OHLCV_LOWER = ("open", "high", "low", "close", "volume")
 
 def load_csv(csv_path: str, timestamp_column: str = "ts",
              required_columns: list[str] | None = None,
+             optional_columns: list[str] | None = None,
              delimiter: str = ",") -> pd.DataFrame:
     """
     Load a CSV file and return a clean OHLCV DataFrame.
@@ -331,13 +441,19 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
         Name of the timestamp column in the CSV (default: "ts").
     required_columns : list[str] | None
         Columns that must exist. Defaults to [ts_col, open, high, low, close, volume].
+    optional_columns : list[str] | None
+        Extra columns to include if present in the source file. Missing
+        optional columns are silently skipped (no validation error). Used
+        e.g. for commodity ASK/BID files where `ask_vwap` exists on ASK files
+        and `bid_vwap` exists on BID files — declaring both as optional lets
+        the same config load either side without per-side branching.
     delimiter : str
         CSV delimiter (default: ",").
 
     Returns
     -------
     pd.DataFrame
-        Columns: open, high, low, close, volume
+        Columns: open, high, low, close, volume (+ any optional_columns present).
         Index: timestamp (UTC datetime)
     """
     ts_col_lc = (timestamp_column or "ts").lower()
@@ -358,7 +474,16 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
 
     src_ts = case_map[ts_col_lc]
     src_ohlcv = [case_map[c] for c in _OHLCV_LOWER]
-    use_cols = [src_ts, *src_ohlcv]
+
+    # Resolve optional columns against the actual header. Anything not present
+    # is silently dropped from the include list — that's the whole point of
+    # the field. Preserves config order and de-dupes against OHLCV/timestamp.
+    optional_lc = [c.lower() for c in (optional_columns or [])]
+    extra_lc = [c for c in optional_lc
+                if c in case_map and c != ts_col_lc and c not in _OHLCV_LOWER]
+    src_extra = [case_map[c] for c in extra_lc]
+
+    use_cols = [src_ts, *src_ohlcv, *src_extra]
 
     # Use PyArrow for the data read — ~35x faster than pandas on the
     # 4M-row OHLCV files (benchmarked). Header probe above stays in pandas
@@ -369,17 +494,20 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
         parse_options=pacsv.ParseOptions(delimiter=delimiter),
         convert_options=pacsv.ConvertOptions(
             include_columns=use_cols,
-            column_types={c: pa.float64() for c in src_ohlcv},
+            column_types={c: pa.float64() for c in [*src_ohlcv, *src_extra]},
         ),
     )
     df = table.to_pandas()
     rename_map = {src_ts: "timestamp"}
     rename_map.update({src: lc for src, lc in zip(src_ohlcv, _OHLCV_LOWER)})
+    rename_map.update({src: lc for src, lc in zip(src_extra, extra_lc)})
     df = df.rename(columns=rename_map)
 
     df["timestamp"] = _parse_timestamps(df["timestamp"])
     df = df.dropna(subset=["timestamp"]).set_index("timestamp")
-    df = df.dropna()
+    # Only OHLCV NaNs disqualify a row — an optional column like ask_vwap may
+    # legitimately be NaN on individual bars and shouldn't drop the row.
+    df = df.dropna(subset=list(_OHLCV_LOWER))
 
     # Each daily file is already monotonic — only sort if a concatenation
     # upstream broke that invariant.
@@ -394,6 +522,7 @@ def load_csv(csv_path: str, timestamp_column: str = "ts",
 
 def concat_side(files: list[str], timestamp_column: str = "ts",
                 required_columns: list[str] | None = None,
+                optional_columns: list[str] | None = None,
                 delimiter: str = ",",
                 max_workers: int | None = None) -> pd.DataFrame:
     """Concatenate daily CSVs for one side (ASK or BID) in timestamp order,
@@ -420,6 +549,7 @@ def concat_side(files: list[str], timestamp_column: str = "ts",
         try:
             return load_csv(path, timestamp_column=timestamp_column,
                             required_columns=required_columns,
+                            optional_columns=optional_columns,
                             delimiter=delimiter)
         except Exception as e:
             logger.warning("csv_load skip %s: %s", Path(path).name, e)
@@ -449,6 +579,11 @@ def _merge_ask_bid_to_mid(ask_df: pd.DataFrame, bid_df: pd.DataFrame) -> pd.Data
 
     O/H/L/C = (ask + bid) / 2, volume = ask + bid. Inner-join on the
     timestamp index, so rows present on only one side are dropped.
+
+    Any extra (non-OHLCV) columns present on either side are carried through
+    to the MID frame with their original per-side values — e.g. for
+    commodity data this preserves ``ask_vwap`` (from the ASK side) and
+    ``bid_vwap`` (from the BID side) on the merged result.
     """
     common_idx = ask_df.index.intersection(bid_df.index)
     ask_aligned = ask_df.loc[common_idx]
@@ -456,11 +591,21 @@ def _merge_ask_bid_to_mid(ask_df: pd.DataFrame, bid_df: pd.DataFrame) -> pd.Data
     ohlc = ["open", "high", "low", "close"]
     mid = (ask_aligned[ohlc] + bid_aligned[ohlc]) * 0.5
     mid["volume"] = (ask_aligned["volume"] + bid_aligned["volume"]).clip(upper=QUANTITY_MAX)
+    # Carry per-side extras through unchanged. ASK-side wins on name collisions
+    # (none expected: ask_vwap vs bid_vwap are distinctly named in practice).
+    base_cols = {*ohlc, "volume"}
+    for col in ask_aligned.columns:
+        if col not in base_cols:
+            mid[col] = ask_aligned[col]
+    for col in bid_aligned.columns:
+        if col not in base_cols and col not in mid.columns:
+            mid[col] = bid_aligned[col]
     return mid
 
 
 def load_pair_mid(entry: dict, timestamp_column: str = "ts",
                   required_columns: list[str] | None = None,
+                  optional_columns: list[str] | None = None,
                   delimiter: str = ",") -> pd.DataFrame:
     """Load one pair's ASK and BID file lists and return a merged MID OHLCV frame."""
     ask_files = entry.get("ask_files") or []
@@ -470,6 +615,8 @@ def load_pair_mid(entry: dict, timestamp_column: str = "ts",
             f"load_pair_mid requires both ask_files and bid_files in the entry "
             f"(got ask={len(ask_files)}, bid={len(bid_files)})"
         )
-    ask_df = concat_side(ask_files, timestamp_column, required_columns, delimiter)
-    bid_df = concat_side(bid_files, timestamp_column, required_columns, delimiter)
+    ask_df = concat_side(ask_files, timestamp_column, required_columns,
+                         optional_columns, delimiter)
+    bid_df = concat_side(bid_files, timestamp_column, required_columns,
+                         optional_columns, delimiter)
     return _merge_ask_bid_to_mid(ask_df, bid_df)

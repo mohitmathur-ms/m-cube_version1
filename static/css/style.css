@@ -989,6 +989,11 @@ span.negative { color: var(--danger); }
 
 .pf-list-wrap table { margin: 0; }
 
+.pf-list-wrap tbody td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
 .pf-list-wrap tbody tr:nth-child(even) {
     background: rgba(127, 127, 127, 0.035);
 }
