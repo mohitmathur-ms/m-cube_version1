@@ -189,6 +189,20 @@ def _filter_bars_by_weekday(bars: list, allowed_weekdays: set | None) -> tuple[l
     return kept, len(bars) - len(kept)
 
 
+def _filter_bars_after_ns(bars: list, cutoff_ns: int) -> tuple[list, int]:
+    """Drop bars with ``ts_event < cutoff_ns`` — keep only bars at/after it.
+
+    Used by the portfolio ReExecute replay (spec §1.2 / §2.4): a replay
+    segment re-runs every slot from the clip timestamp onward, so each slot
+    starts flat at ``cutoff_ns``. ``cutoff_ns <= 0`` is a no-op (the normal
+    full-range run). Returns ``(kept_bars, dropped_count)``.
+    """
+    if cutoff_ns <= 0 or not bars:
+        return bars, 0
+    kept = [b for b in bars if b.ts_event >= cutoff_ns]
+    return kept, len(bars) - len(kept)
+
+
 _NANOS_PER_MINUTE = 60_000_000_000
 
 
@@ -723,11 +737,13 @@ class _MoveSLConfig:
     trail_after: bool = False
     no_buy_legs: bool = False
     no_reexec_sl_cost: bool = False
-    # ReExecute_Logics.html P2 / P5 — wired regardless of move_sl_enabled.
+    # ReExecute_Logics.html P2 / P3 / P5 — wired regardless of move_sl_enabled.
     # no_wait_trade_reexec: skip the slot re-execution delay on re-executions.
     # no_reentry_sl_cost: block the re_entry action when SL was moved to cost.
+    # no_reentry_after_end: block ReExecute / ReEntry past Portfolio End Time.
     no_wait_trade_reexec: bool = False
     no_reentry_sl_cost: bool = True
+    no_reentry_after_end: bool = False
     # LTP-buffer variant (spec §3 action v3, leg-level): on a losing leg, slide
     # SL toward LTP by this buffer (price units). 0 = exit at current price.
     ltp_buffer: float = 0.0
@@ -1018,6 +1034,7 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
     no_reexec_sl_cost = bool(getattr(portfolio, "no_reexec_sl_cost", False))
     no_wait_trade_reexec = bool(getattr(portfolio, "no_wait_trade_reexec", False))
     no_reentry_sl_cost = bool(getattr(portfolio, "no_reentry_sl_cost", True))
+    no_reentry_after_end = bool(getattr(portfolio, "no_reentry_after_end", False))
 
     # Portfolio-aggregate Move SL trigger (spec §2.3). Read regardless of
     # move_sl_enabled — it is an independent portfolio-level trigger, not a
@@ -1041,6 +1058,7 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
             enabled=False, no_reexec_sl_cost=no_reexec_sl_cost,
             no_wait_trade_reexec=no_wait_trade_reexec,
             no_reentry_sl_cost=no_reentry_sl_cost,
+            no_reentry_after_end=no_reentry_after_end,
             agg_pnl_enabled=agg_pnl_enabled,
             agg_pnl_threshold=agg_pnl_threshold,
             agg_pnl_direction=agg_pnl_direction,
@@ -1070,6 +1088,7 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
         no_reexec_sl_cost=no_reexec_sl_cost,
         no_wait_trade_reexec=no_wait_trade_reexec,
         no_reentry_sl_cost=no_reentry_sl_cost,
+        no_reentry_after_end=no_reentry_after_end,
         ltp_buffer=ltp_buffer,
         hit_on_leg_sl=bool(getattr(portfolio, "move_sl_hit_on_leg_sl", False)),
         hit_on_leg_target=bool(getattr(portfolio, "move_sl_hit_on_leg_target", False)),
@@ -2420,6 +2439,7 @@ def _run_single_slot(
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
     default_capture_underlying: bool = False,
+    default_replay_cutoff_ns: int = 0,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -2522,6 +2542,14 @@ def _run_single_slot(
             all_bars, allowed_weekdays
         )
 
+    # Portfolio ReExecute replay (spec §2.4): a replay segment re-runs this
+    # slot from the clip timestamp onward, so drop every bar before the
+    # cutoff — the slot starts flat there. 0 = normal full-range run.
+    if default_replay_cutoff_ns > 0:
+        all_bars, _bars_dropped_pre_cutoff = _filter_bars_after_ns(
+            all_bars, default_replay_cutoff_ns
+        )
+
     # Intra-day entry window (portfolio.entry_start_time / .entry_end_time).
     # Both endpoints UTC and inclusive. Either may be None for unbounded.
     # Skipped for non-intraday bar types (daily/weekly/monthly) since their
@@ -2529,14 +2557,26 @@ def _run_single_slot(
     # bars would unconditionally drop every bar.
     bars_filtered_by_entry_window = 0
     entry_window_skipped_reason: str | None = None
+    # Managed slots gate entries internally (spec §9), so the entry-window
+    # END side is NOT pre-dropped for them — post-window bars are kept so
+    # SL/Target keep being monitored until squareoff. Raw (non-managed)
+    # strategies have no exit management, so they keep the full pre-filter.
+    _eff_sqoff_for_mgmt = (
+        slot.exit_config.squareoff_time or slot.squareoff_time or default_squareoff_time
+    )
+    _slot_is_managed = bool(
+        slot.exit_config.has_exit_management() or _eff_sqoff_for_mgmt
+        or default_rbo_settings is not None
+    )
     with _phase("entry_window_filter", phase_times):
         if (default_entry_start_time or default_entry_end_time) and not _is_intraday_bar_type(slot.bar_type_str):
             entry_window_skipped_reason = (
                 f"bar type {slot.bar_type_str} is not intraday — entry window ignored"
             )
         else:
+            _filter_end = None if _slot_is_managed else default_entry_end_time
             all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
-                all_bars, default_entry_start_time, default_entry_end_time
+                all_bars, default_entry_start_time, _filter_end
             )
 
     if not all_bars:
@@ -2634,6 +2674,13 @@ def _run_single_slot(
                     move_sl_settings=default_move_sl_settings,
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
+                    # Intraday entry window (spec §9) — gated inside the
+                    # strategy so post-window bars still drive exit checks.
+                    # Only meaningful for intraday bar types.
+                    entry_start_time=(default_entry_start_time
+                                      if _is_intraday_bar_type(slot.bar_type_str) else None),
+                    entry_end_time=(default_entry_end_time
+                                    if _is_intraday_bar_type(slot.bar_type_str) else None),
                     # Per-slot runs each get their own process/engine, so the
                     # module-level cross-slot bus has no siblings to reach —
                     # an empty portfolio_id routes to the standalone bus.
@@ -3041,6 +3088,17 @@ def _run_slot_group_node(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        # Intraday entry window — only passed (so the strategy
+                        # gates entries internally) when the whole group is
+                        # managed and its post-window bars were kept.
+                        entry_start_time=(default_entry_start_time
+                                          if (_group_all_managed
+                                              and _is_intraday_bar_type(primary_bar_type_str))
+                                          else None),
+                        entry_end_time=(default_entry_end_time
+                                        if (_group_all_managed
+                                            and _is_intraday_bar_type(primary_bar_type_str))
+                                        else None),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
                         portfolio_id=portfolio_name,
@@ -3151,6 +3209,7 @@ def _run_slot_group(
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
     portfolio_name: str = "",
+    default_replay_cutoff_ns: int = 0,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -3257,18 +3316,34 @@ def _run_slot_group(
             all_bars, allowed_weekdays
         )
 
+    # Portfolio ReExecute replay cutoff (spec §2.4) — mirrors _run_single_slot.
+    if default_replay_cutoff_ns > 0:
+        all_bars, _bars_dropped_pre_cutoff = _filter_bars_after_ns(
+            all_bars, default_replay_cutoff_ns
+        )
+
     # Intra-day entry window filter (mirrors _run_single_slot). Skipped when
     # the group's primary bar type is non-intraday (daily/weekly/monthly).
+    # The END side is pre-dropped only when the group is NOT entirely managed
+    # — if every slot is managed, post-window bars are kept so each strategy
+    # can gate entries internally while still monitoring exits (spec §9).
     bars_filtered_by_entry_window = 0
     entry_window_skipped_reason: str | None = None
+    _group_all_managed = all(
+        (slot.exit_config.has_exit_management()
+         or slot.exit_config.squareoff_time or slot.squareoff_time
+         or default_squareoff_time or default_rbo_settings is not None)
+        for slot, _cap in group
+    )
     with _phase("entry_window_filter", phase_times):
         if (default_entry_start_time or default_entry_end_time) and not _is_intraday_bar_type(primary_bar_type_str):
             entry_window_skipped_reason = (
                 f"bar type {primary_bar_type_str} is not intraday — entry window ignored"
             )
         else:
+            _filter_end = None if _group_all_managed else default_entry_end_time
             all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
-                all_bars, default_entry_start_time, default_entry_end_time
+                all_bars, default_entry_start_time, _filter_end
             )
 
     if not all_bars:
@@ -3487,6 +3562,166 @@ def _run_slot_group(
     return slot_results
 
 
+def _positions_pnl_series(df) -> "pd.Series":
+    """Numeric realized-PnL series for a positions report.
+
+    Prefers the FX-converted base-currency column added by
+    ``positions_report_with_base`` (``realized_pnl_<CCY>``); falls back to
+    parsing the Nautilus Money-string ``realized_pnl`` ("X.XX CCY").
+    Returns an empty float Series when the report has no usable column.
+    """
+    if df is None or df.empty:
+        return pd.Series([], dtype=float)
+    base_col = next(
+        (c for c in df.columns if c.startswith("realized_pnl_") and c != "realized_pnl_"),
+        None,
+    )
+    if base_col is not None:
+        return pd.to_numeric(df[base_col], errors="coerce").fillna(0.0)
+    if "realized_pnl" in df.columns:
+        return df["realized_pnl"].map(
+            lambda x: float(str(x).split(" ")[0]) if x and " " in str(x) else 0.0
+        )
+    return pd.Series([0.0] * len(df), dtype=float)
+
+
+def _per_strategy_breakdown(positions, slot_to_strategy_id: dict | None) -> dict:
+    """Per-slot ``{pnl, trades, wins, losses, trade_pnls}`` from a positions
+    report, keyed by slot_id.
+
+    Used by the ReExecute splice to recover each slot's *pre-clip* stats from
+    the truncated head positions report — ``positions`` rows carry the run's
+    ``strategy_id``, which ``slot_to_strategy_id`` maps back to a slot_id.
+    """
+    out: dict = {}
+    if positions is None or positions.empty or "strategy_id" not in positions.columns:
+        return out
+    inv = {str(sid): slot for slot, sid in (slot_to_strategy_id or {}).items()}
+    pnl = _positions_pnl_series(positions).reset_index(drop=True)
+    sids = positions["strategy_id"].astype(str).reset_index(drop=True)
+    for i in range(len(sids)):
+        slot_id = inv.get(sids.iloc[i])
+        if slot_id is None:
+            continue
+        p = float(pnl.iloc[i])
+        d = out.setdefault(slot_id, {"pnl": 0.0, "trades": 0, "wins": 0,
+                                     "losses": 0, "trade_pnls": []})
+        d["pnl"] += p
+        d["trades"] += 1
+        d["trade_pnls"].append(p)
+        if p > 0:
+            d["wins"] += 1
+        elif p < 0:
+            d["losses"] += 1
+    return out
+
+
+def _splice_merged_results(head: dict, tail: dict, clip_ns: int,
+                           starting_capital: float) -> dict:
+    """Splice a pass-1 merged result (``head``) with a ReExecute replay
+    segment (``tail``) at ``clip_ns``.
+
+    The head contributes every fill/position strictly before the clip; the
+    tail — already bar-cutoff-filtered to start flat at the clip — contributes
+    the whole post-clip regime. Top-level portfolio metrics (PnL, trades,
+    win/loss, equity curve, drawdown) AND the per-slot ``per_strategy`` block
+    are re-derived from the spliced reports — the head's pre-clip per-slot
+    stats (mapped via its ``slot_to_strategy_id``) plus the tail segment's.
+    """
+    def _before(df, col):
+        if df is None or getattr(df, "empty", True) or col not in df.columns:
+            return df.iloc[0:0] if df is not None else pd.DataFrame()
+        ts_int = pd.to_datetime(df[col], errors="coerce", utc=True).astype("int64")
+        return df.loc[ts_int < clip_ns]
+
+    hf = _before(head.get("fills_report"), "ts_init")
+    hp = _before(head.get("positions_report"), "ts_opened")
+    tf = tail.get("fills_report")
+    tp = tail.get("positions_report")
+    fills = pd.concat([d for d in (hf, tf) if d is not None and not d.empty],
+                      ignore_index=True) if (hf is not None or tf is not None) else pd.DataFrame()
+    positions = pd.concat([d for d in (hp, tp) if d is not None and not d.empty],
+                          ignore_index=True) if (hp is not None or tp is not None) else pd.DataFrame()
+
+    pnl = _positions_pnl_series(positions)
+    total_pnl = float(pnl.sum())
+    total_trades = int(len(positions))
+    wins = int((pnl > 0).sum())
+    losses = int((pnl < 0).sum())
+    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+    final_balance = starting_capital + total_pnl
+    total_return_pct = (total_pnl / starting_capital * 100) if starting_capital > 0 else 0.0
+
+    # Equity-curve splice: head points before the clip, then the tail curve
+    # shifted to continue from the head's balance at the clip.
+    head_eq = head.get("equity_curve_ts") or []
+    tail_eq = tail.get("equity_curve_ts") or []
+    kept_head = [p for p in head_eq
+                 if p.get("timestamp") is None or _ts_iso_to_ns(p["timestamp"]) < clip_ns]
+    head_bal_at_clip = next(
+        (p["balance"] for p in reversed(kept_head) if p.get("timestamp") is not None),
+        starting_capital,
+    )
+    shift = head_bal_at_clip - starting_capital
+    spliced_eq = list(kept_head) + [
+        {"timestamp": p["timestamp"], "balance": float(p.get("balance", starting_capital)) + shift}
+        for p in tail_eq if p.get("timestamp") is not None
+    ]
+    balances = [float(p.get("balance", starting_capital)) for p in spliced_eq]
+    # Running-peak drawdown over the spliced balance series.
+    max_dd = 0.0
+    peak = balances[0] if balances else starting_capital
+    for b in balances:
+        peak = max(peak, b)
+        if peak > 0:
+            max_dd = max(max_dd, (peak - b) / peak * 100)
+
+    # Per-slot breakdown: head's pre-clip stats (recovered from the truncated
+    # head positions via its slot_to_strategy_id) + the tail segment's stats.
+    head_pre = _per_strategy_breakdown(hp, head.get("slot_to_strategy_id"))
+    head_per = head.get("per_strategy") or {}
+    tail_per = tail.get("per_strategy") or {}
+    combined_per: dict = {}
+    for slot_id in set(head_pre) | set(tail_per):
+        h = head_pre.get(slot_id)
+        t = tail_per.get(slot_id) or {}
+        meta = tail_per.get(slot_id) or head_per.get(slot_id) or {}
+        s_pnl = (h["pnl"] if h else 0.0) + float(t.get("pnl", 0.0))
+        s_trades = (h["trades"] if h else 0) + int(t.get("trades", 0))
+        s_wins = (h["wins"] if h else 0) + int(t.get("wins", 0))
+        s_losses = (h["losses"] if h else 0) + int(t.get("losses", 0))
+        s_tpnls = (h["trade_pnls"] if h else []) + list(t.get("trade_pnls", []))
+        combined_per[slot_id] = {
+            "display_name": meta.get("display_name", ""),
+            "strategy_name": meta.get("strategy_name", ""),
+            "bar_type": meta.get("bar_type", ""),
+            "pnl": s_pnl,
+            "trades": s_trades,
+            "wins": s_wins,
+            "losses": s_losses,
+            "win_rate": (s_wins / s_trades * 100) if s_trades > 0 else 0.0,
+            "trade_pnls": s_tpnls,
+        }
+
+    out = dict(tail)
+    out.update(
+        fills_report=fills,
+        positions_report=positions,
+        total_pnl=total_pnl,
+        final_balance=final_balance,
+        total_return_pct=total_return_pct,
+        total_trades=total_trades,
+        wins=wins,
+        losses=losses,
+        win_rate=win_rate,
+        equity_curve_ts=spliced_eq,
+        equity_curve=balances,
+        max_drawdown=max_dd,
+        per_strategy=combined_per,
+    )
+    return out
+
+
 def run_portfolio_backtest(
     catalog_path: str,
     portfolio: PortfolioConfig,
@@ -3648,7 +3883,7 @@ def run_portfolio_backtest(
     else:
         sorted_slots = sorted(enabled_slots, key=_duration_estimate, reverse=True)
 
-    def _run_all_slots(active_move_sl, fire_callbacks: bool):
+    def _run_all_slots(active_move_sl, fire_callbacks: bool, replay_cutoff_ns: int = 0):
         """Submit every slot/group to a fresh ProcessPoolExecutor and collect
         results into ``{slot_id: result}``.
 
@@ -3656,6 +3891,8 @@ def run_portfolio_backtest(
         with a different ``active_move_sl``; a normal run calls it once.
         ``fire_callbacks`` gates ``on_slot_complete`` and runtime-history
         recording so only the final (reported) pass drives the UI / history.
+        ``replay_cutoff_ns`` > 0 makes every slot start flat at that timestamp
+        — used by the portfolio ReExecute replay (spec §2.4).
         Returns ``(slot_results, errors)``.
         """
         slot_results: dict = {}
@@ -3691,6 +3928,7 @@ def run_portfolio_backtest(
                             default_move_sl_settings=active_move_sl,
                             user_id=user_id,
                             default_capture_underlying=_capture_underlying,
+                            default_replay_cutoff_ns=replay_cutoff_ns,
                         )
                         futures[future] = ("single", [slot])
                     else:
@@ -3712,6 +3950,7 @@ def run_portfolio_backtest(
                             default_move_sl_settings=active_move_sl,
                             user_id=user_id,
                             portfolio_name=pf_name,
+                            default_replay_cutoff_ns=replay_cutoff_ns,
                         )
                         futures[future] = ("group", [slot for slot, _cap in group])
             else:
@@ -3735,6 +3974,7 @@ def run_portfolio_backtest(
                         default_move_sl_settings=active_move_sl,
                         user_id=user_id,
                         default_capture_underlying=_capture_underlying,
+                        default_replay_cutoff_ns=replay_cutoff_ns,
                     )
                     futures[future] = ("single", [slot])
 
@@ -3830,7 +4070,52 @@ def run_portfolio_backtest(
         raise ValueError(f"All slots failed: {errors}")
 
     # Merge results into portfolio-level metrics
-    return _merge_portfolio_results(portfolio, slot_results, capitals, errors, user_id=user_id)
+    result = _merge_portfolio_results(portfolio, slot_results, capitals, errors, user_id=user_id)
+
+    # ── Portfolio ReExecute replay (spec §2.4) ──────────────────────────────
+    # Opt-in via _USE_PF_REEXEC_REPLAY. When the portfolio SL/Target fires a
+    # ReExecute-family action, re-run every slot FLAT from the clip timestamp
+    # and splice that segment onto the pre-clip trades — a genuine
+    # re-execution instead of the default "keep trades" approximation. The
+    # segment is itself merged (so it re-evaluates the portfolio limit) and
+    # the loop recurses on its first ReExecute clip, up to the configured
+    # ReExecute count (0 = unlimited, hard-capped at 50 to bound runtime).
+    # Default off → single pass, zero behaviour change.
+    if os.environ.get("_USE_PF_REEXEC_REPLAY", "0") == "1":
+        _sl_set, _ = _resolve_pf_stoploss(portfolio)
+        _tgt_set, _ = _resolve_pf_target(portfolio)
+        _cap = max(int(getattr(_sl_set, "reexecute_count", 0) or 0),
+                   int(getattr(_tgt_set, "reexecute_count", 0) or 0))
+        _cap = _cap if _cap > 0 else 50
+        _replays = 0
+        _last_clip_ns = 0
+        while _replays < _cap:
+            _events = result.get("pf_clip_events") or []
+            _first = next((e for e in _events if _is_reexec_action(e[2])), None)
+            if _first is None:
+                break
+            _clip_ns = _ts_iso_to_ns(_first[0])
+            if _clip_ns <= 0 or _clip_ns <= _last_clip_ns:
+                break  # no forward progress — guard against a degenerate loop
+            print(f"[PF_REEXEC] replay #{_replays + 1}: re-running slots flat from {_first[0]}")
+            _seg_results, _seg_errors = _run_all_slots(
+                move_sl_settings, fire_callbacks=False, replay_cutoff_ns=_clip_ns,
+            )
+            if not _seg_results:
+                break
+            _seg_merged = _merge_portfolio_results(
+                portfolio, _seg_results, capitals, _seg_errors, user_id=user_id,
+            )
+            result = _splice_merged_results(
+                result, _seg_merged, _clip_ns, portfolio.starting_capital,
+            )
+            result["pf_reexec_replays"] = _replays + 1
+            _last_clip_ns = _clip_ns
+            _replays += 1
+        if _replays > 0:
+            print(f"[PF_REEXEC] spliced {_replays} replay segment(s)")
+
+    return result
 
 
 def _merge_portfolio_results(
@@ -4261,6 +4546,9 @@ def _merge_portfolio_results(
         "pf_clipped_slot_ids": list(clip_result.clipped_slots),
         "pf_would_reexecute": clip_result.would_reexecute,
         "pf_reexec_count": clip_result.reexec_count,
+        # Chronological clip events (ts, reason, action) — drives the
+        # ReExecute replay loop (_USE_PF_REEXEC_REPLAY). Empty when no clip.
+        "pf_clip_events": list(clip_result.clip_events),
         "portfolio_name": portfolio.name,
         "allocation_mode": portfolio.allocation_mode,
         "fills_report": merged_fills,

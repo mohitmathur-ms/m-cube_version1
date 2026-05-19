@@ -20,6 +20,16 @@ from typing import Optional
 class ExitConfig:
     """Exit management settings for a strategy slot."""
 
+    # Exit-trigger data format (spec execution_logic.html §3 — three-format
+    # engine). Selects which price series SL/Target triggers consult:
+    #   "ohlcv"  — Format B: trigger on the slot's own bar high/low (default).
+    #   "ltp"    — Format C: single last price; trigger collapses to close.
+    #   "bidask" — Format A: SELL exits trigger on the BID series, BUY exits
+    #              on the ASK series. Requires paired ASK/BID bars in the
+    #              catalog (FX/synth-MID slots); falls back to "ohlcv" with a
+    #              log when no bid/ask data is available.
+    exit_price_format: str = "ohlcv"
+
     # Stop Loss
     stop_loss_type: str = "none"  # "none", "percentage", "points", "trailing", "atr"
     stop_loss_value: float = 0.0

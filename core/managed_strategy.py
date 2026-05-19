@@ -126,6 +126,61 @@ def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
     return table.get(key, str(value).strip())
 
 
+def resolve_trigger_hl(
+    exit_fmt: str,
+    is_long: bool,
+    is_short: bool,
+    close: float,
+    bar_high: float,
+    bar_low: float,
+    bid_high: float | None = None,
+    bid_low: float | None = None,
+    ask_high: float | None = None,
+    ask_low: float | None = None,
+) -> tuple[float, float]:
+    """Resolve the (high, low) an SL/Target trigger should consult.
+
+    Three-format engine, spec §3 / §4.1:
+
+    * **Format B** (``ohlcv``) — the slot's own bar high/low.
+    * **Format C** (``ltp``) — a single last price; high and low both
+      collapse to ``close``.
+    * **Format A** (``bidask``) — a LONG leg consults the ASK series
+      (SL on ``ask_low``, TP on ``ask_high``); a SHORT leg consults the
+      BID series (SL on ``bid_high``, TP on ``bid_low``). Falls back to
+      OHLCV when the paired bid/ask values are missing (data gap).
+
+    Pure function — unit-testable without an engine.
+    """
+    if exit_fmt == "ltp":
+        return close, close
+    if exit_fmt == "bidask" and None not in (bid_high, bid_low, ask_high, ask_low):
+        if is_long:
+            return ask_high, ask_low
+        if is_short:
+            return bid_high, bid_low
+    return bar_high, bar_low
+
+
+def _derive_bid_ask_bar_types(primary_bar_type_str: str) -> tuple[str, str]:
+    """Derive the BID and ASK bar-type strings from a primary bar type.
+
+    Used by Format A (Bid/Ask) so the strategy can subscribe to the paired
+    series. Bar types are Nautilus-formatted
+    ``<sym>.<venue>-<tf>-<price>-EXTERNAL``; we swap the price-type token.
+    Returns ``("", "")`` when the primary isn't an FX-style ASK/BID/MID bar
+    (e.g. crypto ``LAST`` bars have no bid/ask pair).
+    """
+    s = str(primary_bar_type_str or "")
+    if "-MID-" in s:
+        return s.replace("-MID-", "-BID-", 1), s.replace("-MID-", "-ASK-", 1)
+    if "-BID-" in s:
+        return s, s.replace("-BID-", "-ASK-", 1)
+    if "-ASK-" in s:
+        return s.replace("-ASK-", "-BID-", 1), s
+    return "", ""
+
+
 def _parse_squareoff_minute(squareoff_time: str | None) -> int:
     """Convert "HH:MM" → minute-of-day, or -1 when disabled.
 
@@ -147,6 +202,16 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Signal
     signal_name: str = "EMA Cross"
     signal_params: dict = {}
+
+    # Exit-trigger data format (spec §3 — three-format engine).
+    #   "ohlcv"  — Format B (default): trigger on this slot's bar high/low.
+    #   "ltp"    — Format C: trigger collapses to the bar close (single price).
+    #   "bidask" — Format A: SELL exits trigger on bid_high, BUY on ask_low.
+    # For "bidask" the strategy also subscribes to bid_bar_type / ask_bar_type
+    # and buffers them per-timestamp; empty strings → fall back to "ohlcv".
+    exit_price_format: str = "ohlcv"
+    bid_bar_type: str = ""
+    ask_bar_type: str = ""
 
     # Exit management
     stop_loss_type: str = "none"
@@ -192,6 +257,16 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Spec §1.2 1.2(c): when False, this leg ignores its own signals until
     # a sibling's "execute" action arms it via the cross-slot bus.
     armed_at_start: bool = True
+
+    # Intraday entry window (spec §9). Minute-of-day UTC; -1 = disabled.
+    # Fresh entries are blocked outside [entry_start_minute, entry_end_minute],
+    # but — unlike a bar pre-filter — bars PAST entry_end_minute are still
+    # delivered so open positions keep being monitored for SL/Target until
+    # squareoff. ReExecute / ReEntry past End Time are blocked only when
+    # no_reentry_after_end is set (spec §7 P3 / §9).
+    entry_start_minute: int = -1
+    entry_end_minute: int = -1
+    no_reentry_after_end: bool = False
 
     # Square-off (resolved by core.models.resolve_squareoff before engine build).
     # squareoff_minute = -1 → disabled. Otherwise daily force-close at this
@@ -400,6 +475,25 @@ class ManagedExitStrategy(Strategy):
         # profit_pct on the bar Move SL to Cost fires.
         self._move_sl_trail_anchor: float = 0.0
 
+        # Three-format engine state (spec §3).
+        #   _exit_fmt: "ohlcv" (B) / "ltp" (C) / "bidask" (A).
+        #   Format A subscribes to the BID and ASK bar types and buffers all
+        #   three streams per ts_event in _fa_pending; the bar logic runs once
+        #   per timestamp when the (primary, bid, ask) trio is complete.
+        self._exit_fmt: str = str(getattr(config, "exit_price_format", "ohlcv") or "ohlcv")
+        self._bid_bt_str: str = str(getattr(config, "bid_bar_type", "") or "")
+        self._ask_bt_str: str = str(getattr(config, "ask_bar_type", "") or "")
+        self._fa_bid_bt: BarType | None = None
+        self._fa_ask_bt: BarType | None = None
+        self._fa_pending: dict[int, dict] = {}
+
+        # Intraday entry window (spec §9). UTC minute-of-day; -1 = disabled.
+        # Gates fresh entries in _check_entries WITHOUT dropping post-window
+        # bars, so SL/Target keep being monitored until squareoff.
+        self._entry_start_min: int = int(getattr(config, "entry_start_minute", -1))
+        self._entry_end_min: int = int(getattr(config, "entry_end_minute", -1))
+        self._no_reentry_after_end: bool = bool(getattr(config, "no_reentry_after_end", False))
+
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
         if self.instrument is None:
@@ -449,7 +543,63 @@ class ManagedExitStrategy(Strategy):
 
         self.subscribe_bars(self.config.bar_type)
 
+        # Format A (Bid/Ask): also subscribe to the paired BID/ASK series so
+        # SL/Target triggers can consult them. Indicators stay registered on
+        # the primary bar type only, so entry signals are unaffected.
+        if self._exit_fmt == "bidask" and self._bid_bt_str and self._ask_bt_str:
+            try:
+                self._fa_bid_bt = BarType.from_str(self._bid_bt_str)
+                self._fa_ask_bt = BarType.from_str(self._ask_bt_str)
+                # Don't double-subscribe when the slot's own series already IS
+                # one side of the pair (primary == ASK or BID bar type).
+                if self._fa_bid_bt != self.config.bar_type:
+                    self.subscribe_bars(self._fa_bid_bt)
+                if self._fa_ask_bt != self.config.bar_type:
+                    self.subscribe_bars(self._fa_ask_bt)
+            except Exception as e:  # noqa: BLE001 — degrade, don't crash the run
+                self.log.warning(
+                    f"Format A: could not subscribe bid/ask bars ({e}); "
+                    f"falling back to OHLCV trigger"
+                )
+                self._exit_fmt = "ohlcv"
+
     def on_bar(self, bar: Bar) -> None:
+        # Format B / C: the slot has a single bar stream — process directly.
+        if self._exit_fmt != "bidask":
+            self._on_primary_bar(bar)
+            return
+
+        # Format A: route bid/ask/primary bars into a per-timestamp buffer and
+        # run the bar logic once the (primary, bid, ask) trio for a ts_event is
+        # complete. Bars arrive in ts order, so when a bar at ts_event T
+        # arrives, any buffered ts < T is final and is flushed first (with an
+        # OHLCV fallback for whichever side a data gap left missing).
+        ts = bar.ts_event
+        stale = sorted(t for t in self._fa_pending if t < ts)
+        for t in stale:
+            g = self._fa_pending.pop(t)
+            if "primary" in g:
+                self._on_primary_bar(g["primary"], g.get("bid"), g.get("ask"))
+        slot = self._fa_pending.setdefault(ts, {})
+        bt = bar.bar_type
+        if bt == self.config.bar_type:
+            slot["primary"] = bar
+            # When the slot's own series IS one side of the pair it doubles
+            # as that side (e.g. a slot configured directly on ASK bars).
+            if self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+                slot["bid"] = bar
+            if self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+                slot["ask"] = bar
+        elif self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+            slot["bid"] = bar
+        elif self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+            slot["ask"] = bar
+        if "primary" in slot and "bid" in slot and "ask" in slot:
+            self._fa_pending.pop(ts)
+            self._on_primary_bar(slot["primary"], slot["bid"], slot["ask"])
+
+    def _on_primary_bar(self, bar: Bar, bid_bar: Bar | None = None,
+                        ask_bar: Bar | None = None) -> None:
         # Cache the current bar's timestamp so _handle_exit can stamp
         # _reentry_blocked_until_ns without us having to thread `bar` through
         # every call site. on_order_filled also reads it for the re-entry
@@ -501,7 +651,18 @@ class ManagedExitStrategy(Strategy):
                 return
 
         if not is_flat:
-            self._check_exits(close, is_long, is_short, float(bar.high), float(bar.low))
+            # Three-format trigger reference (spec §3 / §4.1) — see
+            # resolve_trigger_hl. Format A passes the paired bid/ask OHLC.
+            bh = float(bid_bar.high) if bid_bar is not None else None
+            bl = float(bid_bar.low) if bid_bar is not None else None
+            ah = float(ask_bar.high) if ask_bar is not None else None
+            al = float(ask_bar.low) if ask_bar is not None else None
+            eff_high, eff_low = resolve_trigger_hl(
+                self._exit_fmt, is_long, is_short, close,
+                float(bar.high), float(bar.low),
+                bid_high=bh, bid_low=bl, ask_high=ah, ask_low=al,
+            )
+            self._check_exits(close, is_long, is_short, eff_high, eff_low)
         else:
             self._check_entries(close, is_flat, is_long, is_short)
 
@@ -1098,6 +1259,20 @@ class ManagedExitStrategy(Strategy):
         ):
             return
 
+        # Intraday entry window (spec §9). Blocks FRESH entries outside
+        # [entry_start, entry_end] (UTC minute-of-day) — exits still process
+        # on every bar, so SL/Target are monitored past End Time until
+        # squareoff. ReExecute/ReEntry past End Time are allowed unless
+        # no_reentry_after_end is set (spec §7 P3).
+        if self._entry_start_min >= 0 or self._entry_end_min >= 0:
+            bar_min = (self._current_bar_ts_ns % 86_400_000_000_000) // 60_000_000_000
+            if self._entry_start_min >= 0 and bar_min < self._entry_start_min:
+                return
+            if self._entry_end_min >= 0 and bar_min > self._entry_end_min:
+                _is_reexec = self.re_execution_count > 0 or self.re_entry_count > 0
+                if not (_is_reexec and not self._no_reentry_after_end):
+                    return
+
         # RBO entry gate. Spec rbo_logics.html: re-entries (execute_trigger,
         # i.e. our re_execution_count > 0) bypass the gate so they can fire
         # past entry_end up to portfolio squareoff_time. Fresh entries
@@ -1291,6 +1466,8 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      rbo_settings=None,
                      other_settings=None,
                      move_sl_settings=None,
+                     entry_start_time: str | None = None,
+                     entry_end_time: str | None = None,
                      portfolio_id: str = "",
                      slot_id: str = "") -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
@@ -1309,12 +1486,28 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     by ``core.backtest_runner._resolve_rbo``; when provided it switches on the
     per-day RBO state machine inside the strategy. Spec: rbo_logics.html.
     """
+    # Three-format engine (spec §3). Resolve the exit-trigger data format and,
+    # for Format A, derive the paired BID/ASK bar-type strings from the primary
+    # so the strategy can subscribe to them. Done here so no call site changes.
+    _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
+    if _fmt not in ("ohlcv", "ltp", "bidask"):
+        _fmt = "ohlcv"
+    _bid_bt, _ask_bt = ("", "")
+    if _fmt == "bidask":
+        _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(bar_type))
+        if not _bid_bt or not _ask_bt:
+            # No FX-style bid/ask pair (e.g. crypto LAST bars) — degrade to B.
+            _fmt = "ohlcv"
+
     kwargs = dict(
         instrument_id=instrument_id,
         bar_type=bar_type,
         trade_size=Decimal(str(trade_size)),
         signal_name=signal_name,
         signal_params=signal_params,
+        exit_price_format=_fmt,
+        bid_bar_type=_bid_bt,
+        ask_bar_type=_ask_bt,
         stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,
@@ -1345,6 +1538,9 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         armed_at_start=bool(getattr(exit_config, "armed_at_start", True)),
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
+        # Intraday entry window (spec §9) — UTC minute-of-day, -1 = disabled.
+        entry_start_minute=_parse_squareoff_minute(entry_start_time),
+        entry_end_minute=_parse_squareoff_minute(entry_end_time),
         portfolio_id=portfolio_id,
         slot_id=slot_id,
     )
@@ -1371,6 +1567,11 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         # ReExecute gating flags (ReExecute_Logics.html P1/P2/P5) are wired
         # regardless of move_sl_enabled — no-ops until the relevant condition.
         kwargs["no_reexec_sl_cost"] = bool(move_sl_settings.no_reexec_sl_cost)
+        # ReExecute_Logics.html P3 / spec §9 — block ReExecute & ReEntry past
+        # Portfolio End Time. Real gate now that post-window bars are kept.
+        kwargs["no_reentry_after_end"] = bool(
+            getattr(move_sl_settings, "no_reentry_after_end", False)
+        )
         # Portfolio-aggregate Move SL trigger (spec §2.3). agg_trigger_ns and
         # preseeded_bus are pass-2 inputs the two-pass runner injects; they are
         # 0 / empty during pass 1 and whenever the feature is off. Threaded

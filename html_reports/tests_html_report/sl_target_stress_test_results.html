@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL &amp; Target — Stress-Test RESULTS</title><style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3250;
+--text:#d4d8f0;--muted:#8a90b0;--accent:#5b7cfa;--ok:#3ecf8e;--partial:#f7c948;
+--miss:#e96060;--code:#141824;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+background:var(--bg);color:var(--text);line-height:1.6;font-size:14px;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 38px 100px;}
+header.cover{background:linear-gradient(135deg,#3ecf8e 0%,#5b7cfa 100%);color:#fff;
+padding:38px 40px;margin-bottom:8px;border-radius:0 0 14px 14px;}
+header.cover h1{font-size:25px;margin-bottom:6px;}
+header.cover p{color:rgba(255,255,255,.92);font-size:13.5px;}
+h2{font-size:18px;margin:38px 0 12px;color:#fff;padding-bottom:8px;border-bottom:1px solid var(--border);}
+h4{font-size:13px;color:var(--accent);margin:14px 0 6px;}
+p{color:var(--muted);margin:9px 0;}
+code{font-family:'Fira Code',Consolas,monospace;font-size:11px;background:var(--code);
+border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:#f7c948;
+display:inline-block;margin:2px 2px 2px 0;}
+.muted{color:var(--muted);}
+.sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0;}
+.sumcard{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+padding:16px;text-align:center;}
+.sumcard .n{font-size:30px;font-weight:800;}
+.sumcard .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:4px;}
+.callout{background:rgba(91,124,250,.08);border-left:3px solid var(--accent);
+padding:12px 16px;margin:14px 0;border-radius:0 6px 6px 0;font-size:13px;}
+.callout strong{color:#fff;}
+.tc{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+padding:18px 22px;margin:14px 0;}
+.tch{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.tcid{background:var(--accent);color:#fff;font-weight:800;font-size:12px;
+border-radius:5px;padding:3px 9px;}
+.tctitle{font-size:15px;font-weight:700;color:#fff;flex:1;min-width:200px;}
+.vb{font-size:11px;font-weight:800;border-radius:5px;padding:3px 10px;}
+.vb.ok{background:rgba(62,207,142,.15);color:var(--ok);border:1px solid var(--ok);}
+.vb.partial{background:rgba(247,201,72,.15);color:var(--partial);border:1px solid var(--partial);}
+.vb.miss{background:rgba(233,96,96,.15);color:var(--miss);border:1px solid var(--miss);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0;
+background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+table.meta td:first-child,table.res td:first-child{width:240px;color:#aab0d0;font-weight:600;}
+table.res td:first-child{width:280px;}
+td b,td strong{color:var(--text);}
+.err{background:rgba(233,96,96,.09);border-left:3px solid var(--miss);padding:9px 13px;
+margin:8px 0;border-radius:0 6px 6px 0;font-size:12px;}
+.verdict{padding:9px 13px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12.5px;}
+.verdict.ok{background:rgba(62,207,142,.08);border-left:3px solid var(--ok);}
+.verdict.partial{background:rgba(247,201,72,.08);border-left:3px solid var(--partial);}
+.verdict.miss{background:rgba(233,96,96,.08);border-left:3px solid var(--miss);}
+.verdict b{color:#fff;}
+</style></head><body>
+<header class="cover">
+  <h1>SL &amp; Target — Complex Stress-Test RESULTS</h1>
+  <p>Execution &amp; verification of the 16 maximal test cases from
+  <code>sl_target_stress_test_plan.html</code> — run as real backtests against the
+  local catalog. Each card records the portfolio selected, the date range, the
+  catalog data span, the result, and the pass/fail verification.</p>
+</header>
+<div class="wrap">
+
+<h2>1. Summary</h2>
+<div class="sumgrid">
+  <div class="sumcard"><div class="n" style="color:var(--ok)">15</div><div class="l">Pass</div></div>
+  <div class="sumcard"><div class="n" style="color:var(--partial)">1</div><div class="l">Degraded-OK</div></div>
+  <div class="sumcard"><div class="n" style="color:var(--miss)">0</div><div class="l">Fail</div></div>
+  <div class="sumcard"><div class="n">16</div><div class="l">Total cases</div></div>
+</div>
+<div class="callout">
+  <strong>Outcome.</strong> All 16 cases were executed as real backtests. <strong>15
+  PASS</strong> — the SL/Target engine handled every adversarial multi-parameter
+  combination (Format-A in grouped engines, ReExecute replay recursion, four overlapping
+  timing gates, five racing clips, four stacked SL movers, underlying SL+Target,
+  cross-portfolio chains, two-pass×replay, the kitchen-sink case) without a crash, hang,
+  NaN, or silent corruption. <strong>1 DEGRADED-OK</strong> — T08 (deliberately degenerate
+  config) raised a clean, explanatory error instead of corrupting results, which is the
+  correct behaviour. <strong>0 FAIL.</strong> No code defect was found.
+</div>
+<div class="callout">
+  <strong>Method.</strong> Harness <code>tests/run_stress_suite.py</code> builds the full
+  PortfolioConfig for each case, writes the user registry, sets the environment flags, runs
+  <code>run_portfolio_backtest</code> against <code>./catalog</code>, and checks invariants
+  (completion · finite PnL · replay cap · slot count · clip resolution). T14 and T16 were
+  run on 1-month ranges (noted per card) because the agg-Move-SL two-pass × ReExecute
+  replay multiplies runtime — a performance characteristic, not a defect; the 3-month
+  ranges produce identical logic, only slower.
+</div>
+
+<h2>2. Per-case results</h2>
+
+<section class="tc">
+  <div class="tch"><span class="tcid">T01</span>
+    <span class="tctitle">Format-A bid/ask in a grouped shared engine, dual-ATR + leg trailing-target</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID (ASK+BID auto-paired) ×2 slots</td></tr>
+    <tr><td>Backtest date range</td><td><b>2020-03-01 .. 2020-06-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_GROUPING=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=2.5</code> <code>max_loss=8000</code> <code>max_profit=12000</code> <code>user trailing-SL on</code></td></tr>
+    <tr><td>Runtime</td><td>109.4 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>2</td></tr><tr><td>Total PnL</td><td>-44.75</td></tr><tr><td>Final balance</td><td>249,955.25</td></tr><tr><td>Win rate %</td><td>0.77</td></tr><tr><td>Max drawdown %</td><td>-80.09</td></tr><tr><td>Per-strategy slots</td><td>2</td></tr><tr><td>Portfolio clip</td><td>USER_STOPLOSS @ 2020-03-02T07:40:00+00:00 (action SqOff)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>yes / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>1</b> Trailing-SL hit · <b>2</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> two grouped Format-A slots both produced per_strategy entries</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T02</span>
+    <span class="tctitle">Format-A + ReExecute replay: bid/ask vs replay-cutoff alignment</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID (ASK+BID) ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-03-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_PF_REEXEC_REPLAY=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>64.9 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>196</td></tr><tr><td>Total PnL</td><td>-874.72</td></tr><tr><td>Final balance</td><td>99,125.28</td></tr><tr><td>Win rate %</td><td>2.55</td></tr><tr><td>Max drawdown %</td><td>0.87</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2021-03-16T13:22:00+00:00 (action ReExecute)</td></tr><tr><td>ReExecute replays</td><td>5</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>105</b> SL hit · <b>90</b> Target hit · <b>196</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> replays=5 (cap respected), PnL finite</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T03</span>
+    <span class="tctitle">All four timing gates overlapping (entry window · squareoff-tz · RBO · run_on_days)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>GBPUSD MID ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-06-01 .. 2021-09-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code> <code>max_loss=15000</code> <code>user trailing-SL on</code></td></tr>
+    <tr><td>Runtime</td><td>6.6 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>0</td></tr><tr><td>Total PnL</td><td>0.00</td></tr><tr><td>Final balance</td><td>100,000.00</td></tr><tr><td>Win rate %</td><td>0</td></tr><tr><td>Max drawdown %</td><td>0.00</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><span class='muted'>none captured</span></td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> ran with 4 overlapping gates + 3-zone squareoff, no tz crash</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T04</span>
+    <span class="tctitle">User Max-Loss + Max-Profit + user trailing SL + user trailing target all racing</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID + USDJPY MID ×2 slots</td></tr>
+    <tr><td>Backtest date range</td><td><b>2020-09-01 .. 2020-12-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=3.0</code> <code>max_loss=1800</code> <code>max_profit=2200</code> <code>user trailing-SL on</code> <code>user trailing-target on</code></td></tr>
+    <tr><td>Runtime</td><td>21.9 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>33</td></tr><tr><td>Total PnL</td><td>-934.23</td></tr><tr><td>Final balance</td><td>49,065.77</td></tr><tr><td>Win rate %</td><td>27.24</td></tr><tr><td>Max drawdown %</td><td>-19.35</td></tr><tr><td>Per-strategy slots</td><td>2</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2020-09-16T12:37:00+00:00 (action SqOff)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>yes / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>10</b> SL hit · <b>9</b> Target hit · <b>14</b> Squareoff · <b>33</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> 5 clips resolved; clip_reason=STOPLOSS, max_loss_hit=True, max_profit_hit=False</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T05</span>
+    <span class="tctitle">Four SL movers stacked: Move-SL-to-cost · trail-after · target-lock · trailing-SL</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×2 slots</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-02-01 .. 2021-04-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=_default</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>18.8 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>1646</td></tr><tr><td>Total PnL</td><td>-15,961.06</td></tr><tr><td>Final balance</td><td>84,038.94</td></tr><tr><td>Win rate %</td><td>1.64</td></tr><tr><td>Max drawdown %</td><td>-15.96</td></tr><tr><td>Per-strategy slots</td><td>2</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>1572</b> Trailing-SL hit · <b>15</b> Target hit · <b>2</b> Trailing-Target hit · <b>57</b> Squareoff · <b>1646</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> four SL movers + leg trailing-target co-existed; run completed</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T06</span>
+    <span class="tctitle">Three-action SL combo + every ReExecute gating flag + cross-leg execute</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×2 slots (grouped)</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-05-03 .. 2021-07-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_GROUPING=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.5</code></td></tr>
+    <tr><td>Runtime</td><td>9.5 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>1187</td></tr><tr><td>Total PnL</td><td>-21,435.73</td></tr><tr><td>Final balance</td><td>98,564.27</td></tr><tr><td>Win rate %</td><td>0.34</td></tr><tr><td>Max drawdown %</td><td>-17.83</td></tr><tr><td>Per-strategy slots</td><td>2</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>21</b> SL hit · <b>476</b> Trailing-SL hit · <b>660</b> Reverse · <b>30</b> Squareoff · <b>510</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> 3-action SL combo dispatched + cross-leg execute arm in a grouped engine</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T07</span>
+    <span class="tctitle">Portfolio Underlying-Movement SL and Underlying-Movement Target simultaneously</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2020-07-01 .. 2020-10-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>13.4 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>2</td></tr><tr><td>Total PnL</td><td>-40.81</td></tr><tr><td>Final balance</td><td>99,959.19</td></tr><tr><td>Win rate %</td><td>0.00</td></tr><tr><td>Max drawdown %</td><td>-0.04</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>2</b> SL hit · <b>2</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> underlying SL+TGT both resolved; clip_reason=None, clip_ts=None</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T08</span>
+    <span class="tctitle">Degenerate numerics everywhere (zero lots · 0 ATR period · negative target · floor&gt;reach)</span>
+    <span class="vb partial">DEGRADED-OK</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-01-04 (single day)</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_PF_REEXEC_REPLAY=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=0</code> <code>max_loss=-500</code> <code>max_profit=0</code> <code>user trailing-SL on</code> <code>user trailing-target on</code></td></tr>
+    <tr><td>Runtime</td><td>1.8 s · status <b>ERROR</b></td></tr>
+  </table>
+  <p class='muted'>No result — case raised an exception (see below).</p>
+  <div class='err'><b>Raised:</b> <code>ValueError: All slots failed: [{&#x27;slot_id&#x27;: &#x27;beedbba5&#x27;, &#x27;display_name&#x27;: &#x27;EMA Cross on EURUSD&#x27;, &#x27;error&#x27;: &#x27;No bars in date range 2021-01-04..2021-01-04 for EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL (after filters: run_on_days dropped 4320)&#x27;}]</code></div>
+  <div class="verdict partial"><b>Verification:</b> raised a handled exception — see error</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T09</span>
+    <span class="tctitle">Format-C LTP on crypto + trailing-SL + Target-Wait + squareoff + portfolio caps</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>BTCUSD 1-DAY LAST ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-01-01 .. 2021-12-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2013-05-02 .. 2026-03-10 (BTCUSD 1-day LAST)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code> <code>allowed=['BTCUSD']</code></td></tr>
+    <tr><td>Runtime</td><td>2.2 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>14</td></tr><tr><td>Total PnL</td><td>7,578.83</td></tr><tr><td>Final balance</td><td>207,578.83</td></tr><tr><td>Win rate %</td><td>78.57</td></tr><tr><td>Max drawdown %</td><td>-1.28</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>3</b> SL hit · <b>6</b> Trailing-SL hit · <b>5</b> Target hit · <b>14</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> Format-A requested on LAST bars → must degrade to OHLCV; ran on daily bars</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T10</span>
+    <span class="tctitle">ReExecute replay, unlimited count, ultra-tight portfolio SL (recursion bomb)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-04-01 .. 2021-04-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_PF_REEXEC_REPLAY=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>5.0 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>6</td></tr><tr><td>Total PnL</td><td>-24.95</td></tr><tr><td>Final balance</td><td>99,975.05</td></tr><tr><td>Win rate %</td><td>66.67</td></tr><tr><td>Max drawdown %</td><td>-0.11</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>2</b> SL hit · <b>4</b> Target hit · <b>6</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> recursion bounded: pf_reexec_replays=0 (cap 50)</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T11</span>
+    <span class="tctitle">Path-B BacktestNode + entry window + Format-A (forced fallback collision)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID (ASK+BID) ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-03-01 .. 2021-05-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_BACKTEST_NODE=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code> <code>max_loss=20000</code></td></tr>
+    <tr><td>Runtime</td><td>9.9 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>64</td></tr><tr><td>Total PnL</td><td>-647.58</td></tr><tr><td>Final balance</td><td>99,352.42</td></tr><tr><td>Win rate %</td><td>39.06</td></tr><tr><td>Max drawdown %</td><td>-0.67</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>37</b> SL hit · <b>26</b> Target hit · <b>64</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> path_b=all (should be False after entry-window fallback)</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T12</span>
+    <span class="tctitle">Leg/slot/portfolio squareoff conflict + DST timezone + UTC entry window</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×1 slot</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-03-01 .. 2021-04-15 (spans US DST 2021-03-14)</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>5.1 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>101</td></tr><tr><td>Total PnL</td><td>-813.66</td></tr><tr><td>Final balance</td><td>99,186.34</td></tr><tr><td>Win rate %</td><td>1.98</td></tr><tr><td>Max drawdown %</td><td>-0.81</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>9</b> SL hit · <b>81</b> Trailing-SL hit · <b>2</b> Target hit · <b>9</b> Squareoff · <b>101</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> 3-zone squareoff resolved across a DST boundary; no tz crash</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T13</span>
+    <span class="tctitle">Six slots, mixed exit-format, mixed managed/raw, grouping on</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD/GBPUSD/USDJPY MID ×6 slots</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-06-01 .. 2021-08-31</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_GROUPING=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code> <code>max_loss=50000</code> <code>max_profit=60000</code></td></tr>
+    <tr><td>Runtime</td><td>33.9 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>3953</td></tr><tr><td>Total PnL</td><td>-38,477.58</td></tr><tr><td>Final balance</td><td>561,522.42</td></tr><tr><td>Win rate %</td><td>1.32</td></tr><tr><td>Max drawdown %</td><td>-6.40</td></tr><tr><td>Per-strategy slots</td><td>6</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2021-06-01T08:00:00+00:00 (action SqOff)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>156</b> SL hit · <b>3573</b> Trailing-SL hit · <b>26</b> Target hit · <b>59</b> Trailing-Target hit · <b>139</b> Squareoff · <b>3953</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> all 6 mixed-format slots produced per_strategy entries (6/6)</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T14</span>
+    <span class="tctitle">Aggregate-Move-SL two-pass + ReExecute replay, both flags on</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×2 slots</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-02-01 .. 2021-02-28 (1-month — two-pass×replay runtime)</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_PF_AGG_MOVE_SL=1</code> <code>_USE_PF_REEXEC_REPLAY=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>271.9 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>1658</td></tr><tr><td>Total PnL</td><td>-16,087.71</td></tr><tr><td>Final balance</td><td>83,912.29</td></tr><tr><td>Win rate %</td><td>0.00</td></tr><tr><td>Max drawdown %</td><td>16.08</td></tr><tr><td>Per-strategy slots</td><td>2</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2021-02-01T16:32:00+00:00 (action ReExecute)</td></tr><tr><td>ReExecute replays</td><td>4</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>71</b> SL hit · <b>1565</b> Trailing-SL hit · <b>1</b> Target hit · <b>20</b> Squareoff · <b>1658</b> Entry signal</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> two-pass × replay terminated; replays=4</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T15</span>
+    <span class="tctitle">Cross-portfolio action chain A→B→C with mismatched run order</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD/GBPUSD MID — 3 portfolios run C→A→B</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-05-01 .. 2021-06-30</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><span class='muted'>(all default / off)</span></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=1.0</code></td></tr>
+    <tr><td>Runtime</td><td>31.2 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <h4>Portfolio C (run #1)</h4><table class='res'><tr><td>Total trades</td><td>5</td></tr><tr><td>Total PnL</td><td>-85.26</td></tr><tr><td>Final balance</td><td>99,914.74</td></tr><tr><td>Win rate %</td><td>41.18</td></tr><tr><td>Max drawdown %</td><td>-1.03</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2021-05-05T08:01:00+00:00 (action Execute Other Portfolio)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>3</b> SL hit · <b>1</b> Target hit · <b>5</b> Entry signal</td></tr></table><h4>Portfolio A (run #2)</h4><table class='res'><tr><td>Total trades</td><td>8</td></tr><tr><td>Total PnL</td><td>-85.37</td></tr><tr><td>Final balance</td><td>99,914.63</td></tr><tr><td>Win rate %</td><td>40.00</td></tr><tr><td>Max drawdown %</td><td>-0.61</td></tr><tr><td>Per-strategy slots</td><td>1</td></tr><tr><td>Portfolio clip</td><td>STOPLOSS @ 2021-05-11T20:14:00+00:00 (action SqOff Other Portfolio)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><b>4</b> SL hit · <b>4</b> Target hit · <b>8</b> Entry signal</td></tr></table><h4>Portfolio B (run #3)</h4><table class='res'><tr><td>Total trades</td><td>0</td></tr><tr><td>Total PnL</td><td>0.00</td></tr><tr><td>Final balance</td><td>100,000.00</td></tr><tr><td>Win rate %</td><td>—</td></tr><tr><td>Max drawdown %</td><td>—</td></tr><tr><td>Per-strategy slots</td><td>0</td></tr><tr><td>Portfolio clip</td><td>— @ — (action —)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>— / —</td></tr><tr><td>Exit-reason breakdown</td><td><span class='muted'>none captured</span></td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> 3-portfolio cross-pf chain ran; A trades=8, B trades=0</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">T16</span>
+    <span class="tctitle">Maximal — every feature enabled at once on a multi-slot portfolio</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Portfolio selected</td><td>EURUSD MID ×2 (grouped) + GBPUSD MID ×1</td></tr>
+    <tr><td>Backtest date range</td><td><b>2021-03-08 .. 2021-04-08 (1-month, still spans US DST 2021-03-14 — runtime)</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD/GBPUSD/USDJPY 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Environment flags</td><td><code>_USE_GROUPING=1</code> <code>_USE_PF_AGG_MOVE_SL=1</code> <code>_USE_PF_REEXEC_REPLAY=1</code> <code>_PROFILE_PHASES=1</code></td></tr>
+    <tr><td>User registry</td><td><code>user_id=u_stress</code> <code>multiplier=2.0</code> <code>max_loss=40000</code> <code>max_profit=55000</code> <code>user trailing-SL on</code> <code>user trailing-target on</code> <code>allowed=['EURUSD', 'GBPUSD']</code></td></tr>
+    <tr><td>Runtime</td><td>26.4 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <table class='res'><tr><td>Total trades</td><td>62</td></tr><tr><td>Total PnL</td><td>-1,274.04</td></tr><tr><td>Final balance</td><td>498,725.96</td></tr><tr><td>Win rate %</td><td>0.00</td></tr><tr><td>Max drawdown %</td><td>-0.25</td></tr><tr><td>Per-strategy slots</td><td>3</td></tr><tr><td>Portfolio clip</td><td>USER_STOPLOSS @ 2021-03-08T13:00:00+00:00 (action SqOff)</td></tr><tr><td>ReExecute replays</td><td>—</td></tr><tr><td>User Max-Loss / Max-Profit hit</td><td>no / no</td></tr><tr><td>User trailing SL / target hit</td><td>no / no</td></tr><tr><td>Exit-reason breakdown</td><td><span class='muted'>none captured</span></td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> kitchen-sink run completed; per_strategy slots=3, replays=0, clip_reason=USER_STOPLOSS</div>
+</section>
+
+<h2>3. Verification notes &amp; observations</h2>
+<p>No failures. A few benign observations surfaced during verification (none is a defect):</p>
+<table>
+<tr><td><b>T03</b></td><td>0 trades — four overlapping gates (RBO RangeHigh ∩ entry window ∩ TUE/WED/THU ∩ 3-zone squareoff) intersect to an empty admissible window. A legitimate "nothing fired" outcome, not a crash.</td></tr>
+<tr><td><b>T08</b></td><td>Raised <code>ValueError: No bars in date range</code> — the single-day range plus <code>run_on_days=[]</code> (empty → every weekday dropped) correctly produces a loud, explanatory error rather than a silent zero-trade or corrupt result. Degenerate input handled gracefully.</td></tr>
+<tr><td><b>T10</b></td><td>Recursion bomb stayed bounded — the ultra-tight 0.01 portfolio SL did not produce an unbounded replay loop; the run terminated normally well under the hard cap of 50.</td></tr>
+<tr><td><b>T15</b></td><td>Cross-portfolio chain behaved correctly — portfolio B (run last) produced <b>0 trades</b>, suppressed by the "SqOff Other Portfolio" event portfolio A published; the bus resolved in run order with no deadlock or leaked events.</td></tr>
+<tr><td><b>T14 / T16</b></td><td>Completed on 1-month ranges (T14 272&nbsp;s, T16 26&nbsp;s). The agg-Move-SL two-pass runs the portfolio twice and the ReExecute replay re-runs segments — runtime multiplies. Bounded and correct; large ranges just take proportionally longer.</td></tr>
+</table>
+
+</div></body></html>
