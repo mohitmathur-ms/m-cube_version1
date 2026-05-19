@@ -8,12 +8,7 @@
     },
     {
       "user_id": "u_stress",
-      "multiplier": 2.5,
-      "max_loss": 8000,
-      "max_profit": 12000,
-      "trailing_sl_enabled": true,
-      "trailing_sl_every": 2000,
-      "trailing_sl_by": 500
+      "multiplier": 1.0
     }
   ]
 }
