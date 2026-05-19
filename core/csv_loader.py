@@ -57,6 +57,12 @@ _COMMODITY_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
 _COMMODITY_SCAN_CACHE_TTL_SECONDS = 600.0
 _COMMODITY_SCAN_CACHE_LOCK = threading.Lock()
 
+# Parallel cache for :func:`_scan_index_daily_layout`. Same mtime + TTL
+# safety-net shape as the FX cache above; see that block for the rationale.
+_INDEX_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
+_INDEX_SCAN_CACHE_TTL_SECONDS = 600.0
+_INDEX_SCAN_CACHE_LOCK = threading.Lock()
+
 
 # Default path to the user's crypto CSV data
 DEFAULT_CSV_FOLDER = r"D:\Data_all\Fx"
@@ -80,6 +86,24 @@ _DAILY_FX_PATTERN = re.compile(
 # in the parent directory path (<COMMODITY>/YYYY/MM/DD/), not the filename, so
 # the regex captures only the side.
 _DAILY_COMMODITY_PATTERN = re.compile(r"^(ASK|BID)\.csv$", re.IGNORECASE)
+
+# Index daily-file naming: "DD.MM.YYYY_complete_df_OHLCV.csv" — one consolidated
+# file per trading day (no ASK/BID split — the index level itself is the bar
+# stream). Layout is three-deep with no symbol directory:
+# <root>/YYYY/MM/<DD.MM.YYYY>_complete_df_OHLCV.csv
+_DAILY_INDEX_PATTERN = re.compile(
+    r"^(\d{2})\.(\d{2})\.(\d{4})_complete_df_OHLCV\.csv$",
+    re.IGNORECASE,
+)
+
+# Months → 3-letter abbreviation used in the synthetic display filename produced
+# by :func:`_scan_index_daily_layout`. Matches the convention in the consolidated
+# FX naming (e.g. "01JAN2020_31DEC2025") so the index display filename slots
+# cleanly into the asset-class filter the UI applies.
+_MONTH_ABBR = (
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+)
 
 # Consolidated-FX naming: "{PAIR}_{PAIR}_DDMMMYYYY_DDMMMYYYY_{ASK|BID|MID}_OHLCV.csv"
 # (matches the pattern documented in adapter_admin/data_formats/fx.json). One file
@@ -302,15 +326,115 @@ def _scan_commodity_daily_layout(root: Path) -> list[dict]:
     return entries
 
 
+def _index_symbol_from_root(root: Path) -> str:
+    """Derive a Nautilus-friendly symbol from the root folder name.
+
+    Uppercase, keep only ``[A-Z0-9_]``, collapse runs of disallowed characters
+    into a single underscore, and trim leading/trailing underscores. So
+    ``D:\\complete_df_yyyy`` → ``COMPLETE_DF_YYYY``; ``D:\\NIFTY50`` → ``NIFTY50``.
+    Falls back to ``"INDEX"`` if the result would otherwise be empty.
+    """
+    cleaned = re.sub(r"[^A-Z0-9]+", "_", root.name.upper()).strip("_")
+    return cleaned or "INDEX"
+
+
+def _scan_index_daily_layout(root: Path) -> list[dict]:
+    """Aggregate single-stream daily index CSVs into one entry.
+
+    Layout: ``<root>/YYYY/MM/DD.MM.YYYY_complete_df_OHLCV.csv`` — three-deep,
+    no symbol directory, no ASK/BID split. Files are collected into a single
+    ``files`` list on the emitted entry; the downstream
+    :func:`core.nautilus_loader.load_csv_and_store` already handles this shape
+    via its ``files``-list branch (it falls through to ``price_type="LAST"``
+    when ``side`` is not ASK/BID/MID, matching the ``expose_sides: ["LAST"]``
+    convention in ``adapter_admin/data_formats/index.json``).
+
+    Symbol is derived from the root folder name via
+    :func:`_index_symbol_from_root` — rename the data folder to get a cleaner
+    symbol if needed.
+    """
+    key = str(root)
+    try:
+        root_mtime = root.stat().st_mtime
+    except OSError:
+        return []
+
+    now = time.monotonic()
+    cached = _INDEX_SCAN_CACHE.get(key)
+    if (cached is not None
+            and cached[1] == root_mtime
+            and now - cached[0] < _INDEX_SCAN_CACHE_TTL_SECONDS):
+        return list(cached[2])
+
+    # (date_tuple, path_str) tuples so we can sort chronologically by the
+    # date encoded in the filename — independent of filesystem walk order.
+    dated: list[tuple[tuple[int, int, int], str]] = []
+    for csv_file in root.rglob("*.csv"):
+        match = _DAILY_INDEX_PATTERN.match(csv_file.name)
+        if not match:
+            continue
+        try:
+            rel_parts = csv_file.relative_to(root).parts
+        except ValueError:
+            continue
+        # Expect <root>/YYYY/MM/<file> — exactly two parent dirs above the file.
+        if len(rel_parts) != 3:
+            continue
+        dd, mm, yyyy = match.group(1), match.group(2), match.group(3)
+        try:
+            date_key = (int(yyyy), int(mm), int(dd))
+        except ValueError:
+            continue
+        dated.append((date_key, str(csv_file)))
+
+    if not dated:
+        with _INDEX_SCAN_CACHE_LOCK:
+            _INDEX_SCAN_CACHE[key] = (now, root_mtime, [])
+        return []
+
+    dated.sort(key=lambda t: t[0])
+    files = [path for _, path in dated]
+    first_date, last_date = dated[0][0], dated[-1][0]
+
+    symbol = _index_symbol_from_root(root)
+
+    def _ddmonyyyy(d: tuple[int, int, int]) -> str:
+        yyyy, mm, dd = d
+        return f"{dd:02d}{_MONTH_ABBR[mm - 1]}{yyyy:04d}"
+
+    # Shape the synthetic filename like the consolidated FX/commodity naming so
+    # the index.json filename_pattern (and the FX-style UI filter) still accept
+    # it. The actual files are loaded via the `files` list, not this path.
+    synth_filename = (
+        f"{symbol}_{_ddmonyyyy(first_date)}_{_ddmonyyyy(last_date)}_LAST_OHLCV.csv"
+    )
+
+    entry = {
+        "path": files[0],            # nominal — loader uses 'files' list
+        "filename": synth_filename,
+        "id": -1,                    # negative, like other scanners
+        "symbol": symbol,
+        "name": f"{symbol} ({len(files):,} daily files)",
+        "files": files,
+    }
+    entries = [entry]
+
+    with _INDEX_SCAN_CACHE_LOCK:
+        _INDEX_SCAN_CACHE[key] = (now, root_mtime, list(entries))
+    return entries
+
+
 def clear_fx_scan_cache() -> None:
-    """Drop the daily-layout scan caches (FX + commodity). Call after manually
-    adding new pair / commodity directories if you want the next
-    ``scan_csv_folder`` to see them immediately rather than waiting for the
-    TTL to expire."""
+    """Drop the daily-layout scan caches (FX + commodity + index). Call after
+    manually adding new pair / commodity / index directories if you want the
+    next ``scan_csv_folder`` to see them immediately rather than waiting for
+    the TTL to expire."""
     with _FX_SCAN_CACHE_LOCK:
         _FX_SCAN_CACHE.clear()
     with _COMMODITY_SCAN_CACHE_LOCK:
         _COMMODITY_SCAN_CACHE.clear()
+    with _INDEX_SCAN_CACHE_LOCK:
+        _INDEX_SCAN_CACHE.clear()
 
 
 def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
@@ -387,6 +511,12 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
     # roots stay on their current code path.
     if not results:
         results = _scan_commodity_daily_layout(folder_path)
+
+    # Last-resort fallback: index daily layout
+    # (<root>/YYYY/MM/DD.MM.YYYY_complete_df_OHLCV.csv). Three-deep, no symbol
+    # directory, single consolidated stream.
+    if not results:
+        results = _scan_index_daily_layout(folder_path)
 
     return results
 

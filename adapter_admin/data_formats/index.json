@@ -1,20 +1,33 @@
 {
   "label": "Index",
   "csv": {
-    "filename_pattern": null,
-    "filename_description": null,
-    "required_columns": null,
-    "timestamp_column": null,
-    "timestamp_format": null,
+    "filename_pattern": "^[A-Z][A-Z0-9_]*_\\d{2}[A-Z]{3}\\d{4}_\\d{2}[A-Z]{3}\\d{4}_LAST_OHLCV\\.csv$",
+    "filename_description": "Index daily OHLCV CSVs laid out as <root>/YYYY/MM/DD.MM.YYYY_complete_df_OHLCV.csv (three-level: year, month, then the dated CSV directly — no symbol directory). One file per trading day; the dataset is a single index series so there is no ASK/BID split. Required columns: timestamp, open, high, low, close, volume. An optional vwap column ships per row and is preserved through to the returned dataframe. The scanner aggregates all daily files into one entry and presents it with a synthetic display name shaped like <SYMBOL>_DDMONYYYY_DDMONYYYY_LAST_OHLCV.csv (this is what filename_pattern matches — the source files themselves stay as DD.MM.YYYY_complete_df_OHLCV.csv on disk). Symbol is derived from the root folder name (uppercased, non-alphanumerics replaced with underscore). Default root: D:\\complete_df_yyyy.",
+    "required_columns": [
+      "timestamp",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "optional_columns": [
+      "vwap"
+    ],
+    "timestamp_column": "timestamp",
+    "timestamp_format": "auto",
     "delimiter": ","
   },
   "instrument": {
-    "type": null,
-    "quote_currency": null,
-    "price_precision": null,
-    "size_precision": null,
-    "currency_type": null,
-    "timeframe": null
+    "type": "CurrencyPair",
+    "quote_currency": "INR",
+    "expose_sides": [
+      "LAST"
+    ],
+    "price_precision": 2,
+    "size_precision": 0,
+    "currency_type": 0,
+    "timeframe": "1-MINUTE"
   },
   "trading": {
     "maker_fee": null,
