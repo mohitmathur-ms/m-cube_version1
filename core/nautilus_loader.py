@@ -199,6 +199,7 @@ def load_csv_and_store(
     # or a single `path`.
     ts_col = csv_config.get("timestamp_column") or "ts"
     req_cols = csv_config.get("required_columns") or None
+    opt_cols = csv_config.get("optional_columns") or None
     delimiter = csv_config.get("delimiter") or ","
 
     side = csv_entry.get("side")
@@ -206,22 +207,27 @@ def load_csv_and_store(
     bid_files = csv_entry.get("bid_files") or []
 
     if side == "MID" and ask_files and bid_files:
-        df = load_pair_mid(csv_entry, timestamp_column=ts_col, 
-                           required_columns=req_cols, delimiter=delimiter)
+        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
+                           required_columns=req_cols, optional_columns=opt_cols,
+                           delimiter=delimiter)
     elif side == "ASK" and ask_files:
         df = concat_side(ask_files, timestamp_column=ts_col,
-                         required_columns=req_cols, delimiter=delimiter)
+                         required_columns=req_cols, optional_columns=opt_cols,
+                         delimiter=delimiter)
     elif side == "BID" and bid_files:
         df = concat_side(bid_files, timestamp_column=ts_col,
-                         required_columns=req_cols, delimiter=delimiter)
+                         required_columns=req_cols, optional_columns=opt_cols,
+                         delimiter=delimiter)
     else:
         file_list = csv_entry.get("files")
         if file_list:
             df = concat_side(file_list, timestamp_column=ts_col,
-                             required_columns=req_cols, delimiter=delimiter)
+                             required_columns=req_cols, optional_columns=opt_cols,
+                             delimiter=delimiter)
         else:
             df = load_csv(csv_entry["path"], timestamp_column=ts_col,
-                          required_columns=req_cols, delimiter=delimiter)
+                          required_columns=req_cols, optional_columns=opt_cols,
+                          delimiter=delimiter)
 
     # Step 2: Create instrument
     quote = inst_config.get("quote_currency") or "USD"

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python.exe -c \"from core.csv_loader import load_csv; df = load_csv\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD\\\\2022\\\\01\\\\03\\\\ASK.csv', timestamp_column='timestamp', required_columns=['timestamp','open','high','low','close','volume']\\); print\\(df.head\\(\\)\\); print\\('index name:', df.index.name\\); print\\('index dtype:', df.index.dtype\\); print\\('columns:', list\\(df.columns\\)\\)\")",
+      "Read(//d/ForexDataValidator/output/dataset/**)",
+      "Bash(venv/Scripts/python.exe -c \"from pathlib import Path; root = Path\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset'\\); print\\('exists:', root.exists\\(\\)\\); print\\('children:', [p.name for p in root.iterdir\\(\\)] if root.exists\\(\\) else None\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"from pathlib import Path; xau = Path\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD'\\); files = list\\(xau.rglob\\('*.csv'\\)\\)[:5]; print\\('sample files:'\\); [print\\(' ', f\\) for f in files]; print\\('total csvs under XAUUSD:', sum\\(1 for _ in xau.rglob\\('*.csv'\\)\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import pandas as pd; df = pd.read_csv\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD\\\\2026\\\\04\\\\01\\\\01.04.2026_ASK_OHLCV.csv', nrows=3\\); print\\('columns:', list\\(df.columns\\)\\); print\\(df\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.csv_loader import load_csv; df = load_csv\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD\\\\2026\\\\04\\\\01\\\\01.04.2026_ASK_OHLCV.csv', timestamp_column='timestamp', required_columns=['timestamp','open','high','low','close','volume']\\); print\\(df.head\\(\\)\\); print\\('---'\\); print\\('index name:', df.index.name\\); print\\('index dtype:', df.index.dtype\\); print\\('columns:', list\\(df.columns\\)\\); print\\('rows:', len\\(df\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.csv_loader import scan_csv_folder, clear_fx_scan_cache; clear_fx_scan_cache\\(\\); entries = scan_csv_folder\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset'\\); print\\(f'{len\\(entries\\)} entries'\\); [print\\(' ', e['symbol'], e['side'], 'ask:', len\\(e.get\\('ask_files', []\\)\\), 'bid:', len\\(e.get\\('bid_files', []\\)\\), 'name:', e['name']\\) for e in entries]\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -c \"from pathlib import Path; p = Path\\(r'D:\\\\Data_all\\\\Fx'\\); print\\('exists:', p.exists\\(\\)\\); print\\('children:', [c.name for c in p.iterdir\\(\\)][:10] if p.exists\\(\\) else None\\)\")",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -x -q)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -q --deselect tests/test_custom_strategy_loader.py::TestGetMergedRegistry::test_no_custom_strategies)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_aggregator.py tests/ -q -k \"csv or load or scan\")",
+      "Bash(git stash *)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_custom_strategy_loader.py::TestGetMergedRegistry::test_no_custom_strategies tests/test_perf_regression.py::TestBuildFillsLookup::test_matches_iterrows_reference -q)",
+      "Bash(venv/Scripts/python.exe -c \"import pandas as pd; df = pd.read_csv\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD\\\\2026\\\\04\\\\01\\\\01.04.2026_BID_OHLCV.csv', nrows=3\\); print\\('BID columns:', list\\(df.columns\\)\\); print\\(df\\)\")",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -q --deselect tests/test_custom_strategy_loader.py::TestGetMergedRegistry --deselect tests/test_perf_regression.py::TestBuildFillsLookup)"
+    ]
+  }
+}
