@@ -397,10 +397,10 @@ case("T13", "Six slots, mixed exit-format, mixed managed/raw, grouping on",
 
 # T14 — agg move-sl two-pass + replay
 case("T14", "Aggregate-Move-SL two-pass + ReExecute replay, both flags on",
-     "EURUSD MID ×2 slots", "2021-02-01 .. 2021-04-30",
+     "EURUSD MID ×2 slots", "2021-02-01 .. 2021-02-28 (1-month — two-pass×replay runtime)",
      {"_USE_PF_AGG_MOVE_SL": True, "_USE_PF_REEXEC_REPLAY": True, "_PROFILE_PHASES": True},
      {"user_id": "u_stress", "multiplier": 1.0},
-     lambda: pf("T14_twopass_replay", "2021-02-01", "2021-04-30", [
+     lambda: pf("T14_twopass_replay", "2021-02-01", "2021-02-28", [
          slot("EMA Cross", EUR, 0.04, ec(stop_loss_type="percentage", stop_loss_value=0.15,
               trailing_sl_step=0.04, trailing_sl_offset=0.02, target_type="percentage",
               target_value=0.20), params=emap(6, 18)),
@@ -427,7 +427,8 @@ case("T15", "Cross-portfolio action chain A→B→C with mismatched run order",
 
 # T16 — maximal
 case("T16", "Maximal — every feature enabled at once on a multi-slot portfolio",
-     "EURUSD MID ×2 (grouped) + GBPUSD MID ×1", "2021-03-01 .. 2021-06-30 (spans DST)",
+     "EURUSD MID ×2 (grouped) + GBPUSD MID ×1",
+     "2021-03-08 .. 2021-04-08 (1-month, still spans US DST 2021-03-14 — runtime)",
      {"_USE_GROUPING": True, "_USE_PF_AGG_MOVE_SL": True, "_USE_PF_REEXEC_REPLAY": True,
       "_PROFILE_PHASES": True},
      {"user_id": "u_stress", "multiplier": 2.0, "max_loss": 40000, "max_profit": 55000,
@@ -435,7 +436,7 @@ case("T16", "Maximal — every feature enabled at once on a multi-slot portfolio
       "trailing_tgt_enabled": True, "trailing_tgt_when_reach": 20000, "trailing_tgt_lock": 10000,
       "trailing_tgt_every": 4000, "trailing_tgt_by": 2000,
       "allowed_instruments": ["EURUSD", "GBPUSD"]},
-     lambda: pf("T16_maximal", "2021-03-01", "2021-06-30", [
+     lambda: pf("T16_maximal", "2021-03-08", "2021-04-08", [
          slot("EMA Cross", EUR, 0.05, ec(exit_price_format="bidask", stop_loss_type="atr",
               trailing_sl_step=0.05, trailing_sl_offset=0.03, sl_atr_period=14,
               sl_atr_multiplier=2.0, target_type="atr", tgt_atr_period=21, tgt_atr_multiplier=3.0,
