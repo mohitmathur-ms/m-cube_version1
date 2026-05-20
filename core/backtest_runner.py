@@ -2136,6 +2136,32 @@ def run_backtest(
 
     engine.add_strategy(strategy)
 
+    # aggregation_reports sniffers: snapshot engine.data pre-run and attach
+    # a BarSniffer for live EXTERNAL + INTERNAL capture. All failures swallowed
+    # so the backtest itself never fails on a report-pipeline error.
+    _sniffer_paths = None
+    try:
+        from core.aggregation_report import (
+            derive_sniffer_paths_for_bar_type,
+            pick_internal_bar_type,
+        )
+        from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
+        _all_subscribed = bar_type_strs + paired_strs
+        _sniffer_paths = derive_sniffer_paths_for_bar_type(
+            bar_type_strs[0], bar_type_strs[1:], start_date, end_date,
+        )
+        dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
+        engine.add_strategy(BarSniffer(BarSnifferConfig(
+            bar_types=tuple(_all_subscribed),
+            csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
+            csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
+        )))
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).exception(
+            "aggregation_report: failed to set up sniffer (run_backtest)"
+        )
+
     # Run backtest
     engine.run()
 
@@ -2156,6 +2182,29 @@ def run_backtest(
         )
 
     engine.dispose()
+
+    # aggregation_reports: append ledger row + re-render combined_report.html.
+    if _sniffer_paths is not None:
+        try:
+            import uuid as _uuid
+            from core.aggregation_report import record_run, pick_internal_bar_type
+            record_run(
+                run_id=str(_uuid.uuid4()),
+                run_kind="single",
+                user_id=user_id,
+                portfolio_name=None,
+                bar_type_external=bar_type_strs[0],
+                bar_type_internal=pick_internal_bar_type(bar_type_strs),
+                start_date=start_date,
+                end_date=end_date,
+                csv_paths=_sniffer_paths,
+                result=results,
+            )
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "aggregation_report.record_run failed (run_backtest)"
+            )
 
     return results
 
@@ -2714,6 +2763,31 @@ def _run_single_slot(
 
             engine.add_strategy(strategy)
 
+        # aggregation_reports sniffers: snapshot engine.data pre-run + attach a
+        # BarSniffer alongside the real strategy. Added AFTER the user's
+        # strategy so it does not shift strategy_id ordering used by the
+        # extract logic. Failure here never fails the slot.
+        _sniffer_paths = None
+        try:
+            from core.aggregation_report import derive_sniffer_paths_for_bar_type
+            from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
+            _extra_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+            _all_subscribed = bar_type_strs_to_load + _extra_bts
+            _sniffer_paths = derive_sniffer_paths_for_bar_type(
+                slot.bar_type_str, _extra_bts, start_date, end_date,
+            )
+            dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
+            engine.add_strategy(BarSniffer(BarSnifferConfig(
+                bar_types=tuple(_all_subscribed),
+                csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
+                csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
+            )))
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "aggregation_report: failed to set up sniffer (_run_single_slot)"
+            )
+
         with _phase("engine_run", phase_times):
             engine.run()
 
@@ -2746,6 +2820,17 @@ def _run_single_slot(
         results["allocated_capital"] = capital
         results["elapsed_seconds"] = round(_time.time() - _t_slot_start, 3)
         results["worker_pid"] = os.getpid()
+
+        # aggregation_reports: surface sniffer paths so the parent process can
+        # append a ledger row (the CSVs are already written by on_stop here).
+        if _sniffer_paths is not None:
+            results["_sniffer_csv_paths"] = {
+                k: str(v) for k, v in _sniffer_paths.items()
+            }
+            results["_sniffer_bar_type_external"] = slot.bar_type_str
+            from core.aggregation_report import pick_internal_bar_type as _pin_int
+            _strat_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+            results["_sniffer_bar_type_internal"] = _pin_int(_strat_bts)
 
         # Warn if paired ASK/BID data was unavailable — fills will use MID prices
         if missing_pairs:
@@ -3472,6 +3557,35 @@ def _run_slot_group(
 
                 engine.add_strategy(strategy)
 
+        # aggregation_reports sniffers: one sniffer for the whole group since
+        # every slot in a group shares (bar_type, start, end). Added AFTER
+        # every real strategy so it does not shift the strategy_id index used
+        # by per-slot extract below.
+        _sniffer_paths = None
+        try:
+            from core.aggregation_report import derive_sniffer_paths_for_bar_type
+            from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
+            _group_extra_bts: list[str] = []
+            for _slot_in_grp, _ in group:
+                for _bt in (getattr(_slot_in_grp, "strategy_bar_types", None) or []):
+                    if _bt not in _group_extra_bts:
+                        _group_extra_bts.append(_bt)
+            _all_subscribed = list(bar_type_strs_to_load) + _group_extra_bts
+            _sniffer_paths = derive_sniffer_paths_for_bar_type(
+                primary_bar_type_str, _group_extra_bts, start_date, end_date,
+            )
+            dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
+            engine.add_strategy(BarSniffer(BarSnifferConfig(
+                bar_types=tuple(_all_subscribed),
+                csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
+                csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
+            )))
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "aggregation_report: failed to set up sniffer (_run_slot_group)"
+            )
+
         with _phase("engine_run", phase_times):
             engine.run()
 
@@ -3534,6 +3648,18 @@ def _run_slot_group(
                     r["worker_rss_mb"] = round(_psutil.Process(os.getpid()).memory_info().rss / 1e6, 1)
                 except Exception:
                     r["worker_rss_mb"] = None
+
+                # aggregation_reports: every slot in the group points at the
+                # single shared CSV set (same bar_type + date range). Each
+                # slot still carries its own metrics in the eventual ledger row.
+                if _sniffer_paths is not None:
+                    r["_sniffer_csv_paths"] = {
+                        k: str(v) for k, v in _sniffer_paths.items()
+                    }
+                    r["_sniffer_bar_type_external"] = slot.bar_type_str
+                    from core.aggregation_report import pick_internal_bar_type as _pin_int
+                    _strat_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+                    r["_sniffer_bar_type_internal"] = _pin_int(_strat_bts)
 
                 if missing_pairs:
                     r["warning"] = (
@@ -4118,6 +4244,42 @@ def run_portfolio_backtest(
             _replays += 1
         if _replays > 0:
             print(f"[PF_REEXEC] spliced {_replays} replay segment(s)")
+
+    # aggregation_reports: append one ledger row per enabled slot (all rows
+    # share one run_id so the combined HTML can group them under this
+    # portfolio run). Slots that share a group share CSV paths but each
+    # contributes its own metrics.
+    try:
+        import uuid as _uuid
+        from core.aggregation_report import record_runs
+        _run_id = str(_uuid.uuid4())
+        _rows: list[dict] = []
+        for _slot in enabled_slots:
+            _r = slot_results.get(_slot.slot_id)
+            if not _r:
+                continue
+            _csv_paths = _r.get("_sniffer_csv_paths")
+            if not _csv_paths:
+                continue
+            _rows.append({
+                "run_id": _run_id,
+                "user_id": user_id,
+                "run_kind": "portfolio",
+                "portfolio_name": pf_name,
+                "bar_type_external": _r.get("_sniffer_bar_type_external") or _slot.bar_type_str,
+                "bar_type_internal": _r.get("_sniffer_bar_type_internal"),
+                "start_date": _slot.start_date or portfolio.start_date,
+                "end_date": _slot.end_date or portfolio.end_date,
+                "csv_paths": _csv_paths,
+                "result": _r,
+            })
+        if _rows:
+            record_runs(_rows)
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).exception(
+            "aggregation_report.record_runs failed (run_portfolio_backtest)"
+        )
 
     return result
 

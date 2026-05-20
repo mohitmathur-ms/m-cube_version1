@@ -22,7 +22,14 @@
       "Bash(venv/Scripts/python.exe -m pytest tests/ -v)",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -v -k \"csv or aggregator or loader\" --ignore=tests/test_custom_strategy_loader.py)",
       "Bash(venv/Scripts/python.exe -c \"import json, re; cfg = json.load\\(open\\('adapter_admin/data_formats/index.json'\\)\\); pat = re.compile\\(cfg['csv']['filename_pattern']\\); print\\('regex:', cfg['csv']['filename_pattern']\\); print\\('matches synthetic name:', bool\\(pat.match\\('COMPLETE_DF_YYYY_01JAN2020_31JUL2025_LAST_OHLCV.csv'\\)\\)\\)\")",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Directory)",
+      "PowerShell(d:\\\\m-cube_version1\\\\venv\\\\Scripts\\\\python.exe -c \"from core import sniffers, aggregation_report; print\\('imports ok'\\); from core.aggregation_report import parse_bar_type, _compact_timeframe, paths_for; print\\(parse_bar_type\\('EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL'\\)\\); print\\(parse_bar_type\\('EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL'\\)\\); print\\(_compact_timeframe\\('1-MINUTE'\\), _compact_timeframe\\('5-MINUTE'\\), _compact_timeframe\\('1-HOUR'\\), _compact_timeframe\\('1-DAY'\\)\\); print\\(paths_for\\('fx', 'USDJPY', '1-MINUTE', '5-MINUTE', '2015-01-01', '2015-12-31'\\)\\)\")",
+      "PowerShell(d:\\\\m-cube_version1\\\\venv\\\\Scripts\\\\python.exe -m pytest \"d:\\\\m-cube_version1\\\\tests\" -x --tb=short 2>&1)",
+      "PowerShell(d:\\\\m-cube_version1\\\\venv\\\\Scripts\\\\python.exe -m pytest \"d:\\\\m-cube_version1\\\\tests\" --ignore=\"d:\\\\m-cube_version1\\\\tests\\\\test_aggregator.py\" --tb=short 2>&1)",
+      "PowerShell(d:\\\\m-cube_version1\\\\venv\\\\Scripts\\\\python.exe d:\\\\m-cube_version1\\\\verify_session_changes.py 2>&1)",
+      "Bash(d:/m-cube_version1/venv/Scripts/python.exe verify_session_changes.py)",
+      "Bash(d:/m-cube_version1/venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

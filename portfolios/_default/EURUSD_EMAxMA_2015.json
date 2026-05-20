@@ -2,7 +2,7 @@
   "name": "EURUSD_EMAxMA_2015",
   "description": "EMA Cross + 4 Moving Averages on EURUSD.FOREX_MS-30-MINUTE-BID, full year 2015 (01-01 to 31-12), per-leg SL=0.1% TP=0.5% (Square_off), portfolio SL/TP disabled, lots=0.01.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-19T06:16:59.125203+00:00",
+  "updated_at": "2026-05-20T07:26:12.308483+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -93,10 +93,14 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "LIGHTCMDUSDUSD.COMMODITIES_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "strategy_bar_types": [
+        "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+      ],
       "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
+        "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
         "stop_loss_value": 20,
         "trailing_sl_step": 0,
@@ -144,10 +148,14 @@
         "ma4_period": 50,
         "use_ema": true
       },
-      "bar_type_str": "LIGHTCMDUSDUSD.COMMODITIES_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "strategy_bar_types": [
+        "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+      ],
       "lots": 0.01,
       "allocation_pct": 0,
       "exit_config": {
+        "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
         "stop_loss_value": 20,
         "trailing_sl_step": 0,

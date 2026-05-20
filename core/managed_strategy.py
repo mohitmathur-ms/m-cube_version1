@@ -180,20 +180,20 @@ def _derive_bid_ask_bar_types(primary_bar_type_str: str) -> tuple[str, str]:
         return s.replace("-ASK-", "-BID-", 1), s
     return "", ""
 
-
 def _parse_squareoff_minute(squareoff_time: str | None) -> int:
-    """Convert "HH:MM" → minute-of-day, or -1 when disabled.
+    """Convert "HH:MM" or "HH:MM:SS" → minute-of-day, or -1 when disabled.
 
-    Tolerates ``None`` and an empty string. Raises ``ValueError`` for malformed
-    inputs so a typo in a portfolio JSON fails loudly at engine build instead
-    of silently disabling the squareoff.
+    Tolerates None and an empty string. Seconds are accepted (and dropped —
+    minute-of-day granularity is sufficient for entry-window / squareoff
+    triggers). Raises ValueError for malformed inputs so a typo in a
+    portfolio JSON fails loudly at engine build instead of silently disabling.
     """
     if not squareoff_time:
         return _SQUAREOFF_DISABLED
-    h, _, m = squareoff_time.partition(":")
-    return int(h) * 60 + int(m)
+    parts = squareoff_time.split(":")
+    return int(parts[0]) * 60 + int(parts[1])
 
-
+    
 class ManagedExitConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
