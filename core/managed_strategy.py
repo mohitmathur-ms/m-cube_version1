@@ -30,6 +30,12 @@ from core.signals import SIGNAL_REGISTRY
 # re-parsing the HH:MM string on every bar.
 _SQUAREOFF_DISABLED = -1
 
+# UTC weekday from ts_event nanoseconds. 1970-01-01 (UNIX epoch) was a Thursday
+# → Python weekday() = 3. Mirrors core/backtest_runner.py constants of the same
+# name — used by the per-bar day-of-week gate.
+_NANOS_PER_DAY_MOD = 86_400_000_000_000
+_EPOCH_WEEKDAY = 3
+
 
 # Cross-slot event registry, scoped per portfolio. Strategies in the same
 # portfolio share one dict via `get_cross_slot_bus(portfolio_id)`. Used by
@@ -183,9 +189,9 @@ def _derive_bid_ask_bar_types(primary_bar_type_str: str) -> tuple[str, str]:
 def _parse_squareoff_minute(squareoff_time: str | None) -> int:
     """Convert "HH:MM" or "HH:MM:SS" → minute-of-day, or -1 when disabled.
 
-    Tolerates None and an empty string. Seconds are accepted (and dropped —
+    Tolerates ``None`` and an empty string. Seconds are accepted (and dropped —
     minute-of-day granularity is sufficient for entry-window / squareoff
-    triggers). Raises ValueError for malformed inputs so a typo in a
+    triggers). Raises ``ValueError`` for malformed inputs so a typo in a
     portfolio JSON fails loudly at engine build instead of silently disabling.
     """
     if not squareoff_time:
@@ -278,6 +284,20 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     entry_end_minute: int = -1
     entry_window_tz: str = "Asia/Kolkata"
     no_reentry_after_end: bool = False
+
+    # Day-of-week filter (portfolio.run_on_days). UTC weekday ints (0=Mon..6=Sun)
+    # for which fresh entries are allowed. ``None`` = no filter (all days
+    # allowed — default). ``[]`` (empty list) = explicit "no weekdays allowed",
+    # blocks every fresh entry. Like entry_start_minute/entry_end_minute, this
+    # gates fresh entries only — bars on excluded weekdays are still delivered
+    # so open positions remain monitored for SL/Target/squareoff. The runner
+    # used to pre-filter bars by weekday before engine.add_data(); that
+    # approach broke internal bar aggregation (composite bar types received
+    # discontinuous input and Nautilus's TimeBarAggregator emitted synthetic
+    # stale-close bars across the gap, on which the strategy could fire
+    # phantom signals). Gating at the strategy level keeps the input stream
+    # continuous so the aggregator never sees gaps.
+    allowed_weekdays: list | None = None
 
     # Square-off (resolved by core.models.resolve_squareoff before engine build).
     # squareoff_minute = -1 → disabled. Otherwise daily force-close at this
@@ -522,6 +542,18 @@ class ManagedExitStrategy(Strategy):
         except ZoneInfoNotFoundError:
             self._entry_window_tz = self._utc_tz
         self._no_reentry_after_end: bool = bool(getattr(config, "no_reentry_after_end", False))
+
+        # Day-of-week entry filter — UTC weekday ints (0=Mon..6=Sun). Tri-state:
+        #   None    → no filter (all days allowed; default)
+        #   set()   → explicit empty: every fresh entry blocked
+        #   {0,1,3} → only Mon/Tue/Thu fresh entries allowed
+        # Resolved once here so the per-bar gate in _on_primary_bar is a single
+        # set-membership check.
+        _aw_raw = getattr(config, "allowed_weekdays", None)
+        if _aw_raw is None:
+            self._allowed_weekdays: set[int] | None = None
+        else:
+            self._allowed_weekdays = {int(d) for d in _aw_raw if isinstance(d, (int, bool))}
 
     def on_start(self) -> None:
         self.instrument = self.cache.instrument(self.config.instrument_id)
@@ -1337,6 +1369,18 @@ class ManagedExitStrategy(Strategy):
                 if not (_is_reexec and not self._no_reentry_after_end):
                     return
 
+        # Day-of-week filter (portfolio.run_on_days). Block FRESH entries on
+        # excluded weekdays — exits, SL/Target/trailing, RBO state, squareoff
+        # all ran above this point so open positions stay managed every day.
+        # Empty set = no filter. The weekday is derived from the bar's
+        # ts_event (UTC) using the same integer-modulo trick as
+        # core/backtest_runner.py:_filter_bars_by_weekday.
+        if self._allowed_weekdays is not None:
+            _days = self._current_bar_ts_ns // _NANOS_PER_DAY_MOD
+            _weekday = (_EPOCH_WEEKDAY + _days) % 7
+            if _weekday not in self._allowed_weekdays:
+                return
+
         # RBO entry gate. Spec rbo_logics.html: re-entries (execute_trigger,
         # i.e. our re_execution_count > 0) bypass the gate so they can fire
         # past entry_end up to portfolio squareoff_time. Fresh entries
@@ -1534,6 +1578,7 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      entry_end_time: str | None = None,
                      entry_window_tz: str | None = None,
                      subscribe_bar_types: list | None = None,
+                     allowed_weekdays: list | None = None,
                      portfolio_id: str = "",
                      slot_id: str = "") -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
@@ -1637,7 +1682,11 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         # ``entry_window_tz`` (IST / Asia/Kolkata by default), -1 = disabled.
         entry_start_minute=_parse_squareoff_minute(entry_start_time),
         entry_end_minute=_parse_squareoff_minute(entry_end_time),
-        entry_window_tz=entry_window_tz or "Asia/Kolkata",
+        # Day-of-week entry filter (portfolio.run_on_days) — list of UTC
+        # weekday ints (0=Mon..6=Sun) OR None. ``None`` → no filter (all days
+        # allowed). ``[]`` → explicit "no days allowed". See ManagedExitConfig
+        # field-level comment for why we gate here instead of pre-filtering.
+        allowed_weekdays=(None if allowed_weekdays is None else list(allowed_weekdays)),
         portfolio_id=portfolio_id,
         slot_id=slot_id,
     )
