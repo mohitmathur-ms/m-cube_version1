@@ -213,6 +213,14 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     bid_bar_type: str = ""
     ask_bar_type: str = ""
 
+    # Extra strategy-subscribe bar types — composite bar types beyond the
+    # primary one. When a leg selects strategy timeframe(s), ``bar_type``
+    # above is set to the FIRST composite (the stream the signal / SL / TP
+    # run on); this list holds any further composites the strategy also
+    # subscribes to (received and available, but the single-signal logic
+    # uses the primary). Empty in the common case.
+    subscribe_bar_types: list = []
+
     # Exit management
     stop_loss_type: str = "none"
     stop_loss_value: float = 0.0
@@ -487,6 +495,15 @@ class ManagedExitStrategy(Strategy):
         self._fa_ask_bt: BarType | None = None
         self._fa_pending: dict[int, dict] = {}
 
+        # Extra strategy-subscribe bar types — composite bar types beyond the
+        # primary signal one (``config.bar_type``). Parsed to BarType objects
+        # in on_start; received by on_bar but ignored by the signal / SL / TP
+        # logic (the primary bar type drives those).
+        self._extra_sub_bt_strs: list[str] = [
+            str(s) for s in (getattr(config, "subscribe_bar_types", []) or []) if s
+        ]
+        self._extra_sub_bts: set = set()
+
         # Intraday entry window (spec §9). UTC minute-of-day; -1 = disabled.
         # Gates fresh entries in _check_entries WITHOUT dropping post-window
         # bars, so SL/Target keep being monitored until squareoff.
@@ -563,7 +580,36 @@ class ManagedExitStrategy(Strategy):
                 )
                 self._exit_fmt = "ohlcv"
 
+        # Extra strategy-subscribe bar types — composite bar types beyond the
+        # primary signal one. Subscribed so the strategy receives them and
+        # they are available; the signal / SL / TP logic runs on the primary
+        # bar type (on_bar ignores these). Indicators are NOT registered on
+        # them. Each subscription is best-effort.
+        _already = {str(self.config.bar_type), self._bid_bt_str, self._ask_bt_str}
+        for s in self._extra_sub_bt_strs:
+            if not s or s in _already:
+                continue
+            try:
+                bt = BarType.from_str(s)
+            except Exception as e:  # noqa: BLE001
+                self.log.warning(f"Strategy-subscribe bar type {s!r} invalid ({e}); skipped")
+                continue
+            if bt in (self.config.bar_type, self._fa_bid_bt, self._fa_ask_bt):
+                continue
+            self._extra_sub_bts.add(bt)
+            try:
+                self.subscribe_bars(bt)
+            except Exception as e:  # noqa: BLE001 — degrade, don't crash the run
+                self.log.warning(f"Could not subscribe strategy bar type {s!r} ({e})")
+                self._extra_sub_bts.discard(bt)
+
     def on_bar(self, bar: Bar) -> None:
+        # Extra strategy-subscribe bar types are received so they are
+        # available, but the single-signal logic runs on the primary bar
+        # type (``config.bar_type``) only — ignore the extras here.
+        if bar.bar_type in self._extra_sub_bts:
+            return
+
         # Format B / C: the slot has a single bar stream — process directly.
         if self._exit_fmt != "bidask":
             self._on_primary_bar(bar)
@@ -1468,6 +1514,7 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      move_sl_settings=None,
                      entry_start_time: str | None = None,
                      entry_end_time: str | None = None,
+                     subscribe_bar_types: list | None = None,
                      portfolio_id: str = "",
                      slot_id: str = "") -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
@@ -1486,28 +1533,57 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     by ``core.backtest_runner._resolve_rbo``; when provided it switches on the
     per-day RBO state machine inside the strategy. Spec: rbo_logics.html.
     """
+    # Base / strategy-subscribe timeframe split. ``bar_type`` here is the BASE
+    # bar type — the catalog data fed to the engine, the resolution at which
+    # the matching engine fills orders. When the leg selects strategy
+    # timeframe(s) (UI), the strategy instead OPERATES on the first composite
+    # bar type — its signal, indicators and SL/TP run on that aggregated
+    # stream; orders still fill on the base data. Any further selected
+    # composites are subscribed-and-available (received, but the single-signal
+    # logic uses the primary). Empty selection → strategy runs on the base,
+    # the original unchanged behaviour.
+    _subs = [str(s) for s in (subscribe_bar_types or []) if s]
+    _signal_bar_type = bar_type   # what the strategy logic runs on
+    _extra_subs: list = []
+    if _subs:
+        try:
+            _signal_bar_type = BarType.from_str(_subs[0])
+            # Extra subscriptions = any FURTHER composites only. The base bar
+            # type is NOT subscribed: per the NautilusTrader backtest loop the
+            # SimulatedExchange processes the base data (engine.add_data) in
+            # Phase 1 and the matching core fills orders against it — order
+            # fills resolve on the base data regardless of what the strategy
+            # subscribes to. The strategy therefore receives ONLY the
+            # aggregated composite bars in on_bar; the primary drives the
+            # signal / SL / TP, any further composites are received-and-ignored.
+            _extra_subs = _subs[1:]
+        except Exception:  # noqa: BLE001 — malformed primary → keep base
+            _signal_bar_type = bar_type
+            _extra_subs = []
+
     # Three-format engine (spec §3). Resolve the exit-trigger data format and,
-    # for Format A, derive the paired BID/ASK bar-type strings from the primary
-    # so the strategy can subscribe to them. Done here so no call site changes.
+    # for Format A, derive the paired BID/ASK bar-type strings from the
+    # strategy's signal bar type (the composite when one is selected).
     _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
     if _fmt not in ("ohlcv", "ltp", "bidask"):
         _fmt = "ohlcv"
     _bid_bt, _ask_bt = ("", "")
     if _fmt == "bidask":
-        _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(bar_type))
+        _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(_signal_bar_type))
         if not _bid_bt or not _ask_bt:
             # No FX-style bid/ask pair (e.g. crypto LAST bars) — degrade to B.
             _fmt = "ohlcv"
 
     kwargs = dict(
         instrument_id=instrument_id,
-        bar_type=bar_type,
+        bar_type=_signal_bar_type,
         trade_size=Decimal(str(trade_size)),
         signal_name=signal_name,
         signal_params=signal_params,
         exit_price_format=_fmt,
         bid_bar_type=_bid_bt,
         ask_bar_type=_ask_bt,
+        subscribe_bar_types=_extra_subs,
         stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,
