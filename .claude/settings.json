@@ -21,7 +21,8 @@
       "Bash(venv/Scripts/python.exe -c \"from core.csv_loader import scan_csv_folder, clear_fx_scan_cache; clear_fx_scan_cache\\(\\); entries = scan_csv_folder\\(r'D:\\\\complete_df_yyyy'\\); print\\(f'entries: {len\\(entries\\)}'\\); [print\\({k: \\(v if not isinstance\\(v, list\\) else f'[{len\\(v\\)} files; first={v[0]!r}; last={v[-1]!r}]'\\) for k, v in e.items\\(\\)}\\) for e in entries]\")",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -v)",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -v -k \"csv or aggregator or loader\" --ignore=tests/test_custom_strategy_loader.py)",
-      "Bash(venv/Scripts/python.exe -c \"import json, re; cfg = json.load\\(open\\('adapter_admin/data_formats/index.json'\\)\\); pat = re.compile\\(cfg['csv']['filename_pattern']\\); print\\('regex:', cfg['csv']['filename_pattern']\\); print\\('matches synthetic name:', bool\\(pat.match\\('COMPLETE_DF_YYYY_01JAN2020_31JUL2025_LAST_OHLCV.csv'\\)\\)\\)\")"
+      "Bash(venv/Scripts/python.exe -c \"import json, re; cfg = json.load\\(open\\('adapter_admin/data_formats/index.json'\\)\\); pat = re.compile\\(cfg['csv']['filename_pattern']\\); print\\('regex:', cfg['csv']['filename_pattern']\\); print\\('matches synthetic name:', bool\\(pat.match\\('COMPLETE_DF_YYYY_01JAN2020_31JUL2025_LAST_OHLCV.csv'\\)\\)\\)\")",
+      "Bash(git log *)"
     ]
   }
 }
