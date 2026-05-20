@@ -215,7 +215,7 @@ class PortfolioConfig:
     # Weekday is computed from each bar's UTC ts_event.
     run_on_days: Optional[list[str]] = None
     # Intra-day entry window. Both endpoints in HH:MM format, interpreted in
-    # ``entry_window_tz`` (IANA name) when set, else UTC. When either endpoint
+    # ``entry_window_tz`` (IST / Asia/Kolkata by default). When either endpoint
     # is set, bars outside [entry_start_time, entry_end_time] are dropped
     # before the engine sees them. Caveat: bars dropped at the tail mean the
     # strategy can't process exits past entry_end_time, so set
@@ -223,12 +223,13 @@ class PortfolioConfig:
     # forced closes at end-of-window.
     entry_start_time: Optional[str] = None  # "HH:MM" in entry_window_tz, e.g. "09:30"
     entry_end_time: Optional[str] = None    # "HH:MM" in entry_window_tz, e.g. "16:00"
-    # Timezone for the entry window endpoints above. None ⇒ UTC (preserves
-    # legacy behavior for portfolios saved before this field existed). When
-    # set, the bar-filter and the per-strategy entry gate convert each bar's
-    # UTC ts_event to this zone before comparing time-of-day. Mirrors the
-    # ``squareoff_tz`` pattern.
-    entry_window_tz: Optional[str] = None  # IANA name, e.g. "Asia/Kolkata"
+    # Timezone for the entry window endpoints above. Defaults to IST
+    # (Asia/Kolkata) — product policy is India-only, the UI no longer exposes
+    # a TZ picker. Legacy JSONs saved without this field (or with null) are
+    # coerced to IST in ``portfolio_from_dict``. The bar-filter and the
+    # per-strategy entry gate convert each bar's UTC ts_event to this zone
+    # before comparing time-of-day. Mirrors the ``squareoff_tz`` pattern.
+    entry_window_tz: Optional[str] = "Asia/Kolkata"  # IANA name
 
     # Range Breakout (RBO). When rbo_enabled, the entry timing for all enabled
     # slots is gated by a per-day state machine: range is built during
@@ -560,6 +561,14 @@ def _migrate_legacy_trade_size(slot_data: dict) -> None:
 def portfolio_from_dict(data: dict) -> PortfolioConfig:
     # Don't mutate the caller's dict.
     data = dict(data)
+    # IST default migration. Older portfolio JSONs either omit
+    # ``entry_window_tz`` or carry an explicit ``null`` from the era when the
+    # UI exposed a TZ dropdown (which defaulted to UTC). The product is now
+    # IST-only, so coerce both cases to ``Asia/Kolkata`` here. The dataclass
+    # default would handle the missing case, but not an explicit ``null`` —
+    # that's why this lives in the loader rather than relying on the default.
+    if data.get("entry_window_tz") is None:
+        data["entry_window_tz"] = "Asia/Kolkata"
     slots_data = data.pop("slots", [])
     slots = []
     for raw_slot in slots_data:

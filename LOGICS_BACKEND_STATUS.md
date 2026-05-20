@@ -49,9 +49,9 @@ CSS rules at [static/css/style.css:1156-1209](static/css/style.css#L1156-L1209).
 | `entry_price` | ⚫ **Options-only** | Same. RBO has its own entry-price model — separate concern. |
 | `rounding_value` | ⚫ **Options-only** | Strike rounding. UI marked `pf-live-only`. |
 | `adjust_price` | ⚫ **Options-only** | Strike offset. UI marked `pf-live-only`. |
-| `start_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars before this time are dropped per day. Interpreted in `entry_window_tz` (defaults to UTC). See Phase 1 below. |
-| `end_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars after this time are dropped per day. Interpreted in `entry_window_tz` (defaults to UTC). |
-| `entry_window_tz` (Entry Window TZ) | ✅ **End-to-end wired** | IANA name (e.g. `Asia/Kolkata`). `null` ⇒ UTC. Filter and per-strategy gate both honour the TZ via `astimezone`. |
+| `start_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars before this time are dropped per day. Interpreted in IST (Asia/Kolkata) — see Phase 1 below. UI label shows "(IST)". |
+| `end_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars after this time are dropped per day. Interpreted in IST (Asia/Kolkata). |
+| `entry_window_tz` (internal) | ✅ **End-to-end wired** | Hard-coded to `Asia/Kolkata` in the UI save path and in the schema defaults. Dropdown removed by product decision (India-only). `portfolio_from_dict` coerces missing / null to IST so legacy JSONs migrate transparently. |
 | `sqoff_time` (exec-tab) | ⚪ Wired via Timing tab | The exec-tab's SqOff Time is unwired (`pf-live-only`); the Timing tab's SqOff Time is the canonical wired one (`PortfolioConfig.squareoff_time`). |
 | `run_on_days` | ✅ Wired (last session) | See logic 3 below for details. |
 | `start_day` / `sqoff_day` / `holiday_handling` | ⚫ **Options-only** | Expiry-aware day handling. UI marked `pf-live-only`. |
@@ -270,10 +270,11 @@ if (pf._ui.run_on_days === "Custom") {
 
 **1. Schema** &mdash; [core/models.py](core/models.py)
 ```python
-entry_start_time: Optional[str] = None  # "HH:MM" in entry_window_tz, e.g. "09:30"
-entry_end_time: Optional[str] = None    # "HH:MM" in entry_window_tz, e.g. "16:00"
-entry_window_tz: Optional[str] = None   # IANA name, e.g. "Asia/Kolkata"; None ⇒ UTC
+entry_start_time: Optional[str] = None              # "HH:MM" in entry_window_tz, e.g. "09:30"
+entry_end_time: Optional[str] = None                # "HH:MM" in entry_window_tz, e.g. "16:00"
+entry_window_tz: Optional[str] = "Asia/Kolkata"     # IANA name; product is IST-only
 ```
+`portfolio_from_dict` coerces missing or `null` `entry_window_tz` to `Asia/Kolkata` so legacy portfolios automatically migrate to IST without rewriting their JSON.
 
 **2. Helpers** &mdash; [core/backtest_runner.py](core/backtest_runner.py)
 - `_hhmm_to_minute(s)` parses "HH:MM" or "HH:MM:SS" into minute-of-day (0..1439). Returns None for empty/malformed input — never raises.
@@ -294,9 +295,10 @@ pf.entry_start_time = pf._ui.start_time && pf._ui.start_time !== "00:00:00"
     ? pf._ui.start_time : null;
 pf.entry_end_time = pf._ui.end_time && pf._ui.end_time !== "23:59:59"
     ? pf._ui.end_time : null;
-// Empty string ⇒ null ⇒ UTC (preserves legacy portfolios).
-pf.entry_window_tz = document.getElementById("pf-m-entrytz")?.value || null;
+// IST hard-coded. The TZ dropdown was removed by product decision.
+pf.entry_window_tz = "Asia/Kolkata";
 ```
+Start Time / End Time field labels show "(IST)" suffix so users know what zone they're entering.
 
 **6. UI marking change** &mdash; the Start Time and End Time field rows in the Execution Parameters > Timing fieldset are no longer marked `pf-ui-only`. The parent fieldset has had its `pf-ui-only` removed too — it now contains only wired fields (Start Time, End Time, Run On Days) plus three options-only fields marked `pf-live-only` (Start Day / SqOff Day / Holiday).
 

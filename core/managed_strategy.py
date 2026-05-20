@@ -276,7 +276,7 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # ns-modulo path; any other IANA zone triggers per-bar astimezone.
     entry_start_minute: int = -1
     entry_end_minute: int = -1
-    entry_window_tz: str = "UTC"
+    entry_window_tz: str = "Asia/Kolkata"
     no_reentry_after_end: bool = False
 
     # Square-off (resolved by core.models.resolve_squareoff before engine build).
@@ -514,7 +514,7 @@ class ManagedExitStrategy(Strategy):
         # zone (matches the squareoff_tz handling above).
         self._entry_start_min: int = int(getattr(config, "entry_start_minute", -1))
         self._entry_end_min: int = int(getattr(config, "entry_end_minute", -1))
-        _entry_tz_name = getattr(config, "entry_window_tz", "UTC") or "UTC"
+        _entry_tz_name = getattr(config, "entry_window_tz", "Asia/Kolkata") or "Asia/Kolkata"
         try:
             self._entry_window_tz = (
                 ZoneInfo(_entry_tz_name) if _entry_tz_name != "UTC" else self._utc_tz
@@ -1634,10 +1634,10 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
         # Intraday entry window (spec §9) — minute-of-day in
-        # ``entry_window_tz`` (UTC when unset), -1 = disabled.
+        # ``entry_window_tz`` (IST / Asia/Kolkata by default), -1 = disabled.
         entry_start_minute=_parse_squareoff_minute(entry_start_time),
         entry_end_minute=_parse_squareoff_minute(entry_end_time),
-        entry_window_tz=entry_window_tz or "UTC",
+        entry_window_tz=entry_window_tz or "Asia/Kolkata",
         portfolio_id=portfolio_id,
         slot_id=slot_id,
     )
