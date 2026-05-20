@@ -408,7 +408,7 @@ class MyExchangeExecFactory(LiveExecClientFactory):
 #  this file. They must all be present.
 # ──────────────────────────────────────────────────────────────────────
 
-ADAPTER_NAME = "NIFY_FUTURES_MS"              # Display name (max 100 chars)
+ADAPTER_NAME = "COINBASE_MS"              # Display name (max 100 chars)
 DATA_CLIENT_CLASS = MyExchangeDataClient         # Set to None if not supported
 EXEC_CLIENT_CLASS = MyExchangeExecClient         # Set to None if not supported
 CONFIG_CLASS = MyExchangeDataConfig              # Your configuration class
