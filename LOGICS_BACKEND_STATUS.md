@@ -40,7 +40,7 @@ CSS rules at [static/css/style.css:1156-1209](static/css/style.css#L1156-L1209).
 
 | Field | Status | Notes |
 |---|---|---|
-| `product` (MIS/NRML) | ⚫ **Live-only** | Broker setting; doesn't apply to backtest. UI marked `pf-live-only` (gray). |
+| `product` (MIS/NRML) | ✅ **Wired (backtest UX shortcut)** | MIS supplies a default `squareoff_time` from `mis_squareoff_time` / `mis_squareoff_tz` on `PortfolioConfig` when no explicit value is set on portfolio/slot/leg (routed via `effective_portfolio_squareoff` in `models.py` and consumed by the runner at the 3 dispatch sites). Explicit `squareoff_time` always wins. NRML is a no-op. Leverage / margin are NOT modeled — `default_leverage` stays 1. |
 | `strategy_tag` | ⚫ **Live-only** | Broker integration. UI marked `pf-live-only`. |
 | `leg_fail_action` | ⚫ **Live-only** | Live order-failure handling. UI marked `pf-live-only`. |
 | `leg_execution` (Parallel/Sequential) | ⚫ **Live-only** | Live order placement timing. UI marked `pf-live-only`. |

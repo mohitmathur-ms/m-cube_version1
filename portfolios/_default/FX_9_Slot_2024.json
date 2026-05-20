@@ -2,7 +2,7 @@
   "name": "FX_9_Slot_2024",
   "description": "Benchmark portfolio: EMA/RSI/Bollinger x EURUSD/GBPUSD/USDJPY on 1-minute MID bars.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-20T11:21:44.954233+00:00",
+  "updated_at": "2026-05-20T13:02:56.944888+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -244,9 +244,9 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,
@@ -297,9 +297,9 @@
         "oversold": 30,
         "rsi_period": 14
       },
-      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,
@@ -349,9 +349,9 @@
         "bb_period": 20,
         "bb_std": 2
       },
-      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,
@@ -401,9 +401,9 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "USDJPY.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,
@@ -454,9 +454,9 @@
         "oversold": 30,
         "rsi_period": 14
       },
-      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "USDJPY.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,
@@ -506,9 +506,9 @@
         "bb_period": 20,
         "bb_std": 2
       },
-      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-BID-EXTERNAL",
+      "bar_type_str": "GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "USDJPY.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+        "GBPUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 0.01,
       "allocation_pct": 0,

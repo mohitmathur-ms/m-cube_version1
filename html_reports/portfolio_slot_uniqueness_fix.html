@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Slot Uniqueness Fix &mdash; Investigation &amp; Resolution</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #ff7b72;
+    --code-bg: #1c2128;
+    --table-alt: #1c2128;
+    --bad: #f85149;
+    --good: #3fb950;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    padding: 0;
+    font-size: 16px;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .header .meta {
+    margin-top: 0.8rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h2 {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.8rem;
+  }
+  .toc ol { padding-left: 1.4rem; }
+  .toc li { margin: 0.3rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+  }
+  h2.section-title {
+    font-size: 1.4rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.1rem;
+    color: var(--accent3);
+    margin: 1.2rem 0 0.6rem;
+  }
+  p { margin: 0.6rem 0; }
+  code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.88em;
+    color: var(--accent4);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.8rem 0 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: var(--text);
+    font-size: inherit;
+  }
+  .pill {
+    display: inline-block;
+    padding: 0.1rem 0.6rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+  .pill.bad   { background: rgba(248,81,73,0.15); color: var(--bad); border: 1px solid rgba(248,81,73,0.4); }
+  .pill.good  { background: rgba(63,185,80,0.15); color: var(--good); border: 1px solid rgba(63,185,80,0.4); }
+  .pill.info  { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.4); }
+  .pill.warn  { background: rgba(240,136,62,0.15); color: var(--accent4); border: 1px solid rgba(240,136,62,0.4); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0 1rem;
+    font-size: 0.92rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.55rem 0.8rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--code-bg);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: var(--table-alt); }
+  ul, ol { padding-left: 1.4rem; margin: 0.5rem 0; }
+  li { margin: 0.25rem 0; }
+  .quote {
+    border-left: 3px solid var(--accent);
+    padding: 0.5rem 1rem;
+    color: var(--text-muted);
+    background: rgba(88,166,255,0.05);
+    margin: 1rem 0;
+    font-style: italic;
+  }
+  .callout {
+    border-left: 3px solid var(--accent4);
+    background: rgba(240,136,62,0.06);
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout strong { color: var(--accent4); }
+  .callout.good {
+    border-left-color: var(--good);
+    background: rgba(63,185,80,0.06);
+  }
+  .callout.good strong { color: var(--good); }
+  .diff-add {
+    background: rgba(63,185,80,0.12);
+    color: var(--good);
+  }
+  .diff-del {
+    background: rgba(248,81,73,0.12);
+    color: var(--bad);
+    text-decoration: line-through;
+  }
+  .file-ref {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Portfolio Slot Uniqueness &mdash; Investigation &amp; Fix</h1>
+  <p>Why a 9-slot portfolio rendered as only 3 strategies in the HTML report &amp; order-book CSV, and how the duplicate-slot overwriting was eliminated.</p>
+  <div class="meta">m-cube backtest platform &middot; investigation date: 2026-05-20</div>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#symptom">The reported symptom</a></li>
+    <li><a href="#evidence">Evidence gathered</a></li>
+    <li><a href="#twobugs">Two separate issues uncovered</a></li>
+    <li><a href="#rootcause">Root cause &mdash; the overwriting bug</a></li>
+    <li><a href="#oms">Sidebar: netting vs hedging at the leg level</a></li>
+    <li><a href="#design">Fix design &mdash; questions asked, choices made</a></li>
+    <li><a href="#patch">The patch &mdash; what changed in which file</a></li>
+    <li><a href="#verify">How to verify after re-running</a></li>
+    <li><a href="#scope">Out of scope</a></li>
+  </ol>
+</div>
+
+<section id="symptom">
+  <h2 class="section-title">1. The reported symptom</h2>
+  <p>Running portfolio <code>portfolios/_default/FX_9_Slot_2024.json</code> (9 enabled slots) produced an HTML report whose header read:</p>
+  <pre><code>| 113 trades | 3 Portfolios | 2024-01-01 to 2024-12-31</code></pre>
+  <p>The <em>Portfolio Filter</em> dropdown listed only three entries:</p>
+  <ul>
+    <li><code>Bollinger_Bands_on_GBPUSD_SL_0.5_TP_1_</code></li>
+    <li><code>EMA_Cross_on_GBPUSD_SL_0.5_TP_1_</code></li>
+    <li><code>RSI_Mean_Reversion_on_GBPUSD_SL_0.5_TP_1_</code></li>
+  </ul>
+  <p>And the CSVs in <code>reports/_default/</code> (all dated 20-May-2026, 16:39) showed inconsistent counts across files. The question was: <em>are 6 slots being silently dropped? and if not, why don&rsquo;t I see them?</em></p>
+</section>
+
+<section id="evidence">
+  <h2 class="section-title">2. Evidence gathered</h2>
+  <p>Files inspected from the 16:39 run:</p>
+  <table>
+    <thead><tr><th>File</th><th>Size</th><th>Rows</th><th>Distinct slots present</th></tr></thead>
+    <tbody>
+      <tr><td><code>order_book_portfolio_FX_9_Slot_2024_20_may_2026.csv</code></td><td>39 KB</td><td><strong>113</strong></td><td>3 (only GBPUSD)</td></tr>
+      <tr><td><code>position_report_portfolio_FX_9_Slot_2024_20_may_2026.csv</code></td><td>110 KB</td><td><strong>452</strong></td><td><strong>9</strong> (SLOT-000&hellip;SLOT-008, mixed EUR/GBP/JPY)</td></tr>
+      <tr><td><code>order_fill_report_portfolio_FX_9_Slot_2024_20_may_2026.csv</code></td><td>269 KB</td><td>(many)</td><td>9</td></tr>
+      <tr><td><code>portfolio_FX_9_Slot_2024_20_may_2026_report.html</code></td><td>184 KB</td><td>113 trades shown</td><td>3</td></tr>
+      <tr><td><code>account_report_*</code> for FX_9_Slot_2024</td><td colspan="3">Not generated. Portfolio path doesn&rsquo;t emit one &mdash; only the single-strategy path does.</td></tr>
+    </tbody>
+  </table>
+  <p>Trader-id breakdown from the position report (proves all 9 slots actually ran):</p>
+  <pre><code>SLOT-000 | ManagedExitStrategy-000 | USDJPY.FOREX_MS  &mdash;  80 positions
+SLOT-001 | ManagedExitStrategy-000 | EURUSD.FOREX_MS  &mdash;  35 positions
+SLOT-002 | ManagedExitStrategy-000 | USDJPY.FOREX_MS  &mdash;  77 positions
+SLOT-003 | ManagedExitStrategy-000 | USDJPY.FOREX_MS  &mdash;  84 positions
+SLOT-004 | ManagedExitStrategy-000 | EURUSD.FOREX_MS  &mdash;  33 positions
+SLOT-005 | ManagedExitStrategy-000 | GBPUSD.FOREX_MS  &mdash;  38 positions
+SLOT-006 | ManagedExitStrategy-000 | GBPUSD.FOREX_MS  &mdash;  36 positions
+SLOT-007 | ManagedExitStrategy-000 | GBPUSD.FOREX_MS  &mdash;  39 positions
+SLOT-008 | ManagedExitStrategy-000 | EURUSD.FOREX_MS  &mdash;  30 positions
+                                                       &mdash;&mdash;&mdash;
+                                                       452 positions total</code></pre>
+  <p>Order-book row count <strong>113</strong> exactly matches the three GBPUSD slots: <code>38 + 36 + 39 = 113</code>. The other 6 slots&rsquo; trades were dropped from the order book &amp; HTML but were preserved in the merged position and fill reports.</p>
+</section>
+
+<section id="twobugs">
+  <h2 class="section-title">3. Two separate issues uncovered</h2>
+  <h3>Issue A &mdash; mis-labeled slot IDs in the portfolio JSON <span class="pill warn">data issue</span></h3>
+  <p>The JSON file at <code>portfolios/_default/FX_9_Slot_2024.json</code> has nine slots whose <code>slot_id</code> values suggest three instruments &mdash; <code>fx_eur_*</code>, <code>fx_gbp_*</code>, <code>fx_jpy_*</code> &mdash; but the <code>bar_type_str</code> field on every slot currently reads <code>GBPUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL</code>. So the IDs lie about what the slot trades.</p>
+  <p>(This is purely a data discrepancy in the saved portfolio &mdash; out of scope for this fix; we left the JSON untouched.)</p>
+
+  <h3>Issue B &mdash; report generation overwrites duplicate-config slots <span class="pill bad">code bug</span></h3>
+  <p>This is the real bug. Even if all 9 slots had been truly distinct (e.g. three real instruments &times; three real strategies), if any two of them produced the same <code>display_name</code>, the second slot&rsquo;s data would silently overwrite the first&rsquo;s in the order book CSV and HTML report. This is the bug we fixed.</p>
+</section>
+
+<section id="rootcause">
+  <h2 class="section-title">4. Root cause &mdash; the overwriting bug</h2>
+  <p>In <code>server.py</code>, after the portfolio engine runs, results are reshaped for the report generator:</p>
+  <pre><code><span class="file-ref"># server.py, around line 1490 (before the fix)</span>
+for slot_id, sr in per_strat.items():
+    strat_label = sanitize_filename(sr["display_name"])
+    &hellip;
+    all_results_for_reports[strat_label] = { &hellip; }</code></pre>
+  <p>The key <code>strat_label</code> is built from <code>display_name</code>, which is defined in <code>core/models.py:177</code>:</p>
+  <pre><code><span class="file-ref"># core/models.py</span>
+@property
+def display_name(self) -> str:
+    instrument = self.bar_type_str.split(".")[0] if self.bar_type_str else "N/A"
+    sl_desc = f" | SL: {self.exit_config.stop_loss_value}%" if &hellip; else ""
+    tp_desc = f" | TP: {self.exit_config.target_value}%"   if &hellip; else ""
+    return f"{self.strategy_name} on {instrument}{sl_desc}{tp_desc}"</code></pre>
+  <p><code>display_name</code> deliberately omits <code>slot_id</code>. When three slots share <strong>strategy_name + instrument + SL + TP</strong>, all three produce the same key. The dict overwrites; only the last write survives. Downstream consequences:</p>
+  <ul>
+    <li><code>core/report_generator.py</code> at line 235 iterates <code>for strategy_name, results in all_results.items()</code> and writes <code>strategy_name</code> into the <code>PORTFOLIO NAME</code> and <code>STRATEGY</code> columns of the order book CSV.</li>
+    <li><code>docs/report_template.html</code> at line 1436 dedups the filter dropdown by <code>PORTFOLIO NAME</code>, and at line 1590 dedups the strategy-breakdown table by <code>STRATEGY</code>.</li>
+  </ul>
+  <p>The merged <code>position_report</code> and <code>order_fill_report</code> CSVs were untouched by this bug because they are written before the loop above &mdash; that&rsquo;s why we saw 452 positions but only 113 order-book rows.</p>
+
+  <div class="callout">
+    <strong>Why the disagreement matters &mdash;</strong> any time someone cross-checks the HTML against the merged CSVs (which is exactly what triggered this investigation), the numbers disagree. The bug was silent: no error raised, no warning logged, just trades disappearing into a dict key collision.
+  </div>
+</section>
+
+<section id="oms">
+  <h2 class="section-title">5. Sidebar: netting vs hedging at the leg level</h2>
+  <p>This came up during the discussion and is worth recording. The runner uses different OMS modes per execution path:</p>
+  <table>
+    <thead><tr><th>Execution path</th><th>OMS mode</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Single-strategy backtest</td><td><span class="pill info">NETTING</span></td><td><code>backtest_runner.py:2102</code></td></tr>
+      <tr><td>Portfolio per-slot (default)</td><td><span class="pill info">NETTING</span></td><td><code>backtest_runner.py:2624</code></td></tr>
+      <tr><td>Portfolio grouped <code>_USE_GROUPING=1</code></td><td><span class="pill info">HEDGING</span></td><td><code>backtest_runner.py:3394</code></td></tr>
+      <tr><td>Portfolio Path B grouped <code>_USE_BACKTEST_NODE=1</code></td><td><span class="pill info">HEDGING</span></td><td><code>backtest_runner.py:3046</code></td></tr>
+    </tbody>
+  </table>
+  <p>The HEDGING rationale is commented inline:</p>
+  <div class="quote">HEDGING (not NETTING) so each strategy&rsquo;s positions are tracked independently. NETTING would merge all strategies&rsquo; orders on the same (venue, instrument) into a single position record &mdash; breaks per-strategy round-trip accounting.</div>
+  <p>For the FX_9_Slot_2024 run we investigated: grouping was off, so each slot lived in its own engine with NETTING. Within a single slot, BUY then SELL cancels out. Between slots, no interaction at all &mdash; slots are isolated by trader-id, which is why the position report can carry all 452 positions tagged with unique trader-ids.</p>
+</section>
+
+<section id="design">
+  <h2 class="section-title">6. Fix design &mdash; questions asked, choices made</h2>
+  <p>Two clarifying questions were asked before writing the patch:</p>
+
+  <h3>Q1 &mdash; How should the two label columns work?</h3>
+  <p><strong>Chosen:</strong> Same unique label in both PORTFOLIO NAME and STRATEGY. Format: <code>{sanitize_filename(display_name)}__{slot_id}</code>.</p>
+  <p>This was preferred over splitting the columns (unique in PORTFOLIO NAME, collapsed in STRATEGY) for simplicity. Both the filter dropdown and the strategy-breakdown table now show one row per slot, matching how the user wants to inspect the data.</p>
+
+  <h3>Q2 &mdash; Should SLOT_ID also appear as its own CSV column?</h3>
+  <p><strong>Chosen:</strong> Yes. Adds a <code>SLOT_ID</code> column to the order book CSV so users can filter / pivot in Excel or pandas without parsing the composite label string.</p>
+
+  <h3>What stayed off the table</h3>
+  <ul>
+    <li><code>display_name</code> in <code>models.py</code> was <strong>not</strong> changed. It is also consumed by <code>static/js/portfolio.js</code> and <code>static/js/portfolio_tearsheet.js</code> for UI display; changing it would cascade.</li>
+    <li>No changes to how Nautilus <code>StrategyId</code> / <code>trader_id</code> are assigned in <code>backtest_runner.py</code> &mdash; that disambiguation already works correctly at the engine level.</li>
+    <li>The merged <code>position_report</code> / <code>order_fill_report</code> CSVs were already correct &mdash; left untouched.</li>
+  </ul>
+</section>
+
+<section id="patch">
+  <h2 class="section-title">7. The patch &mdash; what changed in which file</h2>
+
+  <h3>Change 1 &mdash; <code>server.py</code> (around line 1490&ndash;1518)</h3>
+  <p>Make the per-slot dict key unique so duplicate-config slots do not overwrite each other. Also embed <code>slot_id</code> in the result payload so the report generator can write the new column.</p>
+  <pre><code><span class="diff-del">strat_label = sanitize_filename(sr["display_name"])</span>
+<span class="diff-add">base_label  = sanitize_filename(sr["display_name"])
+strat_label = f"{base_label}__{slot_id}"</span>
+&hellip;
+all_results_for_reports[strat_label] = {
+<span class="diff-add">    "slot_id": slot_id,</span>
+    "positions_report": slot_pos, "fills_report": slot_fills,
+    &hellip;
+}</code></pre>
+
+  <h3>Change 2 &mdash; <code>core/report_generator.py</code> (line 240, in <code>_build_orderbook</code>)</h3>
+  <p>Read <code>slot_id</code> off the per-strategy result dict.</p>
+  <pre><code>for strategy_name, results in all_results.items():
+    positions_report = results.get("positions_report")
+    if positions_report is None or positions_report.empty:
+        continue
+<span class="diff-add">    slot_id = results.get("slot_id", "")</span>
+    fills_lookup = _build_fills_lookup(results.get("fills_report"))</code></pre>
+
+  <h3>Change 3 &mdash; <code>core/report_generator.py</code> (line 386, trade dict)</h3>
+  <p>Emit the new column in every trade row.</p>
+  <pre><code>trade = {
+    &hellip;
+    "PORTFOLIO NAME": strategy_name,
+    "STRATEGY": strategy_name,
+<span class="diff-add">    "SLOT_ID": slot_id,</span>
+    "EXIT TIME": exit_time,
+    &hellip;
+}</code></pre>
+
+  <h3>Change 4 &mdash; <code>core/report_generator.py</code> (line 425, <code>column_order</code>)</h3>
+  <p>Pin SLOT_ID&rsquo;s position in the CSV right after STRATEGY.</p>
+  <pre><code>column_order = [
+    "USERID", "SYMBOL", "EXCHANGE", "TRANSACTION", "QUANTITY", "LOTS",
+    "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE",
+    "ENTRY REASON", "ENTRY DETAILED REASON",
+<span class="diff-add">    "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY", "SLOT_ID",</span>
+    "EXIT TIME", "AVG EXIT PRICE",
+    &hellip;
+]</code></pre>
+
+  <div class="callout good">
+    <strong>Net effect &mdash;</strong> the same conceptual key (<code>display_name</code>) is now suffixed with <code>slot_id</code> at exactly the report-generation boundary. The Nautilus engine, the merged CSVs, and the SPA tearsheet UI all see the unchanged <code>display_name</code>; only the order book CSV and HTML report adopt the longer unique label. Surface area: two functions across two files. Backward-compatible for single-strategy runs (empty SLOT_ID column).
+  </div>
+</section>
+
+<section id="verify">
+  <h2 class="section-title">8. How to verify after re-running</h2>
+  <p>Restart the server and rerun the portfolio:</p>
+  <pre><code>.\start.bat
+<span class="file-ref"># then in the browser: Portfolio page &rarr; FX_9_Slot_2024 &rarr; Run</span></code></pre>
+  <p>Then inspect the newly written files in <code>reports/_default/</code>:</p>
+  <ol>
+    <li><strong>Order book CSV:</strong> open <code>order_book_portfolio_FX_9_Slot_2024_&lt;date&gt;.csv</code> and confirm
+      <ul>
+        <li>9 distinct values in <code>PORTFOLIO NAME</code></li>
+        <li>9 distinct values in <code>STRATEGY</code></li>
+        <li>9 distinct values in the new <code>SLOT_ID</code> column (e.g. <code>fx_eur_ema</code>, <code>fx_gbp_ema</code>, &hellip;)</li>
+        <li>Total row count matches the sum of per-slot round-trips (not the previously truncated 113).</li>
+      </ul>
+    </li>
+    <li><strong>HTML report:</strong> open <code>portfolio_FX_9_Slot_2024_&lt;date&gt;_report.html</code> and confirm
+      <ul>
+        <li>Header reads <code>| &lt;N&gt; trades | 9 Portfolios |</code></li>
+        <li>Portfolio Filter dropdown lists 9 entries</li>
+        <li>Strategy Breakdown table shows 9 rows</li>
+      </ul>
+    </li>
+    <li><strong>Regression baseline:</strong> compare row count and unique <code>trader_id</code> count of <code>position_report_*.csv</code> and <code>order_fill_report_*.csv</code> against the 16:39 run &mdash; should be unchanged.</li>
+    <li><strong>Single-strategy sanity:</strong> run any single-strategy backtest. Its <code>order_book_*.csv</code> should still generate, with the <code>SLOT_ID</code> column present but empty &mdash; slot_id is a portfolio-only concept.</li>
+  </ol>
+</section>
+
+<section id="scope">
+  <h2 class="section-title">9. Out of scope</h2>
+  <ul>
+    <li><strong>The mis-named slots in <code>FX_9_Slot_2024.json</code></strong> &mdash; <code>fx_eur_*</code> / <code>fx_jpy_*</code> all currently point at GBPUSD. This is a data fix for the user to decide separately; the report fix is independent of it.</li>
+    <li><strong>Changing <code>display_name</code> semantics</strong> &mdash; would cascade into the SPA tearsheet and portfolio tabs. Kept the surface narrow.</li>
+    <li><strong>Engine-level <code>StrategyId</code> / <code>trader_id</code> generation</strong> &mdash; already correct; nothing to change there.</li>
+    <li><strong><code>docs/report_template.html</code> rendering logic</strong> &mdash; it adapts to whatever STRATEGY values appear, no template changes required.</li>
+  </ul>
+</section>
+
+</div>
+
+<div class="footer">
+  Generated for m-cube backtest platform &middot; investigation &amp; fix on branch <code>Path_A_LowAPI</code> &middot; 2026-05-20
+</div>
+
+</body>
+</html>
