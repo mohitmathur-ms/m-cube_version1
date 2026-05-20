@@ -16,7 +16,12 @@
       "Bash(git stash *)",
       "Bash(venv/Scripts/python.exe -m pytest tests/test_custom_strategy_loader.py::TestGetMergedRegistry::test_no_custom_strategies tests/test_perf_regression.py::TestBuildFillsLookup::test_matches_iterrows_reference -q)",
       "Bash(venv/Scripts/python.exe -c \"import pandas as pd; df = pd.read_csv\\(r'D:\\\\ForexDataValidator\\\\output\\\\dataset\\\\XAUUSD\\\\2026\\\\04\\\\01\\\\01.04.2026_BID_OHLCV.csv', nrows=3\\); print\\('BID columns:', list\\(df.columns\\)\\); print\\(df\\)\")",
-      "Bash(venv/Scripts/python.exe -m pytest tests/ -q --deselect tests/test_custom_strategy_loader.py::TestGetMergedRegistry --deselect tests/test_perf_regression.py::TestBuildFillsLookup)"
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -q --deselect tests/test_custom_strategy_loader.py::TestGetMergedRegistry --deselect tests/test_perf_regression.py::TestBuildFillsLookup)",
+      "Bash(venv/Scripts/python.exe -c \"import json, re; cfg = json.load\\(open\\('adapter_admin/data_formats/index.json'\\)\\); pat = re.compile\\(cfg['csv']['filename_pattern']\\); samples = ['COMPLETE_DF_YYYY_01JAN2020_31DEC2025_LAST_OHLCV.csv','NIFTY50_15MAR2020_28DEC2024_LAST_OHLCV.csv','EURUSD_EURUSD_01JAN2015_31DEC2025_ASK_OHLCV.csv','01.01.2024_complete_df_OHLCV.csv']; [print\\(f\\\\\"{'OK ' if pat.match\\(s\\) else 'NO '} {s}\\\\\"\\) for s in samples]\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.csv_loader import scan_csv_folder, clear_fx_scan_cache; clear_fx_scan_cache\\(\\); entries = scan_csv_folder\\(r'D:\\\\complete_df_yyyy'\\); print\\(f'entries: {len\\(entries\\)}'\\); [print\\({k: \\(v if not isinstance\\(v, list\\) else f'[{len\\(v\\)} files; first={v[0]!r}; last={v[-1]!r}]'\\) for k, v in e.items\\(\\)}\\) for e in entries]\")",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -v)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -v -k \"csv or aggregator or loader\" --ignore=tests/test_custom_strategy_loader.py)",
+      "Bash(venv/Scripts/python.exe -c \"import json, re; cfg = json.load\\(open\\('adapter_admin/data_formats/index.json'\\)\\); pat = re.compile\\(cfg['csv']['filename_pattern']\\); print\\('regex:', cfg['csv']['filename_pattern']\\); print\\('matches synthetic name:', bool\\(pat.match\\('COMPLETE_DF_YYYY_01JAN2020_31JUL2025_LAST_OHLCV.csv'\\)\\)\\)\")"
     ]
   }
 }

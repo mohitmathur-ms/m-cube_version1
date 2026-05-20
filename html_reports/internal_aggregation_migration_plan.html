@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Internal Aggregation Migration Plan — m-cube</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --warn: #f85149;
+    --code-bg: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.6rem 2rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.6rem;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .header .meta {
+    margin-top: 1.1rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .header .meta span {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 10px;
+    margin: 0 4px;
+  }
+  .container {
+    max-width: 1020px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.4rem 2rem;
+    margin-bottom: 2.4rem;
+  }
+  .toc h2 {
+    font-size: 1.05rem;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .toc ol { padding-left: 1.3rem; }
+  .toc li { margin: 0.25rem 0; }
+  .toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.18s;
+  }
+  .toc a:hover { color: var(--accent); }
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.6rem 1.9rem;
+    margin-bottom: 1.6rem;
+  }
+  h2 {
+    font-size: 1.45rem;
+    color: var(--accent);
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.1rem;
+    color: var(--accent3);
+    margin: 1.3rem 0 0.6rem;
+  }
+  h4 {
+    font-size: 0.97rem;
+    color: var(--accent4);
+    margin: 1rem 0 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 0.55rem 0; }
+  ul, ol { margin: 0.4rem 0 0.6rem 1.4rem; }
+  li { margin: 0.3rem 0; }
+  code {
+    background: var(--code-bg);
+    color: var(--accent3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace;
+    font-size: 0.86em;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    margin: 0.7rem 0;
+    font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+  pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .file {
+    color: var(--accent);
+    font-family: 'SF Mono', Consolas, Monaco, monospace;
+    font-size: 0.86em;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0 0.4rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 11px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    margin-right: 4px;
+    border: 1px solid;
+  }
+  .pill-edit  { color: var(--accent);  border-color: var(--accent);  background: rgba(88,166,255,0.10); }
+  .pill-add   { color: var(--accent2); border-color: var(--accent2); background: rgba(63,185,80,0.10); }
+  .pill-del   { color: var(--warn);    border-color: var(--warn);    background: rgba(248,81,73,0.10); }
+  .pill-keep  { color: var(--text-muted); border-color: var(--border); background: rgba(255,255,255,0.02); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(88,166,255,0.06);
+    padding: 0.7rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout.warn {
+    border-left-color: var(--warn);
+    background: rgba(248,81,73,0.07);
+  }
+  .callout.ok {
+    border-left-color: var(--accent2);
+    background: rgba(63,185,80,0.07);
+  }
+  .callout.note {
+    border-left-color: var(--accent4);
+    background: rgba(240,136,62,0.06);
+  }
+  .callout strong { color: var(--text); }
+  .arrow { color: var(--accent2); font-weight: 700; }
+  .footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 2rem 1rem 3rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  .schema {
+    font-family: 'SF Mono', Consolas, Monaco, monospace;
+    font-size: 0.85rem;
+    background: var(--code-bg);
+    padding: 0.7rem 0.9rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .schema .old { color: var(--warn); }
+  .schema .new { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Internal Aggregation Migration Plan</h1>
+  <p>
+    Stop persisting higher-timeframe bars to the catalog. Have NautilusTrader's
+    <code>TimeBarAggregator</code> build them on the fly from <code>1-MINUTE</code> base bars
+    at backtest time.
+  </p>
+  <div class="meta">
+    <span>Project: m-cube</span>
+    <span>Status: proposal — not implemented</span>
+    <span>Migration type: behind feature flag</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#why">Why this change</a></li>
+      <li><a href="#today">How aggregation works today</a></li>
+      <li><a href="#target">Target architecture</a></li>
+      <li><a href="#phaseA">Phase A — Add transform helper</a></li>
+      <li><a href="#phaseB">Phase B — Rewire engine build sites</a></li>
+      <li><a href="#phaseC">Phase C — Two semantic landmines</a></li>
+      <li><a href="#phaseD">Phase D — Update catalog-listing endpoints</a></li>
+      <li><a href="#phaseE">Phase E — Stop persisting aggregates, clean up</a></li>
+      <li><a href="#phaseF">Phase F — Verification</a></li>
+      <li><a href="#files">Files changed (summary)</a></li>
+      <li><a href="#open">Open questions before implementing</a></li>
+    </ol>
+  </div>
+
+  <section id="why">
+    <h2>1. Why this change</h2>
+    <p>
+      Today the catalog stores one parquet directory per timeframe per side per instrument
+      &mdash; e.g. <code>EURUSD.FOREX_MS-5-MINUTE-BID-EXTERNAL</code>,
+      <code>EURUSD.FOREX_MS-15-MINUTE-BID-EXTERNAL</code>, and so on for
+      <code>30-MINUTE</code>, <code>1-HOUR</code>, <code>2-HOUR</code>, <code>1-DAY</code>,
+      <code>1-WEEK</code>, <code>1-MONTH</code>, on both <code>ASK</code> and <code>BID</code>
+      sides (and <code>MID</code> when present). All produced by a manual offline batch.
+    </p>
+    <p>This has three concrete problems:</p>
+    <ul>
+      <li><strong>Stale by default.</strong> Whenever new 1-minute data is ingested, every
+        derived timeframe needs a manual re-aggregation pass or backtests run on out-of-date bars.</li>
+      <li><strong>Disk + I/O cost.</strong> Eight extra timeframe directories per
+        <code>(instrument, side)</code> tuple. Roughly 8&times; the parquet bytes per instrument, all
+        derivable from the 1-MIN source.</li>
+      <li><strong>Mismatch risk.</strong> Custom-aggregated math can drift from Nautilus's
+        live <code>TimeBarAggregator</code>. The notebooks
+        <span class="file">ipynb/aggregate_1min_to_5min.ipynb</span> and
+        <span class="file">ipynb/aggregator_strategy_demo.ipynb</span> already prove parity at
+        the math level, but every divergence between the offline pandas math and Nautilus's
+        internal aggregator is a latent bug waiting to surface.</li>
+    </ul>
+    <div class="callout ok">
+      <strong>Outcome:</strong> the catalog stores only <code>1-MINUTE-{ASK,BID,MID}-EXTERNAL</code>
+      bars and instrument definitions. Every higher TF is computed on demand by Nautilus's own
+      <code>DataEngine</code> via an <code>INTERNAL@1-MINUTE-EXTERNAL</code> composite subscription.
+      Strategies do not change; portfolio JSONs do not change; the user-facing UI does not change.
+    </div>
+  </section>
+
+  <section id="today">
+    <h2>2. How aggregation works today</h2>
+
+    <h3>Who writes aggregated bars?</h3>
+    <p>
+      Exactly one script: <span class="file">scripts/aggregate_catalog.py</span>. It is a
+      pure CLI &mdash; <code>if __name__ == "__main__": main()</code> at line 294, an
+      <code>argparse</code> interface at line 176. <strong>Nothing else in the running app
+      invokes it.</strong>
+    </p>
+    <p>Verified by grep across the codebase:</p>
+    <ul>
+      <li>The only references to <code>aggregate_one</code> and <code>aggregate_catalog</code>
+        are inside the script itself and inside docs
+        (<span class="file">README_APP.md</span>, <span class="file">core/aggregator.py</span> docstring).</li>
+      <li>Neither <span class="file">server.py</span>, <span class="file">start.bat</span>, nor any Flask
+        endpoint references it. No scheduled task or hook calls it.</li>
+      <li>It is run manually, by hand, after a 1-MIN ingest pass &mdash; the operator triggers it.</li>
+    </ul>
+
+    <h3>What does the call chain look like?</h3>
+    <pre><code>scripts/aggregate_catalog.py::aggregate_one()
+  &rarr; load_catalog(...).bars(bar_types=[&lt;1-MIN-side&gt;])    # read 1-MIN
+  &rarr; core/aggregator.py::aggregate_with_features(...)     # pandas resample
+  &rarr; core/nautilus_loader.py::wrangle_bars(...)
+  &rarr; core/nautilus_loader.py::save_to_catalog(bars, ...)
+        &rarr; ParquetDataCatalog(catalog_path).write_data(bars)  # the actual write</code></pre>
+    <p>
+      <code>save_to_catalog</code> is the <em>only</em> place in the project that ever calls
+      <code>catalog.write_data(...)</code> for bar data. Every other code path either reads
+      from the catalog or delegates to <code>save_to_catalog</code>.
+    </p>
+
+    <h3>How are the aggregated bars consumed?</h3>
+    <ol>
+      <li>User picks a slot with
+        <code>bar_type_str = "EURUSD.FOREX_MS-5-MINUTE-BID-EXTERNAL"</code> in the Multileg UI.</li>
+      <li><span class="file">core/backtest_runner.py</span> reads <em>that exact</em> bar type
+        from the catalog via <code>catalog.bars(bar_types=[bt_str])</code>.</li>
+      <li>The bars are pushed to the engine via <code>engine.add_data(all_bars)</code>.</li>
+      <li>The strategy subscribes to the same <code>5-MINUTE-BID-EXTERNAL</code> bar type and
+        receives bars directly &mdash; no composition involved.</li>
+    </ol>
+    <div class="callout note">
+      <strong>The codebase is already half-prepared for this migration.</strong>
+      <span class="file">strategies/ema_cross.py:56-58</span> compares
+      <code>bar.bar_type.standard()</code> against <code>config.bar_type.standard()</code>
+      precisely so that an <code>INTERNAL@1-MIN-EXTERNAL</code> subscription still matches a
+      <code>5-MINUTE-EXTERNAL</code> config. Every strategy file uses the same
+      <code>register_indicator_for_bars</code> + <code>subscribe_bars(self.config.bar_type)</code>
+      idiom, so the switch is purely a runner-side concern.
+    </div>
+  </section>
+
+  <section id="target">
+    <h2>3. Target architecture</h2>
+    <p>
+      The slot's stored <code>bar_type_str</code> stays in EXTERNAL form &mdash; portfolios on
+      disk do not migrate. The runner translates internally:
+    </p>
+    <div class="schema">
+      <div><span class="old">load from catalog (today):</span> EURUSD.FOREX_MS-<strong>5-MINUTE</strong>-BID-EXTERNAL</div>
+      <div><span class="new">load from catalog (new):</span>   EURUSD.FOREX_MS-<strong>1-MINUTE</strong>-BID-EXTERNAL</div>
+      <div>&nbsp;</div>
+      <div><span class="old">strategy subscribes to (today):</span> EURUSD.FOREX_MS-<strong>5-MINUTE</strong>-BID-EXTERNAL</div>
+      <div><span class="new">strategy subscribes to (new):</span>   EURUSD.FOREX_MS-<strong>5-MINUTE</strong>-BID-<strong>INTERNAL@1-MINUTE-EXTERNAL</strong></div>
+    </div>
+    <p>
+      Nautilus's <code>DataEngine</code> sees the <code>INTERNAL@...</code> subscription, attaches
+      a <code>TimeBarAggregator</code> against the 1-MIN data stream, and emits 5-MIN bars
+      to the strategy as if they had been loaded directly. The strategy's
+      <code>bar.bar_type.standard()</code> guard makes the match-up transparent.
+    </p>
+    <p>1-MIN slots stay unchanged (no composite needed).</p>
+  </section>
+
+  <section id="phaseA">
+    <h2>4. Phase A &mdash; Add transform helper</h2>
+    <p>One new function in <span class="file">core/nautilus_loader.py</span> next to <code>make_bar_type_str</code>:</p>
+    <pre><code>def to_internal_composite(bar_type_str: str) -> tuple[str, str] | None:
+    """If bar_type_str is a non-1-MINUTE EXTERNAL bar, return:
+        (1-MIN-EXTERNAL data bar type,
+         INTERNAL@1-MIN-EXTERNAL composite spec)
+    Returns None for 1-MINUTE inputs (no composite needed)."""</code></pre>
+    <p>
+      Behavior: parse <code>&lt;instrument_id&gt;-&lt;timeframe&gt;-&lt;price_type&gt;-EXTERNAL</code>;
+      emit
+    </p>
+    <ul>
+      <li><code>&lt;instrument_id&gt;-1-MINUTE-&lt;price_type&gt;-EXTERNAL</code> &mdash; bar type to load from catalog</li>
+      <li><code>&lt;instrument_id&gt;-&lt;timeframe&gt;-&lt;price_type&gt;-INTERNAL@1-MINUTE-EXTERNAL</code> &mdash; what strategies subscribe to</li>
+    </ul>
+    <p>No behavior change yet &mdash; this helper is the single source of truth used by Phase B.</p>
+  </section>
+
+  <section id="phaseB">
+    <h2>5. Phase B &mdash; Rewire engine build sites</h2>
+    <p>
+      Four near-symmetric engine setup functions in <span class="file">core/backtest_runner.py</span>
+      each do the same three steps today:
+      <em>load slot.bar_type_str bars</em> &rarr; <em>engine.add_data</em> &rarr;
+      <em>build strategy config with that same bar_type</em>. All four need the same edit.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Function</th><th>Path</th><th>Approx line</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>_run_single_slot</code></td><td>Path A, per-slot</td><td>2480 (bars load), 2590 (add_data)</td></tr>
+        <tr><td><code>_run_slot_group</code></td><td>Path A, grouped</td><td>3234 (bars load), 3323 (add_data)</td></tr>
+        <tr><td><code>_run_single_slot_node</code></td><td>Path B, per-slot</td><td>2251&ndash;2306</td></tr>
+        <tr><td><code>_run_slot_group_node</code></td><td>Path B, grouped</td><td>2966&ndash;3009</td></tr>
+        <tr><td><code>run_backtest</code></td><td>top-level (non-portfolio)</td><td>2009&ndash;2093</td></tr>
+      </tbody>
+    </table>
+    <h4>In each site</h4>
+    <ol>
+      <li>Replace <code>bar_type_strs_to_load = [slot.bar_type_str]</code> with the
+        1-MIN form via <code>to_internal_composite</code>. The
+        <code>_pair_bid_ask_bar_type(...)</code> call still applies but now operates on
+        the 1-MIN string (pairing 1-MIN-BID with 1-MIN-ASK so FX matching has both quotes).</li>
+      <li>The catalog read (<code>_cached_catalog_bars</code> /
+        <code>catalog.bars(...)</code>) is now always against 1-MIN parquet. <strong>Bonus
+        efficiency:</strong> different slots on different TFs of the same instrument share
+        one 1-MIN cache entry.</li>
+      <li>When constructing the strategy config, swap the <code>bar_type</code> argument
+        from <code>BarType.from_str(slot.bar_type_str)</code> to the composite form returned
+        by the helper. For 1-MIN slots, leave it alone.</li>
+      <li><code>extra_bar_types</code> on any strategy gets the same transform if any entry
+        is non-1-MIN.</li>
+    </ol>
+    <div class="callout ok">
+      <strong>No strategy file is edited.</strong> Every strategy reads its bar type from
+      <code>self.config.bar_type</code> and uses the standard
+      <code>register_indicator_for_bars</code> / <code>subscribe_bars</code> pattern that
+      handles composite specs transparently.
+    </div>
+  </section>
+
+  <section id="phaseC">
+    <h2>6. Phase C &mdash; Two semantic landmines</h2>
+
+    <h3>C1. <code>run_on_days</code> weekday filter</h3>
+    <p>
+      Today this filter is applied to <code>all_bars</code> before <code>engine.add_data</code>.
+      After Phase B, <code>all_bars</code> is the 1-MIN list. Dropping Mondays at 1-MIN level
+      cleanly drops Mondays at every higher TF too &mdash; weekday is constant inside a 5-MIN
+      window in all non-boundary cases. The FX week boundary at Sun 21:00 UTC produces the
+      same effect either way.
+    </p>
+    <div class="callout ok"><strong>Verdict:</strong> safe to keep this filter at the 1-MIN level.</div>
+
+    <h3>C2. <code>entry_window</code> intraday filter (<code>entry_start_time</code> / <code>entry_end_time</code>)</h3>
+    <p>
+      Today this drops bars by HH:MM-of-day from <code>all_bars</code>. Applied at 1-MIN level,
+      a 5-MIN window whose boundary minute falls inside the rejected slice would be built from
+      <em>incomplete</em> 1-MIN data &mdash; semantically different from current behavior.
+    </p>
+    <h4>Recommendation</h4>
+    <p>
+      <strong>Move the entry-window check into the strategy / <code>ManagedExitStrategy.on_bar</code>
+      path.</strong> All 1-MIN bars flow into the engine; the aggregator builds clean
+      higher-TF bars; the strategy ignores signal logic for bars whose <code>ts_event</code>
+      falls outside the window. The result-dict tag <code>bars_filtered_by_entry_window</code>
+      changes meaning (becomes "signals skipped") but keep the key for tearsheet compatibility.
+    </p>
+
+    <h3>C3. Path-B fallback rule</h3>
+    <p>
+      <span class="file">CLAUDE.md</span> notes Path B auto-falls-back to Path A when
+      <code>run_on_days</code> / <code>entry_window</code> are active, because filters cannot
+      be injected into <code>BacktestDataConfig</code>. After C1+C2, the filter happens outside
+      <code>BacktestDataConfig</code> &mdash; on the bar list for <code>run_on_days</code> and
+      inside the strategy for <code>entry_window</code>.
+    </p>
+    <div class="callout note">
+      <strong>Side-benefit:</strong> Path B no longer needs the auto-fallback for these
+      filters &mdash; a meaningful coverage win for Path B. Land as a follow-up commit, not
+      buried inside this migration.
+    </div>
+  </section>
+
+  <section id="phaseD">
+    <h2>7. Phase D &mdash; Update catalog-listing endpoints</h2>
+    <p>
+      The Multileg UI populates the bar-type dropdown from the catalog. After Phase E
+      (cleanup), the catalog only contains 1-MIN parquets &mdash; so the dropdown would
+      lose its 5-MIN / 15-MIN / etc. entries.
+    </p>
+    <p>
+      Change in <span class="file">server.py</span>: wherever the catalog-status / bar-types
+      endpoint enumerates available bar types (search for the fast-path
+      <code>_bar_type_range_from_files</code> and the public listing endpoint), synthesize
+      the standard derived TFs &mdash; <code>5-MINUTE</code>, <code>15-MINUTE</code>,
+      <code>30-MINUTE</code>, <code>1-HOUR</code>, <code>2-HOUR</code>, <code>1-DAY</code>,
+      <code>1-WEEK</code>, <code>1-MONTH</code> &mdash; for every
+      <code>(instrument, side)</code> that has a 1-MIN parquet directory. The
+      <code>(start, end)</code> range reported is the 1-MIN range. Slightly conservative
+      at the very edges, acceptable.
+    </p>
+    <div class="callout note">
+      Out of caution, also keep listing any <em>already-existing</em> aggregated parquet
+      directories so a half-migrated catalog still works during transition.
+    </div>
+  </section>
+
+  <section id="phaseE">
+    <h2>8. Phase E &mdash; Stop persisting aggregates, clean up</h2>
+    <ol>
+      <li>
+        <span class="pill pill-del">DELETE</span> <span class="file">scripts/aggregate_catalog.py</span>.
+        Nothing calls it after Phase B. Update doc references in
+        <span class="file">README_APP.md:116</span>, <span class="file">README_APP.md:171</span>, and
+        <span class="file">CLAUDE.md</span>.
+      </li>
+      <li>
+        <span class="pill pill-keep">KEEP</span> <span class="file">core/aggregator.py</span> &mdash;
+        the pandas-based math library still produces the features sidecar
+        (<code>RSI</code>, <code>ATR</code>, <code>EMA</code>, <code>VWAP</code>, &hellip;) at
+        <code>catalog/features/bar/&lt;bartype&gt;.parquet</code>.
+        <p><strong>Decision needed:</strong></p>
+        <ul>
+          <li><em>Option E1:</em> drop the features sidecar entirely (verify nothing reads
+            <code>catalog/features/bar/</code> via grep; if so, delete the directory and the
+            feature-writing branch). Simplest.</li>
+          <li><em>Option E2:</em> split the sidecar emit into a small CLI
+            (<span class="file">scripts/write_features_sidecar.py</span>) that imports
+            <code>aggregator.py</code> but does <strong>not</strong> call
+            <code>save_to_catalog</code>. Run on demand.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="pill pill-add">ADD</span> <span class="file">scripts/purge_aggregated_bars.py</span>
+        &mdash; one-time cleanup. Walks <code>catalog/data/bar/</code> and lists any
+        directory whose bar-type name contains a non-<code>1-MINUTE</code> timeframe in
+        the <code>EXTERNAL</code> form. <strong>Dry-run by default;</strong> requires
+        <code>--apply</code> to actually delete.
+        <div class="callout warn">
+          Without this purge, the runner could still find a 5-MIN parquet and load it.
+          Phase B's transform is therefore <em>unconditional</em> &mdash; it must not be
+          gated by "is the higher-TF parquet missing." The purge ensures the catalog stays
+          in the new shape.
+        </div>
+      </li>
+      <li>
+        <span class="pill pill-edit">EDIT</span> <span class="file">core/nautilus_loader.py</span>
+        &mdash; <code>save_to_catalog</code> refuses to write any bar whose
+        <code>bar_type</code> contains a non-1-MIN EXTERNAL timeframe. Locks the invariant
+        in place going forward.
+      </li>
+    </ol>
+  </section>
+
+  <section id="phaseF">
+    <h2>9. Phase F &mdash; Verification</h2>
+    <ol>
+      <li>
+        <strong>Bit-equivalence already proven at the math level.</strong>
+        <span class="file">core/aggregator.py:7</span> docstring and
+        <span class="file">ipynb/aggregate_1min_to_5min.ipynb</span> show pandas-resample
+        and Nautilus's <code>TimeBarAggregator</code> emit bit-identical OHLCV.
+      </li>
+      <li>
+        <strong>Strategy-level parity demonstrated</strong> in
+        <span class="file">ipynb/aggregator_strategy_demo.ipynb</span>: the same EMA-cross +
+        bracket strategy run twice on January-2024 EUR/USD &mdash; once with Nautilus's
+        internal aggregation, once with a manual <code>FiveMinAggregator</code> &mdash;
+        produces near-identical trade counts (78 vs 80 fills, 39 vs 40 positions). The
+        small delta is the boundary-window the on-the-fly aggregator legitimately can't
+        emit until the next minute arrives.
+      </li>
+      <li>
+        <span class="pill pill-add">ADD</span> <span class="file">scripts/verify_internal_aggregation_parity.py</span>:
+        pick a portfolio JSON with a 5-MIN slot, run it under HEAD (aggregated parquets in
+        catalog) &rarr; record trade list + final P&amp;L. Run the same portfolio under the
+        new code path &rarr; compare. Tolerance: positions / fills exact; P&amp;L to 2 decimals.
+      </li>
+      <li>Tweak existing parity harnesses &mdash;
+        <span class="file">scripts/verify_grouping_parity.py</span>,
+        <span class="file">verify_aggregation.py</span>,
+        <span class="file">verify_catalog_vs_1min.py</span> &mdash; to compare
+        INTERNAL-aggregated bars vs catalog-stored 1-MIN re-aggregated by pandas, instead
+        of catalog-aggregated vs 1-MIN.
+      </li>
+      <li>
+        Run <span class="file">verify_session_changes.py</span> &mdash; must stay green.
+      </li>
+    </ol>
+  </section>
+
+  <section id="files">
+    <h2>10. Files changed (summary)</h2>
+
+    <h4>Edit</h4>
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="file">core/nautilus_loader.py</td>
+          <td>Add <code>to_internal_composite</code>; reject non-1-MIN writes in <code>save_to_catalog</code>.</td>
+        </tr>
+        <tr>
+          <td class="file">core/backtest_runner.py</td>
+          <td>Four engine-build sites + the top-level <code>run_backtest</code>. Move the entry-window check out of the bar-list filter step.</td>
+        </tr>
+        <tr>
+          <td class="file">core/managed_strategy.py</td>
+          <td>Entry-window check lands here.</td>
+        </tr>
+        <tr>
+          <td class="file">server.py</td>
+          <td>Bar-types listing endpoint synthesizes derived TFs from 1-MIN availability.</td>
+        </tr>
+        <tr>
+          <td class="file">README_APP.md</td>
+          <td>Remove <code>aggregate_catalog.py</code> references; document the new on-the-fly model.</td>
+        </tr>
+        <tr>
+          <td class="file">CLAUDE.md</td>
+          <td>Update the "Catalog format" and runtime-flags sections.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>Delete</h4>
+    <table>
+      <tbody>
+        <tr>
+          <td class="file">scripts/aggregate_catalog.py</td>
+          <td>Nothing calls it after Phase B. Archive if you prefer.</td>
+        </tr>
+        <tr>
+          <td><code>catalog/data/bar/*-{5,15,30}-MINUTE-*</code>, <code>*-1-HOUR-*</code>, <code>*-2-HOUR-*</code>, <code>*-1-DAY-*</code>, <code>*-1-WEEK-*</code>, <code>*-1-MONTH-*</code></td>
+          <td>Via the new one-time purge script (dry-run-by-default).</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>Add</h4>
+    <table>
+      <tbody>
+        <tr>
+          <td class="file">scripts/purge_aggregated_bars.py</td>
+          <td>One-time catalog cleanup, dry-run-by-default.</td>
+        </tr>
+        <tr>
+          <td class="file">scripts/verify_internal_aggregation_parity.py</td>
+          <td>End-to-end parity check (HEAD vs new path).</td>
+        </tr>
+        <tr>
+          <td class="file">scripts/write_features_sidecar.py</td>
+          <td>Optional (Option E2 only) &mdash; keeps the features sidecar without writing OHLCV.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>No changes needed</h4>
+    <table>
+      <tbody>
+        <tr>
+          <td class="file">strategies/*.py</td>
+          <td>Every strategy already uses <code>register_indicator_for_bars</code> + <code>subscribe_bars</code> + <code>bar.bar_type.standard()</code>, which handles INTERNAL composites transparently.</td>
+        </tr>
+        <tr>
+          <td class="file">core/models.py</td>
+          <td><code>StrategySlotConfig.bar_type_str</code> stays in EXTERNAL form. Portfolios on disk remain valid.</td>
+        </tr>
+        <tr>
+          <td class="file">core/csv_loader.py</td>
+          <td>Still ingests 1-MIN CSVs as today.</td>
+        </tr>
+        <tr>
+          <td class="file">core/aggregator.py</td>
+          <td>Kept as a pure-math library for the features sidecar; only its caller goes away.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="open">
+    <h2>11. Open questions before implementing</h2>
+    <ol>
+      <li>
+        <strong>Features sidecar.</strong> Is anything reading
+        <code>catalog/features/bar/&lt;bartype&gt;.parquet</code> today?
+        If no &rarr; drop it (Option E1). If yes &rarr; split into a dedicated CLI (Option E2).
+      </li>
+      <li>
+        <strong>Entry-window semantics.</strong> OK to move the
+        <code>entry_start_time</code> / <code>entry_end_time</code> check from data-load to
+        strategy-level (signal-skip rather than bar-drop)? Numerical result is identical
+        for any reasonable case; the operational semantics shift.
+      </li>
+      <li>
+        <strong>Migration cutover &mdash; feature flag?</strong> Recommend
+        <code>_USE_INTERNAL_AGGREGATION=1</code> behind the same pattern as
+        <code>_USE_GROUPING</code> / <code>_USE_BACKTEST_NODE</code>. Land Phase B behind
+        the gate, validate parity portfolio-by-portfolio, flip the default later.
+        Keeps blast radius tight.
+      </li>
+      <li>
+        <strong>Grouping key.</strong> Should slots that differ only in TF (e.g. 5-MIN +
+        15-MIN of the same <code>EURUSD-BID</code>) share one engine, now that both consume
+        the same 1-MIN data? Big efficiency win, real behavior change. Recommend
+        <em>not now</em> &mdash; keep the grouping key at the user-facing TF for this
+        migration; revisit as a follow-up.
+      </li>
+    </ol>
+  </section>
+
+</div>
+
+<div class="footer">
+  m-cube &middot; Internal Aggregation Migration Plan &middot; proposal, not implemented
+</div>
+
+</body>
+</html>
