@@ -49,8 +49,9 @@ CSS rules at [static/css/style.css:1156-1209](static/css/style.css#L1156-L1209).
 | `entry_price` | ⚫ **Options-only** | Same. RBO has its own entry-price model — separate concern. |
 | `rounding_value` | ⚫ **Options-only** | Strike rounding. UI marked `pf-live-only`. |
 | `adjust_price` | ⚫ **Options-only** | Strike offset. UI marked `pf-live-only`. |
-| `start_time` (intra-day entry window) | ✅ **End-to-end wired this session** | Bars before this UTC time are dropped per day. See Phase 1 below. |
-| `end_time` (intra-day entry window) | ✅ **End-to-end wired this session** | Bars after this UTC time are dropped per day. |
+| `start_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars before this time are dropped per day. Interpreted in `entry_window_tz` (defaults to UTC). See Phase 1 below. |
+| `end_time` (intra-day entry window) | ✅ **End-to-end wired** | Bars after this time are dropped per day. Interpreted in `entry_window_tz` (defaults to UTC). |
+| `entry_window_tz` (Entry Window TZ) | ✅ **End-to-end wired** | IANA name (e.g. `Asia/Kolkata`). `null` ⇒ UTC. Filter and per-strategy gate both honour the TZ via `astimezone`. |
 | `sqoff_time` (exec-tab) | ⚪ Wired via Timing tab | The exec-tab's SqOff Time is unwired (`pf-live-only`); the Timing tab's SqOff Time is the canonical wired one (`PortfolioConfig.squareoff_time`). |
 | `run_on_days` | ✅ Wired (last session) | See logic 3 below for details. |
 | `start_day` / `sqoff_day` / `holiday_handling` | ⚫ **Options-only** | Expiry-aware day handling. UI marked `pf-live-only`. |
@@ -267,30 +268,34 @@ if (pf._ui.run_on_days === "Custom") {
 
 ### `entry_start_time` / `entry_end_time` intra-day window — ✅ END-TO-END WIRED (this session)
 
-**1. Schema** &mdash; [core/models.py:120-121](core/models.py#L120-L121)
+**1. Schema** &mdash; [core/models.py](core/models.py)
 ```python
-entry_start_time: Optional[str] = None  # "HH:MM" UTC
-entry_end_time: Optional[str] = None    # "HH:MM" UTC
+entry_start_time: Optional[str] = None  # "HH:MM" in entry_window_tz, e.g. "09:30"
+entry_end_time: Optional[str] = None    # "HH:MM" in entry_window_tz, e.g. "16:00"
+entry_window_tz: Optional[str] = None   # IANA name, e.g. "Asia/Kolkata"; None ⇒ UTC
 ```
 
 **2. Helpers** &mdash; [core/backtest_runner.py](core/backtest_runner.py)
 - `_hhmm_to_minute(s)` parses "HH:MM" or "HH:MM:SS" into minute-of-day (0..1439). Returns None for empty/malformed input — never raises.
-- `_filter_bars_by_time_of_day(bars, start_hhmm, end_hhmm)` drops bars whose UTC time-of-day falls outside the window. Both endpoints inclusive. Either endpoint may be None for unbounded. Supports wrap-around windows (e.g. 22:00..02:00 keeps overnight bars).
+- `_filter_bars_by_time_of_day(bars, start_hhmm, end_hhmm, tz=None)` drops bars whose time-of-day falls outside the window. Both endpoints inclusive. Either endpoint may be None for unbounded. Supports wrap-around windows (e.g. 22:00..02:00 keeps overnight bars). When `tz` is None, uses the fast ns-modulo path (UTC); when set, converts each bar's UTC `ts_event` via `astimezone` so the comparison happens in the user's local TZ.
 
 **3. Reader / behavior** &mdash; both engine sites:
-- `_run_single_slot()` and `_run_slot_group()` accept `default_entry_start_time` / `default_entry_end_time` parameters. Filter applied inside `_phase("entry_window_filter", ...)` after the run_on_days filter.
-- `run_portfolio_backtest()` passes `portfolio.entry_start_time` and `portfolio.entry_end_time` down to all 3 worker submit sites.
+- `_run_single_slot()` and `_run_slot_group()` accept `default_entry_start_time` / `default_entry_end_time` / `default_entry_window_tz` parameters. Filter applied inside `_phase("entry_window_filter", ...)` after the run_on_days filter. The per-strategy gate inside `ManagedExitStrategy` (`_check_entries`) also honours `entry_window_tz` so post-window bars (kept for SL/Target monitoring) are correctly gated in the user's local TZ.
+- `run_portfolio_backtest()` passes `portfolio.entry_start_time` / `.entry_end_time` / `.entry_window_tz` down to all 3 worker submit sites.
+- Path B: when `entry_window_tz` is set, `_chunk_data_configs_for_path_b` widens the per-day chunk to the full UTC day (per-UTC-day chunks can't express a non-UTC window without DST-aware conversion) and the in-strategy gate becomes the source of truth.
 
 **4. Result surfacing**
-- Per-slot result includes `entry_start_time`, `entry_end_time`, and `bars_filtered_by_entry_window` when window is configured
-- If filter drops every bar, `ValueError` raised mentioning the filter
+- Per-slot result includes `entry_start_time`, `entry_end_time`, `bars_filtered_by_entry_window`, and (when set) `entry_window_tz`.
+- If filter drops every bar, `ValueError` raised mentioning the filter.
 
-**5. UI translation** &mdash; [static/js/portfolio.js:1304-1310](static/js/portfolio.js#L1304-L1310)
+**5. UI translation** &mdash; [static/js/portfolio.js](static/js/portfolio.js)
 ```javascript
 pf.entry_start_time = pf._ui.start_time && pf._ui.start_time !== "00:00:00"
     ? pf._ui.start_time : null;
 pf.entry_end_time = pf._ui.end_time && pf._ui.end_time !== "23:59:59"
     ? pf._ui.end_time : null;
+// Empty string ⇒ null ⇒ UTC (preserves legacy portfolios).
+pf.entry_window_tz = document.getElementById("pf-m-entrytz")?.value || null;
 ```
 
 **6. UI marking change** &mdash; the Start Time and End Time field rows in the Execution Parameters > Timing fieldset are no longer marked `pf-ui-only`. The parent fieldset has had its `pf-ui-only` removed too — it now contains only wired fields (Start Time, End Time, Run On Days) plus three options-only fields marked `pf-live-only` (Start Day / SqOff Day / Holiday).

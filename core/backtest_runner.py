@@ -43,6 +43,8 @@ from core.venue_config import load_adapter_config_for_bar_type
 import contextlib
 import functools
 import time as _time_mod
+from datetime import datetime, timezone as _dt_timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 @contextlib.contextmanager
@@ -251,16 +253,20 @@ def _filter_bars_by_time_of_day(
     bars: list,
     start_hhmm: str | None,
     end_hhmm: str | None,
+    tz: str | None = None,
 ) -> tuple[list, int]:
-    """Drop bars whose UTC time-of-day falls outside [start_hhmm, end_hhmm].
+    """Drop bars whose time-of-day falls outside [start_hhmm, end_hhmm].
 
     Both endpoints are inclusive. Either may be None — in which case that
     side of the window is unbounded (start=00:00 or end=23:59 effectively).
     When both are None, returns input unchanged.
 
-    Window is in UTC. To use a non-UTC window, the caller would convert
-    bar timestamps first; we don't pull pandas in here for the same
-    perf reason as ``_filter_bars_by_weekday``.
+    Window timezone is determined by ``tz`` (IANA name, e.g.
+    ``"Asia/Kolkata"``). When ``tz`` is None, the window is in UTC and the
+    comparison uses the fast nanosecond-modulo path (no datetime objects
+    constructed). When ``tz`` is set, each bar's UTC ``ts_event`` is
+    converted via ``astimezone`` before extracting minute-of-day — slower
+    but only on opt-in. Unknown TZ falls back to UTC.
 
     Returns (kept_bars, dropped_count).
     """
@@ -275,19 +281,38 @@ def _filter_bars_by_time_of_day(
     lo = start_min if start_min is not None else 0
     hi = end_min if end_min is not None else (24 * 60 - 1)
 
+    # Resolve TZ once. Falls back to UTC on unknown zone, matching the
+    # squareoff path in managed_strategy.py.
+    zone: ZoneInfo | None = None
+    if tz:
+        try:
+            zone = ZoneInfo(tz)
+        except ZoneInfoNotFoundError:
+            zone = None
+
+    if zone is None:
+        # Fast path: UTC window via ns-modulo.
+        def _bar_min(bar) -> int:
+            return (bar.ts_event % _NANOS_PER_DAY) // _NANOS_PER_MINUTE
+    else:
+        utc = _dt_timezone.utc
+        def _bar_min(bar) -> int:
+            local_dt = datetime.fromtimestamp(bar.ts_event / 1e9, tz=utc).astimezone(zone)
+            return local_dt.hour * 60 + local_dt.minute
+
     if lo > hi:
         # Inverted window (e.g. start=22:00, end=02:00) — treat as wrap-around
         # i.e. keep bars in [lo, 24*60) ∪ [0, hi].
         kept = []
         for bar in bars:
-            intra = (bar.ts_event % _NANOS_PER_DAY) // _NANOS_PER_MINUTE
+            intra = _bar_min(bar)
             if intra >= lo or intra <= hi:
                 kept.append(bar)
         return kept, len(bars) - len(kept)
 
     kept = []
     for bar in bars:
-        intra = (bar.ts_event % _NANOS_PER_DAY) // _NANOS_PER_MINUTE
+        intra = _bar_min(bar)
         if lo <= intra <= hi:
             kept.append(bar)
     return kept, len(bars) - len(kept)
@@ -320,6 +345,7 @@ def _chunk_data_configs_for_path_b(
     entry_end_time: str | None,
     run_on_days: list | None,
     rbo_settings: "_RBOSettings | None" = None,
+    entry_window_tz: str | None = None,
 ) -> list[BacktestDataConfig]:
     """One BacktestDataConfig per allowed day, bounded by the entry window.
 
@@ -351,8 +377,18 @@ def _chunk_data_configs_for_path_b(
             "every weekday."
         )
 
-    win_start = entry_start_time or "00:00:00"
-    win_end = entry_end_time or "23:59:59.999999"
+    # When ``entry_window_tz`` is set, the entry window endpoints are in a
+    # non-UTC zone. Per-UTC-day chunks can't express that without per-day
+    # local→UTC conversion (brittle around DST), so widen the per-day chunk
+    # to the full UTC day and let the in-strategy gate (which is TZ-aware,
+    # see ManagedExitStrategy._entry_window_tz) drop bars at runtime.
+    # ``run_on_days`` chunking is still honoured below.
+    if entry_window_tz:
+        win_start = "00:00:00"
+        win_end = "23:59:59.999999"
+    else:
+        win_start = entry_start_time or "00:00:00"
+        win_end = entry_end_time or "23:59:59.999999"
 
     if rbo_settings is not None:
         # Widen to cover the RBO load needs: monitoring window at the start,
@@ -408,6 +444,7 @@ def _build_run_config(
     oms_type: str = "NETTING",
     entry_start_time: str | None = None,
     entry_end_time: str | None = None,
+    entry_window_tz: str | None = None,
     run_on_days: list | None = None,
     rbo_settings: "_RBOSettings | None" = None,
 ) -> BacktestRunConfig:
@@ -467,6 +504,7 @@ def _build_run_config(
             end_date=end_date,
             entry_start_time=entry_start_time if entry_window_effective else None,
             entry_end_time=entry_end_time if entry_window_effective else None,
+            entry_window_tz=entry_window_tz,
             run_on_days=run_on_days,
             rbo_settings=rbo_settings,
         )
@@ -2283,6 +2321,7 @@ def _run_single_slot_node(
     default_run_on_days: list | None = None,
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
+    default_entry_window_tz: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
@@ -2363,6 +2402,7 @@ def _run_single_slot_node(
                 trader_id=f"SLOT-{slot_index:03d}",
                 entry_start_time=default_entry_start_time,
                 entry_end_time=default_entry_end_time,
+                entry_window_tz=default_entry_window_tz,
                 run_on_days=default_run_on_days,
                 rbo_settings=default_rbo_settings,
             )
@@ -2382,6 +2422,12 @@ def _run_single_slot_node(
             # ungated, defeating the point of enabling RBO.
             slot_qty = effective_slot_qty(slot, user_id)
             if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                # When entry_window_tz is set, the chunker widens to full UTC
+                # days (TZ-aware chunking is brittle around DST), so the
+                # strategy gate becomes the source of truth. Pass entry times
+                # only in that mode — otherwise the chunker has already
+                # filtered and the strategy gate would be redundant.
+                _node_pass_entry_window = bool(default_entry_window_tz) and _is_intraday_bar_type(slot.bar_type_str)
                 managed_config = config_from_exit(
                     exit_config=slot.exit_config,
                     signal_name=slot.strategy_name,
@@ -2394,6 +2440,9 @@ def _run_single_slot_node(
                     rbo_settings=default_rbo_settings,
                     other_settings=default_other_settings,
                     move_sl_settings=default_move_sl_settings,
+                    entry_start_time=(default_entry_start_time if _node_pass_entry_window else None),
+                    entry_end_time=(default_entry_end_time if _node_pass_entry_window else None),
+                    entry_window_tz=(default_entry_window_tz if _node_pass_entry_window else None),
                     # Per-slot path: own process, no in-process siblings — the
                     # cross-slot bus is empty here (cross-process events arrive
                     # via the two-pass preseeded_bus inside _MoveSLConfig).
@@ -2484,6 +2533,7 @@ def _run_single_slot(
     default_run_on_days: list | None = None,
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
+    default_entry_window_tz: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
@@ -2522,6 +2572,7 @@ def _run_single_slot(
             default_run_on_days=default_run_on_days,
             default_entry_start_time=default_entry_start_time,
             default_entry_end_time=default_entry_end_time,
+            default_entry_window_tz=default_entry_window_tz,
             default_rbo_settings=default_rbo_settings,
             default_other_settings=default_other_settings,
             default_move_sl_settings=default_move_sl_settings,
@@ -2626,7 +2677,8 @@ def _run_single_slot(
         else:
             _filter_end = None if _slot_is_managed else default_entry_end_time
             all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
-                all_bars, default_entry_start_time, _filter_end
+                all_bars, default_entry_start_time, _filter_end,
+                tz=default_entry_window_tz,
             )
 
     if not all_bars:
@@ -2726,11 +2778,15 @@ def _run_single_slot(
                     squareoff_tz=eff_squareoff_tz,
                     # Intraday entry window (spec §9) — gated inside the
                     # strategy so post-window bars still drive exit checks.
-                    # Only meaningful for intraday bar types.
+                    # Only meaningful for intraday bar types. The TZ is passed
+                    # through so the in-strategy gate converts bars to local
+                    # time before comparing minute-of-day.
                     entry_start_time=(default_entry_start_time
                                       if _is_intraday_bar_type(slot.bar_type_str) else None),
                     entry_end_time=(default_entry_end_time
                                     if _is_intraday_bar_type(slot.bar_type_str) else None),
+                    entry_window_tz=(default_entry_window_tz
+                                     if _is_intraday_bar_type(slot.bar_type_str) else None),
                     # Per-slot runs each get their own process/engine, so the
                     # module-level cross-slot bus has no siblings to reach —
                     # an empty portfolio_id routes to the standalone bus.
@@ -2772,7 +2828,16 @@ def _run_single_slot(
             from core.aggregation_report import derive_sniffer_paths_for_bar_type
             from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
             _extra_bts = list(getattr(slot, "strategy_bar_types", None) or [])
-            _all_subscribed = bar_type_strs_to_load + _extra_bts
+            # Pair INTERNAL extras with their ASK/BID opposite so the sniffer
+            # captures both quote sides in sniffer_strategy.csv. The source
+            # EXTERNAL data for the opposite side is already in
+            # bar_type_strs_to_load, so Nautilus can build the aggregator.
+            _extra_bts_paired: list[str] = []
+            for _bt in _extra_bts:
+                for _p in _pair_bid_ask_bar_type(_bt):
+                    if _p not in _extra_bts and _p not in _extra_bts_paired:
+                        _extra_bts_paired.append(_p)
+            _all_subscribed = bar_type_strs_to_load + _extra_bts + _extra_bts_paired
             _sniffer_paths = derive_sniffer_paths_for_bar_type(
                 slot.bar_type_str, _extra_bts, start_date, end_date,
             )
@@ -2849,6 +2914,8 @@ def _run_single_slot(
         if default_entry_start_time or default_entry_end_time:
             results["entry_start_time"] = default_entry_start_time
             results["entry_end_time"] = default_entry_end_time
+            if default_entry_window_tz:
+                results["entry_window_tz"] = default_entry_window_tz
             results["bars_filtered_by_entry_window"] = bars_filtered_by_entry_window
             if entry_window_skipped_reason:
                 results["entry_window_skipped"] = entry_window_skipped_reason
@@ -3059,6 +3126,7 @@ def _run_slot_group_node(
     default_run_on_days: list | None = None,
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
+    default_entry_window_tz: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
@@ -3131,6 +3199,7 @@ def _run_slot_group_node(
                 oms_type="HEDGING",  # see _run_slot_group for rationale
                 entry_start_time=default_entry_start_time,
                 entry_end_time=default_entry_end_time,
+                entry_window_tz=default_entry_window_tz,
                 run_on_days=default_run_on_days,
                 rbo_settings=default_rbo_settings,
             )
@@ -3162,6 +3231,15 @@ def _run_slot_group_node(
 
                 slot_qty = effective_slot_qty(slot, user_id)
                 if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                    # See _run_single_slot_node — pass entry times only when
+                    # entry_window_tz is set (chunker widens, strategy gates).
+                    # We're already inside the managed-slot branch (the outer
+                    # if-check), so per-slot gating suffices here without the
+                    # group-wide "all managed" check used in Path A.
+                    _node_pass_entry_window = (
+                        bool(default_entry_window_tz)
+                        and _is_intraday_bar_type(primary_bar_type_str)
+                    )
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
                         signal_name=slot.strategy_name,
@@ -3175,17 +3253,9 @@ def _run_slot_group_node(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
-                        # Intraday entry window — only passed (so the strategy
-                        # gates entries internally) when the whole group is
-                        # managed and its post-window bars were kept.
-                        entry_start_time=(default_entry_start_time
-                                          if (_group_all_managed
-                                              and _is_intraday_bar_type(primary_bar_type_str))
-                                          else None),
-                        entry_end_time=(default_entry_end_time
-                                        if (_group_all_managed
-                                            and _is_intraday_bar_type(primary_bar_type_str))
-                                        else None),
+                        entry_start_time=(default_entry_start_time if _node_pass_entry_window else None),
+                        entry_end_time=(default_entry_end_time if _node_pass_entry_window else None),
+                        entry_window_tz=(default_entry_window_tz if _node_pass_entry_window else None),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
                         subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
@@ -3292,6 +3362,7 @@ def _run_slot_group(
     default_run_on_days: list | None = None,
     default_entry_start_time: str | None = None,
     default_entry_end_time: str | None = None,
+    default_entry_window_tz: str | None = None,
     default_rbo_settings: "_RBOSettings | None" = None,
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
@@ -3340,6 +3411,7 @@ def _run_slot_group(
             default_run_on_days=default_run_on_days,
             default_entry_start_time=default_entry_start_time,
             default_entry_end_time=default_entry_end_time,
+            default_entry_window_tz=default_entry_window_tz,
             default_rbo_settings=default_rbo_settings,
             default_other_settings=default_other_settings,
             default_move_sl_settings=default_move_sl_settings,
@@ -3431,7 +3503,8 @@ def _run_slot_group(
         else:
             _filter_end = None if _group_all_managed else default_entry_end_time
             all_bars, bars_filtered_by_entry_window = _filter_bars_by_time_of_day(
-                all_bars, default_entry_start_time, _filter_end
+                all_bars, default_entry_start_time, _filter_end,
+                tz=default_entry_window_tz,
             )
 
     if not all_bars:
@@ -3516,6 +3589,10 @@ def _run_slot_group(
 
                 slot_qty = effective_slot_qty(slot, user_id)
                 if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                    _pass_entry_window = (
+                        _group_all_managed
+                        and _is_intraday_bar_type(primary_bar_type_str)
+                    )
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
                         signal_name=slot.strategy_name,
@@ -3529,6 +3606,12 @@ def _run_slot_group(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        # Intraday entry window — only passed (so the strategy
+                        # gates entries internally) when the whole group is
+                        # managed and its post-window bars were kept.
+                        entry_start_time=(default_entry_start_time if _pass_entry_window else None),
+                        entry_end_time=(default_entry_end_time if _pass_entry_window else None),
+                        entry_window_tz=(default_entry_window_tz if _pass_entry_window else None),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
                         subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
@@ -3570,7 +3653,15 @@ def _run_slot_group(
                 for _bt in (getattr(_slot_in_grp, "strategy_bar_types", None) or []):
                     if _bt not in _group_extra_bts:
                         _group_extra_bts.append(_bt)
-            _all_subscribed = list(bar_type_strs_to_load) + _group_extra_bts
+            # Pair INTERNAL extras with their ASK/BID opposite so the sniffer
+            # captures both quote sides in sniffer_strategy.csv. Source EXTERNAL
+            # data for the opposite side is already in bar_type_strs_to_load.
+            _group_extra_bts_paired: list[str] = []
+            for _bt in _group_extra_bts:
+                for _p in _pair_bid_ask_bar_type(_bt):
+                    if _p not in _group_extra_bts and _p not in _group_extra_bts_paired:
+                        _group_extra_bts_paired.append(_p)
+            _all_subscribed = list(bar_type_strs_to_load) + _group_extra_bts + _group_extra_bts_paired
             _sniffer_paths = derive_sniffer_paths_for_bar_type(
                 primary_bar_type_str, _group_extra_bts, start_date, end_date,
             )
@@ -3674,6 +3765,8 @@ def _run_slot_group(
                 if default_entry_start_time or default_entry_end_time:
                     r["entry_start_time"] = default_entry_start_time
                     r["entry_end_time"] = default_entry_end_time
+                    if default_entry_window_tz:
+                        r["entry_window_tz"] = default_entry_window_tz
                     r["bars_filtered_by_entry_window"] = bars_filtered_by_entry_window
                     if entry_window_skipped_reason:
                         r["entry_window_skipped"] = entry_window_skipped_reason
@@ -4053,6 +4146,7 @@ def run_portfolio_backtest(
                             default_run_on_days=portfolio.run_on_days,
                             default_entry_start_time=portfolio.entry_start_time,
                             default_entry_end_time=portfolio.entry_end_time,
+                            default_entry_window_tz=portfolio.entry_window_tz,
                             default_rbo_settings=rbo_settings,
                             default_other_settings=other_settings,
                             default_move_sl_settings=active_move_sl,
@@ -4075,6 +4169,7 @@ def run_portfolio_backtest(
                             default_run_on_days=portfolio.run_on_days,
                             default_entry_start_time=portfolio.entry_start_time,
                             default_entry_end_time=portfolio.entry_end_time,
+                            default_entry_window_tz=portfolio.entry_window_tz,
                             default_rbo_settings=rbo_settings,
                             default_other_settings=other_settings,
                             default_move_sl_settings=active_move_sl,
@@ -4099,6 +4194,7 @@ def run_portfolio_backtest(
                         default_run_on_days=portfolio.run_on_days,
                         default_entry_start_time=portfolio.entry_start_time,
                         default_entry_end_time=portfolio.entry_end_time,
+                        default_entry_window_tz=portfolio.entry_window_tz,
                         default_rbo_settings=rbo_settings,
                         default_other_settings=other_settings,
                         default_move_sl_settings=active_move_sl,

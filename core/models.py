@@ -214,14 +214,21 @@ class PortfolioConfig:
     # are dropped before the engine sees them, so trades cannot fire on those days.
     # Weekday is computed from each bar's UTC ts_event.
     run_on_days: Optional[list[str]] = None
-    # Intra-day entry window. Both endpoints in HH:MM format, UTC.
-    # When either is set, bars outside [entry_start_time, entry_end_time] are
-    # dropped before the engine sees them. Caveat: bars dropped at the tail
-    # mean the strategy can't process exits past entry_end_time, so set
+    # Intra-day entry window. Both endpoints in HH:MM format, interpreted in
+    # ``entry_window_tz`` (IANA name) when set, else UTC. When either endpoint
+    # is set, bars outside [entry_start_time, entry_end_time] are dropped
+    # before the engine sees them. Caveat: bars dropped at the tail mean the
+    # strategy can't process exits past entry_end_time, so set
     # ``squareoff_time`` to the same time as ``entry_end_time`` if you need
     # forced closes at end-of-window.
-    entry_start_time: Optional[str] = None  # "HH:MM" UTC, e.g. "09:30"
-    entry_end_time: Optional[str] = None    # "HH:MM" UTC, e.g. "16:00"
+    entry_start_time: Optional[str] = None  # "HH:MM" in entry_window_tz, e.g. "09:30"
+    entry_end_time: Optional[str] = None    # "HH:MM" in entry_window_tz, e.g. "16:00"
+    # Timezone for the entry window endpoints above. None ⇒ UTC (preserves
+    # legacy behavior for portfolios saved before this field existed). When
+    # set, the bar-filter and the per-strategy entry gate convert each bar's
+    # UTC ts_event to this zone before comparing time-of-day. Mirrors the
+    # ``squareoff_tz`` pattern.
+    entry_window_tz: Optional[str] = None  # IANA name, e.g. "Asia/Kolkata"
 
     # Range Breakout (RBO). When rbo_enabled, the entry timing for all enabled
     # slots is gated by a per-day state machine: range is built during

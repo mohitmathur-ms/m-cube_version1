@@ -266,14 +266,17 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # a sibling's "execute" action arms it via the cross-slot bus.
     armed_at_start: bool = True
 
-    # Intraday entry window (spec §9). Minute-of-day UTC; -1 = disabled.
-    # Fresh entries are blocked outside [entry_start_minute, entry_end_minute],
-    # but — unlike a bar pre-filter — bars PAST entry_end_minute are still
-    # delivered so open positions keep being monitored for SL/Target until
-    # squareoff. ReExecute / ReEntry past End Time are blocked only when
-    # no_reentry_after_end is set (spec §7 P3 / §9).
+    # Intraday entry window (spec §9). Minute-of-day in ``entry_window_tz``;
+    # -1 = disabled. Fresh entries are blocked outside
+    # [entry_start_minute, entry_end_minute], but — unlike a bar pre-filter —
+    # bars PAST entry_end_minute are still delivered so open positions keep
+    # being monitored for SL/Target until squareoff. ReExecute / ReEntry past
+    # End Time are blocked only when no_reentry_after_end is set (spec §7 P3
+    # / §9). When ``entry_window_tz`` is "UTC" the gate uses the fast
+    # ns-modulo path; any other IANA zone triggers per-bar astimezone.
     entry_start_minute: int = -1
     entry_end_minute: int = -1
+    entry_window_tz: str = "UTC"
     no_reentry_after_end: bool = False
 
     # Square-off (resolved by core.models.resolve_squareoff before engine build).
@@ -504,11 +507,20 @@ class ManagedExitStrategy(Strategy):
         ]
         self._extra_sub_bts: set = set()
 
-        # Intraday entry window (spec §9). UTC minute-of-day; -1 = disabled.
-        # Gates fresh entries in _check_entries WITHOUT dropping post-window
-        # bars, so SL/Target keep being monitored until squareoff.
+        # Intraday entry window (spec §9). Minute-of-day in entry_window_tz;
+        # -1 = disabled. Gates fresh entries in _check_entries WITHOUT
+        # dropping post-window bars, so SL/Target keep being monitored until
+        # squareoff. TZ resolved once here — falls back to UTC for unknown
+        # zone (matches the squareoff_tz handling above).
         self._entry_start_min: int = int(getattr(config, "entry_start_minute", -1))
         self._entry_end_min: int = int(getattr(config, "entry_end_minute", -1))
+        _entry_tz_name = getattr(config, "entry_window_tz", "UTC") or "UTC"
+        try:
+            self._entry_window_tz = (
+                ZoneInfo(_entry_tz_name) if _entry_tz_name != "UTC" else self._utc_tz
+            )
+        except ZoneInfoNotFoundError:
+            self._entry_window_tz = self._utc_tz
         self._no_reentry_after_end: bool = bool(getattr(config, "no_reentry_after_end", False))
 
     def on_start(self) -> None:
@@ -1306,12 +1318,18 @@ class ManagedExitStrategy(Strategy):
             return
 
         # Intraday entry window (spec §9). Blocks FRESH entries outside
-        # [entry_start, entry_end] (UTC minute-of-day) — exits still process
-        # on every bar, so SL/Target are monitored past End Time until
-        # squareoff. ReExecute/ReEntry past End Time are allowed unless
-        # no_reentry_after_end is set (spec §7 P3).
+        # [entry_start, entry_end] (minute-of-day in entry_window_tz) — exits
+        # still process on every bar, so SL/Target are monitored past End
+        # Time until squareoff. ReExecute/ReEntry past End Time are allowed
+        # unless no_reentry_after_end is set (spec §7 P3).
         if self._entry_start_min >= 0 or self._entry_end_min >= 0:
-            bar_min = (self._current_bar_ts_ns % 86_400_000_000_000) // 60_000_000_000
+            if self._entry_window_tz is self._utc_tz:
+                bar_min = (self._current_bar_ts_ns % 86_400_000_000_000) // 60_000_000_000
+            else:
+                _local_dt = datetime.fromtimestamp(
+                    self._current_bar_ts_ns / 1e9, tz=self._utc_tz,
+                ).astimezone(self._entry_window_tz)
+                bar_min = _local_dt.hour * 60 + _local_dt.minute
             if self._entry_start_min >= 0 and bar_min < self._entry_start_min:
                 return
             if self._entry_end_min >= 0 and bar_min > self._entry_end_min:
@@ -1514,6 +1532,7 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      move_sl_settings=None,
                      entry_start_time: str | None = None,
                      entry_end_time: str | None = None,
+                     entry_window_tz: str | None = None,
                      subscribe_bar_types: list | None = None,
                      portfolio_id: str = "",
                      slot_id: str = "") -> ManagedExitConfig:
@@ -1614,9 +1633,11 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         armed_at_start=bool(getattr(exit_config, "armed_at_start", True)),
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
-        # Intraday entry window (spec §9) — UTC minute-of-day, -1 = disabled.
+        # Intraday entry window (spec §9) — minute-of-day in
+        # ``entry_window_tz`` (UTC when unset), -1 = disabled.
         entry_start_minute=_parse_squareoff_minute(entry_start_time),
         entry_end_minute=_parse_squareoff_minute(entry_end_time),
+        entry_window_tz=entry_window_tz or "UTC",
         portfolio_id=portfolio_id,
         slot_id=slot_id,
     )

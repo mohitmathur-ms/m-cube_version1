@@ -93,6 +93,7 @@ const Portfolio = {
             end_date: null,
             squareoff_time: null,
             squareoff_tz: null,
+            entry_window_tz: null,
             slots: [],
         };
     },
@@ -698,13 +699,17 @@ const Portfolio = {
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
-                            <div class="pf-field-row" title="Intra-day entry window start (UTC). Bars before this time are dropped from the backtest.">
+                            <div class="pf-field-row" title="Intra-day entry window start. Interpreted in the Entry Window TZ below (defaults to UTC). Bars before this time are dropped from the backtest.">
                                 <span class="pf-field-label">Start Time</span>
                                 <input type="time" class="form-control" id="pf-m-starttime" value="${ui.start_time || '09:30:00'}" step="1" style="flex:1;">
                             </div>
-                            <div class="pf-field-row" title="Intra-day entry window end (UTC). Bars after this time are dropped from the backtest.">
+                            <div class="pf-field-row" title="Intra-day entry window end. Interpreted in the Entry Window TZ below (defaults to UTC). Bars after this time are dropped from the backtest.">
                                 <span class="pf-field-label">End Time</span>
                                 <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time || '16:15:00'}" step="1" style="flex:1;">
+                            </div>
+                            <div class="pf-field-row" title="Timezone for Start Time / End Time above. Leave blank for UTC (matches existing portfolios). Select an IANA zone (e.g. Asia/Kolkata) to enter the window in local time.">
+                                <span class="pf-field-label">Entry Window TZ</span>
+                                ${this._renderTzSelect(pf.entry_window_tz, "pf-m-entrytz", "(UTC)")}
                             </div>
                             <div class="pf-field-row pf-live-only" title="Live-only. Backtest uses the SqOff Time on the Timing tab (portfolio.squareoff_time).">
                                 <span class="pf-field-label">SqOff Time</span>
@@ -1877,6 +1882,9 @@ const Portfolio = {
             ? pf._ui.start_time : null;
         pf.entry_end_time = pf._ui.end_time && pf._ui.end_time !== "23:59:59"
             ? pf._ui.end_time : null;
+        // IANA name (e.g. "Asia/Kolkata"). Empty string ⇒ null ⇒ UTC,
+        // preserving legacy behavior for portfolios saved before this field.
+        pf.entry_window_tz = document.getElementById("pf-m-entrytz")?.value || null;
         pf._ui.start_day = document.getElementById("pf-m-startday")?.value || "Before Expiry";
         pf._ui.start_day_offset = parseInt(document.getElementById("pf-m-startdayoff")?.value) || 1;
         pf._ui.sqoff_day = parseInt(document.getElementById("pf-m-sqoffday")?.value) || 0;
