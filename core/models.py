@@ -142,6 +142,19 @@ class StrategySlotConfig:
     strategy_name: str = "EMA Cross"
     strategy_params: dict = field(default_factory=dict)
     bar_type_str: str = ""
+    # Strategy-subscribe bar types (NautilusTrader composite/aggregated bar
+    # types). ``bar_type_str`` above is the BASE timeframe — the catalog data
+    # fed to the engine, the resolution at which the matching engine fills
+    # orders. This list holds the composite bar types the strategy subscribes
+    # to, e.g. a 5-minute bar internally aggregated from the 1-minute base:
+    #   "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+    # When non-empty, the strategy OPERATES on the first composite — its
+    # signal, indicators and SL/TP run on that aggregated stream and orders
+    # are submitted on its interval, while fills still happen on the base
+    # data. Any further composites are subscribed-and-received (available to
+    # the strategy) but the single-signal logic uses the first. Empty list →
+    # strategy runs on the base bar type (the original, unchanged behaviour).
+    strategy_bar_types: list[str] = field(default_factory=list)
     # Sizing multiplier (number of contracts). Combined with the instrument's
     # admin-configured lot_size at order-submit time:
     #   order_qty = min(instrument.lot_size × slot.lots, instrument.trade_size_cap)
@@ -459,6 +472,33 @@ def validate_leg_actions(
     if "execute" in actions and not has_execute_target:
         return False, "'execute' action requires an execute_target_leg_id"
     return True, ""
+
+
+def build_composite_bar_type(base_bar_type: str, sub_step_unit: str) -> str:
+    """Build a NautilusTrader composite (internally-aggregated) bar type.
+
+    Given a BASE EXTERNAL bar type and a (coarser-or-equal) strategy-subscribe
+    timeframe, returns the bar type the strategy subscribes to:
+
+        base "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL", sub "5-MINUTE"
+          -> "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+
+    The ``@<step>-<unit>-EXTERNAL`` suffix is Nautilus's composite-source spec:
+    a 5-minute bar internally aggregated from the loaded 1-minute EXTERNAL
+    data. When ``sub_step_unit`` equals the base step-unit the result is just
+    the base bar type (no aggregation). Returns "" on malformed input.
+    """
+    parts = str(base_bar_type or "").split("-")
+    if len(parts) < 5:
+        return ""
+    inst, b_step, b_unit, price = parts[0], parts[1], parts[2], parts[3]
+    sub = str(sub_step_unit or "").strip().upper()
+    if not sub:
+        return ""
+    base_tf = f"{b_step}-{b_unit}"
+    if sub == base_tf:
+        return f"{inst}-{base_tf}-{price}-EXTERNAL"
+    return f"{inst}-{sub}-{price}-INTERNAL@{b_step}-{b_unit}-EXTERNAL"
 
 
 def portfolio_to_dict(config: PortfolioConfig) -> dict:

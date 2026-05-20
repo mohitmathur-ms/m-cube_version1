@@ -535,7 +535,7 @@ const Portfolio = {
         // Build inline-editable legs table rows
         let legsRows = "";
         if ((pf.slots || []).length === 0) {
-            legsRows = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            legsRows = `<tr><td colspan="18" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
             legsRows = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
@@ -586,9 +586,10 @@ const Portfolio = {
                         <th>Asset</th>
                         <th>Venue</th>
                         <th>Instrument ID</th>
-                        <th>Timeframe</th>
+                        <th title="Base timeframe — catalog data fed to the engine; the resolution orders fill at.">Base TF</th>
                         <th>Price Type</th>
-                        <th>Final Instrument</th>
+                        <th title="Base instrument fed to the engine (Nautilus bar type).">Final Instrument</th>
+                        <th title="Composite bar types the strategy subscribes to (set in the leg editor). Empty = base only.">Subscribe Bar Type(s)</th>
                         <th style="width:62px;">Lots</th>
                         <th>Stop Loss</th>
                         <th style="width:56px;">SL Val</th>
@@ -1369,6 +1370,15 @@ const Portfolio = {
                 const composed = this._composeBarType(instId.value, tfSel.value, ptSel.value);
                 if (composed) slot.bar_type_str = composed;
             }
+            // Strategy-subscribe composite bar types — read the inline
+            // multi-select when present (authoritative), else fall back to the
+            // leg's stored TFs. Recompute against the current base bar type.
+            const subSel = document.getElementById(`leg-il-subtf-${i}`);
+            const subTfs = subSel
+                ? Array.from(subSel.selectedOptions).map(o => o.value)
+                : this._parseSubscribeTfs(slot.strategy_bar_types);
+            slot.strategy_bar_types = this._subscribeBarTypesList(
+                slot.bar_type_str, subTfs);
             if (size) {
                 slot.lots = parseFloat(size.value);
                 if (!Number.isFinite(slot.lots) || slot.lots <= 0) slot.lots = 1;
@@ -1384,6 +1394,20 @@ const Portfolio = {
     },
 
     _onInlineStratChange(legIndex) {
+        this._syncInlineLegs();
+    },
+
+    /** Inline strategy-subscribe timeframe multi-select changed: recompute the
+     *  composite bar type preview, then persist into slot.strategy_bar_types. */
+    _onInlineSubTfChange(i) {
+        const subSel = document.getElementById(`leg-il-subtf-${i}`);
+        const base = document.getElementById(`leg-il-final-${i}`)?.value || "";
+        const subEl = document.getElementById(`leg-il-subbt-${i}`);
+        if (subSel && subEl) {
+            const tfs = Array.from(subSel.selectedOptions).map(o => o.value);
+            const list = this._subscribeBarTypesList(base, tfs);
+            subEl.value = list.length ? list.join("\n") : "(base TF only)";
+        }
         this._syncInlineLegs();
     },
 
@@ -1506,6 +1530,56 @@ const Portfolio = {
         return `${instId}-${tfValue}-${priceType}-EXTERNAL`;
     },
 
+    /** Minutes-of-day weight for each timeframe — used to keep strategy
+     *  subscribe timeframes coarser-than-or-equal-to the base. */
+    TF_MINUTES: {
+        "1-MINUTE": 1, "5-MINUTE": 5, "15-MINUTE": 15, "30-MINUTE": 30,
+        "1-HOUR": 60, "2-HOUR": 120, "1-DAY": 1440, "1-WEEK": 10080, "1-MONTH": 43200,
+    },
+
+    /** Build the composite (internally-aggregated) bar type the strategy
+     *  subscribes to: base "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL" + "5-MINUTE"
+     *  -> "EURUSD.FOREX_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL".
+     *  When the subscribe TF equals the base TF the result is just the base
+     *  bar type (no aggregation needed). Mirrors core.models.build_composite_bar_type. */
+    _composeSubscribeBarType(baseBarType, subTfValue) {
+        const p = String(baseBarType || "").split("-");
+        if (p.length < 5) return "";
+        const inst = p[0], bStep = p[1], bUnit = p[2], price = p[3];
+        const sub = String(subTfValue || "").trim().toUpperCase();
+        if (!sub) return "";
+        const baseTf = `${bStep}-${bUnit}`;
+        if (sub === baseTf) return `${inst}-${baseTf}-${price}-EXTERNAL`;
+        return `${inst}-${sub}-${price}-INTERNAL@${bStep}-${bUnit}-EXTERNAL`;
+    },
+
+    /** List of composite bar types for the chosen strategy subscribe TFs.
+     *  Skips TFs finer than the base (cannot aggregate down) and the base TF
+     *  itself (no extra subscription needed); de-duplicates. */
+    _subscribeBarTypesList(baseBarType, subTfValues) {
+        const base = String(baseBarType || "");
+        const bp = base.split("-");
+        const baseTf = (bp[1] && bp[2]) ? `${bp[1]}-${bp[2]}` : "";
+        const baseMin = this.TF_MINUTES[baseTf] || 0;
+        const out = [];
+        for (const tf of (subTfValues || [])) {
+            const subMin = this.TF_MINUTES[tf] || 0;
+            if (subMin && baseMin && subMin < baseMin) continue;  // can't aggregate down
+            const c = this._composeSubscribeBarType(base, tf);
+            if (c && c !== base && !out.includes(c)) out.push(c);
+        }
+        return out;
+    },
+
+    /** Recover the subscribe-timeframe values (e.g. ["5-MINUTE"]) from a list
+     *  of stored composite bar type strings. */
+    _parseSubscribeTfs(barTypes) {
+        return (barTypes || []).map(bt => {
+            const p = String(bt).split("@")[0].split("-");
+            return (p[1] && p[2]) ? `${p[1]}-${p[2]}` : "";
+        }).filter(Boolean);
+    },
+
     /** True iff the exact composed bar_type_str is present in the loaded catalog. */
     _barTypeInCatalog(bt) {
         if (!bt) return false;
@@ -1540,6 +1614,13 @@ const Portfolio = {
                 ? "No data in catalog for this bar type. Load data first or pick another combination."
                 : "Available in catalog";
         const finalNote = `<span class="leg-final-warn" id="leg-il-warn-${i}" style="${finalMissing ? '' : 'display:none;'}">&#9888; no data in catalog</span>`;
+        // Strategy-subscribe timeframes — editable inline multi-select.
+        // Selected = TFs recovered from the leg's stored composite bar types.
+        const subTfs = this._parseSubscribeTfs(slot.strategy_bar_types || []);
+        const subTfOpts = this.TIMEFRAMES.map(tf =>
+            `<option value="${tf.value}" ${subTfs.includes(tf.value) ? "selected" : ""}>${tf.label}</option>`).join("");
+        const subBts = this._subscribeBarTypesList(finalBt, subTfs);
+        const subBtDisplay = subBts.length ? subBts.join("\n") : "(base TF only)";
 
         return `<tr>
             <td style="text-align:center;"><button class="leg-del-btn" onclick="Portfolio._deleteLeg(${i})" title="Delete">X</button></td>
@@ -1550,9 +1631,13 @@ const Portfolio = {
             <td><select class="form-control" id="leg-il-asset-${i}" onchange="Portfolio._onInlineAssetChange(${i})" title="Asset class" style="min-width:110px;">${assetOpts}</select></td>
             <td><select class="form-control" id="leg-il-venue-${i}" onchange="Portfolio._onInlineVenueChange(${i})" title="Venue" style="min-width:110px;">${venueOpts}</select></td>
             <td><select class="form-control" id="leg-il-instid-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Instrument ID" style="min-width:170px;">${instIdOpts}</select></td>
-            <td><select class="form-control" id="leg-il-tf-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Timeframe" style="min-width:90px;">${tfOpts}</select></td>
+            <td><select class="form-control" id="leg-il-tf-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Base timeframe — catalog data fed to the engine" style="min-width:90px;">${tfOpts}</select></td>
             <td><select class="form-control" id="leg-il-pt-${i}" onchange="Portfolio._onInlineInstChange(${i})" title="Price type" style="min-width:80px;">${ptOpts}</select></td>
             <td><input type="text" class="form-control ${finalCls}" id="leg-il-final-${i}" value="${finalBt}" readonly title="${finalTitle}" style="min-width:280px; font-size:0.72rem; color:#33485a;">${finalNote}</td>
+            <td style="min-width:260px;">
+                <select class="form-control" id="leg-il-subtf-${i}" multiple size="4" onchange="Portfolio._onInlineSubTfChange(${i})" title="Timeframe(s) the strategy subscribes to — composite bars aggregated from the base. Ctrl/Cmd-click to select multiple; leave empty to subscribe to the base timeframe only." style="font-size:0.72rem; padding:2px 4px; height:auto; width:100%;">${subTfOpts}</select>
+                <textarea class="form-control" id="leg-il-subbt-${i}" readonly rows="2" title="Composite Nautilus bar type(s) the strategy will subscribe to, aggregated from the base." style="margin-top:3px; font-size:0.66rem; color:#33485a; resize:vertical; white-space:pre; width:100%;">${subBtDisplay}</textarea>
+            </td>
             <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
             <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
             <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
@@ -1600,6 +1685,20 @@ const Portfolio = {
                 ? "No data in catalog for this bar type. Load data first or pick another combination."
                 : "Available in catalog";
         if (warnEl) warnEl.style.display = missing ? "block" : "none";
+        // Base changed → refresh the strategy-subscribe composite display so
+        // its "@<base>" source stays consistent.
+        const subEl = document.getElementById(`leg-il-subbt-${i}`);
+        const subSel = document.getElementById(`leg-il-subtf-${i}`);
+        if (subEl) {
+            const subTfs = subSel
+                ? Array.from(subSel.selectedOptions).map(o => o.value)
+                : (this._editingPfIndex !== null
+                    ? this._parseSubscribeTfs(
+                        ((this.portfolios[this._editingPfIndex].slots || [])[i] || {}).strategy_bar_types || [])
+                    : []);
+            const subBts = this._subscribeBarTypesList(composed, subTfs);
+            subEl.value = subBts.length ? subBts.join("\n") : "(base TF only)";
+        }
     },
 
     _onLegModalAssetChange() {
@@ -1638,6 +1737,16 @@ const Portfolio = {
                 ? "No data in catalog for this bar type. Load data first or pick another combination."
                 : "Available in catalog";
         if (warnEl) warnEl.style.display = missing ? "block" : "none";
+        // Recompute the strategy-subscribe composite bar type(s) from the
+        // (possibly just-changed) base + the selected strategy timeframes.
+        const subSel = document.getElementById("leg-m-subtf");
+        const subBtEl = document.getElementById("leg-m-subbt");
+        if (subSel && subBtEl) {
+            const tfs = Array.from(subSel.selectedOptions).map(o => o.value);
+            const list = this._subscribeBarTypesList(composed, tfs);
+            subBtEl.value = list.length ? list.join("\n")
+                : "(subscribes to base timeframe only)";
+        }
     },
 
     /** Rebuild the entire legs tbody from current slot data (no modal reopen) */
@@ -1648,7 +1757,7 @@ const Portfolio = {
         const tbody = document.getElementById("pf-m-legs-body");
         if (!tbody) return;
         if ((pf.slots || []).length === 0) {
-            tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="18" style="text-align:center; padding:20px; color:var(--text-muted);">No legs. Click "+ Add Leg" to add.</td></tr>`;
         } else {
             tbody.innerHTML = pf.slots.map((slot, i) => this._buildInlineLegRow(slot, i)).join("");
         }
@@ -1935,7 +2044,8 @@ const Portfolio = {
         pf.slots.push({
             slot_id: "s" + Date.now().toString(36) + this.slotCounter,
             strategy_name: firstStrat, strategy_params: defaultParams,
-            bar_type_str: this.barTypes[0] || "", lots: 1, allocation_pct: 0,
+            bar_type_str: this.barTypes[0] || "", strategy_bar_types: [],
+            lots: 1, allocation_pct: 0,
             exit_config: {
                 exit_price_format: "ohlcv",
                 stop_loss_type: "none", stop_loss_value: 0, trailing_sl_step: 0, trailing_sl_offset: 0,
@@ -1988,6 +2098,13 @@ const Portfolio = {
             : mFinalMissing
                 ? "No data in catalog for this bar type. Load data first or pick another combination."
                 : "Available in catalog";
+        // Strategy-subscribe timeframes — multi-select; selected = those
+        // recovered from the leg's stored composite bar types.
+        const mSubTfs = this._parseSubscribeTfs(slot.strategy_bar_types || []);
+        const mSubTfOpts = this.TIMEFRAMES.map(tf =>
+            `<option value="${tf.value}" ${mSubTfs.includes(tf.value) ? "selected" : ""}>${tf.label}</option>`).join("");
+        const mSubBts = this._subscribeBarTypesList(mFinalBt, mSubTfs);
+        const mSubBtDisplay = mSubBts.length ? mSubBts.join("\n") : "(subscribes to base timeframe only)";
         const paramsHTML = this._buildParamsHTML(pf, legIndex);
         const ec = slot.exit_config || {};
         const slTypes = ["none", "percentage", "points", "trailing", "atr"];
@@ -2024,8 +2141,8 @@ const Portfolio = {
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">INSTRUMENT ID</div>
                     <select class="form-control" id="leg-m-instid" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mInstIdOpts}</select>
                 </div>
-                <div style="flex:1; min-width:90px;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">TIMEFRAME</div>
+                <div style="flex:1; min-width:90px;" title="Base timeframe — the catalog data fed to the engine; the resolution orders fill at.">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">BASE TIMEFRAME</div>
                     <select class="form-control" id="leg-m-tf" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mTfOpts}</select>
                 </div>
                 <div style="flex:0.9; min-width:80px;">
@@ -2033,9 +2150,17 @@ const Portfolio = {
                     <select class="form-control" id="leg-m-pt" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.82rem; padding:5px 8px;">${mPtOpts}</select>
                 </div>
                 <div style="flex:2.4; min-width:240px;">
-                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">FINAL INSTRUMENT (NAUTILUS)</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">FINAL INSTRUMENT (NAUTILUS) — BASE DATA</div>
                     <input type="text" class="form-control ${mFinalCls}" id="leg-m-final" value="${mFinalBt}" readonly title="${mFinalTitle}" style="font-size:0.78rem; padding:5px 8px; color:#33485a;">
                     <div class="leg-final-warn" id="leg-m-warn" style="display:${mFinalMissing ? 'block' : 'none'}; margin-top:3px;">&#9888; no data in catalog for this bar type</div>
+                </div>
+                <div style="flex:1; min-width:110px;" title="Timeframe(s) the strategy subscribes to — composite bars aggregated from the base. Ctrl/Cmd-click to select multiple. Leave empty to subscribe to the base timeframe only.">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">STRATEGY TIMEFRAME(S)</div>
+                    <select class="form-control" id="leg-m-subtf" multiple size="5" onchange="Portfolio._onLegModalInstChange()" style="font-size:0.8rem; padding:3px 6px; height:auto;">${mSubTfOpts}</select>
+                </div>
+                <div style="flex:2.6; min-width:240px;" title="Composite Nautilus bar type(s) the strategy will subscribe to, aggregated from the base data above.">
+                    <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">SUBSCRIBE BAR TYPE(S) (NAUTILUS)</div>
+                    <textarea class="form-control" id="leg-m-subbt" readonly rows="3" style="font-size:0.72rem; padding:5px 8px; color:#33485a; resize:vertical; white-space:pre; width:100%;">${mSubBtDisplay}</textarea>
                 </div>
                 <div style="flex:0.7; min-width:70px;">
                     <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">LOTS</div>
@@ -2217,6 +2342,12 @@ const Portfolio = {
         const _mPt = document.getElementById("leg-m-pt")?.value || "";
         const _composed = this._composeBarType(_mInstId, _mTf, _mPt);
         if (_composed) slot.bar_type_str = _composed;
+        // Strategy-subscribe composite bar types from the selected strategy
+        // timeframe(s). Empty selection → [] → strategy subscribes to base.
+        const _subSel = document.getElementById("leg-m-subtf");
+        const _subTfs = _subSel ? Array.from(_subSel.selectedOptions).map(o => o.value) : [];
+        slot.strategy_bar_types = this._subscribeBarTypesList(
+            slot.bar_type_str, _subTfs);
         const lotsInput = parseFloat(document.getElementById("leg-m-size").value);
         slot.lots = (Number.isFinite(lotsInput) && lotsInput > 0) ? lotsInput : 1;
         delete slot.trade_size;

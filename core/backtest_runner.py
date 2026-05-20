@@ -2348,6 +2348,7 @@ def _run_single_slot_node(
                     # Per-slot path: own process, no in-process siblings — the
                     # cross-slot bus is empty here (cross-process events arrive
                     # via the two-pass preseeded_bus inside _MoveSLConfig).
+                    subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
                     portfolio_id="",
                     slot_id=slot.slot_id,
                 )
@@ -2685,6 +2686,7 @@ def _run_single_slot(
                     # module-level cross-slot bus has no siblings to reach —
                     # an empty portfolio_id routes to the standalone bus.
                     # (Cross-slot wiring is meaningful only in _run_slot_group.)
+                    subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
                     portfolio_id="",
                     slot_id=slot.slot_id,
                 )
@@ -3101,6 +3103,7 @@ def _run_slot_group_node(
                                         else None),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
+                        subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
                         portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
                     )
@@ -3443,6 +3446,7 @@ def _run_slot_group(
                         move_sl_settings=default_move_sl_settings,
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
+                        subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
                         portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
                     )
