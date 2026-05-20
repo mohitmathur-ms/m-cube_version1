@@ -2532,16 +2532,18 @@ def _run_single_slot(
         # De-duplicate in case both except and empty-check fire for the same str
         missing_pairs = list(dict.fromkeys(missing_pairs))
 
-    # Day-of-week filter (portfolio.run_on_days). Applied after loading so
-    # the LRU cache stays per-(bar_type, range) and isn't fragmented by the
-    # day filter. None = no filter; empty set = portfolio explicitly disabled
-    # all weekdays for this slot.
+    # Day-of-week filter (portfolio.run_on_days). NO LONGER pre-filters the
+    # bar list — bars stay in the engine on every weekday so Nautilus's
+    # internal aggregators see a continuous input stream. (Pre-filtering
+    # produced a gap that made TimeBarAggregator emit synthetic stale-close
+    # bars across excluded days, on which composite-bar strategies could fire
+    # phantom signals.) The day filter is now enforced inside the strategy
+    # by ManagedExitStrategy's per-bar gate — see allowed_weekdays in
+    # core/managed_strategy.py. The resolved weekday set is threaded through
+    # config_from_exit a few lines below. None = no filter; empty set =
+    # portfolio explicitly disabled all weekdays — strategy never enters.
     allowed_weekdays = _allowed_weekdays(default_run_on_days)
-    bars_filtered_by_run_on_days = 0
-    with _phase("run_on_days_filter", phase_times):
-        all_bars, bars_filtered_by_run_on_days = _filter_bars_by_weekday(
-            all_bars, allowed_weekdays
-        )
+    bars_filtered_by_run_on_days = 0  # always 0 now; kept for result-dict compat
 
     # Portfolio ReExecute replay (spec §2.4): a replay segment re-runs this
     # slot from the clip timestamp onward, so drop every bar before the
@@ -2660,9 +2662,14 @@ def _run_single_slot(
             # is set, OR when RBO is active — squareoff alone (no SL/TP) needs
             # the wrapper because raw strategy classes don't know how to
             # time-close, and RBO needs it because the gate state machine
-            # lives there.
+            # lives there. The day-of-week gate (allowed_weekdays) also lives
+            # in the wrapper, so any active run_on_days filter forces this
+            # path too — otherwise a raw strategy would ignore the filter now
+            # that we no longer pre-filter bars from the engine.
             slot_qty = effective_slot_qty(slot, user_id)
-            if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+            if (slot.exit_config.has_exit_management() or eff_squareoff_time
+                    or default_rbo_settings is not None
+                    or allowed_weekdays is not None):
                 managed_config = config_from_exit(
                     exit_config=slot.exit_config,
                     signal_name=slot.strategy_name,
@@ -2682,6 +2689,13 @@ def _run_single_slot(
                                       if _is_intraday_bar_type(slot.bar_type_str) else None),
                     entry_end_time=(default_entry_end_time
                                     if _is_intraday_bar_type(slot.bar_type_str) else None),
+                    # Day-of-week filter (portfolio.run_on_days) — gated inside
+                    # the strategy so bars stay in the engine stream and
+                    # internal aggregators don't see gaps. ``None`` (no
+                    # filter) and the empty-set case (explicit no-days) are
+                    # both forwarded to ManagedExitConfig as-is.
+                    allowed_weekdays=(None if allowed_weekdays is None
+                                      else sorted(allowed_weekdays)),
                     # Per-slot runs each get their own process/engine, so the
                     # module-level cross-slot bus has no siblings to reach —
                     # an empty portfolio_id routes to the standalone bus.
@@ -3310,14 +3324,13 @@ def _run_slot_group(
             all_bars.extend(cached)
         missing_pairs = list(dict.fromkeys(missing_pairs))
 
-    # Day-of-week filter mirroring _run_single_slot. Applied per-group rather
-    # than per-slot because all slots in the group share the same bars.
+    # Day-of-week filter mirroring _run_single_slot. NO LONGER pre-filters —
+    # bars stay continuous so internal aggregators don't see gaps; each slot's
+    # strategy enforces the filter via ManagedExitConfig.allowed_weekdays
+    # (passed through config_from_exit below). See _run_single_slot for the
+    # full rationale.
     allowed_weekdays = _allowed_weekdays(default_run_on_days)
-    bars_filtered_by_run_on_days = 0
-    with _phase("run_on_days_filter", phase_times):
-        all_bars, bars_filtered_by_run_on_days = _filter_bars_by_weekday(
-            all_bars, allowed_weekdays
-        )
+    bars_filtered_by_run_on_days = 0  # always 0 now; kept for result-dict compat
 
     # Portfolio ReExecute replay cutoff (spec §2.4) — mirrors _run_single_slot.
     if default_replay_cutoff_ns > 0:
@@ -3430,7 +3443,12 @@ def _run_slot_group(
                 )
 
                 slot_qty = effective_slot_qty(slot, user_id)
-                if slot.exit_config.has_exit_management() or eff_squareoff_time or default_rbo_settings is not None:
+                # Force ManagedExitStrategy when a run_on_days filter is active
+                # (gate lives in the wrapper). Mirrors the wrapper-condition in
+                # _run_single_slot.
+                if (slot.exit_config.has_exit_management() or eff_squareoff_time
+                        or default_rbo_settings is not None
+                        or allowed_weekdays is not None):
                     managed_config = config_from_exit(
                         exit_config=slot.exit_config,
                         signal_name=slot.strategy_name,
@@ -3444,6 +3462,11 @@ def _run_slot_group(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        # Day-of-week filter (portfolio.run_on_days) — gated
+                        # inside the strategy so bars stay continuous for the
+                        # internal aggregator. Same pattern as _run_single_slot.
+                        allowed_weekdays=(None if allowed_weekdays is None
+                                          else sorted(allowed_weekdays)),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
                         subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
