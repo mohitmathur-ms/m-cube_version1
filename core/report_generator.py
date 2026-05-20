@@ -237,6 +237,7 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
         if positions_report is None or positions_report.empty:
             continue
 
+        slot_id = results.get("slot_id", "")
         fills_lookup = _build_fills_lookup(results.get("fills_report"))
 
         df = positions_report.reset_index()
@@ -383,6 +384,7 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
                 "STRIKE": "",
                 "PORTFOLIO NAME": strategy_name,
                 "STRATEGY": strategy_name,
+                "SLOT_ID": slot_id,
                 "EXIT TIME": exit_time,
                 "AVG EXIT PRICE": _parse_nautilus_value(avg_close_v) if col_avg_close else 0.0,
                 "EXIT REASON": exit_reason,
@@ -422,7 +424,7 @@ def build_orderbook_dataframe(all_results: dict, user_id: str | None = None) -> 
         "USERID", "SYMBOL", "EXCHANGE", "TRANSACTION", "QUANTITY", "LOTS",
         "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE",
         "ENTRY REASON", "ENTRY DETAILED REASON",
-        "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY",
+        "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY", "SLOT_ID",
         "EXIT TIME", "AVG EXIT PRICE",
         "EXIT REASON", "EXIT DETAILED REASON",
         "PNL",

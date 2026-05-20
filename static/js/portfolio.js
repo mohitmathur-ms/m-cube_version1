@@ -464,6 +464,10 @@ const Portfolio = {
         // _ui from the persisted rbo_* fields here. The form template still
         // reads from `ui.*`, so no template-side changes are needed.
         pf._ui = pf._ui || {};
+        // Execution Settings (Product / MIS defaults)
+        if (pf.product) pf._ui.product = pf.product;
+        if (pf.mis_squareoff_time) pf._ui.mis_squareoff_time = pf.mis_squareoff_time;
+        if (pf.mis_squareoff_tz) pf._ui.mis_squareoff_tz = pf.mis_squareoff_tz;
         if (pf.rbo_enabled !== undefined) pf._ui.rbo_enabled = pf.rbo_enabled;
         if (pf.range_monitoring_start) pf._ui.range_monitoring_start = pf.range_monitoring_start;
         if (pf.range_monitoring_end) pf._ui.range_monitoring_end = pf.range_monitoring_end;
@@ -623,14 +627,21 @@ const Portfolio = {
             <!-- Execution Parameters Tab -->
             <div class="pf-tab-content" id="pf-tab-pf-exec">
                 <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
-                    <fieldset class="pf-fieldset pf-live-only" style="flex:1; min-width:260px;" title="Live-trading-only fields. Backtest ignores these.">
-                        <legend>Execution Settings (live only)</legend>
-                        <div class="pf-field-row pf-live-only">
+                    <fieldset class="pf-fieldset" style="flex:1; min-width:260px;" title="Product applies to backtest as a default squareoff source (MIS). Strategy Tag and leg-fail handling are live-trading-only.">
+                        <legend>Execution Settings</legend>
+                        <div class="pf-field-row" title="MIS = preset intraday squareoff (forces close + blocks re-entries for the rest of the day). NRML = no forced exit. Backtest-wired: see MIS SqOff Time below.">
                             <span class="pf-field-label">Product</span>
-                            <select class="form-control" id="pf-m-product" style="flex:1;">
+                            <select class="form-control" id="pf-m-product" style="flex:1;" onchange="Portfolio._onProductChange()">
                                 <option value="MIS" ${(ui.product || 'MIS') === 'MIS' ? 'selected' : ''}>MIS</option>
                                 <option value="NRML" ${ui.product === 'NRML' ? 'selected' : ''}>NRML</option>
                             </select>
+                        </div>
+                        <div class="pf-field-row" id="pf-row-mis-sqoff"
+                             style="display:${(ui.product || 'MIS') === 'MIS' ? 'flex' : 'none'};"
+                             title="Used only when product=MIS and no explicit SqOff Time is set on the Timing tab. Forces intraday close at this local time and blocks re-entries until the next session.">
+                            <span class="pf-field-label">MIS SqOff Time</span>
+                            <input type="time" class="form-control" id="pf-m-mis-sqoff" value="${ui.mis_squareoff_time || '15:15'}" step="60" style="flex:1;">
+                            <input type="text" class="form-control" id="pf-m-mis-sqofftz" value="${ui.mis_squareoff_tz || 'Asia/Kolkata'}" placeholder="IANA tz" style="flex:1; margin-left:4px;">
                         </div>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Strategy Tag</span>
@@ -1335,6 +1346,12 @@ const Portfolio = {
         document.getElementById("pf-row-adjustprice").style.display = ["DayOpen", "StartTime"].includes(basedOn) ? "flex" : "none";
     },
 
+    _onProductChange() {
+        const v = document.getElementById("pf-m-product")?.value || "MIS";
+        const row = document.getElementById("pf-row-mis-sqoff");
+        if (row) row.style.display = v === "MIS" ? "flex" : "none";
+    },
+
     _onDhTypeChange() {
         const isPremium = (document.getElementById("pf-m-dh-type")?.value || "PremiumBased") === "PremiumBased";
         document.querySelectorAll(".pf-dh-premium").forEach(el => el.style.display = isPremium ? "flex" : "none");
@@ -1848,6 +1865,14 @@ const Portfolio = {
         pf._ui.tgt_sl_per_lot = document.getElementById("pf-m-tgtsl-perlot")?.checked || false;
         // Execution Settings
         pf._ui.product = document.getElementById("pf-m-product")?.value || "MIS";
+        pf._ui.mis_squareoff_time = document.getElementById("pf-m-mis-sqoff")?.value || null;
+        pf._ui.mis_squareoff_tz = (document.getElementById("pf-m-mis-sqofftz")?.value || "").trim() || null;
+        // Persisted copies for the backend (match PortfolioConfig field names).
+        // MIS supplies a default squareoff_time when product==MIS and no
+        // explicit Timing-tab SqOff Time is set. NRML is a no-op.
+        pf.product = pf._ui.product;
+        pf.mis_squareoff_time = pf._ui.mis_squareoff_time;
+        pf.mis_squareoff_tz = pf._ui.mis_squareoff_tz;
         pf._ui.strategy_tag = document.getElementById("pf-m-strattag")?.value || "Default";
         pf._ui.on_leg_fail = document.getElementById("pf-m-legfail")?.value || "KeepPlacedLegs";
         // Execution Mode

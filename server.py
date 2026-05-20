@@ -1493,7 +1493,11 @@ def api_portfolio_backtest():
 
             all_results_for_reports = {}
             for slot_id, sr in per_strat.items():
-                strat_label = sanitize_filename(sr["display_name"])
+                # Append slot_id so duplicate-config slots (same strategy +
+                # instrument + SL/TP) become distinct entries instead of the
+                # later slot's filtered slice overwriting the earlier one's.
+                base_label = sanitize_filename(sr["display_name"])
+                strat_label = f"{base_label}__{slot_id}"
                 # Prefer trader_id for filtering — it is unique per slot even
                 # when multiple slots share the same strategy_id.
                 actual_tid = slot_to_tid.get(slot_id, "")
@@ -1511,6 +1515,7 @@ def api_portfolio_backtest():
                     if fills_rep is not None and not fills_rep.empty and "strategy_id" in fills_rep.columns:
                         slot_fills = fills_rep[fills_rep["strategy_id"] == actual_sid]
                 all_results_for_reports[strat_label] = {
+                    "slot_id": slot_id,
                     "positions_report": slot_pos, "fills_report": slot_fills,
                     "starting_capital": results["starting_capital"],
                     "final_balance": results["final_balance"],

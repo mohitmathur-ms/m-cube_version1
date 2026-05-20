@@ -31,7 +31,12 @@ from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
 import numpy as np
 
 from core.strategies import STRATEGY_REGISTRY
-from core.models import PortfolioConfig, StrategySlotConfig, effective_slot_qty
+from core.models import (
+    PortfolioConfig,
+    StrategySlotConfig,
+    effective_portfolio_squareoff,
+    effective_slot_qty,
+)
 from core.managed_strategy import (
     ManagedExitStrategy,
     advance_trailing_target,
@@ -4131,6 +4136,10 @@ def run_portfolio_backtest(
         """
         slot_results: dict = {}
         errors: list = []
+        # Portfolio-level squareoff routed through the helper so MIS product
+        # type can supply a default when no explicit squareoff_time is set.
+        # Slot/leg overrides still win at resolve-time inside the slot worker.
+        _pf_sq_time, _pf_sq_tz = effective_portfolio_squareoff(portfolio)
         with ProcessPoolExecutor(
             max_workers=max_workers,
             initializer=_worker_init_ignore_sigint,
@@ -4152,8 +4161,8 @@ def run_portfolio_backtest(
                             slot_index=group_idx,
                             default_start_date=portfolio.start_date,
                             default_end_date=portfolio.end_date,
-                            default_squareoff_time=portfolio.squareoff_time,
-                            default_squareoff_tz=portfolio.squareoff_tz,
+                            default_squareoff_time=_pf_sq_time,
+                            default_squareoff_tz=_pf_sq_tz,
                             default_run_on_days=portfolio.run_on_days,
                             default_entry_start_time=portfolio.entry_start_time,
                             default_entry_end_time=portfolio.entry_end_time,
@@ -4175,8 +4184,8 @@ def run_portfolio_backtest(
                             group_index=group_idx,
                             default_start_date=portfolio.start_date,
                             default_end_date=portfolio.end_date,
-                            default_squareoff_time=portfolio.squareoff_time,
-                            default_squareoff_tz=portfolio.squareoff_tz,
+                            default_squareoff_time=_pf_sq_time,
+                            default_squareoff_tz=_pf_sq_tz,
                             default_run_on_days=portfolio.run_on_days,
                             default_entry_start_time=portfolio.entry_start_time,
                             default_entry_end_time=portfolio.entry_end_time,
@@ -4200,8 +4209,8 @@ def run_portfolio_backtest(
                         slot_index=i,
                         default_start_date=portfolio.start_date,
                         default_end_date=portfolio.end_date,
-                        default_squareoff_time=portfolio.squareoff_time,
-                        default_squareoff_tz=portfolio.squareoff_tz,
+                        default_squareoff_time=_pf_sq_time,
+                        default_squareoff_tz=_pf_sq_tz,
                         default_run_on_days=portfolio.run_on_days,
                         default_entry_start_time=portfolio.entry_start_time,
                         default_entry_end_time=portfolio.entry_end_time,

@@ -208,6 +208,13 @@ class PortfolioConfig:
     # Portfolio-level default square-off time. Slot or leg level can override.
     squareoff_time: Optional[str] = None  # "HH:MM"
     squareoff_tz: Optional[str] = None    # IANA name, e.g. "America/New_York"
+    # Product type (Live trading: MIS/NRML control broker margin & auto-squareoff.
+    # Backtest: MIS supplies a default squareoff_time when none is set on
+    # portfolio/slot/leg via effective_portfolio_squareoff(). NRML is a no-op
+    # for backtest. Leverage/margin are NOT modeled — default_leverage stays 1.)
+    product: Optional[str] = None                   # "MIS" | "NRML" | None
+    mis_squareoff_time: Optional[str] = None        # "HH:MM", used only when product=="MIS"
+    mis_squareoff_tz: Optional[str] = None          # IANA name, e.g. "Asia/Kolkata"
     # Day-of-week filter for backtest. None / empty list means all 7 days allowed.
     # Values: subset of ["MON","TUE","WED","THU","FRI","SAT","SUN"] (case-insensitive,
     # full names like "Monday" also accepted). When set, bars on excluded weekdays
@@ -416,6 +423,28 @@ class PortfolioConfig:
         return [s for s in self.slots if s.enabled]
 
 
+def effective_portfolio_squareoff(
+    portfolio: "PortfolioConfig",
+) -> tuple[Optional[str], Optional[str]]:
+    """Return the (squareoff_time, squareoff_tz) the portfolio contributes.
+
+    Explicit ``portfolio.squareoff_time`` always wins. When that's unset
+    AND ``product == "MIS"``, fall back to the portfolio's
+    ``mis_squareoff_time`` / ``mis_squareoff_tz``. ``NRML`` (or any other
+    value, or None) is a no-op — returns (None, None) when no explicit
+    portfolio-level squareoff is configured.
+
+    Slot- and leg-level overrides still win above this via
+    ``resolve_squareoff``; this helper only decides what the
+    PORTFOLIO level contributes as the lowest-priority default.
+    """
+    if portfolio.squareoff_time:
+        return portfolio.squareoff_time, portfolio.squareoff_tz
+    if (portfolio.product or "").upper() == "MIS" and portfolio.mis_squareoff_time:
+        return portfolio.mis_squareoff_time, portfolio.mis_squareoff_tz
+    return None, None
+
+
 def resolve_squareoff(
     portfolio: "PortfolioConfig", slot: "StrategySlotConfig"
 ) -> tuple[Optional[str], Optional[str]]:
@@ -424,12 +453,17 @@ def resolve_squareoff(
     Priority: leg (ExitConfig) > slot > portfolio. Each level is taken
     independently — e.g. a slot may set only the time and inherit the tz
     from the portfolio. Returns (None, None) if disabled at every level.
+
+    The portfolio level is consulted via ``effective_portfolio_squareoff``
+    so MIS product type can supply a default when no explicit value is set.
     """
-    levels = (slot.exit_config, slot, portfolio)
-    time = next((getattr(lvl, "squareoff_time", None) for lvl in levels
-                 if getattr(lvl, "squareoff_time", None)), None)
-    tz = next((getattr(lvl, "squareoff_tz", None) for lvl in levels
-               if getattr(lvl, "squareoff_tz", None)), None)
+    pf_time, pf_tz = effective_portfolio_squareoff(portfolio)
+    leg_time = getattr(slot.exit_config, "squareoff_time", None)
+    slot_time = getattr(slot, "squareoff_time", None)
+    leg_tz = getattr(slot.exit_config, "squareoff_tz", None)
+    slot_tz = getattr(slot, "squareoff_tz", None)
+    time = leg_time or slot_time or pf_time
+    tz = leg_tz or slot_tz or pf_tz
     return time, tz
 
 
