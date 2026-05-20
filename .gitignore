@@ -9,7 +9,6 @@ dist/
 build/
 .pytest_cache/
 
-aggregation_reports/*
 # Benchmark scratch catalogs (created by scripts/ingest_fx_bulk.py runs)
 catalog_bench_*/
 catalog_fx5/
