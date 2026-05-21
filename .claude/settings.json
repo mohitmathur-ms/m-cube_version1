@@ -86,7 +86,25 @@
       "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.model.enums import CurrencyType; print\\('enum:', int\\(CurrencyType.CRYPTO\\), int\\(CurrencyType.FIAT\\), int\\(CurrencyType.COMMODITY_BACKED\\)\\); from core.instrument_factory import _get_currency; print\\('USD ->', int\\(_get_currency\\('USD'\\).currency_type\\)\\); print\\('BTC ->', int\\(_get_currency\\('BTC'\\).currency_type\\)\\); print\\('EUR ->', int\\(_get_currency\\('EUR'\\).currency_type\\)\\); print\\('ETH ->', int\\(_get_currency\\('ETH'\\).currency_type\\)\\)\")",
       "Bash(venv/Scripts/python.exe -c \"import json,pathlib; [print\\(p.name, json.loads\\(p.read_text\\(encoding='utf-8'\\)\\)['instrument'].get\\('currency_type'\\)\\) for p in pathlib.Path\\('adapter_admin/data_formats'\\).glob\\('*.json'\\)]\")",
       "Bash(python3 -c ' *)",
-      "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog; c=ParquetDataCatalog\\('catalog'\\); [print\\(i.id, 'size_precision=', i.size_precision, 'price_precision=', i.price_precision, 'size_increment=', i.size_increment, 'min_qty=', i.min_quantity\\) for i in c.instruments\\(\\) if str\\(i.id\\) in \\('BTCUSD.COINBASE','AAVEUSD.COINBASE','ADAUSD.COINBASE'\\)]\")"
+      "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog; c=ParquetDataCatalog\\('catalog'\\); [print\\(i.id, 'size_precision=', i.size_precision, 'price_precision=', i.price_precision, 'size_increment=', i.size_increment, 'min_qty=', i.min_quantity\\) for i in c.instruments\\(\\) if str\\(i.id\\) in \\('BTCUSD.COINBASE','AAVEUSD.COINBASE','ADAUSD.COINBASE'\\)]\")",
+      "Bash(grep -r \"def load_adapter_config_for_bar_type\" \"d:\\\\m-cube_version1\\\\core\" 2>nul)",
+      "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Recurse -Include \"*.py\")",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)",
+      "Bash(rm \"d:/m-cube_version1/core/instrument_factory.py\" && echo \"deleted\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type, PRICE_PRECISION, BASE_PRICE_PRECISION, CURRENCY_PRECISION, VENUE; print\\('public API ok'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument as c; i=c\\('EUR','USD','FOREX_MS'\\); print\\('EURUSD', i.price_precision, i.size_precision, i.lot_size\\); j=c\\('BTC','USD','BINANCE'\\); print\\('BTCUSD', j.price_precision, j.size_precision, j.lot_size\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import core.nautilus_loader; import scripts.aggregate_catalog; import scripts.ingest_fx_bulk; print\\('callers import ok'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import core.nautilus_loader; print\\('nautilus_loader ok'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import ast,sys; [print\\(p,'imports instrument_factory ok'\\) for p in ['scripts/aggregate_catalog.py','scripts/ingest_fx_bulk.py']]\")",
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import instrument_for_bar_type; print\\('bar_type_resolver callable:', callable\\(instrument_for_bar_type\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -q)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ -q --ignore=tests/test_aggregator.py)",
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type; i=create_instrument\\('EUR','USD','FOREX_MS'\\); print\\('reimport ok:', i.price_precision, i.size_precision, i.lot_size\\)\")"
+    ],
+    "additionalDirectories": [
+      "d:\\m-cube_version1",
+      "d:\\m-cube_version1\\core"
     ]
   }
 }
