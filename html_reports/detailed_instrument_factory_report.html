@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>instrument_factory.py — Detailed Function Report · m-cube</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-card: #141a30;
+    --bg-card-2: #1a2240;
+    --fg: #e4e9f7;
+    --fg-dim: #9aa3c0;
+    --fg-mute: #6c7497;
+    --border: #262e4d;
+
+    /* role colours */
+    --c-pub:  #06b6d4;  /* public API           */
+    --c-priv: #8b5cf6;  /* internal helper       */
+    --c-const:#f59e0b;  /* constant / table      */
+    --c-naut: #10b981;  /* nautilus object       */
+    --c-ext:  #f97316;  /* external config/data  */
+
+    --c-nontech: #34d399;
+    --c-tech:    #60a5fa;
+
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 8% -10%, rgba(139,92,246,.18), transparent 70%),
+      radial-gradient(900px 500px at 100% 0%, rgba(6,182,212,.15), transparent 70%),
+      radial-gradient(800px 400px at 50% 100%, rgba(16,185,129,.12), transparent 70%),
+      var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 48px 28px 96px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+  code {
+    background: rgba(255,255,255,.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 6px;
+    font-size: 0.88em;
+    color: #fcd34d;
+  }
+
+  /* ---------- hero ---------- */
+  header.hero {
+    padding: 42px 38px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1a2244 0%, #221a4a 45%, #143a35 100%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  header.hero::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(400px 200px at 0% 0%, rgba(6,182,212,.20), transparent 70%),
+      radial-gradient(420px 220px at 100% 100%, rgba(16,185,129,.18), transparent 70%);
+    pointer-events: none;
+  }
+  header.hero h1 {
+    margin: 0 0 10px;
+    font-size: 34px;
+    background: linear-gradient(90deg, #06b6d4, #8b5cf6, #10b981);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header.hero .path { font-size: 13px; color: var(--fg-mute); margin-bottom: 12px; }
+  header.hero .sub { color: var(--fg-dim); font-size: 15px; max-width: 940px; }
+  header.hero .meta { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--fg-mute); }
+  header.hero .meta span {
+    padding: 5px 12px; background: rgba(255,255,255,.05);
+    border: 1px solid var(--border); border-radius: 999px;
+  }
+  header.hero a { color: #67e8f9; text-decoration: none; }
+  header.hero a:hover { text-decoration: underline; }
+
+  /* ---------- section heading ---------- */
+  h2.section {
+    margin: 44px 0 18px;
+    font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--fg-dim);
+    display: flex; align-items: center; gap: 12px;
+  }
+  h2.section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  /* ---------- legend ---------- */
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .legend .lg {
+    padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); position: relative; overflow: hidden;
+  }
+  .legend .lg::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--accent, var(--fg-dim)); }
+  .legend .lg.pub   { --accent: var(--c-pub); }
+  .legend .lg.priv  { --accent: var(--c-priv); }
+  .legend .lg.const { --accent: var(--c-const); }
+  .legend .lg.naut  { --accent: var(--c-naut); }
+  .legend .lg.ext   { --accent: var(--c-ext); }
+  .legend .lg .name { font-weight: 700; font-size: 13px; }
+  .legend .lg .desc { font-size: 12px; color: var(--fg-dim); margin-top: 4px; }
+
+  /* ---------- graph ---------- */
+  .graph-card {
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-2) 100%);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 24px; overflow: auto;
+  }
+  .mermaid { background: transparent !important; min-height: 520px; }
+  .graph-note { font-size: 13px; color: var(--fg-dim); margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+  /* ---------- function cards ---------- */
+  .fn-card {
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 26px;
+    overflow: hidden;
+    position: relative;
+  }
+  .fn-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background: var(--accent); }
+  .fn-card.pub  { --accent: var(--c-pub); }
+  .fn-card.priv { --accent: var(--c-priv); }
+
+  .fn-head { padding: 20px 26px 14px; }
+  .fn-head .tagrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .fn-head h3 { margin: 0; font-size: 21px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--fg); }
+  .badge {
+    font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid;
+  }
+  .badge.pub  { color: var(--c-pub);  border-color: color-mix(in srgb, var(--c-pub) 55%, transparent);  background: color-mix(in srgb, var(--c-pub) 12%, transparent); }
+  .badge.priv { color: var(--c-priv); border-color: color-mix(in srgb, var(--c-priv) 55%, transparent); background: color-mix(in srgb, var(--c-priv) 12%, transparent); }
+  .badge.cache{ color: var(--c-const); border-color: color-mix(in srgb, var(--c-const) 55%, transparent); background: color-mix(in srgb, var(--c-const) 12%, transparent); }
+  .sig {
+    margin: 4px 26px 0; padding: 12px 16px;
+    background: #0d1226; border: 1px solid var(--border); border-radius: 10px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12.5px;
+    color: #cbd5f5; overflow-x: auto; white-space: pre;
+  }
+  .sig .kw { color: #c084fc; }
+  .sig .ret { color: #34d399; }
+  .sig .arg { color: #fcd34d; }
+
+  /* two-column non-tech / tech */
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 16px; }
+  .twocol .col { padding: 18px 26px 22px; }
+  .twocol .col.nontech { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .twocol .col.tech    { border-top: 1px solid var(--border); }
+  .col h4 {
+    margin: 0 0 10px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .col h4 .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .col.nontech h4 { color: var(--c-nontech); } .col.nontech h4 .dot { background: var(--c-nontech); }
+  .col.tech h4    { color: var(--c-tech); }    .col.tech h4 .dot    { background: var(--c-tech); }
+  .col p { margin: 0 0 10px; font-size: 14px; color: var(--fg); }
+  .col.nontech p { color: #d6e0f5; }
+  .col ul { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--fg-dim); }
+  .col ul li { margin-bottom: 5px; }
+
+  .gotcha {
+    margin: 0 26px 22px; padding: 12px 16px;
+    border-radius: 10px; font-size: 13px;
+    background: color-mix(in srgb, #f87171 9%, transparent);
+    border: 1px solid color-mix(in srgb, #f87171 35%, transparent);
+    color: #fecaca;
+  }
+  .gotcha b { color: #fca5a5; }
+  .gotcha.info {
+    background: color-mix(in srgb, #60a5fa 9%, transparent);
+    border-color: color-mix(in srgb, #60a5fa 35%, transparent);
+    color: #bfdbfe;
+  }
+  .gotcha.info b { color: #93c5fd; }
+
+  /* ---------- tables ---------- */
+  .tablecard {
+    border-radius: var(--radius); background: var(--bg-card);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 24px; margin-bottom: 24px;
+  }
+  table.dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.dt th, table.dt td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.dt th { background: rgba(255,255,255,.03); color: var(--fg-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  table.dt tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+  table.dt td.k { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: #fcd34d; white-space: nowrap; }
+  table.dt td.v { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: #67e8f9; white-space: nowrap; }
+
+  /* ---------- flow steps ---------- */
+  .flow { counter-reset: step; display: grid; gap: 12px; }
+  .flow .step {
+    position: relative; padding: 14px 18px 14px 56px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    font-size: 14px; color: var(--fg);
+  }
+  .flow .step::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; font-size: 13px;
+    background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #fff;
+  }
+  .flow .step b { color: #67e8f9; }
+
+  footer.foot {
+    margin-top: 52px; padding-top: 24px; border-top: 1px solid var(--border);
+    color: var(--fg-mute); font-size: 12px; text-align: center;
+  }
+  footer.foot a { color: #67e8f9; text-decoration: none; }
+
+  @media (max-width: 760px) {
+    .twocol { grid-template-columns: 1fr; }
+    .twocol .col.nontech { border-right: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ===================== HERO ===================== -->
+<header class="hero">
+  <h1>instrument_factory.py</h1>
+  <div class="path mono">d:\m-cube_version1\core\instrument_factory.py · Layer L0 — Data ingest</div>
+  <div class="sub">
+    This module is the <strong>instrument builder</strong> of m-cube. Given a crypto or FX pair
+    (or a Nautilus bar-type string), it produces a fully-specified NautilusTrader
+    <code>CurrencyPair</code> — with the correct price and size precision, lot size, fees and
+    limits — so the backtest engine knows exactly how to price, size and trade that symbol.
+    Its single most important job: <em>never lose price ticks to under-specified precision</em>.
+  </div>
+  <div class="meta">
+    <span>5 functions</span>
+    <span>4 precision/ISO tables</span>
+    <span>imports <code>core/venue_config.py</code></span>
+    <span>imported by <code>core/nautilus_loader.py</code></span>
+    <span>Companion: <a href="core_knowledge_graph.html">core_knowledge_graph.html</a> · <a href="core_module_report.html">core_module_report.html</a></span>
+  </div>
+</header>
+
+<!-- ===================== LEGEND ===================== -->
+<h2 class="section">Legend</h2>
+<div class="legend">
+  <div class="lg pub"><div class="name">Public API</div><div class="desc">Called from elsewhere in <code>core/</code> — the module's entry points.</div></div>
+  <div class="lg priv"><div class="name">Internal helper</div><div class="desc"><code>_underscore</code> functions — private plumbing used only inside this file.</div></div>
+  <div class="lg const"><div class="name">Constant table</div><div class="desc">Module-level precision / ISO lookup dicts (the "safety net").</div></div>
+  <div class="lg naut"><div class="name">NautilusTrader object</div><div class="desc"><code>CurrencyPair</code>, <code>Currency</code>, <code>Price</code>, <code>Quantity</code>, <code>Money</code>, <code>InstrumentId</code>.</div></div>
+  <div class="lg ext"><div class="name">External config / data</div><div class="desc">Adapter configs, <code>data_formats/*.json</code>, the Parquet catalog.</div></div>
+</div>
+
+<!-- ===================== KNOWLEDGE GRAPH ===================== -->
+<h2 class="section">Knowledge Graph — call flow &amp; dependencies</h2>
+<div class="graph-card">
+  <div class="mermaid">
+flowchart TD
+    classDef pub   fill:#0b3b46,stroke:#06b6d4,stroke-width:2px,color:#cffafe;
+    classDef priv  fill:#2a1d4a,stroke:#8b5cf6,stroke-width:2px,color:#ede9fe;
+    classDef const fill:#3b2a07,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+    classDef naut  fill:#0c3b2e,stroke:#10b981,stroke-width:2px,color:#d1fae5;
+    classDef ext   fill:#3b1e0a,stroke:#f97316,stroke-width:2px,color:#ffedd5;
+
+    caller["core/nautilus_loader.py<br/><i>(caller, L0)</i>"]:::ext
+
+    subgraph IF ["instrument_factory.py"]
+      ifbt["instrument_for_bar_type()<br/><small>@lru_cache · PUBLIC entry</small>"]:::pub
+      ci["create_instrument()<br/><small>PUBLIC builder</small>"]:::pub
+      cat["_catalog_instrument()<br/><small>helper</small>"]:::priv
+      dfc["_data_format_instrument_cfg()<br/><small>helper</small>"]:::priv
+      gc["_get_currency()<br/><small>helper</small>"]:::priv
+      tables["PRICE_PRECISION · BASE_PRICE_PRECISION<br/>CURRENCY_PRECISION · _ISO4217<br/><small>precision tables</small>"]:::const
+    end
+
+    subgraph VC ["core/venue_config.py"]
+      sfbt["symbol_from_bar_type()"]:::ext
+      vfbt["venue_from_bar_type()"]:::ext
+      lacfbt["load_adapter_config_for_bar_type()"]:::ext
+      lic["load_instrument_config()"]:::ext
+    end
+
+    catalog[("ParquetDataCatalog<br/>./catalog/")]:::ext
+    dformats[("adapter_admin/data_formats/<br/>&lt;asset_class&gt;.json")]:::ext
+    cp(["CurrencyPair instrument<br/><small>NautilusTrader</small>"]):::naut
+
+    caller --> ifbt
+
+    ifbt --> cat
+    ifbt --> sfbt
+    ifbt --> vfbt
+    ifbt --> dfc
+    ifbt --> ci
+
+    cat --> catalog
+    dfc --> lacfbt
+    dfc --> dformats
+
+    ci --> gc
+    ci --> lic
+    ci --> tables
+    ci --> cp
+
+    cat -.->|"authoritative<br/>instrument"| cp
+  </div>
+  <div class="graph-note">
+    <strong>How to read it:</strong> <code>instrument_for_bar_type()</code> is the public entry point the
+    data loader calls. It <em>first</em> tries <code>_catalog_instrument()</code> (the instrument the engine
+    would really load); only if the symbol isn't ingested yet does it fall back through
+    <code>_data_format_instrument_cfg()</code> and <code>create_instrument()</code> to <em>build</em> a fresh
+    <code>CurrencyPair</code>. Rounded boxes are NautilusTrader objects; cylinders are on-disk data sources.
+  </div>
+</div>
+
+<!-- ===================== FUNCTIONS ===================== -->
+<h2 class="section">Functions — non-tech &amp; technical definitions</h2>
+
+<!-- 1. _get_currency -->
+<div class="fn-card priv">
+  <div class="fn-head">
+    <div class="tagrow">
+      <h3>_get_currency</h3>
+      <span class="badge priv">Internal helper</span>
+    </div>
+  </div>
+  <div class="sig"><span class="kw">def</span> _get_currency(code: <span class="ret">str</span>) -> <span class="ret">Currency</span></div>
+  <div class="twocol">
+    <div class="col nontech">
+      <h4><span class="dot"></span>Non-technical</h4>
+      <p>Turns a currency code like <code>"USD"</code> or <code>"BTC"</code> into a proper money object the
+      system can do maths with. For real-world money (dollars, euros, pounds, yen) it deliberately
+      keeps <em>extra decimal places</em> so tiny profits — fractions of a cent — don't get rounded
+      away to zero. Anything it doesn't recognise is treated as a crypto coin with 8 decimals.</p>
+    </div>
+    <div class="col tech">
+      <h4><span class="dot"></span>Technical (Nautilus)</h4>
+      <p>Returns a <code>Currency</code>. For the four fiat codes in <code>CURRENCY_PRECISION</code>
+      (USD/EUR/GBP/JPY) it constructs one explicitly with a higher precision and
+      <code>currency_type=2</code> (FIAT) plus the ISO-4217 code from <code>_ISO4217</code>, overriding
+      Nautilus's default precision of 2 (cents).</p>
+      <ul>
+        <li>Otherwise tries <code>Currency.from_str(code)</code> (built-in registry).</li>
+        <li>On failure, builds a <code>currency_type=1</code> (CRYPTO) currency at <code>precision=8</code>.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="gotcha"><b>Why the override matters:</b> Nautilus defaults USD to 2 decimals (cents).
+  At small trade sizes, sub-cent PnL truncates to <code>0.00</code> and silently vanishes from the
+  account — so fiat precision is bumped to match <code>PRICE_PRECISION</code>.</div>
+</div>
+
+<!-- 2. create_instrument -->
+<div class="fn-card pub">
+  <div class="fn-head">
+    <div class="tagrow">
+      <h3>create_instrument</h3>
+      <span class="badge pub">Public API</span>
+    </div>
+  </div>
+  <div class="sig"><span class="kw">def</span> create_instrument(base: <span class="ret">str</span>, quote: <span class="ret">str</span>, venue: <span class="ret">str</span>=<span class="arg">"BINANCE"</span>,
+                  price_precision: <span class="ret">int|None</span>=<span class="arg">None</span>, size_precision: <span class="ret">int|None</span>=<span class="arg">None</span>) -> <span class="ret">CurrencyPair</span></div>
+  <div class="twocol">
+    <div class="col nontech">
+      <h4><span class="dot"></span>Non-technical</h4>
+      <p>The factory's core builder. Hand it two currencies — a "base" (what you're buying, e.g.
+      <code>BTC</code>) and a "quote" (what you pay in, e.g. <code>USD</code>) — and it returns a complete
+      <em>tradeable product definition</em>: how many decimals the price has, the smallest order
+      size, the minimum/maximum order, lot size, and the trading fees. It picks sensible decimal
+      settings automatically if you don't specify them.</p>
+    </div>
+    <div class="col tech">
+      <h4><span class="dot"></span>Technical (Nautilus)</h4>
+      <p>Builds and returns a <code>CurrencyPair</code> with <code>InstrumentId(Symbol(base+quote), Venue)</code>.</p>
+      <ul>
+        <li><b>Price precision:</b> explicit arg → <code>BASE_PRICE_PRECISION[base]</code> →
+          <code>PRICE_PRECISION[quote]</code> → default <code>2</code>.</li>
+        <li><b>Size precision:</b> arg or default <code>0</code>; derives
+          <code>size_step = Quantity(10**-size_prec)</code> for <code>size_increment</code>/<code>min_quantity</code>.</li>
+        <li><b>Per-symbol config:</b> <code>load_instrument_config()</code> supplies <code>lot_size</code>
+          and a <code>trade_size</code> cap → <code>max_quantity</code> (else <code>9_999_999_999</code>).</li>
+        <li>Sets <code>price_increment</code>, <code>min/max_price</code>, <code>min_notional=Money(1, quote)</code>,
+          <code>margin_init/maint</code>, and <code>maker/taker_fee = 0.001</code>.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="gotcha"><b>Precision is silent and catastrophic if too low:</b> FX minute bars stored at
+  precision 2 collapse <code>1.0823 → 1.08</code>, making open == close on every bar (all dojis).
+  Always pick precision that preserves the smallest real tick.</div>
+  <div class="gotcha info"><b>size_precision ≠ max value:</b> precision only controls decimal places.
+  Nautilus stores quantities as fixed-point (<code>FIXED_PRECISION=9</code>), so the cap stays
+  <code>QUANTITY_MAX</code> (~18.4B) regardless. Raising precision is safe; crypto uses non-zero so
+  fractional lots (0.001 BTC) are tradeable.</div>
+</div>
+
+<!-- 3. _data_format_instrument_cfg -->
+<div class="fn-card priv">
+  <div class="fn-head">
+    <div class="tagrow">
+      <h3>_data_format_instrument_cfg</h3>
+      <span class="badge priv">Internal helper</span>
+    </div>
+  </div>
+  <div class="sig"><span class="kw">def</span> _data_format_instrument_cfg(bar_type_str: <span class="ret">str</span>) -> <span class="ret">dict</span></div>
+  <div class="twocol">
+    <div class="col nontech">
+      <h4><span class="dot"></span>Non-technical</h4>
+      <p>Looks up the "rule sheet" for a given asset class. From a bar-type string it figures out
+      which kind of asset this is (crypto, FX, commodity, index…) and reads that asset class's
+      settings file to find how its instruments should be built — decimals, quote currency, and so
+      on. If anything along the way is missing, it just returns an empty answer so the builder can
+      fall back to its built-in defaults.</p>
+    </div>
+    <div class="col tech">
+      <h4><span class="dot"></span>Technical (Nautilus)</h4>
+      <p>Resolves the venue's adapter config via <code>load_adapter_config_for_bar_type()</code>, reads
+      its <code>asset_class</code>, then loads
+      <code>adapter_admin/data_formats/&lt;asset_class&gt;.json</code> and returns its
+      <code>instrument</code> sub-dict (<code>price_precision</code>, <code>size_precision</code>,
+      <code>quote_currency</code>, <code>base_currency_length</code>, …).</p>
+      <ul>
+        <li>Returns <code>{}</code> on <em>any</em> miss — no asset class, missing file, bad JSON, or
+          non-dict <code>instrument</code> block.</li>
+        <li>Callers then fall back to the built-in precision tables in <code>create_instrument</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 4. _catalog_instrument -->
+<div class="fn-card priv">
+  <div class="fn-head">
+    <div class="tagrow">
+      <h3>_catalog_instrument</h3>
+      <span class="badge priv">Internal helper</span>
+    </div>
+  </div>
+  <div class="sig"><span class="kw">def</span> _catalog_instrument(bar_type_str: <span class="ret">str</span>)  <span class="ret"># -> Instrument | None</span></div>
+  <div class="twocol">
+    <div class="col nontech">
+      <h4><span class="dot"></span>Non-technical</h4>
+      <p>Asks the question: "what instrument would the backtest engine <em>actually</em> use for this
+      symbol?" Instead of guessing, it opens the real stored data and returns the exact instrument
+      definition that was saved when the data was loaded. If that symbol hasn't been loaded yet, it
+      returns nothing.</p>
+    </div>
+    <div class="col tech">
+      <h4><span class="dot"></span>Technical (Nautilus)</h4>
+      <p>Opens the <code>ParquetDataCatalog</code> at <code>./catalog</code>, parses
+      <code>BarType.from_str(bar_type_str).instrument_id</code>, and scans
+      <code>catalog.instruments()</code> for the matching <code>inst.id</code> — returning that instrument
+      or <code>None</code>.</p>
+      <ul>
+        <li>This is the <b>authoritative</b> source: <code>backtest_runner.py</code> resolves the
+          instrument the exact same way and calls <code>make_qty()</code> on it.</li>
+        <li>Sidesteps venue-name mismatches between bar types and adapter configs (e.g.
+          <code>COINBASE</code> vs <code>COINBASE_MS</code>).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="gotcha info"><b>Why read the catalog at all?</b> Reading the real ingested instrument means
+  precision validation can never disagree with what the backtest actually does at runtime.</div>
+</div>
+
+<!-- 5. instrument_for_bar_type -->
+<div class="fn-card pub">
+  <div class="fn-head">
+    <div class="tagrow">
+      <h3>instrument_for_bar_type</h3>
+      <span class="badge pub">Public API</span>
+      <span class="badge cache">@lru_cache(256)</span>
+    </div>
+  </div>
+  <div class="sig"><span class="kw">@lru_cache</span>(maxsize=<span class="arg">256</span>)
+<span class="kw">def</span> instrument_for_bar_type(bar_type_str: <span class="ret">str</span>)  <span class="ret"># -> Instrument | None</span></div>
+  <div class="twocol">
+    <div class="col nontech">
+      <h4><span class="dot"></span>Non-technical</h4>
+      <p>The main "give me the right instrument for this data" function the rest of the app calls.
+      It first asks for the real loaded instrument; if the data isn't there yet, it builds a
+      stand-in from the asset class's rule sheet. It also splits a glued-together symbol like
+      <code>ADAUSD</code> into base (<code>ADA</code>) and quote (<code>USD</code>). Results are remembered
+      (cached) so repeated lookups are instant.</p>
+    </div>
+    <div class="col tech">
+      <h4><span class="dot"></span>Technical (Nautilus)</h4>
+      <p>Public, <code>@lru_cache</code>d resolver used to validate a leg's lots/SL/TGT precision.</p>
+      <ul>
+        <li>Prefers <code>_catalog_instrument()</code> (authoritative); returns it immediately if found.</li>
+        <li>Else parses <code>symbol_from_bar_type</code> / <code>venue_from_bar_type</code>; splits
+          base/quote using <code>base_currency_length</code> (FX) or by stripping the quote suffix
+          (variable-length crypto).</li>
+        <li>Calls <code>create_instrument()</code> with precision from
+          <code>_data_format_instrument_cfg()</code>; returns <code>None</code> if nothing resolves.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="gotcha"><b>Re-ingest caveat:</b> because the catalog instrument wins, editing
+  <code>data_formats</code> price/size precision only takes effect after the data is
+  <b>re-ingested</b> (which rewrites the stored catalog instrument). The <code>@lru_cache</code> also
+  holds results for the process lifetime.</div>
+</div>
+
+<!-- ===================== CONSTANTS ===================== -->
+<h2 class="section">Constant reference tables</h2>
+<div class="tablecard">
+  <table class="dt">
+    <thead><tr><th style="width:24%">Table</th><th style="width:30%">Keyed by</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="k">VENUE</td><td>—</td><td>Module default <code>Venue("BINANCE")</code>.</td></tr>
+      <tr><td class="k">PRICE_PRECISION</td><td>quote currency (USD, EUR, GBP, JPY, USDT)</td><td>Fallback price decimals when no per-asset config and no base override. Safety net — under-specify and you lose ticks.</td></tr>
+      <tr><td class="k">BASE_PRICE_PRECISION</td><td>base currency (BTC, ETH, SOL, XRP, DOGE…)</td><td>Price decimals for high-priced assets; wins over <code>PRICE_PRECISION</code>.</td></tr>
+      <tr><td class="k">CURRENCY_PRECISION</td><td>fiat (USD, EUR, GBP, JPY)</td><td><code>Money</code> precision overrides so sub-cent PnL isn't truncated.</td></tr>
+      <tr><td class="k">_ISO4217</td><td>fiat (USD=840, EUR=978, GBP=826, JPY=392)</td><td>ISO-4217 numeric codes for the overridden fiat currencies.</td></tr>
+    </tbody>
+  </table>
+  <table class="dt" style="margin-top:18px">
+    <thead><tr><th style="width:24%">PRICE_PRECISION</th><th style="width:16%">decimals</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td class="k">USD / EUR / GBP</td><td class="v">5</td><td>FX pairs trade at 5 decimals (pip = 0.0001).</td></tr>
+      <tr><td class="k">JPY</td><td class="v">3</td><td>JPY base ~100–200; pip scale 0.01 → 3 decimals.</td></tr>
+      <tr><td class="k">USDT</td><td class="v">8</td><td>Crypto majors /USDT: price ≫ 1, a 0.01 tick is fine.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===================== PRECISION FLOW ===================== -->
+<h2 class="section">How precision is resolved</h2>
+<div class="flow">
+  <div class="step"><b>Catalog wins.</b> <code>instrument_for_bar_type()</code> returns the real ingested
+    instrument from <code>_catalog_instrument()</code> whenever the symbol exists in <code>./catalog</code>.</div>
+  <div class="step"><b>Else build from data_formats.</b> <code>_data_format_instrument_cfg()</code> supplies
+    <code>price_precision</code> / <code>size_precision</code> / <code>quote_currency</code> for the asset class.</div>
+  <div class="step"><b>create_instrument price ladder:</b> explicit <code>price_precision</code> arg →
+    <code>BASE_PRICE_PRECISION[base]</code> → <code>PRICE_PRECISION[quote]</code> → default <code>2</code>.</div>
+  <div class="step"><b>Size ladder:</b> explicit <code>size_precision</code> arg → default <code>0</code> (whole
+    units); crypto sets non-zero so fractional lots trade.</div>
+  <div class="step"><b>Fiat money precision</b> is separately bumped by <code>_get_currency()</code> via
+    <code>CURRENCY_PRECISION</code> so PnL keeps sub-cent resolution.</div>
+</div>
+
+<footer class="foot">
+  Generated documentation for <code>core/instrument_factory.py</code> · m-cube (NautilusTrader backtesting platform) ·
+  companion to <a href="core_knowledge_graph.html">core_knowledge_graph.html</a> and
+  <a href="core_module_report.html">core_module_report.html</a> · knowledge graph rendered client-side by Mermaid.js
+</footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: { curve: 'basis', padding: 18, nodeSpacing: 46, rankSpacing: 64, htmlLabels: true },
+    themeVariables: {
+      darkMode: true,
+      background: '#0b1020',
+      primaryColor: '#1a2240',
+      primaryTextColor: '#e4e9f7',
+      primaryBorderColor: '#8b5cf6',
+      lineColor: '#9aa3c0',
+      secondaryColor: '#141a30',
+      tertiaryColor: '#0b1020',
+      clusterBkg: 'rgba(255,255,255,0.02)',
+      clusterBorder: '#262e4d',
+      labelBackground: '#1a2240'
+    }
+  });
+</script>
+</body>
+</html>

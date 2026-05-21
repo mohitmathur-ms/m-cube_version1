@@ -6,7 +6,10 @@ Uses the same pattern as TestInstrumentProvider but allows any crypto/USD pair.
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.identifiers import Symbol
@@ -17,7 +20,14 @@ from nautilus_trader.model.objects import Money
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 
-from core.venue_config import load_instrument_config
+from core.venue_config import (
+    load_adapter_config_for_bar_type,
+    load_instrument_config,
+    symbol_from_bar_type,
+    venue_from_bar_type,
+)
+
+_DATA_FORMATS_DIR = Path(__file__).resolve().parent.parent / "adapter_admin" / "data_formats"
 
 
 VENUE = Venue("BINANCE")
@@ -37,7 +47,7 @@ PRICE_PRECISION = {
     "EUR": 5,   # FX pairs /EUR
     "GBP": 5,   # FX pairs /GBP
     "JPY": 3,   # FX /JPY: base is ~100-200, so pip scale = 0.01 → 3 decimals
-    "USDT": 2,  # Crypto majors /USDT: price >> 1, 0.01 tick is fine
+    "USDT": 8,  # Crypto majors /USDT: price >> 1, 0.01 tick is fine
 }
 
 # Currency (Money) precision overrides for fiat currencies.  Nautilus defaults
@@ -83,7 +93,7 @@ def _get_currency(code: str) -> Currency:
             precision=CURRENCY_PRECISION[upper],
             iso4217=_ISO4217.get(upper, 0),
             name=upper,
-            currency_type=1,  # CurrencyType.FIAT
+            currency_type=2,  # CurrencyType.FIAT
         )
     try:
         return Currency.from_str(code)
@@ -95,7 +105,7 @@ def _get_currency(code: str) -> Currency:
             precision=8,
             iso4217=0,
             name=code,
-            currency_type=2,  # CurrencyType.CRYPTO
+            currency_type=1,  # CurrencyType.CRYPTO
         )
 
 
@@ -140,9 +150,28 @@ def create_instrument(
         price_prec = price_precision
     else:
         price_prec = BASE_PRICE_PRECISION.get(base, PRICE_PRECISION.get(quote, 2))
-    # Size precision must be low enough that daily volume fits within QUANTITY_MAX (~18.4B).
-    # Yahoo Finance volumes for BTC can be 20B+, so we use precision=0 for safety.
+    # Size precision controls the number of decimal places an order/volume
+    # quantity may carry. It does NOT change the maximum representable value:
+
+    # Nautilus stores quantities as fixed-point with FIXED_PRECISION=9, so the
+    # cap is QUANTITY_MAX (~18.4B) regardless of size_precision. Bar volumes are
+    # already clipped to QUANTITY_MAX at CSV-load time (see core/csv_loader.py),
+
+    # so raising precision is safe. We default to 0 (whole units) only when no
+    # asset-class override is supplied; crypto sets a non-zero value so
+    # fractional lot sizes (e.g. 0.5, 0.001) are tradeable.
+
     size_prec = size_precision if size_precision is not None else 0
+
+    # Smallest tradeable step / minimum order, derived from precision so that a
+
+    # precision>0 instrument can actually trade fractional sizes. precision 0
+
+    # → step 1 (unchanged for FX/index); precision 2 → 0.01; precision 8 →
+
+    # 0.00000001.
+    
+    size_step = Quantity(10 ** (-size_prec), precision=size_prec)
 
     # Per-symbol admin config (lot_size + trade_size cap). Lives in
     # adapter_admin/adapters_config/<venue>.json under the "instruments" key.
@@ -166,10 +195,10 @@ def create_instrument(
         price_precision=price_prec,
         size_precision=size_prec,
         price_increment=Price(10 ** (-price_prec), precision=price_prec),
-        size_increment=Quantity(1, precision=size_prec),
+        size_increment=size_step,
         lot_size=lot_size_quantity,
         max_quantity=Quantity(max_qty_value, precision=size_prec),
-        min_quantity=Quantity(1, precision=size_prec),
+        min_quantity=size_step,
         max_notional=None,
         min_notional=Money(1.00, quote_currency),
         max_price=Price(10_000_000, precision=price_prec),
@@ -181,3 +210,106 @@ def create_instrument(
         ts_event=0,
         ts_init=0,
     )
+
+
+def _data_format_instrument_cfg(bar_type_str: str) -> dict:
+    """Return the ``instrument`` block from the asset class's data-format file.
+
+    Resolves the venue's adapter config → ``asset_class`` →
+    ``adapter_admin/data_formats/<asset_class>.json`` and returns its
+    ``instrument`` sub-dict (``price_precision``, ``size_precision``,
+    ``quote_currency``, ``base_currency_length``, ...). Returns ``{}`` when
+    anything along the path is missing — callers then fall back to the
+    built-in precision tables in ``create_instrument``.
+    """
+    adapter_cfg = load_adapter_config_for_bar_type(bar_type_str) or {}
+    asset_class = (adapter_cfg.get("asset_class") or "").strip().lower().replace(" ", "_")
+    if not asset_class:
+        return {}
+    fmt_path = _DATA_FORMATS_DIR / f"{asset_class}.json"
+    if not fmt_path.exists():
+        return {}
+    try:
+        fmt = json.loads(fmt_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    inst = fmt.get("instrument")
+    return inst if isinstance(inst, dict) else {}
+
+
+_CATALOG_PATH = Path(__file__).resolve().parent.parent / "catalog"
+
+
+def _catalog_instrument(bar_type_str: str):
+    """Return the instrument the backtest engine would actually load for this
+    bar type from the ParquetDataCatalog, or ``None`` if it isn't ingested.
+
+    This is the authoritative source — ``core/backtest_runner.py`` resolves the
+    instrument exactly this way (``catalog.instruments()`` matched on
+    ``BarType.from_str(...).instrument_id``) and calls ``make_qty()`` on it.
+    Reading it here means precision validation can never disagree with what the
+    backtest will do (and it sidesteps venue-name mismatches between bar types
+    and adapter configs, e.g. ``COINBASE`` vs ``COINBASE_MS``).
+    """
+    try:
+        from nautilus_trader.model.data import BarType
+        from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
+
+        inst_id = BarType.from_str(bar_type_str).instrument_id
+        catalog = ParquetDataCatalog(str(_CATALOG_PATH))
+        for inst in catalog.instruments():
+            if inst.id == inst_id:
+                return inst
+    except Exception:
+        return None
+    return None
+
+
+@lru_cache(maxsize=256)
+def instrument_for_bar_type(bar_type_str: str):
+    """Return the instrument used to validate a leg's lots/SL/TGT precision.
+
+    Prefers the **actual catalog instrument** (what the engine loads and calls
+    ``make_qty()`` on); only when the symbol hasn't been ingested yet does it
+    fall back to building one from the asset class's ``data_formats`` precision,
+    mirroring ``core/nautilus_loader.py``. Returns ``None`` when neither is
+    available / the bar type can't be parsed.
+
+    NOTE: because the catalog instrument is authoritative, a change to
+    ``data_formats`` size/price precision only takes effect after the data is
+    **re-ingested** (which rewrites the catalog instrument).
+    """
+    inst = _catalog_instrument(bar_type_str)
+    if inst is not None:
+        return inst
+
+    symbol = symbol_from_bar_type(bar_type_str)
+    venue = venue_from_bar_type(bar_type_str)
+    if not symbol or not venue:
+        return None
+
+    inst_cfg = _data_format_instrument_cfg(bar_type_str)
+
+    # Split base/quote the same way nautilus_loader does: FX uses an explicit
+    # base_currency_length; otherwise strip the configured quote suffix so the
+    # base-currency precision fallback (BASE_PRICE_PRECISION) still works for
+    # variable-length crypto symbols like "ADAUSD" -> base "ADA", quote "USD".
+    quote = (inst_cfg.get("quote_currency") or "USD").upper()
+    base = symbol.upper()
+    base_len = inst_cfg.get("base_currency_length")
+    if base_len and len(base) > base_len:
+        quote = base[base_len:]
+        base = base[:base_len]
+    elif quote and base.endswith(quote) and len(base) > len(quote):
+        base = base[: -len(quote)]
+
+    try:
+        return create_instrument(
+            base,
+            quote,
+            venue,
+            price_precision=inst_cfg.get("price_precision"),
+            size_precision=inst_cfg.get("size_precision"),
+        )
+    except Exception:
+        return None

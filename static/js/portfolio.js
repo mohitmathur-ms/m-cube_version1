@@ -28,17 +28,19 @@ const Portfolio = {
 
     async loadConfig() {
         try {
-            const [barData, stratData, tmplData, adData] = await Promise.all([
+            const [barData, stratData, tmplData, adData, acData] = await Promise.all([
                 App.api("/api/data/bar_types"),
                 App.api("/api/strategies"),
                 App.api("/api/portfolios/templates"),
                 App.api("/api/configured-adapters"),
+                App.api("/api/asset-classes"),
             ]);
             this.barTypes = barData.bar_types || [];
             this.barTypeDetails = barData.bar_type_details || {};
             this.strategies = stratData.strategies || {};
             this.templates = tmplData.templates || {};
             this.assetVenues = (adData && adData.adapters) || {};   // {assetClass: [venue, ...]}
+            this.assetClasses = (acData && acData.asset_classes) || [];   // reference list
             this._instIdx = this._buildInstrumentIndex();
             this._barTypeSet = new Set(this.barTypes);   // O(1) catalog lookup for Final warnings
 
@@ -1310,10 +1312,13 @@ const Portfolio = {
                 <span class="footer-label">Remarks</span>
                 <input type="text" class="form-control" id="pf-m-remarks-footer" value="${pf.description || ''}" style="flex:1;">
                 <button class="btn btn-sm" onclick="Portfolio._cancelPortfolioModal(${isNew ? 1 : 0})">Cancel</button>
-                <button class="btn btn-sm btn-primary" style="min-width:140px; font-weight:600;" onclick="Portfolio._savePortfolioModal()">SAVE PORTFOLIO</button>
+                <button class="btn btn-sm btn-primary" id="pf-save-btn" style="min-width:140px; font-weight:600;" onclick="Portfolio._savePortfolioModal()">SAVE PORTFOLIO</button>
             </div>
         `;
         this._openModal(title, body, 1200, footer);
+        // Flag any pre-existing precision problems (e.g. fractional crypto lots)
+        // the moment the editor opens, not just on the next keystroke.
+        this._scheduleLegValidation();
     },
 
     _switchPfTab(tabName) {
@@ -1478,7 +1483,12 @@ const Portfolio = {
     },
 
     _assetOptions(selected) {
-        const assets = Object.keys(this._instIdx || {}).sort();
+        // Reference list from /api/asset-classes (NautilusTrader AssetClass enum),
+        // so the asset classes are centrally owned, not inferred from the catalog.
+        // Fallback to catalog-derived keys if the reference fetch returned nothing.
+        const assets = (this.assetClasses && this.assetClasses.length)
+            ? this.assetClasses
+            : Object.keys(this._instIdx || {}).sort();
         return assets.map(a => `<option value="${a}" ${a === selected ? "selected" : ""}>${a}</option>`).join("");
     },
 
@@ -1701,11 +1711,11 @@ const Portfolio = {
                 ${subChipsHTML}
                 <div class="subtf-display${subBtEmptyCls}" id="leg-il-subbt-${i}" title="Composite Nautilus bar type(s) the strategy will subscribe to.">${subBtDisplay}</div>
             </td>
-            <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any"></td>
-            <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;">${slTypeOpts}</select></td>
-            <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;"></td>
-            <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;">${tpTypeOpts}</select></td>
-            <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;"></td>
+            <td><input type="number" class="form-control" id="leg-il-size-${i}" value="${slot.lots ?? slot.trade_size ?? 1}" min="0" step="any" oninput="Portfolio._scheduleLegValidation()"></td>
+            <td><select class="form-control" id="leg-il-sltype-${i}" style="min-width:72px;" onchange="Portfolio._scheduleLegValidation()">${slTypeOpts}</select></td>
+            <td><input type="number" class="form-control" id="leg-il-slval-${i}" value="${ec.stop_loss_value || 0}" step="0.5" min="0" style="width:52px;" oninput="Portfolio._scheduleLegValidation()"></td>
+            <td><select class="form-control" id="leg-il-tptype-${i}" style="min-width:72px;" onchange="Portfolio._scheduleLegValidation()">${tpTypeOpts}</select></td>
+            <td><input type="number" class="form-control" id="leg-il-tpval-${i}" value="${ec.target_value || 0}" step="0.5" min="0" style="width:52px;" oninput="Portfolio._scheduleLegValidation()"></td>
             <td style="text-align:center;"><button class="btn btn-xs" onclick="Portfolio._editLeg(${i})" style="font-size:0.72rem;">&#9881; Edit</button></td>
         </tr>`;
     },
@@ -1764,6 +1774,8 @@ const Portfolio = {
             subEl.textContent = empty ? "(base TF only)" : subBts.join("\n");
             subEl.classList.toggle("empty", empty);
         }
+        // Precision is instrument-dependent — re-check lots/SL/TGT for this leg.
+        this._scheduleLegValidation();
     },
 
     _onLegModalAssetChange() {
@@ -2084,13 +2096,110 @@ const Portfolio = {
         delete cleanPf.strategy_tag;
         delete cleanPf.max_legs;
         delete cleanPf.tgt_sl_per_lot;
+        // Save only on success. The server re-validates lots/SL/TGT against
+        // instrument precision and returns a 400 with a clear message — keep
+        // the modal open and surface it instead of silently "succeeding".
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
-            .then(() => App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name))
-            .catch(() => { });
+            .then(() => {
+                App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name);
+                this._closeModal();
+                this.renderApp();
+                App.toast(`Portfolio "${pf.name}" saved.`, "success");
+            })
+            .catch((e) => {
+                const msg = (e && e.message) ? e.message : "Save failed.";
+                this._showValidationBanner([msg]);
+                App.toast(`Could not save: ${msg}`, "error");
+            });
+    },
 
-        this._closeModal();
-        this.renderApp();
-        App.toast(`Portfolio "${pf.name}" saved.`, "success");
+    /* ─── Live leg validation (lots / SL / TGT vs instrument precision) ──── */
+
+    /** Debounced trigger fired from leg inputs and instrument changes. */
+    _scheduleLegValidation() {
+        clearTimeout(this._legValidationTimer);
+        this._legValidationTimer = setTimeout(() => this._validateLegsRemote(), 350);
+    },
+
+    /** Build the same payload the save endpoint receives, for the dry-run
+     *  validator. Syncs inline leg values first, then strips UI-only fields. */
+    _buildValidatePayload() {
+        const idx = this._editingPfIndex;
+        if (idx === null || idx === undefined) return null;
+        this._syncInlineLegs();
+        const pf = this.portfolios[idx];
+        const clean = JSON.parse(JSON.stringify(pf));
+        ["_enabled", "_ui", "on_leg_fail", "execution_mode", "strategy_tag",
+            "max_legs", "tgt_sl_per_lot"].forEach(k => delete clean[k]);
+        if (!clean.name) clean.name = pf.name || "Unnamed";
+        return clean;
+    },
+
+    /** POST the current legs to the server's no-write validator and render
+     *  any per-leg errors. Validation is advisory in the UI — the save
+     *  endpoint re-checks authoritatively — so a failed request never blocks
+     *  typing. */
+    _validateLegsRemote() {
+        const payload = this._buildValidatePayload();
+        if (!payload) return;
+        App.api("/api/portfolios/validate", { method: "POST", body: JSON.stringify(payload) })
+            .then((res) => this._renderLegValidation((res && res.errors) || []))
+            .catch(() => { });
+    },
+
+    /** Highlight offending inputs (red border + tooltip), show the summary
+     *  banner, and disable SAVE while any error stands. */
+    _renderLegValidation(errors) {
+        this._clearValidationMarks();
+        const fieldId = { lots: "leg-il-size-", sl: "leg-il-slval-", tgt: "leg-il-tpval-" };
+        (errors || []).forEach((e) => {
+            const prefix = fieldId[e.field];
+            if (prefix && e.slot_index >= 0) {
+                const el = document.getElementById(`${prefix}${e.slot_index}`);
+                if (el) {
+                    el.style.border = "1px solid #d9534f";
+                    el.style.background = "rgba(217,83,79,0.08)";
+                    el.title = e.message;
+                }
+            }
+        });
+        this._showValidationBanner((errors || []).map(e => e.message));
+    },
+
+    /** Reset all leg-input highlights set by _renderLegValidation. */
+    _clearValidationMarks() {
+        ["leg-il-size-", "leg-il-slval-", "leg-il-tpval-"].forEach((prefix) => {
+            document.querySelectorAll(`[id^="${prefix}"]`).forEach((el) => {
+                el.style.border = "";
+                el.style.background = "";
+                el.title = "";
+            });
+        });
+    },
+
+    /** Show/hide the error banner above the modal footer and toggle SAVE. */
+    _showValidationBanner(messages) {
+        const footer = document.querySelector(".pf-modal-footer");
+        const saveBtn = document.getElementById("pf-save-btn");
+        let banner = document.getElementById("pf-validation-banner");
+        const list = (messages || []).filter(Boolean);
+        if (!list.length) {
+            if (banner) banner.style.display = "none";
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = ""; saveBtn.style.cursor = ""; saveBtn.title = ""; }
+            return;
+        }
+        if (!banner) {
+            banner = document.createElement("div");
+            banner.id = "pf-validation-banner";
+            banner.style.cssText = "width:100%; box-sizing:border-box; margin:0 0 8px; padding:8px 10px; border:1px solid #d9534f; border-radius:4px; background:rgba(217,83,79,0.12); color:#d9534f; font-size:0.74rem; line-height:1.4; max-height:140px; overflow:auto;";
+            if (footer && footer.parentNode) footer.parentNode.insertBefore(banner, footer);
+            else document.body.appendChild(banner);
+        }
+        const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        banner.style.display = "block";
+        banner.innerHTML = "<strong>&#9888; Fix before saving:</strong><ul style=\"margin:4px 0 0; padding-left:18px;\">" +
+            list.map(m => `<li>${esc(m)}</li>`).join("") + "</ul>";
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = "0.5"; saveBtn.style.cursor = "not-allowed"; saveBtn.title = "Resolve the highlighted issues first."; }
     },
 
     _cancelPortfolioModal(isNew) {

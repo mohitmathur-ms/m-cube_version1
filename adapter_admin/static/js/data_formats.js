@@ -165,9 +165,9 @@ const DataFormats = {
                     <label class="form-label">Currency Type</label>
                     <select id="df-currency-type" class="form-control">
                         <option value="">— Not set —</option>
-                        <option value="0" ${inst.currency_type === 0 ? "selected" : ""}>FIAT (0)</option>
-                        <option value="1" ${inst.currency_type === 1 ? "selected" : ""}>METAL (1)</option>
-                        <option value="2" ${inst.currency_type === 2 ? "selected" : ""}>CRYPTO (2)</option>
+                        <option value="1" ${inst.currency_type === 1 ? "selected" : ""}>CRYPTO (1)</option>
+                        <option value="2" ${inst.currency_type === 2 ? "selected" : ""}>FIAT (2)</option>
+                        <option value="3" ${inst.currency_type === 3 ? "selected" : ""}>COMMODITY_BACKED (3)</option>
                     </select>
                 </div>
                 <div class="form-group">

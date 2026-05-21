@@ -26,7 +26,7 @@
     ],
     "price_precision": 2,
     "size_precision": 0,
-    "currency_type": 0,
+    "currency_type": 2,
     "timeframe": "1-MINUTE"
   },
   "trading": {

@@ -77,7 +77,16 @@
       "PowerShell(git stash push -- core/csv_loader.py core/nautilus_loader.py server.py adapter_admin/data_formats/cryptocurrency.json)",
       "PowerShell(& \"venv\\\\Scripts\\\\python.exe\" -m pytest tests\\\\test_custom_strategy_loader.py tests\\\\test_perf_regression.py::TestBuildFillsLookup -q 2>&1)",
       "PowerShell(git stash pop)",
-      "PowerShell(& \"venv\\\\Scripts\\\\python.exe\" verify_session_changes.py 2>&1)"
+      "PowerShell(& \"venv\\\\Scripts\\\\python.exe\" verify_session_changes.py 2>&1)",
+      "Bash(rm -f _tmp_validate_check.py _tmp_endpoint_check.py)",
+      "Bash(venv/Scripts/python.exe verify_session_changes.py)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/ --ignore=tests/test_aggregator.py -q)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_custom_strategy_loader.py tests/test_perf_regression.py -q)",
+      "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.model.enums import CurrencyType; import enum; [print\\(m.name, '=', int\\(m.value\\)\\) for m in CurrencyType]\")",
+      "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.model.enums import CurrencyType; print\\('enum:', int\\(CurrencyType.CRYPTO\\), int\\(CurrencyType.FIAT\\), int\\(CurrencyType.COMMODITY_BACKED\\)\\); from core.instrument_factory import _get_currency; print\\('USD ->', int\\(_get_currency\\('USD'\\).currency_type\\)\\); print\\('BTC ->', int\\(_get_currency\\('BTC'\\).currency_type\\)\\); print\\('EUR ->', int\\(_get_currency\\('EUR'\\).currency_type\\)\\); print\\('ETH ->', int\\(_get_currency\\('ETH'\\).currency_type\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import json,pathlib; [print\\(p.name, json.loads\\(p.read_text\\(encoding='utf-8'\\)\\)['instrument'].get\\('currency_type'\\)\\) for p in pathlib.Path\\('adapter_admin/data_formats'\\).glob\\('*.json'\\)]\")",
+      "Bash(python3 -c ' *)",
+      "Bash(venv/Scripts/python.exe -c \"from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog; c=ParquetDataCatalog\\('catalog'\\); [print\\(i.id, 'size_precision=', i.size_precision, 'price_precision=', i.price_precision, 'size_increment=', i.size_increment, 'min_qty=', i.min_quantity\\) for i in c.instruments\\(\\) if str\\(i.id\\) in \\('BTCUSD.COINBASE','AAVEUSD.COINBASE','ADAUSD.COINBASE'\\)]\")"
     ]
   }
 }

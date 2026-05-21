@@ -6,6 +6,7 @@ This module bridges local CSV data → NautilusTrader native types → Parquet c
 
 from __future__ import annotations
 
+import shutil
 import threading
 from pathlib import Path
 
@@ -113,11 +114,32 @@ def save_to_catalog(
     # writing — re-writing it makes Nautilus log "File ... already exists,
     # skipping write" once per (pair, side) call. Check first; only write if
     # the catalog hasn't seen this instrument yet.
+    #
+    # Exception: when the stored instrument's precision DIFFERS from the one we
+    # just built (e.g. the asset-class data-format size_precision/price_precision
+    # was changed to enable decimal lot sizes for crypto), the stale definition
+    # must be replaced — otherwise re-ingesting silently keeps the old precision
+    # and order sizing can't use decimals. Each instrument lives in its own
+    # ``currency_pair/<id>/`` folder, so replacing just this one is isolated and
+    # leaves every other instrument untouched.
     try:
-        existing_ids = {inst.id for inst in catalog.instruments()}
+        existing = {inst.id: inst for inst in catalog.instruments()}
     except Exception:
-        existing_ids = set()
-    if instrument.id not in existing_ids:
+        existing = {}
+    prior = existing.get(instrument.id)
+    precision_changed = prior is not None and (
+        prior.size_precision != instrument.size_precision
+        or prior.price_precision != instrument.price_precision
+    )
+    if precision_changed:
+        inst_dir = Path(catalog_path) / "data" / "currency_pair" / str(instrument.id)
+        try:
+            if inst_dir.exists():
+                shutil.rmtree(inst_dir)
+        except Exception:
+            pass
+        prior = None
+    if prior is None:
         catalog.write_data([instrument])
     catalog.write_data(bars)
     return catalog

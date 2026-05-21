@@ -1110,6 +1110,7 @@ from core.models import (
     save_portfolio, load_portfolio, list_portfolios, delete_portfolio,
     validate_leg_actions,
 )
+from core.instrument_factory import instrument_for_bar_type
 from core.templates import get_templates, build_template
 
 _PORTFOLIOS_ROOT = PROJECT_DIR / "portfolios"
@@ -1125,7 +1126,10 @@ from core.users import (
     list_users as _list_users,
     is_instrument_allowed as _is_instrument_allowed,
 )
-from core.venue_config import symbol_from_bar_type as _symbol_from_bar_type
+from core.venue_config import (
+    symbol_from_bar_type as _symbol_from_bar_type,
+    load_instrument_config_for_bar_type as _load_instrument_config_for_bar_type,
+)
 
 
 def _resolve_user_id() -> str:
@@ -1229,6 +1233,112 @@ def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
     return True, ""
 
 
+def _max_decimals_phrase(precision: int) -> str:
+    """Human phrase for how many decimals a precision permits."""
+    return "a whole number" if int(precision) <= 0 else f"at most {int(precision)} decimal place(s)"
+
+
+def _fits_precision(value, precision, tol: float = 1e-6) -> bool:
+    """True when ``value`` is *exactly* representable at ``precision`` decimals.
+
+    e.g. 0.5 is not representable at precision 0 (whole numbers only); 1.005 is
+    not representable at precision 2. A small tolerance absorbs binary-float
+    noise (0.01 × 100000 = 1000.0000000000001 still counts as the integer 1000).
+    """
+    scaled = float(value) * (10 ** int(precision))
+    return abs(scaled - round(scaled)) <= tol
+
+
+def _slot_precision_errors(slot, user_id) -> list:
+    """Validate one slot's lots/SL/TGT against its instrument's precision.
+
+    Returns a list of ``{"field", "message"}`` dicts (empty when the slot is
+    fine). ``field`` is one of ``"lots"``, ``"sl"``, ``"tgt"``. The instrument's
+    ``size_precision`` / ``price_precision`` come from the asset class's
+    ``adapter_admin/data_formats/<asset>.json`` (via ``instrument_for_bar_type``),
+    so the rule matches what the data layer actually configures.
+
+    **Strict conformance:** a value is rejected unless it is exactly
+    representable at the instrument's precision — not merely "doesn't round to
+    zero". Lots are checked as the configured base quantity
+    (``lots × instrument lot_size``), independent of the per-user multiplier,
+    so a saved portfolio is valid for every user. (The runtime multiplier is a
+    separate per-user scalar and is not folded into config validation.)
+
+    An unknown/unparseable instrument is skipped (no error) — only built-in
+    venues carry precision metadata, and we don't want to block on missing
+    config.
+    """
+    errors = []
+    inst = instrument_for_bar_type(slot.bar_type_str)
+    if inst is None:
+        return errors
+
+    label = getattr(slot, "display_name", "") or getattr(slot, "strategy_name", "") or "leg"
+    symbol = _symbol_from_bar_type(slot.bar_type_str) or slot.bar_type_str
+
+    # --- Lots vs size precision (strict conformance) ----------------------
+    inst_cfg = _load_instrument_config_for_bar_type(slot.bar_type_str) or {}
+    lot_size = float(inst_cfg.get("lot_size") or 1) or 1.0
+    base_qty = float(slot.lots) * lot_size
+    size_prec = inst.size_precision
+    min_qty = float(inst.min_quantity)
+    qty_suffix = "" if lot_size == 1.0 else f" (lots {slot.lots:g} x lot size {lot_size:g})"
+
+    if base_qty <= 0:
+        errors.append({"field": "lots", "message":
+            f"Leg '{label}' on {symbol}: lots must be greater than 0."})
+    elif not _fits_precision(base_qty, size_prec):
+        errors.append({"field": "lots", "message":
+            f"Leg '{label}' on {symbol}: a quantity of {base_qty:g}{qty_suffix} is not valid "
+            f"for this instrument - size precision {size_prec} allows "
+            f"{_max_decimals_phrase(size_prec)}. Enter lots that yield "
+            f"{_max_decimals_phrase(size_prec)}."})
+    elif base_qty < min_qty:
+        errors.append({"field": "lots", "message":
+            f"Leg '{label}' on {symbol}: a quantity of {base_qty:g}{qty_suffix} is below the "
+            f"instrument's minimum of {min_qty:g}. Increase lots."})
+
+    # --- SL / TGT vs price precision --------------------------------------
+    price_prec = inst.price_precision
+    tick = float(inst.price_increment)
+    ec = slot.exit_config
+    for field, kind, value in (
+        ("sl", ec.stop_loss_type, ec.stop_loss_value),
+        ("tgt", ec.target_type, ec.target_value),
+    ):
+        what = "Stop-loss" if field == "sl" else "Target"
+        if kind not in ("points", "percentage"):
+            continue
+        if float(value) <= 0:
+            errors.append({"field": field, "message":
+                f"Leg '{label}' on {symbol}: {what} type is '{kind}' but the value is "
+                f"{value:g}. Enter a value greater than 0."})
+        elif kind == "points" and not _fits_precision(value, price_prec):
+            errors.append({"field": field, "message":
+                f"Leg '{label}' on {symbol}: {what} of {value:g} points is not valid for this "
+                f"instrument - price precision {price_prec} allows {_max_decimals_phrase(price_prec)} "
+                f"(tick {tick:g}). Use a value that fits the tick."})
+    return errors
+
+
+def _validate_portfolio_precision(portfolio_config, user_id) -> tuple[bool, str]:
+    """Block a save when any leg's lots/SL/TGT violate instrument precision.
+
+    Stops at the first offending leg and returns ``(False, message)`` so the
+    save endpoint can 400 with a clear, specific reason. Shares the per-slot
+    rule with the ``/api/portfolios/validate`` dry-run endpoint via
+    ``_slot_precision_errors``.
+    """
+    for slot in portfolio_config.slots:
+        if not getattr(slot, "enabled", True):
+            continue
+        errs = _slot_precision_errors(slot, user_id)
+        if errs:
+            return False, errs[0]["message"]
+    return True, ""
+
+
 @app.route("/api/users/list")
 def api_users_list():
     """Public-safe user list for the frontend picker.
@@ -1305,10 +1415,45 @@ def api_save_portfolio():
         ok, err = _validate_portfolio_sl(config)
         if not ok:
             return jsonify({"error": err}), 400
+        ok, err = _validate_portfolio_precision(config, user_or_resp["user_id"])
+        if not ok:
+            return jsonify({"error": err}), 400
         path = save_portfolio(config, _user_portfolios_dir(user_or_resp["user_id"]))
         return jsonify({"success": True, "message": f"Portfolio '{config.name}' saved.", "path": str(path)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/portfolios/validate", methods=["POST"])
+def api_validate_portfolio():
+    """Dry-run validation for the live portfolio editor (no write).
+
+    Runs the same precision checks as ``/api/portfolios/save`` but collects
+    every offending leg instead of stopping at the first, so the UI can flag
+    each bad lots/SL/TGT field as the user types. Returns
+    ``{"ok": bool, "errors": [{"slot_index", "slot_id", "field", "message"}]}``.
+    """
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    try:
+        config = portfolio_from_dict(request.json)
+    except Exception as e:
+        return jsonify({"ok": False, "errors": [{"slot_index": -1, "slot_id": "", "field": "", "message": str(e)}]})
+
+    user_id = user_or_resp["user_id"]
+    errors = []
+    for i, slot in enumerate(config.slots):
+        if not getattr(slot, "enabled", True):
+            continue
+        for err in _slot_precision_errors(slot, user_id):
+            errors.append({
+                "slot_index": i,
+                "slot_id": getattr(slot, "slot_id", "") or "",
+                "field": err["field"],
+                "message": err["message"],
+            })
+    return jsonify({"ok": not errors, "errors": errors})
 
 
 @app.route("/api/portfolios/delete", methods=["POST"])

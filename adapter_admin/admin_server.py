@@ -82,6 +82,7 @@ def refresh_registry():
 def get_asset_classes():
     """Return asset classes from NautilusTrader."""
     try:
+        # pyrefly: ignore [missing-import]
         from nautilus_trader.model.enums import AssetClass
         classes = [member.name.lower() for member in AssetClass]
     except ImportError:

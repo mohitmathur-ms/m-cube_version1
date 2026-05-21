@@ -250,6 +250,13 @@ const LoadData = {
                         <p class="section-caption" id="csv-search-count" style="margin-top: 4px;">Showing ${matched.length} matched files</p>
                     </div>
 
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" id="suppress-precision-warning">
+                            <span>Suppress precision / doji warnings for this load</span>
+                        </label>
+                    </div>
+
                     <button class="btn btn-primary btn-block" onclick="LoadData.loadSelected()">
                         &#128229; Load Selected into Catalog
                     </button>
@@ -333,6 +340,11 @@ const LoadData = {
             </div>
         `;
         resultsDiv.innerHTML = "";
+        // Capture the suppression toggle once. _renderLoadRow is also called
+        // later by the MID background-job poller, so stash it on the instance
+        // to keep late-arriving renders consistent with this load's choice.
+        this._suppressPrecisionWarnings =
+            document.getElementById("suppress-precision-warning")?.checked || false;
         this._updateBadges();
         App.log(`Loading ${entries.length} symbol(s) into catalog...`, "MESSAGE", "LoadData");
         // Auto-open the loading status popup so user sees progress immediately
@@ -393,7 +405,7 @@ const LoadData = {
             } else if (pendingJobs.length > 0) {
                 App.toast(`${pendingJobs.length} ingest job(s) running in background — cards will fill in as each finishes.`, "success");
             }
-            if (warnCount > 0) {
+            if (warnCount > 0 && !this._suppressPrecisionWarnings) {
                 App.toast(`${warnCount} symbol(s) have precision warnings — check the results panel.`, "error", 8000);
             }
 
@@ -420,7 +432,7 @@ const LoadData = {
             </div>`;
         // Precision sanity warning from server. Surface inline so the user
         // sees it alongside the success banner for the same symbol.
-        if (result.warning) {
+        if (result.warning && !this._suppressPrecisionWarnings) {
             html += `
                 <div class="alert alert-warning" style="margin-top: -8px;">
                     <strong>&#9888; Ingest sanity warning for ${result.symbol}${sideTag}:</strong>
