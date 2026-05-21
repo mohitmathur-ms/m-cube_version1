@@ -101,19 +101,7 @@
       "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import instrument_for_bar_type; print\\('bar_type_resolver callable:', callable\\(instrument_for_bar_type\\)\\)\")",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -q)",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -q --ignore=tests/test_aggregator.py)",
-      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type; i=create_instrument\\('EUR','USD','FOREX_MS'\\); print\\('reimport ok:', i.price_precision, i.size_precision, i.lot_size\\)\")",
-      "Bash(venv/Scripts/python.exe -c \"import core.nautilus_loader, scripts.ingest_fx_bulk; print\\('callers import ok'\\)\")",
-      "Bash(find /d:/m-cube_version1 -name \"aggregation_report.py\" -type f)",
-      "Read(//d:/**)",
-      "Bash(venv/Scripts/python.exe -c \"import core.sniffers as s; print\\('sniffers OK'\\); print\\('OrderFilled:', s.OrderFilled\\); print\\('cols:', len\\(s.SNIFFER_COLUMNS\\)\\); import core.backtest_runner; print\\('runner import OK'\\)\")",
-      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe -c ' *)",
-      "Bash(venv/Scripts/python.exe -c \"import inspect,core.backtest_runner as r; print\\(inspect.signature\\(r.run_portfolio_backtest\\)\\)\")",
-      "Bash(ls -t aggregation_reports/unknown/BTCUSD/*02JAN2024.csv)",
-      "Bash(PYTHONIOENCODING=utf-8 _USE_GROUPING=1 venv/Scripts/python.exe -c ' *)",
-      "Bash(Sort-Object -Unique)",
-      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py',encoding='utf-8'\\).read\\(\\)\\); print\\('PARSES OK'\\)\")",
-      "Bash(venv/Scripts/python.exe -c \"import json; [json.load\\(open\\(f,encoding='utf-8'\\)\\) and print\\('OK',f\\) for f in ['.claude/settings.json','adapter_admin/data_formats/commodity.json','adapter_admin/data_formats/cryptocurrency.json','portfolios/_default/FX_9_Slot_Jan2024.json']]\")",
-      "Bash(venv/Scripts/python.exe -c \"import core.backtest_runner, server; print\\('IMPORT OK'\\)\")"
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type; i=create_instrument\\('EUR','USD','FOREX_MS'\\); print\\('reimport ok:', i.price_precision, i.size_precision, i.lot_size\\)\")"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
