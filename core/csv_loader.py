@@ -63,6 +63,12 @@ _INDEX_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
 _INDEX_SCAN_CACHE_TTL_SECONDS = 600.0
 _INDEX_SCAN_CACHE_LOCK = threading.Lock()
 
+# Parallel cache for :func:`_scan_crypto_nested_layout`. Same mtime + TTL
+# safety-net shape as the FX cache above; see that block for the rationale.
+_CRYPTO_SCAN_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
+_CRYPTO_SCAN_CACHE_TTL_SECONDS = 600.0
+_CRYPTO_SCAN_CACHE_LOCK = threading.Lock()
+
 
 # Default path to the user's crypto CSV data
 DEFAULT_CSV_FOLDER = r"D:\Data_all\Fx"
@@ -95,6 +101,15 @@ _DAILY_INDEX_PATTERN = re.compile(
     r"^(\d{2})\.(\d{2})\.(\d{4})_complete_df_OHLCV\.csv$",
     re.IGNORECASE,
 )
+
+# Nested-crypto layout gates: <root>/<venue>/<BASE-QUOTE>/YYYY/MM/<daily>.csv.
+# The date lives entirely in the parent directories (a 4-digit YEAR dir then a
+# 1-2 digit MONTH dir), so the daily filename itself is unconstrained — these
+# two patterns match the year/month directory names instead. This is also what
+# distinguishes the layout from the FX daily tree (<PAIR>/YYYY/MM/DD/...), where
+# the directory at depth index 2 is a 2-digit month, not a 4-digit year.
+_CRYPTO_YEAR_DIR_PATTERN = re.compile(r"^\d{4}$")
+_CRYPTO_MONTH_DIR_PATTERN = re.compile(r"^\d{1,2}$")
 
 # Months → 3-letter abbreviation used in the synthetic display filename produced
 # by :func:`_scan_index_daily_layout`. Matches the convention in the consolidated
@@ -424,17 +439,107 @@ def _scan_index_daily_layout(root: Path) -> list[dict]:
     return entries
 
 
+def _scan_crypto_nested_layout(root: Path) -> list[dict]:
+    """Aggregate nested crypto CSVs into one entry per (base, quote) pair.
+
+    Layout: the scanned root **is** the venue folder, and below it sit
+    ``<BASE-QUOTE>/YYYY/MM/<daily>.csv`` — four path components below the root
+    (pair, year-dir, month-dir, file). The venue is taken from the root folder
+    name (e.g. ``D:\\crypto_yyy\\binance`` → venue ``BINANCE``), so the user
+    selects a single venue by choosing which folder to scan.
+
+    Each daily file is a single OHLCV stream (no ASK/BID split). Unlike the FX /
+    commodity scanners the date is *not* in the filename, so the daily filename
+    is left unconstrained; the structural gate (a ``BASE-QUOTE`` pair dir, a
+    4-digit year dir, then a 1-2 digit month dir) is what identifies the layout.
+
+    Files are collected into a ``files`` list on the emitted entry, which the
+    downstream :func:`core.nautilus_loader.load_csv_and_store` handles via its
+    ``files``-list branch (falling through to ``price_type="LAST"`` since no
+    ``side`` is set). The base/quote currencies are parsed from the pair dir
+    name and carried as ``symbol`` + ``quote_currency``; the venue (root folder
+    name) is carried as ``venue`` so the load endpoint applies it per-entry.
+
+    Result is cached under :data:`_CRYPTO_SCAN_CACHE` with a TTL — repeated UI
+    refreshes hit the cache instead of re-walking the daily-file tree.
+    """
+    key = str(root)
+    try:
+        root_mtime = root.stat().st_mtime
+    except OSError:
+        return []
+
+    now = time.monotonic()
+    cached = _CRYPTO_SCAN_CACHE.get(key)
+    if (cached is not None
+            and cached[1] == root_mtime
+            and now - cached[0] < _CRYPTO_SCAN_CACHE_TTL_SECONDS):
+        return list(cached[2])
+
+    # Venue is the scanned folder itself, e.g. ".../binance" -> "BINANCE".
+    venue_uc = root.name.upper()
+
+    # (base, quote) -> list of (year, month, filename, path) for sorting.
+    aggregated: dict[tuple[str, str], list[tuple[int, int, str, str]]] = {}
+    for csv_file in root.rglob("*.csv"):
+        try:
+            rel_parts = csv_file.relative_to(root).parts
+        except ValueError:
+            continue
+        if len(rel_parts) != 4:
+            continue
+        pair_dir, year_dir, month_dir, filename = rel_parts
+        if "-" not in pair_dir:
+            continue
+        if not _CRYPTO_YEAR_DIR_PATTERN.match(year_dir):
+            continue
+        if not _CRYPTO_MONTH_DIR_PATTERN.match(month_dir):
+            continue
+        base, _, quote = pair_dir.upper().partition("-")
+        if not base or not quote:
+            continue
+        aggregated.setdefault((base, quote), []).append(
+            (int(year_dir), int(month_dir), filename, str(csv_file))
+        )
+
+    entries: list[dict] = []
+    auto_id = 0
+    for (base, quote) in sorted(aggregated):
+        dated = sorted(aggregated[(base, quote)])
+        files = [path for _, _, _, path in dated]
+        auto_id -= 1
+        entries.append({
+            "path": files[0],   # nominal — loader uses the 'files' list
+            # Synthetic filename shaped so the cryptocurrency.json
+            # filename_pattern (and the UI filter) accepts it. Actual files
+            # are loaded via the 'files' list, not this path.
+            "filename": f"{base}-{quote}_{venue_uc}_LAST_OHLCV.csv",
+            "id": auto_id,
+            "symbol": base,
+            "quote_currency": quote,
+            "venue": venue_uc,
+            "name": f"{base}/{quote} ({venue_uc}, {len(files):,} daily files)",
+            "files": files,
+        })
+
+    with _CRYPTO_SCAN_CACHE_LOCK:
+        _CRYPTO_SCAN_CACHE[key] = (now, root_mtime, list(entries))
+    return entries
+
+
 def clear_fx_scan_cache() -> None:
-    """Drop the daily-layout scan caches (FX + commodity + index). Call after
-    manually adding new pair / commodity / index directories if you want the
-    next ``scan_csv_folder`` to see them immediately rather than waiting for
-    the TTL to expire."""
+    """Drop the daily-layout scan caches (FX + commodity + index + crypto). Call
+    after manually adding new pair / commodity / index / crypto directories if
+    you want the next ``scan_csv_folder`` to see them immediately rather than
+    waiting for the TTL to expire."""
     with _FX_SCAN_CACHE_LOCK:
         _FX_SCAN_CACHE.clear()
     with _COMMODITY_SCAN_CACHE_LOCK:
         _COMMODITY_SCAN_CACHE.clear()
     with _INDEX_SCAN_CACHE_LOCK:
         _INDEX_SCAN_CACHE.clear()
+    with _CRYPTO_SCAN_CACHE_LOCK:
+        _CRYPTO_SCAN_CACHE.clear()
 
 
 def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
@@ -512,11 +617,20 @@ def scan_csv_folder(folder: str = DEFAULT_CSV_FOLDER) -> list[dict]:
     if not results:
         results = _scan_commodity_daily_layout(folder_path)
 
-    # Last-resort fallback: index daily layout
+    # Index daily layout
     # (<root>/YYYY/MM/DD.MM.YYYY_complete_df_OHLCV.csv). Three-deep, no symbol
     # directory, single consolidated stream.
     if not results:
         results = _scan_index_daily_layout(folder_path)
+
+    # Last-resort fallback: nested crypto layout where the scanned root is the
+    # venue folder (<root>/<BASE-QUOTE>/YYYY/MM/<daily>.csv; venue = root name).
+    # Runs only when every earlier scanner came up empty — their filename
+    # regexes never match crypto daily files, and the 4-deep tree doesn't
+    # collide with the FX daily (5-deep) or index (3-deep) layouts, so a crypto
+    # tree falls through to here while the others are claimed before reaching it.
+    if not results:
+        results = _scan_crypto_nested_layout(folder_path)
 
     return results
 

@@ -230,7 +230,11 @@ def load_csv_and_store(
                           delimiter=delimiter)
 
     # Step 2: Create instrument
-    quote = inst_config.get("quote_currency") or "USD"
+    # An entry may carry an explicit quote currency (e.g. the nested-crypto
+    # scanner parses "AAVE-USD" → symbol="AAVE", quote_currency="USD"). It wins
+    # over the asset-class config default since variable-length crypto symbols
+    # can't be split by the fixed base_currency_length below.
+    quote = csv_entry.get("quote_currency") or inst_config.get("quote_currency") or "USD"
     base = csv_entry["symbol"]
 
     # For forex: split combined pair symbol (e.g., "EURUSD" → base="EUR", quote="USD")

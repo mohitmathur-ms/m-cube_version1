@@ -1,24 +1,24 @@
 {
   "label": "Cryptocurrency",
   "csv": {
-    "filename_pattern": "^\\d+_[A-Z]+_.+\\.csv$",
-    "filename_description": "id_SYMBOL_Name.csv (e.g., 1_BTC_Bitcoin.csv)",
+    "filename_pattern": "^(\\d+_[A-Z]+_.+|[A-Z0-9]+-[A-Z0-9]+_[A-Z0-9]+_LAST_OHLCV)\\.csv$",
+    "filename_description": "Flat: id_SYMBOL_Name.csv (e.g., 1_BTC_Bitcoin.csv). Nested layout: scan the <venue> folder containing <BASE-QUOTE>/YYYY/MM/<daily>.csv (e.g., scan D:\\crypto_yyy\\binance which holds binance/AAVE-USD/2021/02/01.csv)",
     "required_columns": [
-      "ts",
+      "timestamp",
       "open",
       "high",
       "low",
       "close",
       "volume"
     ],
-    "timestamp_column": "ts",
+    "timestamp_column": "timestamp",
     "timestamp_format": "auto",
     "delimiter": ","
   },
   "instrument": {
     "type": "CurrencyPair",
     "quote_currency": "USD",
-    "price_precision": 2,
+    "price_precision": null,
     "size_precision": 8,
     "currency_type": 2,
     "timeframe": "1-DAY"

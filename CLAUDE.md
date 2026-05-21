@@ -4,13 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**m-cube** — a backtesting and research platform for FX, crypto and other
-asset classes built on **NautilusTrader**. The product is a single Flask
-web app (Python backend + vanilla HTML/CSS/JS SPA frontend) for loading
-historical data, running single-strategy and multi-slot portfolio
-backtests with exit management (SL/TP/trailing), and viewing tearsheets.
-A second Flask app under [adapter_admin/](adapter_admin/) administers
-broker adapter configurations.
+**m-cube** — a backtesting and research platform built on **NautilusTrader**.
+The product is a single Flask web app (Python backend + vanilla HTML/CSS/JS
+SPA frontend) for loading historical data, running single-strategy and
+multi-slot portfolio backtests with exit management (SL/TP/trailing), and
+viewing tearsheets. It targets multiple asset classes: **FX**, **crypto**,
+**commodities** and **indices** are wired end-to-end, with CSV/instrument
+schema stubs already in place for **equity**, **debt** and **alternative**
+assets (see `adapter_admin/data_formats/`). Every single-strategy backtest
+also auto-generates an aggregation report (a self-rebuilding HTML catalog of
+all runs plus per-stage bar-capture CSVs) under `aggregation_reports/`.
+
+A second Flask app under [adapter_admin/](adapter_admin/) (port **5001**)
+administers broker/venue adapter configurations, per-asset-class data-format
+schemas, and the multi-user registry.
 
 Primary docs to read when context is needed:
 - [README_APP.md](README_APP.md) — user-facing app overview
@@ -31,7 +38,7 @@ This is a Windows-first codebase. The default shell is PowerShell.
 # Manual run (assumes venv activated or pip install -r requirements.txt done)
 python server.py
 
-# Adapter Admin Panel (separate Flask app, default port differs)
+# Adapter Admin Panel (separate Flask app, http://localhost:5001)
 python adapter_admin\admin_server.py
 ```
 
@@ -42,11 +49,15 @@ on mismatch). Major dep pins: `nautilus_trader==1.224.0`, `Flask==3.1.3`,
 ### Tests
 
 ```powershell
-# pytest test suite (custom strategy loader, perf regression, aggregator)
+# pytest test suite (custom strategy loader, perf regression, leg/target features, ...)
 venv\Scripts\python.exe -m pytest tests\
 
 # Single test file
-venv\Scripts\python.exe -m pytest tests\test_aggregator.py -v
+venv\Scripts\python.exe -m pytest tests\test_custom_strategy_loader.py -v
+
+# NOTE: tests\test_aggregator.py still imports the removed `core/aggregator.py`
+# (the aggregation logic was superseded by the reporting subsystem) and will
+# fail at collection until that module is restored — skip it for now.
 
 # Verification harness (parses 100+ checks against this session's wiring;
 # exits non-zero on any failure — keep this green)
@@ -88,9 +99,24 @@ server.py  (Flask REST API — every endpoint takes an X-User-Id header)
         └─ _merge_portfolio_results / _apply_portfolio_clip (post-run aggregation + portfolio SL/TP halt)
   └─ core/managed_strategy.py      L2  ManagedExitStrategy (the SL/TP/trailing/RBO engine)
   └─ strategies/                   L1  Pure entry strategies (EMA Cross, RSI, Bollinger, Four MA, Range Breakout)
-  └─ core/{csv_loader,nautilus_loader,instrument_factory,aggregator}.py
+  └─ core/{csv_loader,nautilus_loader,instrument_factory}.py
                                    L0  Data ingest → ParquetDataCatalog
+  └─ core/{aggregation_report,sniffers,report_generator}.py
+                                   --  Reporting: ledger + auto HTML + bar-capture CSVs
 ```
+
+Supporting `core/` modules (not part of the L0–L3 stack but referenced throughout):
+- `aggregation_report.py` — owns the `aggregation_reports/` path layout, the JSON
+  ledger, and the single self-rebuilding `combined_report.html`.
+- `sniffers.py` — capture-strategies that dump the bar stream at three pipeline
+  stages (raw engine data, DataEngine dispatch, post-aggregation strategy boundary).
+- `report_generator.py` — interpolates per-backtest tearsheet HTML (orderbook, fills,
+  P&L, logs) from a NautilusTrader result; `_pandas_utils.py` provides its fast
+  row iteration helper.
+- `runtime_history.py` — persists EMA-weighted per-`(bar_type, strategy)` wall-times
+  to `.runtime_history.json` for longest-processing-time scheduling heuristics.
+- `templates.py` — built-in portfolio templates (Trend Following, Mean Reversion, etc.).
+- `strategies.py` — thin backward-compat re-export of the `strategies/` package registry.
 
 **Layer cheat-sheet** referenced throughout `LOGICS_BACKEND_STATUS.md`:
 - L1 = `strategies/<name>.py` — pure signal logic, no exit management
@@ -242,15 +268,42 @@ Plotly chart so colors stay consistent.
 
 ### Adapter Admin Panel
 
-A separate Flask app under [adapter_admin/](adapter_admin/) manages
-broker/exchange configurations stored as JSON in
-`adapter_admin/adapters_config/*.json` (one per venue). Built-in adapters
-are auto-discovered from the installed `nautilus_trader` package
-(`adapter_discovery.py`); custom adapters can be uploaded as Python files
-to `adapter_admin/custom_adapters/`. The main server reads these configs at
-backtest time via [core/venue_config.py](core/venue_config.py) — the venue
-is parsed from the bar type string. Sensitive fields (`api_key`, `secret`,
-etc.) are masked with `****<last-4>` when sent to the frontend.
+A separate Flask app under [adapter_admin/](adapter_admin/), served on
+**port 5001**, with its own vanilla-JS SPA in `adapter_admin/static/`
+(Dashboard, Add Adapter, Custom Adapters, Data Formats, Users pages). It owns
+three kinds of configuration:
+
+**1. Venue/adapter configs** — stored as JSON in
+`adapter_admin/adapters_config/*.json` (one per venue; currently `binance_ms`,
+`coinbase_ms`, `commodities_ms`, `forex_ms`, `nifty_futures_ms`). Built-in
+adapters are auto-discovered from the installed `nautilus_trader` package by
+`adapter_discovery.py` (it introspects `*DataClientConfig` / `*ExecClientConfig`
++ factory classes and turns their fields into UI form definitions). Custom
+adapters are uploaded as Python files to `adapter_admin/custom_adapters/` and
+validated in a subprocess by `custom_adapter_loader.py` (must export
+`ADAPTER_NAME`, a `DATA_CLIENT_CLASS`/`EXEC_CLIENT_CLASS`, `CONFIG_CLASS`,
+`FACTORY_CLASS`, and optional `PARAMS`) — subprocess isolation prevents a bad
+file from crashing the panel via the Rust extension. `adapter_registry.py`
+handles masking: sensitive fields (`api_key`, `secret`, `passphrase`, tokens,
+etc.) are sent to the frontend as `****<last-4>`, and on update an incoming
+masked value preserves the stored secret instead of overwriting it. Each config
+also carries `account_base_currency` and an `fx_conversion` block — these drive
+cross-currency PnL conversion (see the FX-specific concerns above). The main
+server reads these configs at backtest time via
+[core/venue_config.py](core/venue_config.py) — the venue is parsed from the
+bar type string.
+
+**2. Per-asset-class data-format schemas** — `adapter_admin/data_formats/*.json`,
+one per asset class (`cryptocurrency`, `commodity`, `equity`, `fx`, `debt`,
+`index`, `alternative`). Each describes how that class's CSV input is parsed
+(filename pattern, required/optional columns, timestamp format), how its
+NautilusTrader instrument is constructed (type, quote currency, exposed
+ASK/BID/MID sides, price/size precision, default timeframe), and default
+trading params (maker/taker fees, init/maint margin). These are consumed at
+data-load time; `equity`/`debt`/`alternative` are still mostly null stubs.
+
+**3. The multi-user registry** — the panel also reads/writes the repo-root
+[config/users.json](config/users.json) (see Multi-user model above).
 
 ### Catalog format
 
@@ -267,6 +320,34 @@ There is a fast-path in `server.py::_bar_type_range_from_files` that parses
 date ranges from parquet **filenames** (`<start_iso>_<end_iso>.parquet`) instead
 of opening rows — this is the difference between ~1 second and ~3 minutes for
 the FX catalog with ~24M bars. Don't replace this with a `catalog.bars()` scan.
+
+### Auto-generated reports
+
+Every single-strategy `run_backtest()` automatically records an aggregation
+report after `engine.run()` —
+[core/backtest_runner.py](core/backtest_runner.py) calls
+`core.aggregation_report.record_run(...)`, which appends one row to
+`aggregation_reports/_ledger.json` and re-renders the single global
+`aggregation_reports/combined_report.html` from that ledger. In parallel,
+`core/sniffers.py` captures the bar stream at three pipeline stages and writes
+CSVs under `aggregation_reports/{asset_class}/{symbol}/`:
+
+```
+raw_engine_sniffer_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv   # engine.data before run()
+sniffer_data_engine_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv  # what DataEngine dispatches
+sniffer_strategy_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv     # what reaches the strategy
+                                                      # (after any INTERNAL aggregation)
+```
+
+**Contract:** all report functions swallow and log their own errors — a
+report-pipeline failure must **never** propagate out and kill a backtest. Keep
+this invariant when touching the reporting code.
+
+Both `aggregation_reports/` and the portfolio-level `reports/` directory are
+runtime artifacts and are **gitignored** — don't commit their contents. The
+portfolio-level HTML tearsheets in `reports/<user_id>/` are produced separately
+by `core/report_generator.py` and are only generated on explicit request from
+the relevant `server.py` endpoints, not auto-triggered.
 
 ## Conventions specific to this repo
 

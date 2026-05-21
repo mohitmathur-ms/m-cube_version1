@@ -306,8 +306,12 @@ def csv_load():
 
     for entry in inline_entries:
         try:
+            # An entry may carry its own venue (the nested-crypto scanner parses
+            # it from the folder path, since a single root can span venues);
+            # fall back to the request-level dropdown venue when it doesn't.
             result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
-                                        venue=venue, data_format=data_format)
+                                        venue=(entry.get("venue") or venue),
+                                        data_format=data_format)
             results.append(_build_load_row(entry, result, asset_class))
         except Exception as e:
             errors.append({"symbol": entry.get("symbol", "?"),
@@ -326,7 +330,8 @@ def csv_load():
             }
         thread = threading.Thread(
             target=_run_csv_load_job,
-            args=(job_id, entry, catalog_path, venue, data_format, asset_class),
+            args=(job_id, entry, catalog_path, (entry.get("venue") or venue),
+                  data_format, asset_class),
             daemon=True,
         )
         thread.start()
