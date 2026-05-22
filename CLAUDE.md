@@ -77,6 +77,9 @@ python tests\smoke_tests\stress_test_stoploss_report.py
 | `_USE_GROUPING=1` | Slots that share `(bar_type, start_date, end_date, custom_strategies_dir)` run in **one** shared `BacktestEngine` (bars load once per group instead of once per slot). Falls back per-slot for group size 1. |
 | `_USE_BACKTEST_NODE=1` | Routes through `BacktestNode` (Path B) instead of building a `BacktestEngine` per worker. Auto-falls-back to Path A when `run_on_days` or `entry_start_time/end_time` filters are set. Result dict gets `"path_b": True`. |
 | `_PROFILE_PHASES=1` | Emits per-phase wall-time (`registry_load`, `bars_load`, `engine_run`, etc.) inside the slot/group helpers. Zero cost when off. |
+| `_USE_VWAP_FILL=1` | Reprices SL/Target exit fills to a VWAP-proxy fill (per spec §4.2). Builds a VWAP lookup from the ASK/BID bars instead of filling at the bar close. |
+| `_USE_PF_AGG_MOVE_SL=1` | Two-pass portfolio-level **aggregated** Move-SL trigger: pass 1 discovers the combined-P&L timeline, pass 2 replays slots with the aggregate trigger injected. ~2× runtime; only active when an aggregate/cross-slot Move-SL is configured. |
+| `_USE_PF_REEXEC_REPLAY=1` | Portfolio **ReExecute replay** (spec §2.4): when a portfolio SL/Target fires ReExecute, every slot is re-run flat from the clip timestamp and spliced onto the pre-clip trades. Recurses per configured ReExecute count (0 = unlimited, hard-capped at 50). |
 
 Verify grouping parity for a specific portfolio before trusting `_USE_GROUPING=1`:
 ```powershell
@@ -99,11 +102,33 @@ server.py  (Flask REST API — every endpoint takes an X-User-Id header)
         └─ _merge_portfolio_results / _apply_portfolio_clip (post-run aggregation + portfolio SL/TP halt)
   └─ core/managed_strategy.py      L2  ManagedExitStrategy (the SL/TP/trailing/RBO engine)
   └─ strategies/                   L1  Pure entry strategies (EMA Cross, RSI, Bollinger, Four MA, Range Breakout)
-  └─ core/{csv_loader,nautilus_loader,instrument_factory}.py
+  └─ core/{csv_loader/,nautilus_loader.py,instrument_factory/}
                                    L0  Data ingest → ParquetDataCatalog
+                                       (csv_loader & instrument_factory are now packages)
   └─ core/{aggregation_report,sniffers,report_generator}.py
                                    --  Reporting: ledger + auto HTML + bar-capture CSVs
 ```
+
+The two L0 ingest modules are **packages**, not single files (recently
+modularized into single-responsibility sub-packages; each public API is
+re-exported from the package `__init__.py`, so `from core.csv_loader import
+scan_csv_folder` / `from core.instrument_factory import create_instrument`
+keep working unchanged):
+- `core/csv_loader/` — CSV scan → clean OHLCV → MID synthesis. Public API:
+  `scan_csv_folder`, `load_csv`, `concat_side`, `load_pair_mid`,
+  `get_display_label`, `clear_fx_scan_cache`, `DEFAULT_CSV_FOLDER`,
+  `QUANTITY_MAX`. Sub-packages: per-layout scanners (`fx_daily_scanner`,
+  `fx_consolidated_scanner`, `commodity_daily_scanner`, `index_daily_scanner`,
+  `crypto_nested_scanner`) + `folder_scanner` orchestrator, `csv_reader`,
+  `side_concat` (parallel one-side concat), `mid_merge` (ASK+BID → MID),
+  `timestamp_parser` (vectorized), `scan_cache` (mtime+TTL), `constants`.
+- `core/instrument_factory/` — bar-type → NautilusTrader `CurrencyPair`.
+  Public API: `create_instrument`, `instrument_for_bar_type`, `VENUE`,
+  `PRICE_PRECISION`, `BASE_PRICE_PRECISION`, `CURRENCY_PRECISION`.
+  Sub-packages: `bar_type_resolver`, `instrument_builder`, `currency`,
+  `price_size_precision`, `lot_size`, `catalog_lookup` (authoritative lookup
+  from the ParquetDataCatalog), `data_format_config` (per-asset-class JSON).
+  Construction is invoked from `core/nautilus_loader.py` after CSV load.
 
 Supporting `core/` modules (not part of the L0–L3 stack but referenced throughout):
 - `aggregation_report.py` — owns the `aggregation_reports/` path layout, the JSON
@@ -186,18 +211,47 @@ There are three backtest execution paths that the runner can dispatch to:
 These exist as feature flags for safe rollout. Don't remove the flag gates
 without verifying parity with `scripts/verify_grouping_parity.py`.
 
+### Other gated execution behaviors
+
+Three more flags (see the runtime-flags table) gate non-default exit/fill logic
+in `backtest_runner.py`, all off by default and all additive:
+
+- **VWAP fill** (`_USE_VWAP_FILL`): instead of filling SL/Target exits at the
+  bar close, a VWAP-proxy lookup is built from the ASK/BID bars and the exit
+  fill is repriced to it.
+- **Aggregate Move-SL** (`_USE_PF_AGG_MOVE_SL`): a two-pass replay. Pass 1 runs
+  to discover the combined cross-slot P&L timeline; pass 2 re-runs with the
+  portfolio-aggregate Move-SL trigger injected (`move_sl_agg_pnl_*` fields on
+  `PortfolioConfig`). Roughly doubles runtime, so it's gated.
+- **ReExecute replay** (`_USE_PF_REEXEC_REPLAY`): when a portfolio SL/Target
+  resolves to ReExecute, every slot is re-run flat starting at the clip
+  timestamp and the new trades are spliced onto the pre-clip trades. It
+  recurses per the configured ReExecute count (hard-capped at 50).
+
 ### Portfolio data model
 
 `core/models.py` is the schema. Three nested dataclasses:
 
 ```
-PortfolioConfig (portfolio-level: capital, max_loss/profit, run_on_days,
-   │              entry window, squareoff, RBO settings, portfolio SL/TP)
+PortfolioConfig (~90 fields. portfolio-level: capital, max_loss/profit,
+   │              run_on_days, entry window, squareoff, RBO settings;
+   │              portfolio SL/Target + trailing; Move-SL-to-cost incl. the
+   │              aggregate trigger (move_sl_agg_pnl_*); cross-portfolio SL/Target
+   │              dispatch (pf_sl/tgt_target_portfolio); ReExecute tab; product/
+   │              MIS squareoff; live-only monitoring fields)
    └─ StrategySlotConfig (per-slot: strategy_name, bar_type_str, lots,
-          │               allocation_pct, start/end_date, squareoff)
-          └─ ExitConfig (per-leg: SL/TP type+value, trailing, target lock,
-                         sl_wait_bars, on_sl/target_action, squareoff)
+          │               allocation_pct, start/end_date, squareoff,
+          │               strategy_bar_types = composite/aggregated bar list)
+          └─ ExitConfig (per-leg: SL/TP type+value incl. ATR-based (sl_atr_*,
+                         tgt_atr_*), trailing, target lock, leg-level trailing
+                         target (tgt_trail_*), sl_wait_bars/sl_wait_sec +
+                         tgt_wait_sec, on_sl/target_action, cross-leg re-entry
+                         (execute_target_leg_id, reentry_price), squareoff)
 ```
+
+The schema is large and still growing; treat the field groups above as
+categories, not an exhaustive list — read `core/models.py` for the authoritative
+set and defaults.
 
 Saved as JSON under `portfolios/<user_id>/<name>.json`. The `_default`
 user_id is reserved for legacy portfolios pre-multi-user (see
@@ -222,7 +276,8 @@ description says so.
 - **Bar type strings** are Nautilus-formatted: `"<symbol>.<venue>-<timeframe>-<price_type>-EXTERNAL"`
   (e.g. `"USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL"`).
 - **MID bars are synthesized** from ASK+BID at CSV-load time
-  ([core/csv_loader.py](core/csv_loader.py)). When a MID slot runs, the engine
+  ([core/csv_loader/mid_merge/](core/csv_loader/mid_merge/) —
+  `_merge_ask_bid_to_mid` / `load_pair_mid`). When a MID slot runs, the engine
   also needs the matching ASK and BID bar types loaded — see
   `_pair_bid_ask_bar_type` in `backtest_runner.py`.
 - **Cross-currency PnL** is converted via [core/fx_rates.py](core/fx_rates.py).
@@ -330,13 +385,16 @@ report after `engine.run()` —
 `aggregation_reports/_ledger.json` and re-renders the single global
 `aggregation_reports/combined_report.html` from that ledger. In parallel,
 `core/sniffers.py` captures the bar stream at three pipeline stages and writes
-CSVs under `aggregation_reports/{asset_class}/{symbol}/`:
+CSVs under `aggregation_reports/{asset_class}/{symbol}/{target_timeframe}/`
+(the `{target_timeframe}` directory is the INTERNAL aggregation timeframe the
+strategy trades on — e.g. `5MIN` for a 1-min→5-min run — or the EXTERNAL base
+timeframe when no aggregation is used):
 
 ```
-raw_engine_sniffer_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv   # engine.data before run()
-sniffer_data_engine_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv  # what DataEngine dispatches
-sniffer_strategy_<TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv     # what reaches the strategy
-                                                      # (after any INTERNAL aggregation)
+raw_engine_sniffer_<EXT_TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv   # engine.data before run()
+sniffer_data_engine_<EXT_TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv  # what DataEngine dispatches
+sniffer_strategy_<TARGET_TF>_<DDMMMYYYY>_<DDMMMYYYY>.csv  # what reaches the strategy
+                                                          # (after any INTERNAL aggregation)
 ```
 
 **Contract:** all report functions swallow and log their own errors — a

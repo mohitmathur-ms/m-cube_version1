@@ -7,10 +7,14 @@ Output layout::
     aggregation_reports/
       _ledger.json
       combined_report.html
-      {asset_class}/{symbol}/
-        raw_engine_sniffer_{TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
-        sniffer_data_engine_{TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
-        sniffer_strategy_{TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
+      {asset_class}/{symbol}/{target_timeframe}/
+        raw_engine_sniffer_{EXT_TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
+        sniffer_data_engine_{EXT_TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
+        sniffer_strategy_{TARGET_TIMEFRAME}_{DDMMMYYYY}_{DDMMMYYYY}.csv
+
+    ``{target_timeframe}`` is the INTERNAL aggregation timeframe the strategy
+    trades on (e.g. ``5MIN`` for a 1-min→5-min run), or the EXTERNAL base
+    timeframe when no aggregation is used.
 
 CSVs are written by :mod:`core.sniffers`; this module owns paths,
 the ledger, and the HTML.
@@ -143,16 +147,25 @@ def paths_for(
 ) -> dict[str, Path]:
     """Return absolute paths for the three sniffer CSVs.
 
+    All three CSVs are filed under a per-run **target-timeframe** directory
+    (``{asset_class}/{symbol}/{TARGET_TF}/``). The target timeframe is the
+    INTERNAL aggregation timeframe when there is one, else the EXTERNAL (base)
+    timeframe — i.e. the resolution the strategy actually trades on. So a
+    1-min→5-min run drops all three CSVs into ``.../{symbol}/5MIN/``.
+
     The ``sniffer_strategy`` CSV is tagged with the INTERNAL timeframe
     if there is one, else falls back to the EXTERNAL timeframe (in which
     case the file is expected to contain only the header — diagnostic of
-    a strategy that doesn't use any aggregations).
+    a strategy that doesn't use any aggregations). The raw-engine and
+    data-engine CSVs keep the EXTERNAL (base) timeframe in their filename
+    but live under the target-timeframe folder.
     """
-    out_dir = REPORTS_ROOT / asset_class / symbol
     range_tag = f"{_fmt_ddmmmyyyy(start_date)}_{_fmt_ddmmmyyyy(end_date)}"
     ext_tag = _compact_timeframe(timeframe_external)
     strat_tf = timeframe_internal or timeframe_external
     strat_tag = _compact_timeframe(strat_tf)
+    # Segregate every run's CSVs by the target timeframe the strategy trades on.
+    out_dir = REPORTS_ROOT / asset_class / symbol / strat_tag
     return {
         "raw_engine_sniffer": out_dir / f"raw_engine_sniffer_{ext_tag}_{range_tag}.csv",
         "sniffer_data_engine": out_dir / f"sniffer_data_engine_{ext_tag}_{range_tag}.csv",
