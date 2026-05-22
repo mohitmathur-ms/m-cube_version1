@@ -28,8 +28,8 @@
       "MID"
     ],
     "price_precision": 3,
-    "size_precision": 2,
-    "currency_type": 0,
+    "size_precision": 0,
+    "currency_type": 3,
     "timeframe": "1-MINUTE"
   },
   "trading": {
