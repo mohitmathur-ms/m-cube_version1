@@ -1,0 +1,186 @@
+[
+  {
+    "id": "AGG1",
+    "title": "Streaming aggregation coarseness: 1-MIN vs 5-MIN vs 1-HOUR (EMA Cross 10/30, no SL/TP)",
+    "settings": {
+      "strategy": "EMA Cross 10/30",
+      "instrument": "EURUSD MID",
+      "base": "1-MINUTE",
+      "aggregated": [
+        "5-MINUTE",
+        "1-HOUR"
+      ],
+      "exit": "signal-only"
+    },
+    "range": "2021-01-04 .. 2021-01-29",
+    "runs": {
+      "base_1m": {
+        "total_trades": 1138,
+        "total_pnl": -85503.98,
+        "final_balance": 14496.020000000004,
+        "win_rate": 1.3181019332161688,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 569,
+          "EMA Cross BUY": 569
+        }
+      },
+      "agg_5m": {
+        "total_trades": 221,
+        "total_pnl": -16572.54,
+        "final_balance": 83427.45999999999,
+        "win_rate": 6.787330316742081,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross BUY": 111,
+          "EMA Cross SELL": 110
+        }
+      },
+      "agg_1h": {
+        "total_trades": 13,
+        "total_pnl": -987.41,
+        "final_balance": 99012.59,
+        "win_rate": 23.076923076923077,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross BUY": 7,
+          "EMA Cross SELL": 6
+        }
+      }
+    },
+    "verdict": "PASS",
+    "note": "trades base1m=1138 >= 5m=221 >= 1h=13 (monotonic=True, 5m!=base=True, 5m fired=True, all PnL finite=True)",
+    "status": "COMPLETED",
+    "seconds": 19.6
+  },
+  {
+    "id": "AGG2",
+    "title": "Format-A bid/ask aggregation to 15-MINUTE (paired-aggregator dispatch path)",
+    "settings": {
+      "strategy": "EMA Cross 9/21",
+      "instrument": "EURUSD MID -> auto BID/ASK pair",
+      "base": "1-MINUTE",
+      "aggregated": "15-MINUTE",
+      "exit": "Format-A, SL 20% / TP 30%"
+    },
+    "range": "2021-01-04 .. 2021-01-29",
+    "runs": {
+      "base_1m": {
+        "total_trades": 37,
+        "total_pnl": -2778.23,
+        "final_balance": 97221.77,
+        "win_rate": 18.91891891891892,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 18,
+          "Stop Loss": 19,
+          "EMA Cross BUY": 19,
+          "Squareoff": 10,
+          "Take Profit": 7
+        }
+      },
+      "agg_15m": {
+        "total_trades": 33,
+        "total_pnl": -2156.86,
+        "final_balance": 97843.14,
+        "win_rate": 18.181818181818183,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross BUY": 16,
+          "Take Profit": 6,
+          "Stop Loss": 14,
+          "EMA Cross SELL": 17,
+          "Squareoff": 12
+        }
+      }
+    },
+    "verdict": "PASS",
+    "note": "Format-A bid/ask aggregated to 15m ran (trades=33, base=37, differs=True, PnL finite=True)",
+    "status": "COMPLETED",
+    "seconds": 13.0
+  },
+  {
+    "id": "MIS1",
+    "title": "MIS vs NRML: MIS supplies a daily forced squareoff (15:15 IST), NRML carries forward",
+    "settings": {
+      "strategy": "EMA Cross 10/30",
+      "instrument": "EURUSD MID",
+      "mis_squareoff_time": "15:15 Asia/Kolkata",
+      "explicit squareoff_time": "none",
+      "exit": "wide SL 50% / TP 80% so squareoff dominates"
+    },
+    "range": "2021-01-04 .. 2021-01-29",
+    "runs": {
+      "mis": {
+        "total_trades": 11,
+        "total_pnl": -925.56,
+        "final_balance": 99074.44,
+        "win_rate": 9.090909090909092,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 7,
+          "Squareoff": 10,
+          "EMA Cross BUY": 4
+        }
+      },
+      "nrml": {
+        "total_trades": 6,
+        "total_pnl": -1107.04,
+        "final_balance": 98892.96,
+        "win_rate": 16.666666666666664,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 6,
+          "Stop Loss": 5,
+          "Take Profit": 1
+        }
+      }
+    },
+    "verdict": "PASS",
+    "note": "MIS forced Squareoff exits=10 (>0 expected); NRML Squareoff exits=0 (0 expected); PnL finite=True",
+    "status": "COMPLETED",
+    "seconds": 9.0
+  },
+  {
+    "id": "MIS2",
+    "title": "Explicit portfolio squareoff_time (09:30 IST) overrides the MIS default (15:15 IST)",
+    "settings": {
+      "strategy": "EMA Cross 10/30",
+      "instrument": "EURUSD MID",
+      "mis_default": "15:15 Asia/Kolkata",
+      "explicit": "09:30 Asia/Kolkata",
+      "exit": "wide SL 50% / TP 80% so squareoff dominates"
+    },
+    "range": "2021-01-04 .. 2021-01-29",
+    "runs": {
+      "mis_default": {
+        "total_trades": 11,
+        "total_pnl": -925.56,
+        "final_balance": 99074.44,
+        "win_rate": 9.090909090909092,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 7,
+          "Squareoff": 10,
+          "EMA Cross BUY": 4
+        }
+      },
+      "explicit": {
+        "total_trades": 12,
+        "total_pnl": -947.28,
+        "final_balance": 99052.72,
+        "win_rate": 0.0,
+        "per_strategy_slots": 1,
+        "exit_reasons": {
+          "EMA Cross SELL": 7,
+          "Squareoff": 11,
+          "EMA Cross BUY": 5
+        }
+      }
+    },
+    "verdict": "PASS",
+    "note": "MIS-default Squareoff=10, explicit-09:30 Squareoff=11; both square off=True; trade profiles differ=True; finite=True",
+    "status": "COMPLETED",
+    "seconds": 9.6
+  }
+]

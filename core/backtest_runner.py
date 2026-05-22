@@ -84,6 +84,40 @@ def _config_supports_extra_bar_types(config_class) -> bool:
     return False
 
 
+def _config_supports_aggregate_to(config_class) -> bool:
+    """Memoized check for whether a strategy config accepts aggregate_to_bar_type."""
+    cached = config_class.__dict__.get("_supports_aggregate_to")
+    if cached is not None:
+        return cached
+    for cls in reversed(config_class.__mro__):
+        if "aggregate_to_bar_type" in getattr(cls, "__annotations__", {}):
+            config_class._supports_aggregate_to = True
+            return True
+    config_class._supports_aggregate_to = False
+    return False
+
+
+def _aggregate_target_for_slot(slot, base_bar_type) -> str:
+    """Plain EXTERNAL bar type the leg's first strategy timeframe aggregates to,
+    or "" when none is selected or it equals the base. Mirrors the logic in
+    ``config_from_exit`` so the raw (non-ManagedExit) strategy path — used when a
+    leg has no SL/TP/squareoff/RBO/run_on_days — aggregates identically to the
+    managed path instead of silently dropping the aggregation."""
+    from core.aggregator import external_from_composite
+    sbts = [str(s) for s in (getattr(slot, "strategy_bar_types", None) or []) if s]
+    if not sbts:
+        return ""
+    ext = external_from_composite(sbts[0])
+    if not ext:
+        return ""
+    try:
+        if BarType.from_str(ext) != base_bar_type:
+            return ext
+    except Exception:  # noqa: BLE001 — malformed → no aggregation
+        return ""
+    return ""
+
+
 def _group_slots(
     enabled_slots: list,
     capitals_by_slot_id: dict[str, float],
@@ -544,6 +578,66 @@ def _hms_to_sec(hms: str) -> int:
     return h * 3600 + m * 60 + s
 
 
+def add_one_hour(t: str | None) -> str | None:
+    """Shift an "HH:MM" / "HH:MM:SS" local time forward by one hour.
+
+    Implements the spec's ``add_one_hour()`` for the Winter Time Adjustment
+    (execution_logic_target.html §9). ``None`` / empty / malformed input is
+    returned unchanged so callers can apply it unconditionally. A shift that
+    would cross midnight is clamped to end-of-day (23:59[:59]) rather than
+    wrapping — session times never legitimately wrap, and clamping preserves
+    "late square-off" intent instead of silently moving it to 00:xx.
+    """
+    if not t:
+        return t
+    parts = str(t).split(":")
+    try:
+        h = int(parts[0])
+        m = int(parts[1])
+        s = int(parts[2]) if len(parts) > 2 else None
+    except (ValueError, IndexError):
+        return t
+    h += 1
+    if h > 23:
+        h, m = 23, 59
+        if s is not None:
+            s = 59
+    if s is not None:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{h:02d}:{m:02d}"
+
+
+def _apply_winter_time(portfolio) -> bool:
+    """Apply the Winter Time Adjustment to all configured local times in place.
+
+    Spec execution_logic_target.html §9: when winter time is in effect for a
+    US-listed instrument, the engine shifts the raw configured times by +1 hour
+    before applying them. We mutate the (per-run, freshly-loaded) portfolio's
+    intraday time fields — entry window, portfolio/MIS square-off, RBO windows,
+    and every slot/leg square-off override — so all downstream paths (Path A
+    per-slot, grouped, Path B) see the shifted values uniformly. Dates are not
+    touched. Returns True when a shift was applied (for logging). No-op unless
+    ``portfolio.winter_time_adjust`` is set.
+    """
+    if not getattr(portfolio, "winter_time_adjust", False):
+        return False
+    portfolio.entry_start_time = add_one_hour(portfolio.entry_start_time)
+    portfolio.entry_end_time = add_one_hour(portfolio.entry_end_time)
+    portfolio.squareoff_time = add_one_hour(portfolio.squareoff_time)
+    portfolio.mis_squareoff_time = add_one_hour(portfolio.mis_squareoff_time)
+    portfolio.range_monitoring_start = add_one_hour(portfolio.range_monitoring_start)
+    portfolio.range_monitoring_end = add_one_hour(portfolio.range_monitoring_end)
+    portfolio.rbo_entry_start = add_one_hour(portfolio.rbo_entry_start)
+    portfolio.rbo_entry_end = add_one_hour(portfolio.rbo_entry_end)
+    for slot in portfolio.slots:
+        if getattr(slot, "squareoff_time", None):
+            slot.squareoff_time = add_one_hour(slot.squareoff_time)
+        ec = getattr(slot, "exit_config", None)
+        if ec is not None and getattr(ec, "squareoff_time", None):
+            ec.squareoff_time = add_one_hour(ec.squareoff_time)
+    return True
+
+
 def _resolve_rbo(portfolio) -> tuple[_RBOSettings | None, str | None]:
     """Validate portfolio.rbo_* fields per rbo_logics.html.
 
@@ -781,9 +875,11 @@ _OPTIONS_ONLY_PF_SL_TYPES = ("Combined Premium", "Absolute Combined Premium")
 _OPTIONS_ONLY_PF_TGT_TYPES = ("Combined Premium", "Absolute Combined Premium")
 _VALID_PF_ACTIONS_FX = (
     "SqOff", "ReExecute",
-    # ReExecute-family — accepted; the "at Entry Price" variants currently
-    # fall back to plain ReExecute behavior (full price-wait gating relies on
-    # leg-level ReEntry, now implemented per spec §1.2 1.2(d)).
+    # ReExecute-family — all three drive the config-driven portfolio ReExecute
+    # replay (spec §2.4): slots re-run flat from the clip timestamp and the
+    # segment is spliced on. The "at Entry Price" variants replay as plain
+    # ReExecute (the FX adaptation the spec marks ⚙️ — price-wait re-entry at a
+    # specific level lives at the leg level, spec §1.2(d)).
     "ReExecute at Entry Price",
     "ReExecute Same Contract at EntryPrice",
     # Cross-portfolio actions (spec §2.1(h)/(i)/(j)). Each clip in this
@@ -1645,14 +1741,20 @@ def _user_sl_clip(
     eff_max_loss: float | None,
     user_trail_sl: dict | None,
     all_slot_ids: list[str],
+    scope_label: str = "USER",
 ) -> _ClipResult:
-    """User-level SL clip (spec §3 Level 3 / execution_logic.html §6).
+    """User-level (or tag-level) SL clip (spec §3 Level 3 / §6 / §11).
 
     Walks the merged equity curve in combined-PnL terms (this portfolio's PnL
-    plus the user's cumulative PnL from earlier portfolios). The user Max-Loss
-    cap — optionally ratcheted tighter each bar by the user Trailing SL — is a
-    real force-sqoff: at the first breaching bar the whole portfolio is clipped
-    (every slot), and post-clip trades are dropped by the caller.
+    plus ``cum_user_pnl`` — the cumulative PnL the scope has accrued from
+    earlier portfolios). The Max-Loss cap — optionally ratcheted tighter each
+    bar by the Trailing SL — is a real force-sqoff: at the first breaching bar
+    the whole portfolio is clipped (every slot), and post-clip trades are
+    dropped by the caller.
+
+    ``scope_label`` ("USER" or "TAG") only flavours the clip reason / log
+    strings so the two tiers are distinguishable downstream; the arithmetic is
+    identical. The tag tier reuses this exact walk one level down (spec §11).
     """
     if eff_max_loss is None:
         return _ClipResult()
@@ -1672,9 +1774,9 @@ def _user_sl_clip(
                 anchor += steps * user_trail_sl["every"]
         if combined <= -u_sl:
             ratcheted = bool(user_trail_sl) and u_sl < abs(float(eff_max_loss))
-            reason = "USER_TRAIL_STOPLOSS" if ratcheted else "USER_STOPLOSS"
+            reason = f"{scope_label}_TRAIL_STOPLOSS" if ratcheted else f"{scope_label}_STOPLOSS"
             logs.append(
-                f"USER_SL_HIT | reason={reason} | combined_pnl={combined:.2f} "
+                f"{scope_label}_SL_HIT | reason={reason} | combined_pnl={combined:.2f} "
                 f"| effective_sl={u_sl:.2f} | clip_ts={ts}"
             )
             return _ClipResult(
@@ -1750,8 +1852,9 @@ def _user_tgt_clip(
     eff_max_profit: float | None,
     user_trail_tgt: dict | None,
     all_slot_ids: list[str],
+    scope_label: str = "USER",
 ) -> _ClipResult:
-    """User-level Target clip (spec §3 Level 3 / execution_logic_target.html §6).
+    """User-level (or tag-level) Target clip (spec §3 / target §6 / §11).
 
     Mirror of ``_user_sl_clip`` on the profit side. Walks the merged equity
     curve in combined-PnL terms (this portfolio's PnL plus the user's
@@ -1783,11 +1886,11 @@ def _user_tgt_clip(
         # Fixed Max Profit ceiling.
         if cap is not None and cap > 0 and combined >= cap:
             logs.append(
-                f"USER_TARGET_HIT | reason=USER_TARGET | combined_pnl={combined:.2f} "
+                f"{scope_label}_TARGET_HIT | reason={scope_label}_TARGET | combined_pnl={combined:.2f} "
                 f"| max_profit={cap:.2f} | clip_ts={ts}"
             )
             return _ClipResult(
-                clip_ts=ts, clip_reason="USER_TARGET", clip_action="SqOff",
+                clip_ts=ts, clip_reason=f"{scope_label}_TARGET", clip_action="SqOff",
                 clipped_slots=tuple(all_slot_ids), logs=tuple(logs),
             )
 
@@ -1800,11 +1903,11 @@ def _user_tgt_clip(
             )
             if tt_hit:
                 logs.append(
-                    f"USER_TARGET_HIT | reason=USER_TRAIL_TARGET | combined_pnl={combined:.2f} "
+                    f"{scope_label}_TARGET_HIT | reason={scope_label}_TRAIL_TARGET | combined_pnl={combined:.2f} "
                     f"| locked_floor={tt_stop:.2f} | clip_ts={ts}"
                 )
                 return _ClipResult(
-                    clip_ts=ts, clip_reason="USER_TRAIL_TARGET", clip_action="SqOff",
+                    clip_ts=ts, clip_reason=f"{scope_label}_TRAIL_TARGET", clip_action="SqOff",
                     clipped_slots=tuple(all_slot_ids), logs=tuple(logs),
                 )
     return _ClipResult()
@@ -1903,6 +2006,7 @@ def run_backtest_node(
     start_date: str | None = None,
     end_date: str | None = None,
     user_id: str | None = None,
+    aggregate_to_bar_type: str = "",
 ) -> dict:
     """Path B (BacktestNode) variant of run_backtest.
 
@@ -1968,6 +2072,8 @@ def run_backtest_node(
     }
     if extra_bar_types and _config_supports_extra_bar_types(config_class):
         config_kwargs["extra_bar_types"] = extra_bar_types
+    if aggregate_to_bar_type and _config_supports_aggregate_to(config_class):
+        config_kwargs["aggregate_to_bar_type"] = aggregate_to_bar_type
     strategy_config = config_class(**config_kwargs)
     strategy = registry_entry["strategy_class"](strategy_config)
     engine.add_strategy(strategy)
@@ -1996,6 +2102,7 @@ def run_backtest(
     start_date: str | None = None,
     end_date: str | None = None,
     user_id: str | None = None,
+    aggregate_to_bar_type: str = "",
 ) -> dict:
     """
     Run a backtest using data from the catalog.
@@ -2135,6 +2242,11 @@ def run_backtest(
     # Only pass extra_bar_types if the config class supports it and there are extras
     if extra_bar_types and _config_supports_extra_bar_types(config_class):
         config_kwargs["extra_bar_types"] = extra_bar_types
+
+    # Custom streaming aggregation: aggregate the base stream up to a coarser
+    # EXTERNAL bar type in-strategy (replaces Nautilus internal aggregation).
+    if aggregate_to_bar_type and _config_supports_aggregate_to(config_class):
+        config_kwargs["aggregate_to_bar_type"] = aggregate_to_bar_type
 
     strategy_config = config_class(**config_kwargs)
     strategy = registry_entry["strategy_class"](strategy_config)
@@ -2371,6 +2483,9 @@ def _run_single_slot_node(
                     "trade_size": Decimal(str(slot_qty)),
                     **filtered_params,
                 }
+                _agg_to = _aggregate_target_for_slot(slot, primary_bt)
+                if _agg_to and _config_supports_aggregate_to(config_class):
+                    config_kwargs["aggregate_to_bar_type"] = _agg_to
                 strategy_config = config_class(**config_kwargs)
                 strategy = registry_entry["strategy_class"](strategy_config)
 
@@ -2446,6 +2561,7 @@ def _run_single_slot(
     user_id: str | None = None,
     default_capture_underlying: bool = False,
     default_replay_cutoff_ns: int = 0,
+    default_vwap_fill: bool = False,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -2641,7 +2757,7 @@ def _run_single_slot(
             # exits. None when the flag is off or no ASK/BID data is present.
             vwap_lookup = (
                 _build_vwap_lookup(all_bars)
-                if os.environ.get("_USE_VWAP_FILL", "0") == "1"
+                if (default_vwap_fill or os.environ.get("_USE_VWAP_FILL", "0") == "1")
                 else None
             )
             # Free the bar list reference; Nautilus has copied into its internal cache.
@@ -2727,6 +2843,9 @@ def _run_single_slot(
                 }
                 if extra_bar_types and _config_supports_extra_bar_types(config_class):
                     config_kwargs["extra_bar_types"] = extra_bar_types
+                _agg_to = _aggregate_target_for_slot(slot, primary_bt)
+                if _agg_to and _config_supports_aggregate_to(config_class):
+                    config_kwargs["aggregate_to_bar_type"] = _agg_to
 
                 strategy_config = config_class(**config_kwargs)
                 strategy = registry_entry["strategy_class"](strategy_config)
@@ -3141,6 +3260,9 @@ def _run_slot_group_node(
                         "order_id_tag": order_tag,
                         **filtered_params,
                     }
+                    _agg_to = _aggregate_target_for_slot(slot, primary_bt)
+                    if _agg_to and _config_supports_aggregate_to(config_class):
+                        config_kwargs["aggregate_to_bar_type"] = _agg_to
                     strategy_config = config_class(**config_kwargs)
                     strategy = registry_entry["strategy_class"](strategy_config)
 
@@ -3232,6 +3354,7 @@ def _run_slot_group(
     user_id: str | None = None,
     portfolio_name: str = "",
     default_replay_cutoff_ns: int = 0,
+    default_vwap_fill: bool = False,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -3422,7 +3545,7 @@ def _run_slot_group(
             # reprice SL/Target exits. None when the flag is off / no ASK-BID.
             vwap_lookup = (
                 _build_vwap_lookup(all_bars)
-                if os.environ.get("_USE_VWAP_FILL", "0") == "1"
+                if (default_vwap_fill or os.environ.get("_USE_VWAP_FILL", "0") == "1")
                 else None
             )
             del all_bars
@@ -3495,6 +3618,9 @@ def _run_slot_group(
                         "order_id_tag": order_tag,
                         **filtered_params,
                     }
+                    _agg_to = _aggregate_target_for_slot(slot, primary_bt)
+                    if _agg_to and _config_supports_aggregate_to(config_class):
+                        config_kwargs["aggregate_to_bar_type"] = _agg_to
                     strategy_config = config_class(**config_kwargs)
                     strategy = registry_entry["strategy_class"](strategy_config)
 
@@ -3812,6 +3938,12 @@ def run_portfolio_backtest(
     if not enabled_slots:
         raise ValueError("No enabled strategy slots in portfolio")
 
+    # Winter Time Adjustment (spec execution_logic_target.html §9). Shift all
+    # configured local times +1h in place BEFORE resolving RBO / square-off /
+    # entry-window, so every downstream path sees the adjusted values.
+    if _apply_winter_time(portfolio):
+        print(f"[WINTER] {pf_name!r}: configured times shifted +1h (winter_time_adjust)")
+
     # Resolve RBO once at the orchestrator. Failures fall back to standard
     # time-based entry per spec (rbo_logics.html validation rules); we surface
     # the message via print so it shows up in worker output even when the
@@ -3836,6 +3968,15 @@ def run_portfolio_backtest(
     move_sl_settings, move_sl_warnings = _resolve_move_sl_to_cost(portfolio)
     for w in move_sl_warnings:
         print(f"[MOVE_SL] {w}")
+
+    # Conservative VWAP exit-fill model (spec §4.2 / §8.1). Enabled per-portfolio
+    # via the saved config, or globally via the _USE_VWAP_FILL dev/parity flag.
+    # Threaded into every slot worker as default_vwap_fill.
+    vwap_fill_enabled = bool(getattr(portfolio, "vwap_exit_fill", False)) or (
+        os.environ.get("_USE_VWAP_FILL", "0") == "1"
+    )
+    if vwap_fill_enabled:
+        print(f"[VWAP_FILL] {pf_name!r}: conservative VWAP exit-fill enabled")
 
     # Calculate capital allocation per slot
     n = len(enabled_slots)
@@ -3965,6 +4106,7 @@ def run_portfolio_backtest(
                             user_id=user_id,
                             default_capture_underlying=_capture_underlying,
                             default_replay_cutoff_ns=replay_cutoff_ns,
+                            default_vwap_fill=vwap_fill_enabled,
                         )
                         futures[future] = ("single", [slot])
                     else:
@@ -3987,6 +4129,7 @@ def run_portfolio_backtest(
                             user_id=user_id,
                             portfolio_name=pf_name,
                             default_replay_cutoff_ns=replay_cutoff_ns,
+                            default_vwap_fill=vwap_fill_enabled,
                         )
                         futures[future] = ("group", [slot for slot, _cap in group])
             else:
@@ -4011,6 +4154,7 @@ def run_portfolio_backtest(
                         user_id=user_id,
                         default_capture_underlying=_capture_underlying,
                         default_replay_cutoff_ns=replay_cutoff_ns,
+                        default_vwap_fill=vwap_fill_enabled,
                     )
                     futures[future] = ("single", [slot])
 
@@ -4066,14 +4210,20 @@ def run_portfolio_backtest(
     # Two-pass portfolio-aggregate Move SL (spec §2.3). When active: pass 1
     # discovers the combined-P&L timeline + per-leg SL/target hits, the parent
     # computes the aggregate trigger ts and a cross-process event bus, then
-    # pass 2 replays with those injected. ~2x runtime; gated by
-    # _USE_PF_AGG_MOVE_SL and only when an aggregate / cross-slot trigger is
-    # actually configured. Default off → single pass, zero behavior change.
+    # pass 2 replays with those injected. ~2x runtime.
+    #
+    # Now a real per-portfolio feature: the two-pass runs whenever the
+    # aggregate-P&L trigger or a cross-slot Hit-On-Leg trigger is configured on
+    # the portfolio (cross-process Hit-On-Leg only works correctly via the
+    # two-pass pre-seeded bus, since the in-process bus doesn't span workers).
+    # When nothing is configured, agg_active stays False → single pass, zero
+    # behavior change. The legacy _USE_PF_AGG_MOVE_SL env flag is still honoured
+    # as a manual override for parity tooling.
     agg_active = (
-        os.environ.get("_USE_PF_AGG_MOVE_SL", "0") == "1"
-        and (move_sl_settings.agg_pnl_enabled
-             or move_sl_settings.hit_on_leg_sl
-             or move_sl_settings.hit_on_leg_target)
+        move_sl_settings.agg_pnl_enabled
+        or move_sl_settings.hit_on_leg_sl
+        or move_sl_settings.hit_on_leg_target
+        or os.environ.get("_USE_PF_AGG_MOVE_SL", "0") == "1"
     )
     if not agg_active:
         slot_results, errors = _run_all_slots(move_sl_settings, fire_callbacks=True)
@@ -4109,17 +4259,28 @@ def run_portfolio_backtest(
     result = _merge_portfolio_results(portfolio, slot_results, capitals, errors, user_id=user_id)
 
     # ── Portfolio ReExecute replay (spec §2.4) ──────────────────────────────
-    # Opt-in via _USE_PF_REEXEC_REPLAY. When the portfolio SL/Target fires a
-    # ReExecute-family action, re-run every slot FLAT from the clip timestamp
-    # and splice that segment onto the pre-clip trades — a genuine
-    # re-execution instead of the default "keep trades" approximation. The
-    # segment is itself merged (so it re-evaluates the portfolio limit) and
-    # the loop recurses on its first ReExecute clip, up to the configured
-    # ReExecute count (0 = unlimited, hard-capped at 50 to bound runtime).
-    # Default off → single pass, zero behaviour change.
-    if os.environ.get("_USE_PF_REEXEC_REPLAY", "0") == "1":
-        _sl_set, _ = _resolve_pf_stoploss(portfolio)
-        _tgt_set, _ = _resolve_pf_target(portfolio)
+    # When the portfolio SL/Target fires a ReExecute-family action (plain
+    # ReExecute, "ReExecute at Entry Price", or "ReExecute Same Contract at
+    # EntryPrice"), re-run every slot FLAT from the clip timestamp and splice
+    # that segment onto the pre-clip trades — a genuine re-execution instead of
+    # the default "keep trades" approximation. The segment is itself merged (so
+    # it re-evaluates the portfolio limit) and the loop recurses on its first
+    # ReExecute clip, up to the configured ReExecute count (0 = unlimited,
+    # hard-capped at 50 to bound runtime).
+    #
+    # Now config-driven: the replay runs whenever a ReExecute-family action is
+    # actually configured on the portfolio SL or Target (the entry-price
+    # variants replay as plain ReExecute — the FX adaptation per spec, which
+    # marks them ⚙️ since price-wait re-entry lives at the leg level §1.2(d)).
+    # When no ReExecute action is configured, this is a no-op single pass. The
+    # legacy _USE_PF_REEXEC_REPLAY env flag is still honoured as an override.
+    _sl_set, _ = _resolve_pf_stoploss(portfolio)
+    _tgt_set, _ = _resolve_pf_target(portfolio)
+    _reexec_configured = (
+        (_sl_set.enabled and _is_reexec_action(_sl_set.action))
+        or (_tgt_set.enabled and _is_reexec_action(_tgt_set.action))
+    )
+    if _reexec_configured or os.environ.get("_USE_PF_REEXEC_REPLAY", "0") == "1":
         _cap = max(int(getattr(_sl_set, "reexecute_count", 0) or 0),
                    int(getattr(_tgt_set, "reexecute_count", 0) or 0))
         _cap = _cap if _cap > 0 else 50
@@ -4320,10 +4481,28 @@ def _merge_portfolio_results(
     # equity-curve clip below (_user_tgt_clip), same as the SL side.
     user_trail_tgt = get_user_trailing_target(user_id) if user_id else None
 
-    # Roll this portfolio's PnL into the user aggregator so subsequent
+    # Tag-level caps (spec §11) — the tier BETWEEN portfolio and user. A
+    # portfolio carrying ``portfolio_tag`` shares a Max Loss / Max Profit /
+    # trailing cap (defined in config/tags.json) with every other portfolio in
+    # the same tag; the cap is evaluated on the tag's cumulative combined PnL,
+    # exactly like the user tier one level up.
+    from core.tags import (
+        get_tag_max_loss, get_tag_max_profit, get_tag_trailing_sl,
+        get_tag_trailing_target, get_tag_cumulative_pnl, add_tag_pnl,
+    )
+    pf_tag = getattr(portfolio, "portfolio_tag", None) or None
+    tag_max_loss = get_tag_max_loss(pf_tag) if pf_tag else None
+    tag_max_profit = get_tag_max_profit(pf_tag) if pf_tag else None
+    tag_trail_sl = get_tag_trailing_sl(pf_tag) if pf_tag else None
+    tag_trail_tgt = get_tag_trailing_target(pf_tag) if pf_tag else None
+    cum_tag_pnl = get_tag_cumulative_pnl(pf_tag) if pf_tag else 0.0
+
+    # Roll this portfolio's PnL into the user AND tag aggregators so subsequent
     # portfolios (or repeat runs in the same orchestrator session) see it.
     if user_id:
         add_user_pnl(user_id, total_pnl)
+    if pf_tag:
+        add_tag_pnl(pf_tag, total_pnl)
 
     # Portfolio-level Stoploss / Target post-hoc clip. Spec:
     # 5. Logics/portfolio_sl_tgt.html. Walks the merged equity curve, finds
@@ -4352,9 +4531,22 @@ def _merge_portfolio_results(
     )
     user_trail_tgt_hit = user_tgt_clip.clip_reason == "USER_TRAIL_TARGET"
 
+    # Tag-level SL + Target clips (spec §11) — same machinery one tier down,
+    # evaluated on the tag's cumulative combined PnL. No-op when the portfolio
+    # has no tag or the tag defines no caps.
+    tag_clip = _user_sl_clip(
+        equity_curve_ts, portfolio.starting_capital, cum_tag_pnl,
+        tag_max_loss, tag_trail_sl, _user_clip_slot_ids, scope_label="TAG",
+    ) if pf_tag else _ClipResult()
+    tag_tgt_clip = _user_tgt_clip(
+        equity_curve_ts, portfolio.starting_capital, cum_tag_pnl,
+        tag_max_profit, tag_trail_tgt, _user_clip_slot_ids, scope_label="TAG",
+    ) if pf_tag else _ClipResult()
+
     clip_result = _ClipResult()
     if (pf_sl_settings.enabled or pf_tgt_settings.enabled
-            or user_clip.clip_ts is not None or user_tgt_clip.clip_ts is not None):
+            or user_clip.clip_ts is not None or user_tgt_clip.clip_ts is not None
+            or tag_clip.clip_ts is not None or tag_tgt_clip.clip_ts is not None):
         # Compute per-slot final P&L for selective sqoff (used at clip-point
         # to decide which slots to clip — uses end-of-run P&L as a proxy for
         # P&L at clip_ts, which is close enough for v1 since selective sqoff
@@ -4421,10 +4613,12 @@ def _merge_portfolio_results(
                 pf_sl_settings, pf_tgt_settings, slot_pnl_at_clip,
                 slot_curves=slot_curves,
             )
-        # Merge the user-level SL and Target clips — whichever (portfolio vs
-        # user SL vs user Target) fires earliest wins; the user caps are the
-        # outer ceiling (spec §8 evaluation order).
-        clip_result = _earliest_clip(clip_result, user_clip, user_tgt_clip)
+        # Merge the portfolio, tag and user clips — whichever fires earliest
+        # wins (spec §8 evaluation order). The tag tier (§11) sits between
+        # portfolio and user; all are evaluated and the earliest breach clips.
+        clip_result = _earliest_clip(
+            clip_result, tag_clip, tag_tgt_clip, user_clip, user_tgt_clip,
+        )
         for log_line in clip_result.logs:
             print(f"[PF_CLIP] {log_line}")
 

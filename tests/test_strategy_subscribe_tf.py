@@ -70,17 +70,19 @@ def test_strategy_bar_types_roundtrip():
     assert old.slots[0].strategy_bar_types == []
 
 
-# ── config_from_exit — base / strategy-timeframe split ──────────────────────
+# ── config_from_exit — base / custom-aggregation split ──────────────────────
 #
-# When a leg selects strategy timeframe(s): config.bar_type becomes the FIRST
-# composite (the stream the strategy logic runs on); config.subscribe_bar_types
-# holds any FURTHER composites. The base bar type is NOT subscribed — the
-# simulated exchange processes engine.add_data (the base) and fills orders
-# against it regardless of strategy subscriptions.
+# Custom streaming aggregation (replaces Nautilus internal composites): when a
+# leg selects strategy timeframe(s), config.bar_type STAYS the BASE bar type
+# (subscribed + the resolution orders fill on); config.aggregate_to_bar_type
+# holds the FIRST selection's plain EXTERNAL form (the timeframe the base is
+# aggregated up to in-strategy). Further selections are dropped, and
+# subscribe_bar_types is always empty (no composite subscriptions remain).
 
 _BASE = "EURUSD.SIM-1-MINUTE-MID-EXTERNAL"
 _C5 = "EURUSD.SIM-5-MINUTE-MID-INTERNAL@1-MINUTE-EXTERNAL"
 _C15 = "EURUSD.SIM-15-MINUTE-MID-INTERNAL@1-MINUTE-EXTERNAL"
+_EXT5 = "EURUSD.SIM-5-MINUTE-MID-EXTERNAL"
 
 
 def _cfg(subscribe_bar_types=None):
@@ -96,25 +98,29 @@ def test_config_no_strategy_tf_keeps_base():
     cfg = _cfg(None)
     assert str(cfg.bar_type) == _BASE
     assert cfg.subscribe_bar_types == []
+    assert cfg.aggregate_to_bar_type == ""
     cfg2 = _cfg([])
-    assert str(cfg2.bar_type) == _BASE and cfg2.subscribe_bar_types == []
+    assert str(cfg2.bar_type) == _BASE and cfg2.aggregate_to_bar_type == ""
 
 
-def test_config_one_strategy_tf_becomes_signal_bar_type():
+def test_config_one_strategy_tf_sets_aggregate_to_external():
     cfg = _cfg([_C5])
-    # The strategy operates on the 5-min composite; no extra subscriptions
-    # (the base is NOT subscribed — add_data drives matching).
-    assert str(cfg.bar_type) == _C5
+    # Base stays the subscribed/fill stream; the 5-min EXTERNAL is the target
+    # the strategy aggregates the base up to (no composite subscriptions).
+    assert str(cfg.bar_type) == _BASE
+    assert cfg.aggregate_to_bar_type == _EXT5
     assert cfg.subscribe_bar_types == []
 
 
-def test_config_multiple_strategy_tfs_first_is_primary():
+def test_config_multiple_strategy_tfs_first_is_aggregate_target():
     cfg = _cfg([_C5, _C15])
-    assert str(cfg.bar_type) == _C5            # first = primary signal stream
-    assert cfg.subscribe_bar_types == [_C15]   # further composite only
+    assert str(cfg.bar_type) == _BASE          # base unchanged
+    assert cfg.aggregate_to_bar_type == _EXT5  # first selection = target
+    assert cfg.subscribe_bar_types == []       # further composites dropped
 
 
 def test_config_subscribe_bar_types_drops_falsy():
     cfg = _cfg([_C5, "", None])
-    assert str(cfg.bar_type) == _C5
+    assert str(cfg.bar_type) == _BASE
+    assert cfg.aggregate_to_bar_type == _EXT5
     assert cfg.subscribe_bar_types == []

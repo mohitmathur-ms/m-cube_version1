@@ -228,6 +228,20 @@
   </tbody>
 </table>
 
+<h3>1.6 Leg-Level Trailing SL — Profit Lock (NEW) <span class="badge badge-resolved">Updated</span></h3>
+<p>PnL-based profit-lock ratchet on the <strong>SL side</strong> — the direct mirror of §1.5 (Leg-Level Trailing Target). Once the leg's PnL crosses the activation threshold, a profit floor is locked and ratchets up as PnL grows; if PnL falls back to the floor, the leg exits with the locked profit protected.</p>
+<div class="callout"><strong>Distinct from §1.3 Move SL to Cost:</strong> Move SL to Cost (+ Trail After Move SL) moves the SL <em>price level</em> and only trails after breakeven is reached. This profit lock is a standalone <em>PnL floor</em> with its own activation threshold — it can run alongside the loss-limiting SL. See <code>execution_logic.html</code> §4.9 for the execution formula (incl. three-format handling).</p></div>
+<table>
+  <thead><tr><th>Field</th><th>Config Key</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>Enabled</td><td><code>enabled</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>When Profit Reach</td><td><code>when_profit_reach</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Lock Minimum Profit</td><td><code>lock_min_profit</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail Every</td><td><code>trail_every</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail By</td><td><code>trail_by</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+
 <!-- LEVEL 2 -->
 <h2 id="level-2">Level 2 — Portfolio</h2>
 
@@ -307,19 +321,23 @@
 </table>
 
 <!-- LEVEL 3 — USER -->
-<h2 id="level-3">Level 3 — User</h2>
+<h2 id="level-3">Level 3 — User <span class="badge badge-resolved">Updated</span></h2>
 <p>Top-level limits across all portfolios for this user.</p>
 <table>
   <thead><tr><th>Field</th><th>Format</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td>Max Loss</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
-    <tr><td>Max Profit</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
+    <tr><td>Max Loss</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td><strong>Absolute only</strong> — % removed (see note below)</td></tr>
+    <tr><td>Max Profit</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td><strong>Absolute only</strong> — % removed (see note below)</td></tr>
     <tr><td>Enable Trailing SL</td><td>Bool</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Re-added</td></tr>
     <tr><td>Trailing SL — For Every Profit of / Tighten SL By</td><td>Numeric (×2)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
     <tr><td>Enable Trailing Target (Profit Lock)</td><td>Bool</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Re-added</td></tr>
     <tr><td>Trailing Target — Reach / Lock / Every / By</td><td>Numeric (×4)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
   </tbody>
 </table>
+
+<div class="callout warn">
+  <strong>Updated — Max Loss / Max Profit are absolute-only:</strong> % input has been <strong>removed</strong> for user-level Max Loss and Max Profit. % is a risky feature here due to available margin / strategy allocation / funding and many other nuances — if anything is not picked right, the system could take e.g. <strong>1% as $0.01</strong>, breach the user SL on the first bar, and immediately exit <strong>all trades running under that user</strong> via the user SL trigger (causing us to miss all running trades). Enter absolute values only. <em>(Leg- and portfolio-level fields, and the user-level trailing every/by, are unaffected.)</em>
+</div>
 
 <!-- LOTS -->
 <h2 id="lots">Per-instrument lot sizes (reference)</h2>

@@ -88,6 +88,38 @@ def emap(f, s):
     return {"fast_ema_period": f, "slow_ema_period": s}
 
 
+# ── Feature augmentation — fold the two newest features into EVERY case ───────
+# The user asked to run the existing maximal cases WITH the custom streaming
+# aggregator and MIS/NRML enabled. So every 1-MINUTE slot also gets a strategy
+# subscribe-timeframe (aggregated to a coarser EXTERNAL bar type in-strategy,
+# replacing Nautilus' internal aggregation), and every portfolio gets a product
+# (MIS / NRML, alternating across the suite). Explicit per-case squareoff_time
+# still overrides the MIS default — that precedence is itself exercised here.
+
+def _composite_for(base_bt: str, tf: str = "5-MINUTE"):
+    """1-MINUTE base bar type -> the composite carrier the UI emits, or None
+    when the base is not 1-minute (can't aggregate up from a coarser base)."""
+    p = str(base_bt or "").split("-")
+    if len(p) >= 5 and p[1] == "1" and p[2] == "MINUTE":
+        return f"{p[0]}-{tf}-{p[3]}-INTERNAL@1-MINUTE-EXTERNAL"
+    return None
+
+
+def _augment(pf_dict: dict, product: str, agg_tf: str = "5-MINUTE") -> str:
+    """Inject custom aggregation (strategy_bar_types) into every 1-min slot and
+    a product (MIS/NRML) at portfolio level. Returns a one-line description."""
+    n_agg = 0
+    for s in pf_dict.get("slots", []):
+        c = _composite_for(s.get("bar_type_str", ""), agg_tf)
+        if c:
+            s["strategy_bar_types"] = [c]
+            n_agg += 1
+    pf_dict["product"] = product
+    pf_dict.setdefault("mis_squareoff_time", "15:15")
+    pf_dict.setdefault("mis_squareoff_tz", "Asia/Kolkata")
+    return f"product={product} (mis_sqoff 15:15 IST) · aggregate {agg_tf} on {n_agg} slot(s)"
+
+
 CASES = []
 
 
@@ -534,13 +566,20 @@ def run_suite():
                 reset_user_pnl()
                 clear_cross_portfolio_bus()
                 uid = c["user"]["user_id"]
+                # Alternate MIS / NRML across the suite so both the forced-
+                # squareoff and carry-forward product paths are exercised.
+                _product = "MIS" if (len(results) % 2 == 0) else "NRML"
                 if c["builder"] == "MULTI":
-                    rs = _run_t15(portfolio_from_dict, run_portfolio_backtest, uid)
+                    rs = _run_t15(portfolio_from_dict, run_portfolio_backtest, uid, _product)
                     rec["status"] = "COMPLETED"
+                    rec["augmentation"] = (f"product={_product} (mis_sqoff 15:15 IST) · "
+                                           f"aggregate 5-MINUTE on EUR/GBP 1-min slots")
                     rec["results"] = [_summ(x) for x in rs]
                     ok, note = c["verdict"](rs)
                 else:
-                    pd_ = portfolio_from_dict(c["builder"]())
+                    _d = c["builder"]()
+                    rec["augmentation"] = _augment(_d, _product)
+                    pd_ = portfolio_from_dict(_d)
                     r = run_portfolio_backtest(CATALOG, pd_, user_id=uid)
                     rec["status"] = "COMPLETED"
                     rec["result"] = _summ(r)
@@ -564,7 +603,7 @@ def run_suite():
     print(f"\nSUITE DONE — {len(results)} cases — results at {OUT}", flush=True)
 
 
-def _run_t15(portfolio_from_dict, run_portfolio_backtest, uid):
+def _run_t15(portfolio_from_dict, run_portfolio_backtest, uid, product="MIS"):
     """T15 — three portfolios with cross-portfolio actions, run in order C, A, B."""
     A = pf("A", "2021-05-01", "2021-06-30", [
         slot("EMA Cross", EUR, 0.05, ec(stop_loss_type="percentage", stop_loss_value=0.20,
@@ -583,6 +622,8 @@ def _run_t15(portfolio_from_dict, run_portfolio_backtest, uid):
              params={"bb_period": 20, "bb_std": 2.0})],
         pf_sl_enabled=True, pf_sl_value=80, pf_sl_action="Execute Other Portfolio",
         pf_sl_target_portfolio="A")
+    for spec in (A, B, C):
+        _augment(spec, product)
     out = []
     for spec in (C, A, B):  # mismatched run order
         out.append(run_portfolio_backtest(CATALOG, portfolio_from_dict(spec), user_id=uid))

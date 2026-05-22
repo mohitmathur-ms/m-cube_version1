@@ -12,12 +12,17 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregating_strategy import AggregatingStrategyMixin
+
 
 class FourMAConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
     extra_bar_types: list[BarType] | None = None
+    # Target EXTERNAL bar type to aggregate the base stream up to (custom
+    # streaming aggregator). Empty ⇒ no aggregation (runs on base, unchanged).
+    aggregate_to_bar_type: str = ""
     use_ema: bool = False
     ma1_period: PositiveInt = 5
     ma2_period: PositiveInt = 10
@@ -25,7 +30,7 @@ class FourMAConfig(StrategyConfig, frozen=True):
     ma4_period: PositiveInt = 50
 
 
-class FourMAStrategy(Strategy):
+class FourMAStrategy(AggregatingStrategyMixin, Strategy):
     """Buy when MA1 > MA2 > MA3 > MA4 (bullish alignment), sell on bearish alignment."""
 
     def __init__(self, config: FourMAConfig) -> None:
@@ -43,8 +48,15 @@ class FourMAStrategy(Strategy):
             self.log.error(f"Could not find instrument for {self.config.instrument_id}")
             self.stop()
             return
-        for ma in (self.ma1, self.ma2, self.ma3, self.ma4):
-            self.register_indicator_for_bars(self.config.bar_type, ma)
+        aggregating = self._setup_aggregation(
+            self.instrument,
+            self.config.bar_type,
+            self.config.aggregate_to_bar_type,
+            [self.ma1, self.ma2, self.ma3, self.ma4],
+        )
+        if not aggregating:
+            for ma in (self.ma1, self.ma2, self.ma3, self.ma4):
+                self.register_indicator_for_bars(self.config.bar_type, ma)
         self.subscribe_bars(self.config.bar_type)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
@@ -55,7 +67,10 @@ class FourMAStrategy(Strategy):
         # feed indicators but must not drive order submission.
         if bar.bar_type != self.config.bar_type:
             return
-        if not self.indicators_initialized():
+        bar = self._route_bar(bar)
+        if bar is None:
+            return
+        if not self._indicators_ready():
             return
 
         v1, v2, v3, v4 = self.ma1.value, self.ma2.value, self.ma3.value, self.ma4.value
@@ -92,6 +107,7 @@ class FourMAStrategy(Strategy):
         self.submit_order(order)
 
     def on_stop(self) -> None:
+        self._flush_aggregator()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 

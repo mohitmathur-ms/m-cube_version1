@@ -197,6 +197,12 @@ class PortfolioConfig:
 
     name: str = "New Portfolio"
     description: str = ""
+    # Portfolio Tag (spec §11). Groups this portfolio with others sharing the
+    # same tag so a tag-level SL/Target (defined in config/tags.json) can clip
+    # the whole group — a risk tier BETWEEN portfolio and user. None / "" = no
+    # tag (this portfolio is only subject to its own and the user-level caps).
+    # Distinct from the live-only broker ``strategy_tag`` UI field.
+    portfolio_tag: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     starting_capital: float = 100_000.0
@@ -229,6 +235,17 @@ class PortfolioConfig:
     # forced closes at end-of-window.
     entry_start_time: Optional[str] = None  # "HH:MM" UTC, e.g. "09:30"
     entry_end_time: Optional[str] = None    # "HH:MM" UTC, e.g. "16:00"
+
+    # Winter Time Adjustment (spec execution_logic_target.html §9). For
+    # US-listed instruments whose data/config straddle a DST boundary, the
+    # engine shifts every configured local time (entry window, square-off,
+    # RBO windows, slot/leg square-off overrides) by +1 hour via
+    # ``add_one_hour`` before applying them. India/NSE instruments don't
+    # observe DST, so leave this off for them. User-controlled because
+    # reliable per-instrument DST detection needs timezone metadata the
+    # catalog doesn't carry. Applied once at run start in
+    # ``backtest_runner._apply_winter_time``. Default off → no shift.
+    winter_time_adjust: bool = False
 
     # Range Breakout (RBO). When rbo_enabled, the entry timing for all enabled
     # slots is gated by a per-day state machine: range is built during
@@ -388,6 +405,17 @@ class PortfolioConfig:
     exit_order_type: str = "MARKET"
     exit_sell_first: bool = True
     on_portfolio_complete: str = "None"
+    # Conservative VWAP exit-fill model (spec execution_logic.html §4.2 / §8.1).
+    # When True, leg SL/Target exit fills are repriced post-run to the
+    # direction-aware conservative price: SELL exits = max(vwap, hit),
+    # BUY exits = min(vwap, hit), where vwap is the opposite-quote-side per-bar
+    # typical price and hit is the trigger-side bar extreme (see
+    # backtest_runner._apply_vwap_fill). Requires paired ASK/BID bars in the
+    # catalog (FX/synth-MID slots); a no-op on LAST-only/crypto slots. Default
+    # off preserves the plain Nautilus matching-engine fill so existing saved
+    # backtests are unchanged unless the user opts in. Also force-enabled by the
+    # _USE_VWAP_FILL env flag (dev/parity tooling).
+    vwap_exit_fill: bool = False
 
     # ── Monitoring Tab (no spec doc found in 5. Logics/) ──
     # All 6 fields are evaluation-frequency settings (Realtime / MinuteClose

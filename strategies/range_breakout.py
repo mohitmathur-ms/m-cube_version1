@@ -75,6 +75,8 @@ from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.model.objects import Quantity
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregating_strategy import AggregatingStrategyMixin
+
 
 MAX_LEGS = 10
 
@@ -84,6 +86,9 @@ class RangeBreakoutConfig(StrategyConfig, frozen=True):
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
     extra_bar_types: list[BarType] | None = None
+    # Target EXTERNAL bar type to aggregate the base stream up to (custom
+    # streaming aggregator). Empty ⇒ no aggregation (runs on base, unchanged).
+    aggregate_to_bar_type: str = ""
 
     range_start_hhmm: int = 930
     range_end_hhmm: int = 1030
@@ -150,7 +155,7 @@ def _hhmm_to_min(hhmm: int) -> int:
     return (hhmm // 100) * 60 + (hhmm % 100)
 
 
-class RangeBreakoutStrategy(Strategy):
+class RangeBreakoutStrategy(AggregatingStrategyMixin, Strategy):
     """Opening Range Breakout with N-leg pyramiding (target promotes next leg)."""
 
     def __init__(self, config: RangeBreakoutConfig) -> None:
@@ -231,17 +236,25 @@ class RangeBreakoutStrategy(Strategy):
             self.stop()
             return
         self._leg_qty = [self.instrument.make_qty(q) for q in self._leg_qty_decimals]
+        # No indicators — aggregation just gates which bars drive the logic.
+        self._setup_aggregation(
+            self.instrument, self.config.bar_type, self.config.aggregate_to_bar_type, []
+        )
         self.subscribe_bars(self.config.bar_type)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
                 self.subscribe_bars(bt)
 
     def on_stop(self) -> None:
+        self._flush_aggregator()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 
     def on_bar(self, bar: Bar) -> None:
         if bar.bar_type != self.config.bar_type:
+            return
+        bar = self._route_bar(bar)
+        if bar is None:
             return
 
         local_dt = datetime.fromtimestamp(bar.ts_event / 1e9, tz=timezone.utc) + self._tz_delta

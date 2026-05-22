@@ -530,6 +530,7 @@ const Portfolio = {
         if (pf.exit_order_type) pf._ui.exit_order_type = pf.exit_order_type;
         if (pf.exit_sell_first !== undefined) pf._ui.exit_sell_first = pf.exit_sell_first;
         if (pf.on_portfolio_complete) pf._ui.on_portfolio_complete = pf.on_portfolio_complete;
+        if (pf.vwap_exit_fill !== undefined) pf._ui.vwap_exit_fill = pf.vwap_exit_fill;
         const ui = pf._ui;
 
         // Strategy tags summary
@@ -1047,8 +1048,12 @@ const Portfolio = {
                             <span class="pf-field-label">On Target</span>
                             <select class="form-control" id="pf-m-tgt-action" style="flex:1;">
                                 ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
-            const opt = (o !== "SqOff" && o !== "ReExecute");
-            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.on_target || 'SqOff') === o ? 'selected' : ''}>${o}${opt ? ' (live/options only)' : ''}</option>`;
+            // ReExecute family is wired (config-driven replay, spec §2.4 — the
+            // entry-price variants replay as plain ReExecute, the FX adaptation).
+            // Cross-portfolio "…Other Portfolio" actions dispatch via the event
+            // bus but only fire on the target portfolio's next run in the session.
+            const xpf = o.endsWith("Other Portfolio");
+            return `<option value="${o}" class="${xpf ? 'pf-live-only' : ''}" ${(ui.on_target || 'SqOff') === o ? 'selected' : ''}>${o}${xpf ? ' (cross-portfolio)' : ''}</option>`;
         }).join("")}
                             </select>
                         </div>
@@ -1131,8 +1136,12 @@ const Portfolio = {
                             <span class="pf-field-label">On SL Action</span>
                             <select class="form-control" id="pf-m-sl-action" style="flex:1;">
                                 ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
-            const opt = (o !== "SqOff" && o !== "ReExecute");
-            return `<option value="${o}" class="${opt ? 'pf-live-only' : ''}" ${(ui.on_sl_action || 'SqOff') === o ? 'selected' : ''}>${o}${opt ? ' (live/options only)' : ''}</option>`;
+            // ReExecute family is wired (config-driven replay, spec §2.4 — the
+            // entry-price variants replay as plain ReExecute, the FX adaptation).
+            // Cross-portfolio "…Other Portfolio" actions dispatch via the event
+            // bus but only fire on the target portfolio's next run in the session.
+            const xpf = o.endsWith("Other Portfolio");
+            return `<option value="${o}" class="${xpf ? 'pf-live-only' : ''}" ${(ui.on_sl_action || 'SqOff') === o ? 'selected' : ''}>${o}${xpf ? ' (cross-portfolio)' : ''}</option>`;
         }).join("")}
                             </select>
                         </div>
@@ -1205,15 +1214,15 @@ const Portfolio = {
                             <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Adapted for FX/crypto: skip Move SL to Cost on slots whose position is LONG.">
                                 <input type="checkbox" id="pf-m-sl-move-nobuy" ${ui.no_move_buy_legs ? 'checked' : ''}> No Move SL for BUY Legs
                             </label>
-                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its SL. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its SL. Wired in backtest via the two-pass runner — auto-enabled when checked (no env flag needed).">
                                 <input type="checkbox" id="pf-m-sl-move-hitsl" ${ui.hit_on_leg_sl ? 'checked' : ''}> Re-apply on every Leg SL hit
                             </label>
-                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its Target. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Cross-slot trigger: raise every other leg's SL to entry when any leg hits its Target. Wired in backtest via the two-pass runner — auto-enabled when checked (no env flag needed).">
                                 <input type="checkbox" id="pf-m-sl-move-hittgt" ${ui.hit_on_leg_target ? 'checked' : ''}> Re-apply on every Leg Target hit
                             </label>
                         </div>
                         <div style="margin-top:8px; border-top:1px solid var(--border, #ddd); padding-top:6px;">
-                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Portfolio-aggregate trigger: when the whole portfolio's combined P&L crosses the threshold, move every open leg's SL to entry. Wired in backtest via the two-pass runner (server-side _USE_PF_AGG_MOVE_SL flag).">
+                            <label class="pf-field-row" style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;" title="Portfolio-aggregate trigger: when the whole portfolio's combined P&L crosses the threshold, move every open leg's SL to entry. Wired in backtest via the two-pass runner — auto-enabled when checked (no env flag needed).">
                                 <input type="checkbox" id="pf-m-sl-agg-enabled" ${ui.move_sl_agg_pnl_enabled ? 'checked' : ''}> Move SL on aggregate portfolio P&amp;L
                             </label>
                             <div class="pf-field-row">
@@ -1255,6 +1264,26 @@ const Portfolio = {
                                 <span class="pf-field-label">Squareoff TZ</span>
                                 ${this._renderTzSelect(pf.squareoff_tz, "pf-m-sqofftz", "(UTC)")}
                             </div>
+                            <div class="pf-field-row" title="Spec §9 Winter Time Adjustment. Shifts entry window, square-off and RBO times +1 hour at run time for US-listed instruments during DST. Leave off for NSE/India (no DST).">
+                                <label style="display:flex; align-items:center; gap:6px;">
+                                    <input type="checkbox" id="pf-m-winter" ${pf.winter_time_adjust ? 'checked' : ''}> Winter Time Adjustment (+1h, US/DST)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px; border-top:1px solid var(--border, #ddd); padding-top:8px;">
+                        <div class="pf-field-row" title="Spec §11 Portfolio Tag. Groups this portfolio with others sharing the same tag so a tag-level SL/Target (a risk tier between portfolio and user) clips the whole group. Leave blank for none.">
+                            <span class="pf-field-label">Portfolio Tag (§11)</span>
+                            <input type="text" class="form-control" id="pf-m-tag" list="pf-m-tag-list" value="${pf.portfolio_tag || ''}" placeholder="e.g. non-trending" style="flex:1;">
+                            <datalist id="pf-m-tag-list">
+                                ${(this._tagDefs || []).map(t => `<option value="${t.tag}">`).join("")}
+                            </datalist>
+                        </div>
+                        <div class="pf-field-row" title="Optional: define the tag's caps (absolute, reporting ccy). Saved to the shared tag registry when you click Save Tag Limits. Portfolio SL/Target must not exceed these or the user-level caps (spec §11 hierarchy).">
+                            <span class="pf-field-label">Tag Max Loss / Profit</span>
+                            <input type="number" class="form-control" id="pf-m-tag-maxloss" placeholder="Max Loss" min="0" step="any" style="width:110px;">
+                            <input type="number" class="form-control" id="pf-m-tag-maxprofit" placeholder="Max Profit" min="0" step="any" style="width:110px; margin-left:4px;">
+                            <button type="button" class="btn btn-sm" style="margin-left:6px;" onclick="Portfolio._saveTagLimits()">Save Tag Limits</button>
                         </div>
                     </div>
                 </fieldset>
@@ -1278,6 +1307,9 @@ const Portfolio = {
                         </select>
                         <label class="pf-live-only" style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer;" title="Options-only multi-leg ordering (close SELL straddle legs first to reduce delta). FX/crypto slots are independent.">
                             <input type="checkbox" id="pf-m-exit-sellfirst" ${(ui.exit_sell_first !== false) ? 'checked' : ''}> Exit Sell Legs First
+                        </label>
+                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer; margin-top:8px;" title="Spec §4.2/§8.1: reprice SL/Target exit fills to the conservative VWAP price (SELL=max(vwap,hit), BUY=min(vwap,hit)). Needs paired ASK/BID bars (FX/MID slots); no-op on LAST-only data.">
+                            <input type="checkbox" id="pf-m-exit-vwapfill" ${(ui.vwap_exit_fill === true) ? 'checked' : ''}> Conservative VWAP Exit Fill
                         </label>
                     </div>
                     <div style="flex:1; min-width:300px;">
@@ -1309,6 +1341,41 @@ const Portfolio = {
             </div>
         `;
         this._openModal(title, body, 1200, footer);
+        // Populate the tag datalist + prefill the current tag's limits (spec §11).
+        this._loadTagDefs(pf.portfolio_tag);
+    },
+
+    /* Fetch tag definitions, refresh the datalist, and prefill the current
+     * tag's Max Loss / Max Profit inputs. Best-effort — failures are silent. */
+    _loadTagDefs(currentTag) {
+        App.api("/api/tags/list").then(resp => {
+            this._tagDefs = resp.tags || [];
+            const dl = document.getElementById("pf-m-tag-list");
+            if (dl) dl.innerHTML = this._tagDefs.map(t => `<option value="${t.tag}">`).join("");
+            const def = this._tagDefs.find(t => t.tag === currentTag);
+            if (def) {
+                const ml = document.getElementById("pf-m-tag-maxloss");
+                const mp = document.getElementById("pf-m-tag-maxprofit");
+                if (ml && def.max_loss != null) ml.value = def.max_loss;
+                if (mp && def.max_profit != null) mp.value = def.max_profit;
+            }
+        }).catch(() => { });
+    },
+
+    /* Save the named tag's Max Loss / Max Profit to the shared tag registry
+     * (spec §11). Separate from portfolio save so editing one portfolio doesn't
+     * silently rewrite the shared tag — the user clicks this explicitly. */
+    _saveTagLimits() {
+        const tag = (document.getElementById("pf-m-tag")?.value || "").trim();
+        if (!tag) { App.toast("Enter a Portfolio Tag name first.", "error"); return; }
+        const ml = document.getElementById("pf-m-tag-maxloss")?.value;
+        const mp = document.getElementById("pf-m-tag-maxprofit")?.value;
+        const body = { tag };
+        if (ml !== "" && ml != null) body.max_loss = parseFloat(ml);
+        if (mp !== "" && mp != null) body.max_profit = parseFloat(mp);
+        App.api("/api/tags/save", { method: "POST", body: JSON.stringify(body) })
+            .then(() => { App.toast(`Tag "${tag}" limits saved.`, "success"); this._loadTagDefs(tag); })
+            .catch(e => App.toast(`Save tag failed: ${e?.message || e}`, "error"));
     },
 
     _switchPfTab(tabName) {
@@ -1850,6 +1917,10 @@ const Portfolio = {
         pf.end_date = document.getElementById("pf-m-end")?.value || null;
         pf.squareoff_time = document.getElementById("pf-m-sqoff")?.value || null;
         pf.squareoff_tz = document.getElementById("pf-m-sqofftz")?.value || null;
+        // Winter Time Adjustment (spec §9) — applied at run time by the backend.
+        pf.winter_time_adjust = document.getElementById("pf-m-winter")?.checked || false;
+        // Portfolio Tag (spec §11) — assigns this portfolio to a shared risk tier.
+        pf.portfolio_tag = (document.getElementById("pf-m-tag")?.value || "").trim() || null;
         pf.max_loss = parseFloat(document.getElementById("pf-m-maxloss")?.value) || null;
         pf.max_profit = parseFloat(document.getElementById("pf-m-maxprofit")?.value) || null;
 
@@ -2030,6 +2101,7 @@ const Portfolio = {
         pf._ui.exit_order_type = document.getElementById("pf-m-exit-ordertype")?.value || "MARKET";
         pf._ui.exit_sell_first = document.getElementById("pf-m-exit-sellfirst")?.checked ?? true;
         pf._ui.on_portfolio_complete = document.getElementById("pf-m-exit-oncomplete")?.value || "None";
+        pf._ui.vwap_exit_fill = document.getElementById("pf-m-exit-vwapfill")?.checked || false;
         // Persisted copies for the backend (Monitoring + ReExecute + Exit Settings).
         // Field names on pf match PortfolioConfig in models.py. Only
         // no_reexec_sl_cost has runtime effect (FX/crypto adaptation of
@@ -2049,6 +2121,7 @@ const Portfolio = {
         pf.exit_order_type = pf._ui.exit_order_type;
         pf.exit_sell_first = pf._ui.exit_sell_first;
         pf.on_portfolio_complete = pf._ui.on_portfolio_complete;
+        pf.vwap_exit_fill = pf._ui.vwap_exit_fill;
         // Other Settings. Mirror to both _ui (UI scratchpad) AND pf.<model_field>
         // so the strip-before-POST below preserves them for the server. Field
         // names on pf match PortfolioConfig in models.py.
@@ -2064,6 +2137,15 @@ const Portfolio = {
         pf.on_target_action_on = pf._ui.on_target_action_on;
         pf.on_sl_action_on = pf._ui.on_sl_action_on;
 
+        // Timing-ordering pre-check (spec §9: Start ≤ End ≤ SqOff). Mirrors the
+        // server-side _validate_portfolio_times so the user gets immediate
+        // feedback instead of a swallowed 400. Returns an error string or null.
+        const timeErr = this._validateTimingOrder(pf);
+        if (timeErr) {
+            App.toast(timeErr, "error");
+            return;  // keep the modal open so the user can fix it
+        }
+
         // Strip UI-only fields before sending to server
         const cleanPf = JSON.parse(JSON.stringify(pf));
         delete cleanPf._enabled;
@@ -2074,12 +2156,58 @@ const Portfolio = {
         delete cleanPf.max_legs;
         delete cleanPf.tgt_sl_per_lot;
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
-            .then(() => App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name))
-            .catch(() => { });
+            .then(() => {
+                App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name);
+                App.toast(`Portfolio "${pf.name}" saved.`, "success");
+            })
+            .catch((e) => {
+                // Surface the server's rejection (e.g. allowlist, SL/timing
+                // validation) instead of silently claiming success.
+                App.toast(`Save failed: ${e?.message || e || "server error"}`, "error");
+            });
 
         this._closeModal();
         this.renderApp();
-        App.toast(`Portfolio "${pf.name}" saved.`, "success");
+    },
+
+    /* Client-side mirror of server _validate_portfolio_times (spec §9).
+     * Returns an error string when the timing fields are out of order, else
+     * null. Effective square-off = explicit squareoff_time, else MIS default. */
+    _validateTimingOrder(pf) {
+        const toMin = (v) => {
+            if (!v) return null;
+            const p = String(v).split(":");
+            const h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+            if (Number.isNaN(h) || Number.isNaN(m)) return null;
+            return h * 60 + m;
+        };
+        // Calendar date ordering (portfolio + slots).
+        if (pf.start_date && pf.end_date && pf.start_date > pf.end_date) {
+            return `Portfolio start date ${pf.start_date} is after end date ${pf.end_date}.`;
+        }
+        for (const sl of (pf.slots || [])) {
+            if (sl.start_date && sl.end_date && sl.start_date > sl.end_date) {
+                return `Slot "${sl.strategy_name}" start date is after its end date.`;
+            }
+        }
+        // Effective square-off: explicit, else MIS default when product==MIS.
+        let sqTime = pf.squareoff_time;
+        if (!sqTime && String(pf.product || "").toUpperCase() === "MIS") {
+            sqTime = pf.mis_squareoff_time;
+        }
+        const es = toMin(pf.entry_start_time);
+        const ee = toMin(pf.entry_end_time);
+        const sq = toMin(sqTime);
+        if (es !== null && ee !== null && es > ee) {
+            return `Entry Start Time ${pf.entry_start_time} is after Entry End Time ${pf.entry_end_time} (spec §9: Start ≤ End).`;
+        }
+        if (ee !== null && sq !== null && ee > sq) {
+            return `Entry End Time ${pf.entry_end_time} is after Square-off Time ${sqTime} (spec §9: End ≤ SqOff).`;
+        }
+        if (es !== null && sq !== null && es > sq) {
+            return `Entry Start Time ${pf.entry_start_time} is after Square-off Time ${sqTime} (spec §9: Start ≤ SqOff).`;
+        }
+        return null;
     },
 
     _cancelPortfolioModal(isNew) {

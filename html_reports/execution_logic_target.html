@@ -225,7 +225,7 @@ else:
         anchor_pnl += steps × trail_every
         # log: LEG_TRAIL_TARGET_UPDATED</code></pre>
   <p>Fields: <code>enabled</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code>. All accept absolute or % input.</p>
-  <p>Parallel to Trail After Move SL on the SL side — see SL doc §4.6.</p>
+  <p>Direct mirror of the Leg-Level Trailing SL (Profit Lock) on the SL side — see SL doc §4.9.</p>
 </div>
 
 <h2 id="portfolio">5. Portfolio-Level Target Execution</h2>
@@ -298,6 +298,7 @@ else:
         user_current_stop += steps × user_trail_by
         user_anchor_pnl += steps × user_trail_every
         # log: USER_TRAIL_TARGET_UPDATED</code></pre>
+  <p><code>max_profit</code> accepts <strong>absolute input only</strong> (% removed at user level — see <code>sl_features.html</code> Level 3). <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code> accept absolute or % input.</p>
 </div>
 
 <h2 id="reexec">7. ReExecute Gating Flags</h2>

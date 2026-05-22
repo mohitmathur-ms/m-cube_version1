@@ -12,18 +12,23 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregating_strategy import AggregatingStrategyMixin
+
 
 class RSIConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
     extra_bar_types: list[BarType] | None = None
+    # Target EXTERNAL bar type to aggregate the base stream up to (custom
+    # streaming aggregator). Empty ⇒ no aggregation (runs on base, unchanged).
+    aggregate_to_bar_type: str = ""
     rsi_period: PositiveInt = 14
     overbought: float = 70.0
     oversold: float = 30.0
 
 
-class RSIMeanReversionStrategy(Strategy):
+class RSIMeanReversionStrategy(AggregatingStrategyMixin, Strategy):
     """Buy when RSI is oversold, sell when RSI is overbought."""
 
     def __init__(self, config: RSIConfig) -> None:
@@ -37,7 +42,14 @@ class RSIMeanReversionStrategy(Strategy):
             self.log.error(f"Could not find instrument for {self.config.instrument_id}")
             self.stop()
             return
-        self.register_indicator_for_bars(self.config.bar_type, self.rsi)
+        aggregating = self._setup_aggregation(
+            self.instrument,
+            self.config.bar_type,
+            self.config.aggregate_to_bar_type,
+            [self.rsi],
+        )
+        if not aggregating:
+            self.register_indicator_for_bars(self.config.bar_type, self.rsi)
         self.subscribe_bars(self.config.bar_type)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
@@ -48,7 +60,10 @@ class RSIMeanReversionStrategy(Strategy):
         # feed indicators but must not drive order submission.
         if bar.bar_type != self.config.bar_type:
             return
-        if not self.indicators_initialized():
+        bar = self._route_bar(bar)
+        if bar is None:
+            return
+        if not self._indicators_ready():
             return
 
         if self.rsi.value <= self.config.oversold:
@@ -81,6 +96,7 @@ class RSIMeanReversionStrategy(Strategy):
         self.submit_order(order)
 
     def on_stop(self) -> None:
+        self._flush_aggregator()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 

@@ -22,6 +22,11 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregator import (
+    BarAggregator,
+    external_from_composite,
+    timeframe_of_bar_type,
+)
 from core.models import ExitConfig, parse_leg_actions
 from core.signals import SIGNAL_REGISTRY
 
@@ -227,6 +232,16 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # subscribes to (received and available, but the single-signal logic
     # uses the primary). Empty in the common case.
     subscribe_bar_types: list = []
+
+    # Custom streaming aggregation. When a leg selects a strategy timeframe
+    # coarser than the base, this holds the TARGET EXTERNAL bar type the base
+    # stream is aggregated up to (e.g. "EURUSD.FOREX_MS-5-MINUTE-MID-EXTERNAL").
+    # ``bar_type`` stays the BASE stream the strategy subscribes to; each base
+    # bar is fed to a core.aggregator.BarAggregator and the signal / indicators
+    # / SL / TP run on the emitted aggregated bar. Empty ⇒ no aggregation (runs
+    # on the base bar type, the original unchanged behaviour). This replaces the
+    # old Nautilus-internal composite (``INTERNAL@``) aggregation.
+    aggregate_to_bar_type: str = ""
 
     # Exit management
     stop_loss_type: str = "none"
@@ -525,6 +540,20 @@ class ManagedExitStrategy(Strategy):
         ]
         self._extra_sub_bts: set = set()
 
+        # Custom streaming aggregation state. ``_agg_to_str`` is the target
+        # EXTERNAL bar type (empty ⇒ no aggregation). The aggregators and the
+        # ``_aggregating`` flag are built in on_start (need the instrument).
+        # ``_agg_indicators`` is the list of indicators fed manually from the
+        # emitted aggregated bar (signal indicators + ATR(s)). ``_agg_pending``
+        # pairs primary/bid/ask aggregated bars by window-close ts for Format A.
+        self._agg_to_str: str = str(getattr(config, "aggregate_to_bar_type", "") or "")
+        self._aggregating: bool = False
+        self._primary_agg: BarAggregator | None = None
+        self._bid_agg: BarAggregator | None = None
+        self._ask_agg: BarAggregator | None = None
+        self._agg_indicators: list = []
+        self._agg_pending: dict[int, dict] = {}
+
         # Intraday entry window (spec §9). UTC minute-of-day; -1 = disabled.
         # Gates fresh entries in _check_entries WITHOUT dropping post-window
         # bars, so SL/Target keep being monitored until squareoff.
@@ -559,6 +588,29 @@ class ManagedExitStrategy(Strategy):
 
         params = dict(self.config.signal_params) if self.config.signal_params else {}
 
+        # Resolve the custom streaming aggregation target (replaces Nautilus'
+        # internal composite aggregation). When aggregating, indicators are NOT
+        # registered with the engine — they would otherwise be fed on every BASE
+        # bar — and are instead driven manually from the emitted aggregated bar
+        # in on_bar. ``config.bar_type`` is always the BASE stream.
+        self._aggregating = False
+        if self._agg_to_str:
+            try:
+                _tgt = external_from_composite(self._agg_to_str) or self._agg_to_str
+                _target_bt = BarType.from_str(_tgt)
+                if _target_bt != self.config.bar_type:
+                    self._primary_agg = BarAggregator(
+                        self.instrument, _target_bt, timeframe_of_bar_type(str(_target_bt))
+                    )
+                    self._aggregating = True
+            except Exception as e:  # noqa: BLE001 — degrade to no-aggregation
+                self.log.warning(
+                    f"Custom aggregation disabled for {self._agg_to_str!r} ({e}); "
+                    f"running on base bar type"
+                )
+                self._aggregating = False
+                self._primary_agg = None
+
         for ind_name, ind_spec in signal_entry["indicators"].items():
             period = params.get(ind_spec["param_key"], ind_spec["default"])
 
@@ -576,26 +628,39 @@ class ManagedExitStrategy(Strategy):
                 indicator = ind_class(int(period))
 
             self.indicators[ind_name] = indicator
-            self.register_indicator_for_bars(self.config.bar_type, indicator)
+            if not self._aggregating:
+                self.register_indicator_for_bars(self.config.bar_type, indicator)
 
         # ATR-based SL: register a dedicated ATR indicator so it warms up
         # alongside the signal indicators. indicators_initialized() also waits
         # on it, so the leg won't enter until ATR has a valid value.
         if self.config.stop_loss_type == "atr" and self.config.sl_atr_period > 0:
             self._atr = AverageTrueRange(int(self.config.sl_atr_period))
-            self.register_indicator_for_bars(self.config.bar_type, self._atr)
+            if not self._aggregating:
+                self.register_indicator_for_bars(self.config.bar_type, self._atr)
 
         # ATR-based Target: dedicated indicator (spec §1.1 fn.4). Registered so
         # indicators_initialized() also waits on it before the leg may enter.
         if self.config.target_type == "atr" and self.config.tgt_atr_period > 0:
             self._tgt_atr = AverageTrueRange(int(self.config.tgt_atr_period))
-            self.register_indicator_for_bars(self.config.bar_type, self._tgt_atr)
+            if not self._aggregating:
+                self.register_indicator_for_bars(self.config.bar_type, self._tgt_atr)
+
+        # Indicators fed manually from the aggregated bar (aggregating mode) and
+        # used for the readiness gate in both modes.
+        self._agg_indicators = list(self.indicators.values())
+        if self._atr is not None:
+            self._agg_indicators.append(self._atr)
+        if self._tgt_atr is not None:
+            self._agg_indicators.append(self._tgt_atr)
 
         self.subscribe_bars(self.config.bar_type)
 
         # Format A (Bid/Ask): also subscribe to the paired BID/ASK series so
         # SL/Target triggers can consult them. Indicators stay registered on
-        # the primary bar type only, so entry signals are unaffected.
+        # the primary bar type only, so entry signals are unaffected. When
+        # aggregating, build matching bid/ask aggregators so the trigger series
+        # are aggregated to the same windows as the primary.
         if self._exit_fmt == "bidask" and self._bid_bt_str and self._ask_bt_str:
             try:
                 self._fa_bid_bt = BarType.from_str(self._bid_bt_str)
@@ -606,6 +671,21 @@ class ManagedExitStrategy(Strategy):
                     self.subscribe_bars(self._fa_bid_bt)
                 if self._fa_ask_bt != self.config.bar_type:
                     self.subscribe_bars(self._fa_ask_bt)
+                if self._aggregating:
+                    _tf = timeframe_of_bar_type(str(self._primary_agg.target_bar_type))
+                    _tgt_bid, _tgt_ask = _derive_bid_ask_bar_types(
+                        str(self._primary_agg.target_bar_type)
+                    )
+                    if _tgt_bid and _tgt_ask:
+                        self._bid_agg = BarAggregator(
+                            self.instrument, BarType.from_str(_tgt_bid), _tf
+                        )
+                        self._ask_agg = BarAggregator(
+                            self.instrument, BarType.from_str(_tgt_ask), _tf
+                        )
+                    else:
+                        # Can't aggregate the trigger pair — fall back to OHLCV.
+                        self._exit_fmt = "ohlcv"
             except Exception as e:  # noqa: BLE001 — degrade, don't crash the run
                 self.log.warning(
                     f"Format A: could not subscribe bid/ask bars ({e}); "
@@ -643,6 +723,22 @@ class ManagedExitStrategy(Strategy):
         if bar.bar_type in self._extra_sub_bts:
             return
 
+        # Custom streaming aggregation: convert the BASE bar(s) into the
+        # higher-timeframe aggregated bar(s) and run the strategy logic on
+        # those, instead of the base bars (replaces Nautilus' internal
+        # aggregation). Returns None mid-window.
+        if self._aggregating:
+            if self._exit_fmt != "bidask":
+                agg = self._primary_agg.on_bar(bar)
+                if agg is None:
+                    return
+                self._feed_indicators(agg)
+                self._on_primary_bar(agg)
+            else:
+                self._on_bar_aggregating_bidask(bar)
+            return
+
+        # ── No aggregation: original base-bar dispatch ──
         # Format B / C: the slot has a single bar stream — process directly.
         if self._exit_fmt != "bidask":
             self._on_primary_bar(bar)
@@ -677,6 +773,59 @@ class ManagedExitStrategy(Strategy):
             self._fa_pending.pop(ts)
             self._on_primary_bar(slot["primary"], slot["bid"], slot["ask"])
 
+    def _feed_indicators(self, agg_bar: Bar) -> None:
+        """Drive the (unregistered) indicators from an emitted aggregated bar."""
+        for ind in self._agg_indicators:
+            ind.handle_bar(agg_bar)
+
+    def _indicators_ready(self) -> bool:
+        """Readiness gate that works in both aggregating and base-bar modes."""
+        if self._aggregating:
+            return all(ind.initialized for ind in self._agg_indicators)
+        return self.indicators_initialized()
+
+    def _on_bar_aggregating_bidask(self, bar: Bar) -> None:
+        """Format A under aggregation: feed each base stream to its aggregator
+        and dispatch when the (primary, bid, ask) aggregated trio for a window
+        close is complete (or a later primary window proves it final)."""
+        bt = bar.bar_type
+        if bt == self.config.bar_type:
+            self._collect_agg("primary", self._primary_agg.on_bar(bar))
+            # Slot configured directly on one side of the pair → same bar.
+            if self._bid_agg is not None and self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+                self._collect_agg("bid", self._bid_agg.on_bar(bar))
+            if self._ask_agg is not None and self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+                self._collect_agg("ask", self._ask_agg.on_bar(bar))
+        elif self._bid_agg is not None and self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+            self._collect_agg("bid", self._bid_agg.on_bar(bar))
+        elif self._ask_agg is not None and self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+            self._collect_agg("ask", self._ask_agg.on_bar(bar))
+        self._drain_agg_pending()
+
+    def _collect_agg(self, kind: str, agg_bar: Bar | None) -> None:
+        if agg_bar is None:
+            return
+        self._agg_pending.setdefault(agg_bar.ts_event, {})[kind] = agg_bar
+
+    def _drain_agg_pending(self) -> None:
+        """Dispatch complete aggregated trios in window-close order. A window
+        whose primary is present but whose close-ts predates the latest primary
+        window is final — its missing bid/ask defaulted (OHLCV fallback)."""
+        if not self._agg_pending:
+            return
+        primary_ts = [t for t, g in self._agg_pending.items() if "primary" in g]
+        if not primary_ts:
+            return
+        watermark = max(primary_ts)
+        for t in sorted(self._agg_pending):
+            g = self._agg_pending[t]
+            complete = "primary" in g and "bid" in g and "ask" in g
+            final = "primary" in g and t < watermark
+            if complete or final:
+                self._agg_pending.pop(t)
+                self._feed_indicators(g["primary"])
+                self._on_primary_bar(g["primary"], g.get("bid"), g.get("ask"))
+
     def _on_primary_bar(self, bar: Bar, bid_bar: Bar | None = None,
                         ask_bar: Bar | None = None) -> None:
         # Cache the current bar's timestamp so _handle_exit can stamp
@@ -691,7 +840,7 @@ class ManagedExitStrategy(Strategy):
         if self._rbo_enabled:
             self._rbo_step(bar)
 
-        if not self.indicators_initialized():
+        if not self._indicators_ready():
             return
 
         close = float(bar.close)
@@ -1545,6 +1694,11 @@ class ManagedExitStrategy(Strategy):
         self._pending_entry_reason = None
 
     def on_stop(self) -> None:
+        # Drain trailing partial windows (no order action — matches Nautilus,
+        # which never emits an in-progress window).
+        for agg in (self._primary_agg, self._bid_agg, self._ask_agg):
+            if agg is not None:
+                agg.flush()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 
@@ -1588,48 +1742,50 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     # composites are subscribed-and-available (received, but the single-signal
     # logic uses the primary). Empty selection → strategy runs on the base,
     # the original unchanged behaviour.
+    # Custom streaming aggregation. ``bar_type`` (the BASE catalog stream) stays
+    # the bar type the strategy subscribes to and the resolution at which the
+    # matching engine fills orders. When the leg selects strategy timeframe(s),
+    # the FIRST selected string is reinterpreted as the aggregation TARGET: its
+    # plain EXTERNAL form (composite ``INTERNAL@`` carrier stripped) becomes
+    # ``aggregate_to_bar_type``, and the strategy aggregates the base up to it
+    # with core.aggregator.BarAggregator — no Nautilus-internal composite bars.
+    # Any further selections are dropped (they were received-and-ignored before).
     _subs = [str(s) for s in (subscribe_bar_types or []) if s]
-    _signal_bar_type = bar_type   # what the strategy logic runs on
-    _extra_subs: list = []
+    _aggregate_to = ""
     if _subs:
-        try:
-            _signal_bar_type = BarType.from_str(_subs[0])
-            # Extra subscriptions = any FURTHER composites only. The base bar
-            # type is NOT subscribed: per the NautilusTrader backtest loop the
-            # SimulatedExchange processes the base data (engine.add_data) in
-            # Phase 1 and the matching core fills orders against it — order
-            # fills resolve on the base data regardless of what the strategy
-            # subscribes to. The strategy therefore receives ONLY the
-            # aggregated composite bars in on_bar; the primary drives the
-            # signal / SL / TP, any further composites are received-and-ignored.
-            _extra_subs = _subs[1:]
-        except Exception:  # noqa: BLE001 — malformed primary → keep base
-            _signal_bar_type = bar_type
-            _extra_subs = []
+        _ext = external_from_composite(_subs[0])
+        if _ext:
+            try:
+                if BarType.from_str(_ext) != bar_type:
+                    _aggregate_to = _ext
+            except Exception:  # noqa: BLE001 — malformed → no aggregation
+                _aggregate_to = ""
 
     # Three-format engine (spec §3). Resolve the exit-trigger data format and,
-    # for Format A, derive the paired BID/ASK bar-type strings from the
-    # strategy's signal bar type (the composite when one is selected).
+    # for Format A, derive the paired BID/ASK bar-type strings from the BASE bar
+    # type (the strategy aggregates these base streams to the same windows as
+    # the primary when aggregating).
     _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
     if _fmt not in ("ohlcv", "ltp", "bidask"):
         _fmt = "ohlcv"
     _bid_bt, _ask_bt = ("", "")
     if _fmt == "bidask":
-        _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(_signal_bar_type))
+        _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(bar_type))
         if not _bid_bt or not _ask_bt:
             # No FX-style bid/ask pair (e.g. crypto LAST bars) — degrade to B.
             _fmt = "ohlcv"
 
     kwargs = dict(
         instrument_id=instrument_id,
-        bar_type=_signal_bar_type,
+        bar_type=bar_type,
         trade_size=Decimal(str(trade_size)),
         signal_name=signal_name,
         signal_params=signal_params,
         exit_price_format=_fmt,
         bid_bar_type=_bid_bt,
         ask_bar_type=_ask_bt,
-        subscribe_bar_types=_extra_subs,
+        subscribe_bar_types=[],
+        aggregate_to_bar_type=_aggregate_to,
         stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,

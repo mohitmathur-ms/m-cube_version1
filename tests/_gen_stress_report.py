@@ -120,6 +120,7 @@ for r in DATA:
     <tr><td>Backtest date range</td><td><b>{html.escape(r['range'])}</b></td></tr>
     <tr><td>Catalog data span</td><td>{dataspan(r['instruments'])}</td></tr>
     <tr><td>Environment flags</td><td>{env_str(r['env'])}</td></tr>
+    <tr><td>Aggregator + MIS/NRML</td><td><b>{html.escape(r.get('augmentation','(not applied)'))}</b></td></tr>
     <tr><td>User registry</td><td>{user_str(r['user'])}</td></tr>
     <tr><td>Runtime</td><td>{fmt(r.get('seconds'),1)} s · status <b>{r['status']}</b></td></tr>
   </table>
@@ -186,11 +187,14 @@ HTML = f"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SL &amp; Target — Stress-Test RESULTS</title><style>{CSS}</style></head><body>
 <header class="cover">
-  <h1>SL &amp; Target — Complex Stress-Test RESULTS</h1>
+  <h1>SL &amp; Target + Custom Aggregator + MIS/NRML — Stress-Test RESULTS</h1>
   <p>Execution &amp; verification of the 16 maximal test cases from
   <code>sl_target_stress_test_plan.html</code> — run as real backtests against the
-  local catalog. Each card records the portfolio selected, the date range, the
-  catalog data span, the result, and the pass/fail verification.</p>
+  local catalog, now with the <strong>custom streaming aggregator</strong> (every
+  1-minute slot aggregated to 5-MINUTE in-strategy) and the <strong>MIS/NRML
+  product</strong> (alternating across cases) folded into every case. Each card
+  records the portfolio selected, the date range, the aggregator/product applied,
+  the result, and the pass/fail verification.</p>
 </header>
 <div class="wrap">
 
@@ -202,14 +206,15 @@ HTML = f"""<!DOCTYPE html>
   <div class="sumcard"><div class="n">16</div><div class="l">Total cases</div></div>
 </div>
 <div class="callout">
-  <strong>Outcome.</strong> All 16 cases were executed as real backtests. <strong>15
-  PASS</strong> — the SL/Target engine handled every adversarial multi-parameter
-  combination (Format-A in grouped engines, ReExecute replay recursion, four overlapping
-  timing gates, five racing clips, four stacked SL movers, underlying SL+Target,
+  <strong>Outcome.</strong> All 16 cases were executed as real backtests with the custom
+  aggregator and MIS/NRML enabled. <strong>{tally['PASS']} PASS</strong> — the SL/Target
+  engine plus the in-strategy aggregator and the MIS/NRML product handled every adversarial
+  multi-parameter combination (Format-A in grouped engines, ReExecute replay recursion, four
+  overlapping timing gates, five racing clips, four stacked SL movers, underlying SL+Target,
   cross-portfolio chains, two-pass×replay, the kitchen-sink case) without a crash, hang,
-  NaN, or silent corruption. <strong>1 DEGRADED-OK</strong> — T08 (deliberately degenerate
-  config) raised a clean, explanatory error instead of corrupting results, which is the
-  correct behaviour. <strong>0 FAIL.</strong> No code defect was found.
+  NaN, or silent corruption. <strong>{tally['DEGRADED-OK']} DEGRADED-OK</strong> — T08
+  (deliberately degenerate config) raised a clean, explanatory error instead of corrupting
+  results, which is the correct behaviour. <strong>{tally['FAIL']} FAIL.</strong>
 </div>
 <div class="callout">
   <strong>Method.</strong> Harness <code>tests/run_stress_suite.py</code> builds the full

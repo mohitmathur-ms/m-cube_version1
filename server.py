@@ -7,6 +7,7 @@ for data loading, visualization, backtesting, and report generation.
 Run with: python server.py
 """
 
+import hashlib
 import json
 import sys
 import threading
@@ -1103,7 +1104,7 @@ from core.models import (
     PortfolioConfig, StrategySlotConfig, ExitConfig,
     portfolio_to_dict, portfolio_from_dict,
     save_portfolio, load_portfolio, list_portfolios, delete_portfolio,
-    validate_leg_actions,
+    validate_leg_actions, effective_portfolio_squareoff,
 )
 from core.templates import get_templates, build_template
 
@@ -1119,7 +1120,10 @@ from core.users import (
     get_user as _get_user,
     list_users as _list_users,
     is_instrument_allowed as _is_instrument_allowed,
+    get_user_max_loss as _get_user_max_loss,
+    get_user_max_profit as _get_user_max_profit,
 )
+from core import tags as _tags
 from core.venue_config import symbol_from_bar_type as _symbol_from_bar_type
 
 
@@ -1199,6 +1203,135 @@ def _check_portfolio_allowlist(portfolio_config, user) -> tuple[bool, str]:
     return True, ""
 
 
+def _parse_hhmm_minute(value) -> "int | None":
+    """Parse an "HH:MM" / "HH:MM:SS" string to minute-of-day, or None.
+
+    Tolerates None / empty / malformed input by returning None (the caller
+    treats None as "unset", so a typo silently disables that one check rather
+    than blocking the save — the field-format itself is validated elsewhere).
+    """
+    if not value:
+        return None
+    try:
+        parts = str(value).split(":")
+        return int(parts[0]) * 60 + int(parts[1])
+    except (ValueError, IndexError):
+        return None
+
+
+def _validate_portfolio_times(portfolio_config) -> tuple[bool, str]:
+    """Enforce the spec §9 timing-ordering rule on save.
+
+    Spec: ``Portfolio Start ≤ Leg Start ≤ Portfolio End ≤ SqOff Time``. This
+    engine has no per-leg intraday Start Time — the entry window is
+    portfolio-level (``entry_start_time`` / ``entry_end_time``) — so the rule
+    maps to:
+
+        entry_start_time ≤ entry_end_time ≤ effective squareoff_time
+
+    Plus general calendar sanity: ``start_date ≤ end_date`` at portfolio level
+    and on every slot. All times are HH:MM UTC / local; dates are ISO
+    ``YYYY-MM-DD`` (lexicographic compare is correct for that format). Each
+    bound is only checked when both endpoints are present, so partially-
+    configured portfolios still save.
+    """
+    pf = portfolio_config
+
+    # Calendar date ordering (portfolio + per slot).
+    if pf.start_date and pf.end_date and pf.start_date > pf.end_date:
+        return False, (
+            f"Portfolio start date {pf.start_date} is after end date {pf.end_date}."
+        )
+    for slot in pf.slots:
+        if slot.start_date and slot.end_date and slot.start_date > slot.end_date:
+            return False, (
+                f"Slot '{slot.strategy_name}' start date {slot.start_date} is "
+                f"after its end date {slot.end_date}."
+            )
+
+    # Intraday window ordering (spec §9): Start ≤ End ≤ SqOff.
+    es = _parse_hhmm_minute(pf.entry_start_time)
+    ee = _parse_hhmm_minute(pf.entry_end_time)
+    if es is not None and ee is not None and es > ee:
+        return False, (
+            f"Entry Start Time {pf.entry_start_time} is after Entry End Time "
+            f"{pf.entry_end_time} (spec §9: Start ≤ End)."
+        )
+    sq_time, _ = effective_portfolio_squareoff(pf)
+    sq = _parse_hhmm_minute(sq_time)
+    if ee is not None and sq is not None and ee > sq:
+        return False, (
+            f"Entry End Time {pf.entry_end_time} is after Square-off Time "
+            f"{sq_time} (spec §9: End ≤ SqOff Time)."
+        )
+    if es is not None and sq is not None and es > sq:
+        return False, (
+            f"Entry Start Time {pf.entry_start_time} is after Square-off Time "
+            f"{sq_time} (spec §9: Start ≤ SqOff Time)."
+        )
+    return True, ""
+
+
+def _validate_portfolio_hierarchy(portfolio_config, user_id) -> tuple[bool, str]:
+    """Hierarchical risk-limit validation (spec §11).
+
+    A child-level cap must not exceed its parent: ``portfolio SL ≤ tag SL ≤
+    user SL`` (and the same on the Target/profit side). All three are absolute
+    amounts in the reporting currency, so they are directly comparable. (Leg
+    SL is a price-distance % / points trigger — not a currency budget — so it
+    can't be summed against the portfolio cap in this engine; that part of the
+    spec rule is N/A here.)
+
+    Only blocks when both endpoints of a comparison are set, so partially-
+    configured portfolios still save. Returns ``(ok, error_message)``.
+    """
+    pf = portfolio_config
+    tag = (getattr(pf, "portfolio_tag", None) or "").strip() or None
+
+    tag_max_loss = _tags.get_tag_max_loss(tag) if tag else None
+    tag_max_profit = _tags.get_tag_max_profit(tag) if tag else None
+    user_max_loss = _get_user_max_loss(user_id) if user_id else None
+    user_max_profit = _get_user_max_profit(user_id) if user_id else None
+
+    pf_sl = abs(float(getattr(pf, "pf_sl_value", 0.0) or 0.0)) if getattr(pf, "pf_sl_enabled", False) else None
+    pf_tgt = abs(float(getattr(pf, "pf_tgt_value", 0.0) or 0.0)) if getattr(pf, "pf_tgt_enabled", False) else None
+
+    # SL side: portfolio ≤ tag ≤ user.
+    if pf_sl and tag_max_loss is not None and pf_sl > tag_max_loss:
+        return False, (
+            f"Portfolio Stoploss {pf_sl:g} exceeds the '{tag}' tag's Max Loss "
+            f"{tag_max_loss:g} (spec §11: portfolio SL ≤ tag SL)."
+        )
+    if pf_sl and user_max_loss is not None and pf_sl > user_max_loss:
+        return False, (
+            f"Portfolio Stoploss {pf_sl:g} exceeds the user's Max Loss "
+            f"{user_max_loss:g} (spec §11: portfolio SL ≤ user SL)."
+        )
+    if tag_max_loss is not None and user_max_loss is not None and tag_max_loss > user_max_loss:
+        return False, (
+            f"Tag '{tag}' Max Loss {tag_max_loss:g} exceeds the user's Max Loss "
+            f"{user_max_loss:g} (spec §11: tag SL ≤ user SL)."
+        )
+
+    # Target side: portfolio ≤ tag ≤ user.
+    if pf_tgt and tag_max_profit is not None and pf_tgt > tag_max_profit:
+        return False, (
+            f"Portfolio Target {pf_tgt:g} exceeds the '{tag}' tag's Max Profit "
+            f"{tag_max_profit:g} (spec §11: portfolio Target ≤ tag Target)."
+        )
+    if pf_tgt and user_max_profit is not None and pf_tgt > user_max_profit:
+        return False, (
+            f"Portfolio Target {pf_tgt:g} exceeds the user's Max Profit "
+            f"{user_max_profit:g} (spec §11: portfolio Target ≤ user Target)."
+        )
+    if tag_max_profit is not None and user_max_profit is not None and tag_max_profit > user_max_profit:
+        return False, (
+            f"Tag '{tag}' Max Profit {tag_max_profit:g} exceeds the user's Max "
+            f"Profit {user_max_profit:g} (spec §11: tag Target ≤ user Target)."
+        )
+    return True, ""
+
+
 def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
     """Validate SL-related config before a portfolio is saved.
 
@@ -1207,6 +1340,7 @@ def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
         engine (spec execution_logic.html §8.1; only MARKET is wired).
       • Invalid leg-level On SL / On Target action combinations
         (spec §4.8 — see ``core.models.validate_leg_actions``).
+      • Out-of-order timing fields (spec §9 — see ``_validate_portfolio_times``).
     """
     order_type = str(getattr(portfolio_config, "exit_order_type", "MARKET") or "MARKET")
     if order_type.upper() != "MARKET":
@@ -1221,6 +1355,9 @@ def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
             ok, err = validate_leg_actions(action, has_execute_target=has_target)
             if not ok:
                 return False, f"Slot '{slot.strategy_name}' {label} action: {err}"
+    ok, err = _validate_portfolio_times(portfolio_config)
+    if not ok:
+        return False, err
     return True, ""
 
 
@@ -1257,6 +1394,70 @@ def api_users_me():
         "multiplier": user.get("multiplier", 1.0),
         "allowed_instruments": user.get("allowed_instruments"),
     })
+
+
+# ─── Portfolio Tags (spec §11) ───────────────────────────────────────────────
+# A tag groups portfolios that share a risk cap between the portfolio and user
+# levels. Definitions live in config/tags.json; the runner clips a tag's whole
+# group when its cumulative combined PnL breaches the cap (see core/tags.py).
+
+@app.route("/api/tags/list")
+def api_tags_list():
+    """Return all portfolio-tag definitions (name + limits)."""
+    return jsonify({"tags": _tags.list_tags()})
+
+
+@app.route("/api/tags/save", methods=["POST"])
+def api_tags_save():
+    """Create or update a portfolio-tag definition.
+
+    Body: ``{tag, max_loss?, max_profit?, trailing_sl_enabled?, ...}``. The
+    tag name must be a safe slug. Limits are absolute amounts in the reporting
+    currency. Mutating endpoint — requires a known user.
+    """
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    data = request.json or {}
+    name = str(data.get("tag", "")).strip()
+    if not _tags.validate_tag(name):
+        return jsonify({"error": f"Invalid tag name '{name}'. Use letters, digits, _ or - (1-48 chars)."}), 400
+
+    def _num(key):
+        raw = data.get(key)
+        if raw in (None, ""):
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    tag_def = {"tag": name}
+    for k in ("max_loss", "max_profit", "trailing_sl_every", "trailing_sl_by",
+              "trailing_tgt_when_reach", "trailing_tgt_lock",
+              "trailing_tgt_every", "trailing_tgt_by"):
+        v = _num(k)
+        if v is not None:
+            tag_def[k] = v
+    for k in ("trailing_sl_enabled", "trailing_tgt_enabled"):
+        tag_def[k] = bool(data.get(k))
+    try:
+        _tags.upsert_tag(tag_def)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"success": True, "tag": tag_def})
+
+
+@app.route("/api/tags/delete", methods=["POST"])
+def api_tags_delete():
+    """Delete a portfolio-tag definition by name."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    name = str((request.json or {}).get("tag", "")).strip()
+    if _tags.delete_tag(name):
+        return jsonify({"success": True, "message": f"Tag '{name}' deleted."})
+    return jsonify({"error": "Tag not found"}), 404
 
 
 @app.route("/api/portfolios/list")
@@ -1298,6 +1499,9 @@ def api_save_portfolio():
         if not ok:
             return jsonify({"error": err}), 403
         ok, err = _validate_portfolio_sl(config)
+        if not ok:
+            return jsonify({"error": err}), 400
+        ok, err = _validate_portfolio_hierarchy(config, user_or_resp["user_id"])
         if not ok:
             return jsonify({"error": err}), 400
         path = save_portfolio(config, _user_portfolios_dir(user_or_resp["user_id"]))
@@ -1488,11 +1692,19 @@ def api_portfolio_backtest():
 
             all_results_for_reports = {}
             for slot_id, sr in per_strat.items():
-                # Append slot_id so duplicate-config slots (same strategy +
-                # instrument + SL/TP) become distinct entries instead of the
-                # later slot's filtered slice overwriting the earlier one's.
+                # Append a neutral, stable token so duplicate-config slots (same
+                # strategy + instrument + SL/TP) become distinct entries instead
+                # of the later slot's filtered slice overwriting the earlier
+                # one's. The token is an 8-char hash of slot_id — random-looking
+                # (leaks no instrument hint like a hand-typed "fx_eur_bb"), yet
+                # deterministic so reports stay comparable across reruns.
                 base_label = sanitize_filename(sr["display_name"])
-                strat_label = f"{base_label}__{slot_id}"
+                token = hashlib.md5(str(slot_id).encode("utf-8")).hexdigest()[:8]
+                strat_label = f"{base_label}__{token}"
+                # Uniqueness safety net: if two slots ever hash-collide AND share
+                # a base_label, disambiguate with the index so nothing overwrites.
+                if strat_label in all_results_for_reports:
+                    strat_label = f"{strat_label}_{len(all_results_for_reports)}"
                 # Prefer trader_id for filtering — it is unique per slot even
                 # when multiple slots share the same strategy_id.
                 actual_tid = slot_to_tid.get(slot_id, "")
@@ -1510,7 +1722,7 @@ def api_portfolio_backtest():
                     if fills_rep is not None and not fills_rep.empty and "strategy_id" in fills_rep.columns:
                         slot_fills = fills_rep[fills_rep["strategy_id"] == actual_sid]
                 all_results_for_reports[strat_label] = {
-                    "slot_id": slot_id,
+                    "slot_id": token,
                     "positions_report": slot_pos, "fills_report": slot_fills,
                     "starting_capital": results["starting_capital"],
                     "final_balance": results["final_balance"],

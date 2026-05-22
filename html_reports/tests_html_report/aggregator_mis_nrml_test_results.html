@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Custom Aggregator &amp; MIS/NRML — Verification</title><style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3250;
+--text:#d4d8f0;--muted:#8a90b0;--accent:#5b7cfa;--ok:#3ecf8e;--partial:#f7c948;
+--miss:#e96060;--code:#141824;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+background:var(--bg);color:var(--text);line-height:1.6;font-size:14px;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 38px 100px;}
+header.cover{background:linear-gradient(135deg,#3ecf8e 0%,#5b7cfa 100%);color:#fff;
+padding:38px 40px;margin-bottom:8px;border-radius:0 0 14px 14px;}
+header.cover h1{font-size:25px;margin-bottom:6px;}
+header.cover p{color:rgba(255,255,255,.92);font-size:13.5px;}
+h2{font-size:18px;margin:38px 0 12px;color:#fff;padding-bottom:8px;border-bottom:1px solid var(--border);}
+h4{font-size:12px;color:var(--accent);margin:14px 0 5px;text-transform:uppercase;letter-spacing:.04em;}
+p{color:var(--muted);margin:9px 0;}
+code{font-family:'Fira Code',Consolas,monospace;font-size:11px;background:var(--code);
+border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:#f7c948;}
+.muted{color:var(--muted);}
+.sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0;}
+.sumcard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;}
+.sumcard .n{font-size:30px;font-weight:800;}
+.sumcard .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:4px;}
+.callout{background:rgba(91,124,250,.08);border-left:3px solid var(--accent);
+padding:12px 16px;margin:14px 0;border-radius:0 6px 6px 0;font-size:13px;}
+.callout strong{color:#fff;}
+.tc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 22px;margin:14px 0;}
+.tch{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.tcid{background:var(--accent);color:#fff;font-weight:800;font-size:12px;border-radius:5px;padding:3px 9px;}
+.tctitle{font-size:15px;font-weight:700;color:#fff;flex:1;min-width:200px;}
+.vb{font-size:11px;font-weight:800;border-radius:5px;padding:3px 10px;}
+.vb.ok{background:rgba(62,207,142,.15);color:var(--ok);border:1px solid var(--ok);}
+.vb.miss{background:rgba(233,96,96,.15);color:var(--miss);border:1px solid var(--miss);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0;
+background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+td,th{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;text-align:left;}
+th{color:#aab0d0;font-weight:700;background:rgba(91,124,250,.06);}
+tr:last-child td{border-bottom:none;}
+table.meta td:first-child{width:240px;color:#aab0d0;font-weight:600;}
+table.runs td.mk{width:200px;color:#aab0d0;font-weight:600;}
+td b,td strong{color:var(--text);}
+.err{background:rgba(233,96,96,.09);border-left:3px solid var(--miss);padding:9px 13px;margin:8px 0;border-radius:0 6px 6px 0;font-size:12px;}
+.verdict{padding:9px 13px;margin-top:8px;border-radius:0 6px 6px 0;font-size:12.5px;}
+.verdict.ok{background:rgba(62,207,142,.08);border-left:3px solid var(--ok);}
+.verdict.miss{background:rgba(233,96,96,.08);border-left:3px solid var(--miss);}
+.verdict b{color:#fff;}
+</style></head><body>
+<header class="cover">
+  <h1>Custom Aggregator &amp; MIS / NRML — Verification Results</h1>
+  <p>Real backtests proving the two newest features behave correctly: the in-strategy
+  streaming aggregator (which replaced Nautilus' internal <code>TimeBarAggregator</code>)
+  and the MIS / NRML product type. Each case runs the same portfolio twice with one
+  variable changed and compares the results, so the effect of the feature is observable.</p>
+</header>
+<div class="wrap">
+
+<h2>1. Summary</h2>
+<div class="sumgrid">
+  <div class="sumcard"><div class="n" style="color:var(--ok)">4</div><div class="l">Pass</div></div>
+  <div class="sumcard"><div class="n" style="color:var(--miss)">0</div><div class="l">Fail</div></div>
+  <div class="sumcard"><div class="n">4</div><div class="l">Total cases</div></div>
+</div>
+<div class="callout">
+  <strong>Outcome.</strong> 4/4 PASS. The custom streaming
+  aggregator drives strategy logic at the selected timeframe — coarser timeframes yield
+  monotonically fewer signal trades (1-min&nbsp;→&nbsp;5-min&nbsp;→&nbsp;15-min&nbsp;→&nbsp;1-hour),
+  in both the managed (SL/TP) and raw (signal-only) portfolio paths, while order fills
+  still resolve on the base data fed to the engine. MIS supplies a forced daily squareoff;
+  NRML carries forward; an explicit portfolio squareoff time overrides the MIS default.
+</div>
+<div class="callout">
+  <strong>Method.</strong> Harness <code>tests/run_agg_mis_nrml_tests.py</code> builds each
+  portfolio via <code>portfolio_from_dict</code> and runs <code>run_portfolio_backtest</code>
+  against <code>./catalog</code> using the reserved <code>_default</code> user. Aggregation is
+  requested through the leg's <code>strategy_bar_types</code> (the composite
+  <code>…-INTERNAL@…-EXTERNAL</code> string the Multileg UI emits), which the backend
+  reinterprets into an EXTERNAL aggregation target. MIS/NRML is set via
+  <code>PortfolioConfig.product</code> + <code>mis_squareoff_time</code>.
+</div>
+
+<h2>2. Per-case results</h2>
+
+<section class="tc">
+  <div class="tch"><span class="tcid">AGG1</span>
+    <span class="tctitle">Streaming aggregation coarseness: 1-MIN vs 5-MIN vs 1-HOUR (EMA Cross 10/30, no SL/TP)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-01-29</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Runtime</td><td>19.60 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <h4>Settings under test</h4>
+  <table class="meta"><tr><td>strategy</td><td>EMA Cross 10/30</td></tr><tr><td>instrument</td><td>EURUSD MID</td></tr><tr><td>base</td><td>1-MINUTE</td></tr><tr><td>aggregated</td><td>[&#x27;5-MINUTE&#x27;, &#x27;1-HOUR&#x27;]</td></tr><tr><td>exit</td><td>signal-only</td></tr></table>
+  <h4>Comparative runs</h4>
+  <table class='runs'><tr><th>Metric</th><th>base_1m</th><th>agg_5m</th><th>agg_1h</th></tr><tr><td class='mk'>Total trades</td><td>1138</td><td>221</td><td>13</td></tr><tr><td class='mk'>Total PnL</td><td>-85,503.98</td><td>-16,572.54</td><td>-987.41</td></tr><tr><td class='mk'>Final balance</td><td>14,496.02</td><td>83,427.46</td><td>99,012.59</td></tr><tr><td class='mk'>Win rate %</td><td>1.32</td><td>6.79</td><td>23.08</td></tr><tr><td class='mk'>Per-strategy slots</td><td>1</td><td>1</td><td>1</td></tr><tr><td class='mk'>Exit reasons</td><td>EMA Cross SELL:569, EMA Cross BUY:569</td><td>EMA Cross BUY:111, EMA Cross SELL:110</td><td>EMA Cross BUY:7, EMA Cross SELL:6</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> trades base1m=1138 &gt;= 5m=221 &gt;= 1h=13 (monotonic=True, 5m!=base=True, 5m fired=True, all PnL finite=True)</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">AGG2</span>
+    <span class="tctitle">Format-A bid/ask aggregation to 15-MINUTE (paired-aggregator dispatch path)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-01-29</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Runtime</td><td>13.00 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <h4>Settings under test</h4>
+  <table class="meta"><tr><td>strategy</td><td>EMA Cross 9/21</td></tr><tr><td>instrument</td><td>EURUSD MID -&gt; auto BID/ASK pair</td></tr><tr><td>base</td><td>1-MINUTE</td></tr><tr><td>aggregated</td><td>15-MINUTE</td></tr><tr><td>exit</td><td>Format-A, SL 20% / TP 30%</td></tr></table>
+  <h4>Comparative runs</h4>
+  <table class='runs'><tr><th>Metric</th><th>base_1m</th><th>agg_15m</th></tr><tr><td class='mk'>Total trades</td><td>37</td><td>33</td></tr><tr><td class='mk'>Total PnL</td><td>-2,778.23</td><td>-2,156.86</td></tr><tr><td class='mk'>Final balance</td><td>97,221.77</td><td>97,843.14</td></tr><tr><td class='mk'>Win rate %</td><td>18.92</td><td>18.18</td></tr><tr><td class='mk'>Per-strategy slots</td><td>1</td><td>1</td></tr><tr><td class='mk'>Exit reasons</td><td>EMA Cross SELL:18, Stop Loss:19, EMA Cross BUY:19, Squareoff:10, Take Profit:7</td><td>EMA Cross BUY:16, Take Profit:6, Stop Loss:14, EMA Cross SELL:17, Squareoff:12</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> Format-A bid/ask aggregated to 15m ran (trades=33, base=37, differs=True, PnL finite=True)</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">MIS1</span>
+    <span class="tctitle">MIS vs NRML: MIS supplies a daily forced squareoff (15:15 IST), NRML carries forward</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-01-29</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Runtime</td><td>9.00 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <h4>Settings under test</h4>
+  <table class="meta"><tr><td>strategy</td><td>EMA Cross 10/30</td></tr><tr><td>instrument</td><td>EURUSD MID</td></tr><tr><td>mis_squareoff_time</td><td>15:15 Asia/Kolkata</td></tr><tr><td>explicit squareoff_time</td><td>none</td></tr><tr><td>exit</td><td>wide SL 50% / TP 80% so squareoff dominates</td></tr></table>
+  <h4>Comparative runs</h4>
+  <table class='runs'><tr><th>Metric</th><th>mis</th><th>nrml</th></tr><tr><td class='mk'>Total trades</td><td>11</td><td>6</td></tr><tr><td class='mk'>Total PnL</td><td>-925.56</td><td>-1,107.04</td></tr><tr><td class='mk'>Final balance</td><td>99,074.44</td><td>98,892.96</td></tr><tr><td class='mk'>Win rate %</td><td>9.09</td><td>16.67</td></tr><tr><td class='mk'>Per-strategy slots</td><td>1</td><td>1</td></tr><tr><td class='mk'>Exit reasons</td><td>EMA Cross SELL:7, Squareoff:10, EMA Cross BUY:4</td><td>EMA Cross SELL:6, Stop Loss:5, Take Profit:1</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> MIS forced Squareoff exits=10 (&gt;0 expected); NRML Squareoff exits=0 (0 expected); PnL finite=True</div>
+</section>
+<section class="tc">
+  <div class="tch"><span class="tcid">MIS2</span>
+    <span class="tctitle">Explicit portfolio squareoff_time (09:30 IST) overrides the MIS default (15:15 IST)</span>
+    <span class="vb ok">PASS</span></div>
+  <table class="meta">
+    <tr><td>Backtest date range</td><td><b>2021-01-04 .. 2021-01-29</b></td></tr>
+    <tr><td>Catalog data span</td><td>2015-01-01 .. 2025-06-27 (EURUSD 1-minute ASK·BID·MID)</td></tr>
+    <tr><td>Runtime</td><td>9.60 s · status <b>COMPLETED</b></td></tr>
+  </table>
+  <h4>Settings under test</h4>
+  <table class="meta"><tr><td>strategy</td><td>EMA Cross 10/30</td></tr><tr><td>instrument</td><td>EURUSD MID</td></tr><tr><td>mis_default</td><td>15:15 Asia/Kolkata</td></tr><tr><td>explicit</td><td>09:30 Asia/Kolkata</td></tr><tr><td>exit</td><td>wide SL 50% / TP 80% so squareoff dominates</td></tr></table>
+  <h4>Comparative runs</h4>
+  <table class='runs'><tr><th>Metric</th><th>mis_default</th><th>explicit</th></tr><tr><td class='mk'>Total trades</td><td>11</td><td>12</td></tr><tr><td class='mk'>Total PnL</td><td>-925.56</td><td>-947.28</td></tr><tr><td class='mk'>Final balance</td><td>99,074.44</td><td>99,052.72</td></tr><tr><td class='mk'>Win rate %</td><td>9.09</td><td>0.00</td></tr><tr><td class='mk'>Per-strategy slots</td><td>1</td><td>1</td></tr><tr><td class='mk'>Exit reasons</td><td>EMA Cross SELL:7, Squareoff:10, EMA Cross BUY:4</td><td>EMA Cross SELL:7, Squareoff:11, EMA Cross BUY:5</td></tr></table>
+  
+  <div class="verdict ok"><b>Verification:</b> MIS-default Squareoff=10, explicit-09:30 Squareoff=11; both square off=True; trade profiles differ=True; finite=True</div>
+</section>
+
+</div></body></html>

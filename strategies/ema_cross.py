@@ -13,17 +13,23 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregating_strategy import AggregatingStrategyMixin
+
 
 class EMACrossConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
     extra_bar_types: list[BarType] | None = None
+    # Target EXTERNAL bar type to aggregate the base stream up to via the custom
+    # streaming aggregator (e.g. "EURUSD.FOREX_MS-5-MINUTE-ASK-EXTERNAL"). Empty
+    # ⇒ no aggregation (strategy runs on the base bar_type, unchanged behaviour).
+    aggregate_to_bar_type: str = ""
     fast_ema_period: PositiveInt = 10
     slow_ema_period: PositiveInt = 20
 
 
-class EMACrossStrategy(Strategy):
+class EMACrossStrategy(AggregatingStrategyMixin, Strategy):
     """Buy when fast EMA crosses above slow EMA, sell when it crosses below."""
 
     def __init__(self, config: EMACrossConfig) -> None:
@@ -42,8 +48,16 @@ class EMACrossStrategy(Strategy):
             self.log.error(f"Could not find instrument for {self.config.instrument_id}")
             self.stop()
             return
-        self.register_indicator_for_bars(self.config.bar_type, self.fast_ema)
-        self.register_indicator_for_bars(self.config.bar_type, self.slow_ema)
+        aggregating = self._setup_aggregation(
+            self.instrument,
+            self.config.bar_type,
+            self.config.aggregate_to_bar_type,
+            [self.fast_ema, self.slow_ema],
+        )
+        if not aggregating:
+            # Passthrough: let the engine feed the indicators as before.
+            self.register_indicator_for_bars(self.config.bar_type, self.fast_ema)
+            self.register_indicator_for_bars(self.config.bar_type, self.slow_ema)
         self.subscribe_bars(self.config.bar_type)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
@@ -57,7 +71,11 @@ class EMACrossStrategy(Strategy):
         # standard LHS form) still match config.bar_type.
         if bar.bar_type.standard() != self.config.bar_type.standard():
             return
-        if not self.indicators_initialized():
+        # Route through the streaming aggregator. None ⇒ window still open.
+        bar = self._route_bar(bar)
+        if bar is None:
+            return
+        if not self._indicators_ready():
             return
 
         if self.fast_ema.value >= self.slow_ema.value:
@@ -94,6 +112,7 @@ class EMACrossStrategy(Strategy):
         self.submit_order(order)
 
     def on_stop(self) -> None:
+        self._flush_aggregator()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 

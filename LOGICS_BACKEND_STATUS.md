@@ -133,20 +133,21 @@ All fields missing — no hedge logic exists in backend.
 | `target.type` — Underlying Movement — **new** | ✅ Wired | `_underlying_tgt_clip` — primary-instrument price crossing (was downgraded) |
 | `target.trailing.*` (Profit-Lock) | ✅ Wired | `_apply_portfolio_clip` step 3 |
 | `portfolio_action` — SqOff | ✅ Wired | Drops post-clip trades for the clipped slot set |
-| `portfolio_action` — ReExecute (replay) — **new** | ✅ Wired (flag-gated) | `_USE_PF_REEXEC_REPLAY=1`: re-runs slots flat from the clip via `_filter_bars_after_ns`, splices via `_splice_merged_results`, recurses to the ReExecute count |
+| `portfolio_action` — ReExecute (replay), incl. "at Entry Price" / "Same Contract" variants — **now config-driven** | ✅ Wired | Runs whenever a ReExecute-family action is configured on the portfolio SL/Target (no env flag): re-runs slots flat from the clip via `_filter_bars_after_ns`, splices via `_splice_merged_results`, recurses to the ReExecute count. Entry-price variants replay as plain ReExecute (FX adaptation). `_USE_PF_REEXEC_REPLAY` kept as override |
 | `portfolio_action` — cross-portfolio (SqOff/Execute/Start Other) | ✅ Wired | `publish_cross_portfolio_event` / `consume_cross_portfolio_events` — applied across sequential portfolio runs in a server process |
 | `portfolio_delay_sl` / `portfolio_delay_target` | ✅ Wired | `pf_*_delay_sec` — deferred-confirm with oscillation guard |
-| `move_sl_hit_on_leg_sl` / `move_sl_hit_on_leg_target` (cross-slot) | ✅ **Wired (flag-gated)** | Previously `pf-live-only`. Now wired in backtest via the two-pass runner: pass 1 records every leg's SL/target hit timestamps, the parent unions them into a cross-process event bus, pass 2 pre-seeds each worker's `_CROSS_SLOT_EVENT_BUSES`. `core/backtest_runner.py:_compute_agg_coordination`, `core/managed_strategy.py` `__init__` bus pre-seed + existing Hit-On-Leg branch in `_check_exits`. Gated by `_USE_PF_AGG_MOVE_SL=1`. |
-| `move_sl_agg_pnl_enabled` / `move_sl_agg_pnl_threshold` / `move_sl_agg_pnl_direction` (§2.3 portfolio-aggregate trigger) | ✅ **Wired (flag-gated)** | New: when the whole portfolio's combined P&L crosses the threshold, every open leg snaps its SL to entry. Pass 1 builds the merged combined-P&L curve, the parent finds the first crossing timestamp, pass 2 injects it via `_MoveSLConfig.agg_trigger_ns` → `ManagedExitConfig.move_sl_agg_trigger_ns` → aggregate branch in `_check_exits`. `core/models.py` PortfolioConfig fields. Gated by `_USE_PF_AGG_MOVE_SL=1`. |
+| `move_sl_hit_on_leg_sl` / `move_sl_hit_on_leg_target` (cross-slot) | ✅ **Wired (config-driven)** | Previously `pf-live-only`/flag-gated. Now wired via the two-pass runner, auto-active when either checkbox is set: pass 1 records every leg's SL/target hit timestamps, the parent unions them into a cross-process event bus, pass 2 pre-seeds each worker's `_CROSS_SLOT_EVENT_BUSES`. `core/backtest_runner.py:_compute_agg_coordination`, `core/managed_strategy.py` `__init__` bus pre-seed + Hit-On-Leg branch in `_check_exits`. `_USE_PF_AGG_MOVE_SL` kept as override. |
+| `move_sl_agg_pnl_enabled` / `move_sl_agg_pnl_threshold` / `move_sl_agg_pnl_direction` (§2.3 portfolio-aggregate trigger) | ✅ **Wired (config-driven)** | When the whole portfolio's combined P&L crosses the threshold, every open leg snaps its SL to entry. Auto-active when `move_sl_agg_pnl_enabled` is set (no env flag). Pass 1 builds the merged combined-P&L curve, the parent finds the first crossing timestamp, pass 2 injects it via `_MoveSLConfig.agg_trigger_ns` → `ManagedExitConfig.move_sl_agg_trigger_ns` → aggregate branch in `_check_exits`. `core/models.py` PortfolioConfig fields. `_USE_PF_AGG_MOVE_SL` kept as override. |
 
-Two-pass note: when `_USE_PF_AGG_MOVE_SL=1` and an aggregate / cross-slot
-trigger is configured, the portfolio runs **twice** (~2× runtime) — a
+Two-pass note: when an aggregate / cross-slot Move-SL trigger is configured
+(or `_USE_PF_AGG_MOVE_SL=1`), the portfolio runs **twice** (~2× runtime) — a
 discovery pass then a deterministic replay pass. No fixpoint iteration: pass 2
 is a pure function of pass 1 + the bar data. Path B (`_USE_BACKTEST_NODE`) is
 not wired for the cross-slot leg-event surfacing; the aggregate-P&L trigger
 still works there (it reads only equity curves).
 
-ReExecute replay note: `_USE_PF_REEXEC_REPLAY=1` turns the `ReExecute`
+ReExecute replay note: configuring any ReExecute-family action on the portfolio
+SL/Target (or `_USE_PF_REEXEC_REPLAY=1`) turns the `ReExecute`
 portfolio action into a genuine clip-then-replay. On a ReExecute clip the
 slots are re-run **flat** from the clip timestamp (`_filter_bars_after_ns`
 drops pre-cutoff bars), the segment is merged and spliced onto the pre-clip
@@ -195,7 +196,12 @@ per-slot `per_strategy` sub-metrics keep segment values (documented v1 limit).
 | Intraday entry window — End Time exit-monitoring (`entry_end_minute`) — **new** | ✅ Wired | Managed slots keep post-window bars; `_check_entries` gates fresh entries so SL/Target are monitored past End Time until squareoff (spec §9) |
 | `no_reentry_after_end` (block ReExecute/ReEntry past End Time) — **new** | ✅ Wired | Real gate in `_check_entries`; threaded portfolio → `_MoveSLConfig` → `ManagedExitConfig` (spec §7 P3) |
 | Underlying SL/Target (leg level) | ❌ Missing | Per spec, leg-level Underlying uses the portfolio level instead |
-| Conservative VWAP exit fill (SL/Target hits) | ✅ Wired | `_build_vwap_lookup` / `_apply_vwap_fill` — post-hoc reprice, excludes time-squareoff (spec §4.2/§8) |
+| Conservative VWAP exit fill (SL/Target hits) — **per-portfolio toggle** | ✅ Wired | `vwap_exit_fill` config + `_USE_VWAP_FILL` env flag → `default_vwap_fill` threaded to slot workers → `_build_vwap_lookup` / `_apply_vwap_fill` (spec §4.2/§8.1). UI: Exit Settings tab |
+| **Winter Time Adjustment** (`winter_time_adjust`, +1h DST shift) — **new** | ✅ Wired | `_apply_winter_time` / `add_one_hour` shift entry-window, square-off & RBO times at run start (spec §9). UI: Timing tab |
+| **Timing-ordering save validation** (Start ≤ End ≤ SqOff; date sanity) — **new** | ✅ Wired | `server._validate_portfolio_times` (400 on save) + client mirror `_validateTimingOrder` (spec §9) |
+| Mark Price (crypto fair-value trigger/fill) | ❌ Missing — **data-blocked** | No `mark_price` series in the catalog (OHLCV/bid/ask only) and Nautilus `Bar` carries none. Requires mark-price ingestion before it can be wired (spec §3) |
+| **Portfolio Tags** (per-tag SL/Target between Portfolio & User) — **new** | ✅ Wired | `core/tags.py` (config/tags.json registry + `_TAG_PNL_AGGREGATOR`); `_merge_portfolio_results` rolls each portfolio's PnL into its tag bucket and runs `_user_sl_clip`/`_user_tgt_clip` with `scope_label="TAG"`, combined via `_earliest_clip`. `portfolio_tag` on PortfolioConfig; UI selector on Timing tab; `/api/tags/*` endpoints. Clips the tag's group on cumulative-combined-PnL breach (spec §11) |
+| **Hierarchical limit validation** (portfolio SL ≤ tag SL ≤ user SL; same on Target) — **new** | ✅ Wired | `server._validate_portfolio_hierarchy` (400 on save). Leg→portfolio summing is N/A here (leg SL is a %/points price trigger, not a currency budget) |
 
 #### User-level SL/Target (spec §6) — ✅ Wired
 
