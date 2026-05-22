@@ -3,7 +3,14 @@
   "csv": {
     "filename_pattern": "^[A-Z]+_[A-Z]+_\\d{2}[A-Z]{3}\\d{4}_\\d{2}[A-Z]{3}\\d{4}_(ASK|BID|MID)_OHLCV\\.csv$",
     "filename_description": "FX daily ASK and BID CSVs per pair are aggregated and exposed as three selectable entries per pair (ASK, BID, MID); MID is synthesized at ingest from ASK+BID. Pre-merged single-file CSVs matching the same pattern are also accepted.",
-    "required_columns": ["timestamp", "open", "high", "low", "close", "volume"],
+    "required_columns": [
+      "timestamp",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
     "timestamp_column": "timestamp",
     "timestamp_format": "auto",
     "delimiter": ","
@@ -12,7 +19,11 @@
     "type": "CurrencyPair",
     "quote_currency": "USD",
     "base_currency_length": 3,
-    "expose_sides": ["ASK", "BID", "MID"],
+    "expose_sides": [
+      "ASK",
+      "BID",
+      "MID"
+    ],
     "price_precision": 5,
     "size_precision": 0,
     "currency_type": 2,

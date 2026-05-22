@@ -11,7 +11,7 @@ for NautilusTrader wrangling. Two layouts are supported:
   in the UI and its own BarType key in the parquet catalog. MID is
   synthesized from ASK+BID at load time.
 """
-
+ 
 from __future__ import annotations
 
 import logging

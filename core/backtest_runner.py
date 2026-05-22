@@ -36,6 +36,7 @@ from core.models import (
     StrategySlotConfig,
     effective_portfolio_squareoff,
     effective_slot_qty,
+    normalize_strategy_bar_types,
 )
 from core.managed_strategy import (
     ManagedExitStrategy,
@@ -2188,17 +2189,12 @@ def run_backtest(
             derive_sniffer_paths_for_bar_type,
             pick_internal_bar_type,
         )
-        from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
+        from core.sniffers import attach_bar_sniffer
         _all_subscribed = bar_type_strs + paired_strs
         _sniffer_paths = derive_sniffer_paths_for_bar_type(
             bar_type_strs[0], bar_type_strs[1:], start_date, end_date,
         )
-        dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
-        engine.add_strategy(BarSniffer(BarSnifferConfig(
-            bar_types=tuple(_all_subscribed),
-            csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
-            csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
-        )))
+        attach_bar_sniffer(engine, _all_subscribed, _sniffer_paths)
     except Exception:
         import logging as _logging
         _logging.getLogger(__name__).exception(
@@ -2637,6 +2633,15 @@ def _run_single_slot(
         # De-duplicate in case both except and empty-check fire for the same str
         missing_pairs = list(dict.fromkeys(missing_pairs))
 
+    # Validate the slot's strategy timeframe against its data feed. A strategy
+    # timeframe that is not strictly coarser than the base bar type yields a
+    # degenerate INTERNAL aggregation (NautilusTrader emits ~zero bars, so the
+    # strategy silently trades nothing). Collapse same/finer timeframes to the
+    # base feed and surface a warning for the finer case.
+    eff_strategy_bar_types, _sbt_warnings = normalize_strategy_bar_types(
+        slot.bar_type_str, getattr(slot, "strategy_bar_types", None) or [],
+    )
+
     # Day-of-week filter (portfolio.run_on_days). NO LONGER pre-filters the
     # bar list — bars stay in the engine on every weekday so Nautilus's
     # internal aggregators see a continuous input stream. (Pre-filtering
@@ -2808,7 +2813,7 @@ def _run_single_slot(
                     # module-level cross-slot bus has no siblings to reach —
                     # an empty portfolio_id routes to the standalone bus.
                     # (Cross-slot wiring is meaningful only in _run_slot_group.)
-                    subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
+                    subscribe_bar_types=eff_strategy_bar_types,
                     portfolio_id="",
                     slot_id=slot.slot_id,
                 )
@@ -2843,8 +2848,8 @@ def _run_single_slot(
         _sniffer_paths = None
         try:
             from core.aggregation_report import derive_sniffer_paths_for_bar_type
-            from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
-            _extra_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+            from core.sniffers import attach_bar_sniffer
+            _extra_bts = list(eff_strategy_bar_types)
             # Pair INTERNAL extras with their ASK/BID opposite so the sniffer
             # captures both quote sides in sniffer_strategy.csv. The source
             # EXTERNAL data for the opposite side is already in
@@ -2858,12 +2863,7 @@ def _run_single_slot(
             _sniffer_paths = derive_sniffer_paths_for_bar_type(
                 slot.bar_type_str, _extra_bts, start_date, end_date,
             )
-            dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
-            engine.add_strategy(BarSniffer(BarSnifferConfig(
-                bar_types=tuple(_all_subscribed),
-                csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
-                csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
-            )))
+            attach_bar_sniffer(engine, _all_subscribed, _sniffer_paths)
         except Exception:
             import logging as _logging
             _logging.getLogger(__name__).exception(
@@ -2911,7 +2911,7 @@ def _run_single_slot(
             }
             results["_sniffer_bar_type_external"] = slot.bar_type_str
             from core.aggregation_report import pick_internal_bar_type as _pin_int
-            _strat_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+            _strat_bts = list(eff_strategy_bar_types)
             results["_sniffer_bar_type_internal"] = _pin_int(_strat_bts)
 
         # Warn if paired ASK/BID data was unavailable — fills will use MID prices
@@ -2919,6 +2919,13 @@ def _run_single_slot(
             results["warning"] = (
                 f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
                 f"Fills will use MID prices — spread cost is not reflected in results."
+            )
+
+        # Surface any strategy-timeframe repair warnings (finer-than-feed case).
+        if _sbt_warnings:
+            _msg = " ".join(_sbt_warnings)
+            results["warning"] = (
+                f"{results['warning']} {_msg}" if results.get("warning") else _msg
             )
 
         # Surface day-of-week filter telemetry so users can see the rule
@@ -3585,6 +3592,18 @@ def _run_slot_group(
 
         # Build and attach N strategies with deterministic unique order_id_tags
         expected_tags: list[str] = []
+        # Per-slot strategy-timeframe validation/repair (see _run_single_slot).
+        # Keyed by slot_id so warnings can be surfaced on each slot's result.
+        _group_sbt_eff: dict[str, list[str]] = {}
+        _group_sbt_warnings: dict[str, list[str]] = {}
+        for _slot_in_grp, _ in group:
+            _eff, _warns = normalize_strategy_bar_types(
+                _slot_in_grp.bar_type_str,
+                getattr(_slot_in_grp, "strategy_bar_types", None) or [],
+            )
+            _group_sbt_eff[_slot_in_grp.slot_id] = _eff
+            _group_sbt_warnings[_slot_in_grp.slot_id] = _warns
+
         with _phase("strategy_build", phase_times):
             for i, (slot, _capital) in enumerate(group):
                 order_tag = f"{group_index:03d}-{i:03d}"
@@ -3630,7 +3649,7 @@ def _run_slot_group(
                                           else sorted(allowed_weekdays)),
                         # Shared-engine group: all slots in this process share
                         # one cross-slot bus keyed by the portfolio name.
-                        subscribe_bar_types=getattr(slot, "strategy_bar_types", None),
+                        subscribe_bar_types=_group_sbt_eff.get(slot.slot_id, []),
                         portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
                     )
@@ -3663,10 +3682,10 @@ def _run_slot_group(
         _sniffer_paths = None
         try:
             from core.aggregation_report import derive_sniffer_paths_for_bar_type
-            from core.sniffers import BarSniffer, BarSnifferConfig, dump_raw_engine
+            from core.sniffers import attach_bar_sniffer
             _group_extra_bts: list[str] = []
             for _slot_in_grp, _ in group:
-                for _bt in (getattr(_slot_in_grp, "strategy_bar_types", None) or []):
+                for _bt in _group_sbt_eff.get(_slot_in_grp.slot_id, []):
                     if _bt not in _group_extra_bts:
                         _group_extra_bts.append(_bt)
             # Pair INTERNAL extras with their ASK/BID opposite so the sniffer
@@ -3681,12 +3700,7 @@ def _run_slot_group(
             _sniffer_paths = derive_sniffer_paths_for_bar_type(
                 primary_bar_type_str, _group_extra_bts, start_date, end_date,
             )
-            dump_raw_engine(engine, _sniffer_paths["raw_engine_sniffer"])
-            engine.add_strategy(BarSniffer(BarSnifferConfig(
-                bar_types=tuple(_all_subscribed),
-                csv_engine_path=str(_sniffer_paths["sniffer_data_engine"]),
-                csv_strategy_path=str(_sniffer_paths["sniffer_strategy"]),
-            )))
+            attach_bar_sniffer(engine, _all_subscribed, _sniffer_paths)
         except Exception:
             import logging as _logging
             _logging.getLogger(__name__).exception(
@@ -3765,13 +3779,21 @@ def _run_slot_group(
                     }
                     r["_sniffer_bar_type_external"] = slot.bar_type_str
                     from core.aggregation_report import pick_internal_bar_type as _pin_int
-                    _strat_bts = list(getattr(slot, "strategy_bar_types", None) or [])
+                    _strat_bts = list(_group_sbt_eff.get(slot.slot_id, []))
                     r["_sniffer_bar_type_internal"] = _pin_int(_strat_bts)
 
                 if missing_pairs:
                     r["warning"] = (
                         f"ASK/BID bar data not found in catalog ({', '.join(missing_pairs)}). "
                         f"Fills will use MID prices — spread cost is not reflected in results."
+                    )
+
+                # Surface strategy-timeframe repair warnings (finer-than-feed).
+                _sw = _group_sbt_warnings.get(slot.slot_id) or []
+                if _sw:
+                    _msg = " ".join(_sw)
+                    r["warning"] = (
+                        f"{r['warning']} {_msg}" if r.get("warning") else _msg
                     )
 
                 if default_run_on_days is not None:

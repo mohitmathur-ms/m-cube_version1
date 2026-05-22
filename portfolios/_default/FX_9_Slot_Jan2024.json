@@ -2,7 +2,7 @@
   "name": "FX_9_Slot_Jan2024",
   "description": "Benchmark portfolio: Jan 2024 only, 9 slots, 1-min MID bars.",
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-21T11:16:35.186050+00:00",
+  "updated_at": "2026-05-22T07:41:50.852232+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -12,11 +12,17 @@
   "squareoff_time": null,
   "squareoff_tz": null,
   "product": "MIS",
-  "mis_squareoff_time": "15:15",
+  "mis_squareoff_time": "23:50",
   "mis_squareoff_tz": "Asia/Kolkata",
-  "run_on_days": null,
-  "entry_start_time": "09:30:00",
-  "entry_end_time": "16:15:00",
+  "run_on_days": [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri"
+  ],
+  "entry_start_time": "06:00:00",
+  "entry_end_time": "23:50:00",
   "entry_window_tz": "Asia/Kolkata",
   "rbo_enabled": true,
   "range_monitoring_start": "10:30:00",
@@ -91,22 +97,22 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -144,22 +150,22 @@
         "oversold": 30,
         "rsi_period": 14
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -196,22 +202,22 @@
         "bb_period": 20,
         "bb_std": 2
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -248,22 +254,22 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -301,22 +307,22 @@
         "oversold": 30,
         "rsi_period": 14
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -353,22 +359,22 @@
         "bb_period": 20,
         "bb_std": 2
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -405,22 +411,22 @@
         "fast_ema_period": 10,
         "slow_ema_period": 30
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 0.5,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 1,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -458,22 +464,22 @@
         "oversold": 30,
         "rsi_period": 14
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 10,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 20,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,
@@ -510,22 +516,22 @@
         "bb_period": 20,
         "bb_std": 2
       },
-      "bar_type_str": "AAVEUSD.COINBASE-1-MINUTE-LAST-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-BID-EXTERNAL",
       "strategy_bar_types": [
-        "AAVEUSD.COINBASE-5-MINUTE-LAST-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-15-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
       ],
-      "lots": 0.01,
+      "lots": 1,
       "allocation_pct": 0,
       "exit_config": {
         "exit_price_format": "ohlcv",
         "stop_loss_type": "percentage",
-        "stop_loss_value": 10,
+        "stop_loss_value": 15,
         "trailing_sl_step": 0,
         "trailing_sl_offset": 0,
         "sl_atr_period": 0,
         "sl_atr_multiplier": 0,
         "target_type": "percentage",
-        "target_value": 20,
+        "target_value": 30,
         "tgt_atr_period": 0,
         "tgt_atr_multiplier": 0,
         "target_lock_trigger": null,

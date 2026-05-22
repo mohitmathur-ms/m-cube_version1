@@ -22,7 +22,7 @@
     "type": "CurrencyPair",
     "quote_currency": "USD",
     "price_precision": 4,
-    "size_precision": 8,
+    "size_precision": 0,
     "currency_type": 1,
     "timeframe": "1-MINUTE"
   },
