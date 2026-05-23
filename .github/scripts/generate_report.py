@@ -485,7 +485,31 @@ def render_html(meta: dict, report: dict | None, error: str | None) -> str:
 """
 
 
+def _load_dotenv() -> None:
+    """Load a local .env into os.environ for LOCAL runs (no python-dotenv dep).
+
+    Real environment variables / CI secrets always win (uses setdefault), so this
+    is a no-op in GitHub Actions — there is no .env on the runner anyway.
+    """
+    dotenv = Path(os.environ.get("DOTENV_PATH", ".env"))
+    if not dotenv.is_file():
+        return
+    for raw in dotenv.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, val)
+    print("[generate_report] loaded .env (local)")
+
+
 def main() -> int:
+    _load_dotenv()
     meta_path = os.environ.get("REPORT_META")
     out_path = os.environ.get("OUTPUT_PATH")
     if not meta_path or not out_path:

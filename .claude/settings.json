@@ -108,7 +108,12 @@
       "Bash(gh api *)",
       "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { \"gh found: $\\($g.Source\\)\"; gh run list --workflow=push-report.yml -L 5 } else { \"gh NOT installed\" })",
       "Bash(git fetch *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "PowerShell($env:GIT_PAGER=''; git show \"origin/Path_A_LowAPI:.github/workflows/push-report.yml\" | Select-String -Pattern \"paths-ignore|html_reports|skip ci|Commit report\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "Bash(grep -E \"\\\\.\\(py|ipynb\\)$\")",
+      "PowerShell(ls -Recurse \"d:\\\\m-cube_version1\\\\csv\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"commodity|light|cmd\" } | Select-Object -First 10)",
+      "PowerShell(head -20)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_bar_aggregator.py -q)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
