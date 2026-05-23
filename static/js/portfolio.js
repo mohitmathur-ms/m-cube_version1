@@ -634,11 +634,14 @@ const Portfolio = {
                         </div>
                         <div class="pf-field-row" id="pf-row-mis-sqoff"
                              style="display:${(ui.product || 'MIS') === 'MIS' ? 'flex' : 'none'};"
-                             title="Used only when product=MIS and no explicit SqOff Time is set on the Timing tab. Forces intraday close at this local time and blocks re-entries until the next session.">
+                             title="Linked to the SqOff Time on the Timing tab — editing either keeps both in sync (same time + timezone). Forces intraday close at this local time and blocks re-entries until the next session.">
                             <span class="pf-field-label">MIS SqOff Time</span>
                             <input type="time" class="form-control" id="pf-m-mis-sqoff" value="${ui.mis_squareoff_time || '15:15'}" step="60" style="flex:1;">
                             <input type="text" class="form-control" id="pf-m-mis-sqofftz" value="${ui.mis_squareoff_tz || 'Asia/Kolkata'}" placeholder="IANA tz" style="flex:1; margin-left:4px;">
                         </div>
+                        <p id="pf-mis-sqoff-note" style="display:${(ui.product || 'MIS') === 'MIS' ? 'block' : 'none'}; font-size:0.7rem; color:var(--text-muted); margin:2px 0 6px; font-style:italic;">
+                            Time &amp; timezone are linked to the SqOff Time / Squareoff TZ on the Timing tab — changing either updates both.
+                        </p>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Strategy Tag</span>
                             <select class="form-control" id="pf-m-strattag" style="flex:1;">
@@ -1254,7 +1257,7 @@ const Portfolio = {
                                 <span class="pf-field-label">End Date</span>
                                 <input type="date" class="form-control" id="pf-m-end" value="${pf.end_date || ''}" style="flex:1;">
                             </div>
-                            <div class="pf-field-row">
+                            <div class="pf-field-row" title="Linked to the MIS SqOff Time on the Execution Parameters tab — editing either keeps both in sync (same time + timezone). This is the value the backtest squares off at.">
                                 <span class="pf-field-label">SqOff Time</span>
                                 <input type="time" class="form-control" id="pf-m-sqoff" value="${pf.squareoff_time || ''}" style="flex:1;">
                             </div>
@@ -1343,6 +1346,9 @@ const Portfolio = {
         this._openModal(title, body, 1200, footer);
         // Populate the tag datalist + prefill the current tag's limits (spec §11).
         this._loadTagDefs(pf.portfolio_tag);
+        // Keep MIS SqOff Time (Execution Params) and SqOff Time (Timing tab) in
+        // lock-step — same time + timezone, editable from either side.
+        this._bindSqoffMirror();
     },
 
     /* Fetch tag definitions, refresh the datalist, and prefill the current
@@ -1412,6 +1418,62 @@ const Portfolio = {
         const v = document.getElementById("pf-m-product")?.value || "MIS";
         const row = document.getElementById("pf-row-mis-sqoff");
         if (row) row.style.display = v === "MIS" ? "flex" : "none";
+        const note = document.getElementById("pf-mis-sqoff-note");
+        if (note) note.style.display = v === "MIS" ? "block" : "none";
+    },
+
+    /* Mirror the two square-off fields so they always represent the SAME value:
+     *   MIS SqOff Time (Execution Params tab)  <->  SqOff Time (Timing tab)
+     * Both the time and the timezone are linked, and editing either side
+     * immediately updates the other.
+     *
+     * On open we reconcile to whichever source actually drives the backtest
+     * today: the Timing-tab value wins when set, else the MIS value — matching
+     * the backend precedence in core/models.py `_portfolio_squareoff`
+     * (squareoff_time over mis_squareoff_time). The (time, tz) pair is taken
+     * from a single source so we never mix one field's time with the other's
+     * timezone (e.g. 21:00 + UTC vs 15:15 + Asia/Kolkata). */
+    _bindSqoffMirror() {
+        const misT = document.getElementById("pf-m-mis-sqoff");
+        const misTz = document.getElementById("pf-m-mis-sqofftz");
+        const timT = document.getElementById("pf-m-sqoff");
+        const timTz = document.getElementById("pf-m-sqofftz");
+        if (!misT || !timT) return;
+
+        // Set a value, adding the option first if the target is a <select> that
+        // doesn't already list it (the MIS TZ is free-text, the Timing TZ is a
+        // dropdown — this keeps an arbitrary typed zone in sync both ways).
+        const setVal = (el, val) => {
+            if (el.tagName === "SELECT" && val &&
+                !Array.from(el.options).some(o => o.value === val)) {
+                el.add(new Option(val, val));
+            }
+            el.value = val;
+        };
+
+        // Reconcile on open — pick a coherent (time, tz) pair from one source.
+        let effTime, effTz;
+        if (timT.value) {
+            effTime = timT.value;
+            effTz = (timTz && timTz.value) || "UTC";          // "" on Timing means (UTC)
+        } else if (misT.value) {
+            effTime = misT.value;
+            effTz = (misTz && misTz.value) || "Asia/Kolkata";  // MIS default zone
+        } else {
+            effTime = "";
+            effTz = "";
+        }
+        setVal(misT, effTime); setVal(timT, effTime);
+        if (misTz) setVal(misTz, effTz);
+        if (timTz) setVal(timTz, effTz);
+
+        // Two-way live mirror. <select> fires "change"; text/time inputs "input".
+        const link = (a, b) => {
+            const ev = a.tagName === "SELECT" ? "change" : "input";
+            a.addEventListener(ev, () => setVal(b, a.value));
+        };
+        link(misT, timT); link(timT, misT);
+        if (misTz && timTz) { link(misTz, timTz); link(timTz, misTz); }
     },
 
     _onDhTypeChange() {
