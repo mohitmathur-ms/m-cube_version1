@@ -55,7 +55,14 @@ const ViewData = {
 
     async loadBarTypes() {
         try {
-            const data = await App.api("/api/data/bar_types");
+            // Fetch bar types and the venue-name map in parallel. The map lets
+            // us show the adapter config's friendly "name" (e.g. COINBASE_MS)
+            // for the raw venue token (e.g. COINBASE) parsed from bar types.
+            const [data, adData] = await Promise.all([
+                App.api("/api/data/bar_types"),
+                App.api("/api/configured-adapters").catch(() => ({})),
+            ]);
+            this.venueNames = (adData && adData.venue_names) || {};
             const select = document.getElementById("view-bar-type");
             const venueSelect = document.getElementById("view-venue");
 
@@ -85,7 +92,7 @@ const ViewData = {
             venueSelect.innerHTML =
                 `<option value="" ${!this.selectedVenue ? "selected" : ""}>All Venues</option>`
                 + sortedVenues.map(v =>
-                    `<option value="${v}" ${this.selectedVenue === v ? "selected" : ""}>${v}</option>`
+                    `<option value="${v}" ${this.selectedVenue === v ? "selected" : ""}>${this.venueNames[v] || v}</option>`
                 ).join("");
 
             this.renderBarTypeOptions();

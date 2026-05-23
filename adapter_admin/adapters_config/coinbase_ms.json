@@ -1,7 +1,7 @@
 {
   "id": "coinbase_ms",
   "name": "COINBASE_MS",
-  "venue": "COINBASE_MS",
+  "venue": "COINBASE",
   "exchange_type": "COINBASE_MS",
   "asset_class": "cryptocurrency",
   "is_custom": true,

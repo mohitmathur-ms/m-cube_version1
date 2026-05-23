@@ -9,7 +9,10 @@ models package free of a top-level dependency on them.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.models.strategy_slot_config import StrategySlotConfig
 
 
 def effective_slot_qty(

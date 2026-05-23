@@ -150,7 +150,18 @@
       "Bash(grep -v 'github.com/mohit\\\\|github.com/.*commit\\\\|w3.org\\\\|github.com$')",
       "Bash(powershell -Command \"Select-String -Path 'core\\\\\\\\backtest_runner.py','server.py' -Pattern 'range.breakout|RangeBreakout|range_breakout' | select -First 20\")",
       "Bash(python -c \"import json;m=json.load\\(open\\('meta.json'\\)\\);print\\('\\\\n'.join\\(m['changed_files']\\)\\)\")",
-      "Bash(DOTENV_PATH=/nonexistent ANTHROPIC_API_KEY= CLAUDE_CODE_OAUTH_TOKEN= OUTPUT_PATH=out/degraded.html REPORT_META=meta.json python .github/scripts/generate_report.py)"
+      "Bash(DOTENV_PATH=/nonexistent ANTHROPIC_API_KEY= CLAUDE_CODE_OAUTH_TOKEN= OUTPUT_PATH=out/degraded.html REPORT_META=meta.json python .github/scripts/generate_report.py)",
+      "Bash(awk 'NR>=4900 && NR<=5160 && /^[[:space:]]*def /{print NR\": \"$0}' core/backtest_runner.py)",
+      "Bash(awk 'NR>=3100 && NR<=3500 && /^def |^    def |^def _|^[[:alpha:]_]+.*def /{print NR\": \"$0}' core/backtest_runner.py)",
+      "Bash(awk 'NR>=3100 && NR<=3520 && /^def /{print NR\": \"$0}' core/backtest_runner.py)",
+      "Bash(awk -F: '$1>=3120 && $1<=3360 || /_extract_portfolio_results/')",
+      "Bash(awk 'NR>=3120 && NR<=3356 && /managed|all\\\\\\(/{print NR\": \"$0}' core/backtest_runner.py)",
+      "Bash(venv/Scripts/python.exe -m pip install flake8 -q)",
+      "Bash(venv/Scripts/python.exe -m flake8 . --select=E9,F63,F7,F82 --show-source --statistics)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Recurse -Depth 2 -ErrorAction SilentlyContinue)",
+      "Bash(venv/Scripts/python.exe -m flake8 . --select=E9,F63,F7,F82 --exclude=venv,.git,__pycache__ --statistics)",
+      "Bash(echo \"flake8 exit=$?\")"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",

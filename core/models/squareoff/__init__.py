@@ -9,7 +9,11 @@ the dataclass components (keeps the package graph acyclic).
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.models.portfolio_config import PortfolioConfig
+    from core.models.strategy_slot_config import StrategySlotConfig
 
 
 def effective_portfolio_squareoff(

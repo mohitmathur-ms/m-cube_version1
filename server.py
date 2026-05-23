@@ -179,6 +179,7 @@ def get_configured_adapters():
     """Read saved adapter configs and return venues grouped by asset class."""
     config_dir = PROJECT_DIR / "adapter_admin" / "adapters_config"
     adapters_by_class = {}
+    venue_names = {}  # raw venue token -> human-friendly config "name"
     if config_dir.exists():
         for f in sorted(config_dir.glob("*.json")):
             try:
@@ -187,9 +188,10 @@ def get_configured_adapters():
                 venue = config.get("venue", "")
                 if venue:
                     adapters_by_class.setdefault(asset_class, []).append(venue)
+                    venue_names[venue] = config.get("name") or venue
             except Exception:
                 continue
-    return jsonify({"adapters": adapters_by_class})
+    return jsonify({"adapters": adapters_by_class, "venue_names": venue_names})
 
 
 # ─── CSV Scan / Load API ────────────────────────────────────────────────────

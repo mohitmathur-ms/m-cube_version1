@@ -3165,6 +3165,17 @@ def _run_slot_group_node(
         else:
             registry = STRATEGY_REGISTRY
 
+    # Whether every slot in the group is managed (has exit management, a
+    # squareoff, or RBO). Mirrors the same flag in Path A's _run_slot_group:
+    # when the whole group is managed, post-entry-window bars are kept so each
+    # strategy can gate entries internally while still monitoring exits.
+    _group_all_managed = all(
+        (slot.exit_config.has_exit_management()
+         or slot.exit_config.squareoff_time or slot.squareoff_time
+         or default_squareoff_time or default_rbo_settings is not None)
+        for slot, _cap in group
+    )
+
     # Auto-pair BID/ASK and detect missing pairs (same surface as Path A so
     # each slot result still gets a clear warning when fills will use MID).
     bar_type_strs_to_load = [primary_bar_type_str]
@@ -4958,6 +4969,7 @@ def _extract_portfolio_results(
     engine: BacktestEngine,
     portfolio: PortfolioConfig,
     slot_strategy_map: dict,
+    user_id: str | None = None,
 ) -> dict:
     """Extract portfolio-level and per-strategy results."""
     # Get actual strategy IDs from engine
