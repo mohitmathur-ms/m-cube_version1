@@ -1,0 +1,11 @@
+{
+  "headline": "- Changed the .github script so that now the HTML generated report get's put in /html_reports/ directory",
+  "branch": "Path_A_LowAPI",
+  "sha": "79cb83da2e6e3101bcf14ac446b7b9f6d1333315",
+  "short_sha": "79cb83d",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/79cb83da2e6e3101bcf14ac446b7b9f6d1333315",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-23T04:39:19+00:00",
+  "ai": false
+}
