@@ -33,6 +33,8 @@ from html import escape
 from pathlib import Path
 
 from _style import BASE_CSS
+import depgraph
+import depgraph_svg
 
 MODEL = os.environ.get("MODEL", "claude-sonnet-4-6")
 MAX_TOKENS = 2000
@@ -61,6 +63,10 @@ SYSTEM_STATIC = (
     "  2. technical: for an engineer. Cover the implementation approach, which "
     "modules/layers are affected, data-flow or behavioral impact, and any notable "
     "design choices. You may reference files, functions and concepts.\n"
+    "  3. example: ONE concrete worked illustration of the single most significant "
+    "change in this push. Make it tangible: a small before/after, a representative "
+    "code path or call, or a sample input -> output. Reference real symbols from the "
+    "diff. Keep it short (a few lines / one short paragraph).\n"
     "Base everything ONLY on the provided diff and metadata; do not invent changes "
     "you cannot see. If the diff is truncated, say so and reason about what is visible. "
     "Always call the submit_report tool with your answer.\n\n"
@@ -87,6 +93,12 @@ REPORT_TOOL = {
                 "description": "Engineer-facing implementation breakdown. "
                 "Separate paragraphs with blank lines.",
             },
+            "example": {
+                "type": "string",
+                "description": "One concrete worked example illustrating the most "
+                "significant change (before/after, a representative code path, or a "
+                "sample input -> output). Short.",
+            },
             "changed_files": {
                 "type": "array",
                 "description": "One entry per notable changed file.",
@@ -108,12 +120,16 @@ REPORT_TOOL = {
                 "items": {"type": "string"},
             },
         },
-        "required": ["headline", "plain_english", "technical", "changed_files", "risks_or_followups"],
+        "required": ["headline", "plain_english", "technical", "example", "changed_files", "risks_or_followups"],
     },
 }
 
 
 REQUIRED_FIELDS = REPORT_TOOL["input_schema"]["required"]
+# Fields a response MUST have to count as a valid report. `example`, `changed_files`
+# and `risks_or_followups` are requested but optional at parse time so a model that
+# omits one doesn't sink an otherwise-good report into degraded mode.
+CORE_FIELDS = ("headline", "plain_english", "technical")
 CLI_TIMEOUT = int(os.environ.get("CLI_TIMEOUT", "300"))  # seconds
 
 
@@ -132,8 +148,8 @@ def _user_content(meta: dict) -> str:
 
 
 def _coerce_report(obj: object) -> dict | None:
-    """Validate a parsed object has the required report fields."""
-    if isinstance(obj, dict) and all(k in obj for k in REQUIRED_FIELDS):
+    """Validate a parsed object has at least the core report fields."""
+    if isinstance(obj, dict) and all(k in obj for k in CORE_FIELDS):
         return obj
     return None
 
@@ -365,18 +381,46 @@ def _risks_list(report: dict | None) -> str:
     return "<ul class='risks'>" + "".join(f"<li>{escape(x)}</li>" for x in items) + "</ul>"
 
 
+def _build_graph(meta: dict) -> dict | None:
+    """Deterministic dependency graph for the push (AST scan of files on disk).
+
+    Never raises: any failure returns None so the report still renders.
+    """
+    try:
+        return depgraph.graph_for_push(".", meta.get("changed_files") or [])
+    except Exception as exc:  # noqa: BLE001
+        print(f"[generate_report] dependency graph unavailable: {exc}", file=sys.stderr)
+        return None
+
+
+def _graph_section(graph: dict | None) -> str:
+    """Render the dependency-graph SVG + adjacency tables, or a graceful note."""
+    if graph is None:
+        return "<p class='muted'>Dependency graph could not be computed for this push.</p>"
+    svg = depgraph_svg.render_svg(graph)
+    tables = depgraph_svg.render_tables(graph)
+    legend = (
+        "<p class='sub'>Arrows point <strong>importer &rarr; imported</strong> "
+        "(&ldquo;depends on&rdquo;). Middle column = files changed in this push; "
+        "left = files that import them; right = files they import.</p>"
+    )
+    return f"{legend}<div class='depgraph'>{svg}</div>{tables}"
+
+
+# Most components now live in _style.py (the guide-style kit). Only the few
+# report-page-specific bits remain here.
 PAGE_CSS = BASE_CSS + """
-  header.rpt { border-bottom: 1px solid var(--border); padding-bottom: 18px; margin-bottom: 26px; }
-  header.rpt h1 { font-size: 1.6rem; margin: 10px 0 6px; line-height: 1.25; }
   .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
               color: var(--muted); font-size: 0.85rem; }
   .meta-row .sep { color: var(--border); }
   .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
-           padding: 20px 22px; margin: 18px 0; }
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
   .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
   .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
   .panel.plain { border-left: 4px solid var(--blue); }
   .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
   .panel.files-p { border-left: 4px solid var(--green); }
   .panel.risks-p { border-left: 4px solid var(--orange); }
   .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
@@ -390,11 +434,11 @@ PAGE_CSS = BASE_CSS + """
   .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
             border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
   footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
-  .backlink { font-size: 0.85rem; }
 """
 
 
-def render_html(meta: dict, report: dict | None, error: str | None) -> str:
+def render_html(meta: dict, report: dict | None, error: str | None,
+                graph: dict | None = None) -> str:
     short_sha = meta.get("short_sha", "")
     sha = meta.get("sha", "")
     branch = meta.get("branch", "")
@@ -423,6 +467,12 @@ def render_html(meta: dict, report: dict | None, error: str | None) -> str:
 
     plain_html = _paragraphs((report or {}).get("plain_english", "")) if report else "<p class='muted'>Not generated.</p>"
     tech_html = _paragraphs((report or {}).get("technical", "")) if report else "<p class='muted'>Not generated.</p>"
+    example_html = (
+        _paragraphs((report or {}).get("example", ""))
+        if report and (report or {}).get("example")
+        else "<p class='muted'>No worked example generated for this push.</p>"
+    )
+    graph_html = _graph_section(graph)
 
     diffstat = escape(meta.get("diffstat", "").strip() or "(no diff stat)")
     diff_note = " <span class='chip warn'>truncated</span>" if meta.get("diff_truncated") else ""
@@ -435,7 +485,7 @@ def render_html(meta: dict, report: dict | None, error: str | None) -> str:
 <style>{PAGE_CSS}</style>
 </head><body>
 <div class="wrap">
-  <header class="rpt">
+  <header class="cover">
     <div class="meta-row">
       <span class="chip branch">{escape(branch)}</span>
       {ai_chip}
@@ -445,34 +495,59 @@ def render_html(meta: dict, report: dict | None, error: str | None) -> str:
       <span>{escape(author)}</span>
     </div>
     <h1>{escape(headline)}</h1>
-    <div class="meta-row"><span>Report generated {generated}</span></div>
+    <p class="subtitle">Push change report &middot; generated {generated}</p>
   </header>
 
   {banner}
 
-  <section class="panel plain">
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
     <h2><span class="dot blue"></span> Plain English</h2>
     <p class="sub">What this change does, for a non-technical reader.</p>
-    {plain_html}
+    <div class="simple">{plain_html}</div>
   </section>
 
-  <section class="panel tech">
+  <section id="sec-tech" class="panel tech">
     <h2><span class="dot purple"></span> Technical / Engineering</h2>
     <p class="sub">Implementation detail and impact, for engineers.</p>
-    {tech_html}
+    <div class="callout-tech">{tech_html}</div>
   </section>
 
-  <section class="panel files-p">
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok">{example_html}</div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    {graph_html}
+  </section>
+
+  <section id="sec-files" class="panel files-p">
     <h2><span class="dot green"></span> Changed Files</h2>
     {_changed_files_table(meta, report)}
   </section>
 
-  <section class="panel risks-p">
+  <section id="sec-risks" class="panel risks-p">
     <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
     {_risks_list(report)}
   </section>
 
-  <section class="panel">
+  <section id="sec-diff" class="panel">
     <h2>Diff stat{diff_note}</h2>
     <pre>{diffstat}</pre>
   </section>
@@ -522,7 +597,8 @@ def main() -> int:
     if error:
         print(f"[generate_report] degraded mode: {error}", file=sys.stderr)
 
-    html = render_html(meta, report, error)
+    graph = _build_graph(meta)
+    html = render_html(meta, report, error, graph)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")

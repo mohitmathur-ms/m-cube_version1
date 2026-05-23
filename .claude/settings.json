@@ -140,7 +140,17 @@
       "Bash(python -c \"import core.backtest_runner, core.managed_strategy, core.templates; print\\('consumers import OK'\\)\")",
       "Bash(venv/Scripts/python.exe scripts/_decompose_br.py)",
       "Bash(venv/Scripts/python.exe -c \"import core.backtest_runner as br; print\\('run_backtest', br.run_backtest.__module__\\); print\\('run_portfolio_backtest', br.run_portfolio_backtest.__module__\\); print\\('BacktestNode', br.BacktestNode\\); print\\('_run_single_slot', br._run_single_slot.__module__\\); print\\('_run_slot_group', br._run_slot_group.__module__\\); print\\('_worker_init_ignore_sigint', br._worker_init_ignore_sigint.__module__\\); print\\('OK total exports:', len\\(br.__all__\\)\\)\")",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(python .github/scripts/depgraph.py .)",
+      "PowerShell(\\(Get-Command gh -ErrorAction SilentlyContinue\\).Source; git remote -v)",
+      "Bash(REPORT_META=meta.json AFTER_SHA=$\\(git rev-parse HEAD\\) python .github/scripts/collect_meta.py)",
+      "Bash(OUTPUT_PATH=out/index.html REPORT_META=meta.json python .github/scripts/generate_report.py)",
+      "Bash(cd /d d:\\\\m-cube_version1)",
+      "Bash(findstr /n \"def config_from_exit\" core\\\\managed_strategy.py)",
+      "Bash(grep -v 'github.com/mohit\\\\|github.com/.*commit\\\\|w3.org\\\\|github.com$')",
+      "Bash(powershell -Command \"Select-String -Path 'core\\\\\\\\backtest_runner.py','server.py' -Pattern 'range.breakout|RangeBreakout|range_breakout' | select -First 20\")",
+      "Bash(python -c \"import json;m=json.load\\(open\\('meta.json'\\)\\);print\\('\\\\n'.join\\(m['changed_files']\\)\\)\")",
+      "Bash(DOTENV_PATH=/nonexistent ANTHROPIC_API_KEY= CLAUDE_CODE_OAUTH_TOKEN= OUTPUT_PATH=out/degraded.html REPORT_META=meta.json python .github/scripts/generate_report.py)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
