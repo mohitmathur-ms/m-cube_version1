@@ -1,0 +1,99 @@
+name: Push Change Report
+
+# On every push to any branch, generate a colorful HTML report explaining the
+# pushed changes (plain-English + technical), then publish it to an accumulating
+# gh-pages site. See .github/scripts/ for the generator.
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize deploys to gh-pages so concurrent pushes don't race on the branch.
+concurrency:
+  group: push-report-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for diffing)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install report deps
+        run: pip install -r .github/scripts/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        # Used for subscription auth (CLAUDE_CODE_OAUTH_TOKEN). Harmless if only
+        # the API key is configured — the generator just won't use the CLI path.
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Restore existing reports from gh-pages
+        # Extract the current gh-pages tree into out/ so the rebuilt index
+        # reflects the full accumulated history, not just this push.
+        run: |
+          mkdir -p out
+          if git fetch origin gh-pages --depth=1 2>/dev/null; then
+            git archive origin/gh-pages | tar -x -C out
+            echo "Restored $(find out/reports -name '*.html' 2>/dev/null | wc -l) prior report(s)."
+          else
+            echo "No existing gh-pages branch yet."
+          fi
+
+      - name: Compute safe branch dir
+        id: vars
+        run: echo "safe_branch=$(echo '${{ github.ref_name }}' | tr '/' '_')" >> "$GITHUB_OUTPUT"
+
+      - name: Collect commit metadata + diff
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          REPORT_META: meta.json
+        run: python .github/scripts/collect_meta.py
+
+      - name: Generate report HTML
+        env:
+          # Preferred: subscription auth via the OAuth token from `claude setup-token`.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Optional fallback: pay-per-call API key. Either (or neither) may be set.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: claude-sonnet-4-6
+          REPORT_META: meta.json
+          OUTPUT_PATH: out/reports/${{ steps.vars.outputs.safe_branch }}/${{ github.sha }}.html
+        run: python .github/scripts/generate_report.py
+
+      - name: Rebuild index
+        env:
+          REPORTS_DIR: out/reports
+        run: python .github/scripts/render_index.py
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./out
+          keep_files: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "report: ${{ github.ref_name }}@${{ github.sha }}"
