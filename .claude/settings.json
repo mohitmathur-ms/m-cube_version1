@@ -101,7 +101,14 @@
       "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import instrument_for_bar_type; print\\('bar_type_resolver callable:', callable\\(instrument_for_bar_type\\)\\)\")",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -q)",
       "Bash(venv/Scripts/python.exe -m pytest tests/ -q --ignore=tests/test_aggregator.py)",
-      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type; i=create_instrument\\('EUR','USD','FOREX_MS'\\); print\\('reimport ok:', i.price_precision, i.size_precision, i.lot_size\\)\")"
+      "Bash(venv/Scripts/python.exe -c \"from core.instrument_factory import create_instrument, instrument_for_bar_type; i=create_instrument\\('EUR','USD','FOREX_MS'\\); print\\('reimport ok:', i.price_precision, i.size_precision, i.lot_size\\)\")",
+      "Bash(gh auth *)",
+      "Bash(gh run *)",
+      "Bash(gh secret *)",
+      "Bash(gh api *)",
+      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { \"gh found: $\\($g.Source\\)\"; gh run list --workflow=push-report.yml -L 5 } else { \"gh NOT installed\" })",
+      "Bash(git fetch *)",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",

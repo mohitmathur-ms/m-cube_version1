@@ -435,7 +435,6 @@ def render_html(meta: dict, report: dict | None, error: str | None) -> str:
 <style>{PAGE_CSS}</style>
 </head><body>
 <div class="wrap">
-  <p class="backlink"><a href="../../index.html">&larr; All change reports</a></p>
   <header class="rpt">
     <div class="meta-row">
       <span class="chip branch">{escape(branch)}</span>
