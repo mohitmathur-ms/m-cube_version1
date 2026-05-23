@@ -63,8 +63,7 @@ Additional toggles:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from decimal import Decimal
 
 from nautilus_trader.config import PositiveInt, StrategyConfig
@@ -76,6 +75,9 @@ from nautilus_trader.model.objects import Quantity
 from nautilus_trader.trading.strategy import Strategy
 
 from core.aggregating_strategy import AggregatingStrategyMixin
+from strategies._shared.entry_tags import rbo_reason
+from strategies._shared.leg_state import LegState
+from strategies._shared.time_windows import bar_to_local, hhmm_to_min
 
 
 MAX_LEGS = 10
@@ -137,24 +139,6 @@ class RangeBreakoutConfig(StrategyConfig, frozen=True):
     reexecute_cutoff_minutes: int = 0     # 0 = disabled
 
 
-@dataclass
-class LegState:
-    active: bool = False
-    entry_price: float = 0.0
-    ever_hit_target: bool = False
-    entry_count: int = 0
-
-    def reset(self) -> None:
-        self.active = False
-        self.entry_price = 0.0
-        self.ever_hit_target = False
-        self.entry_count = 0
-
-
-def _hhmm_to_min(hhmm: int) -> int:
-    return (hhmm // 100) * 60 + (hhmm % 100)
-
-
 class RangeBreakoutStrategy(AggregatingStrategyMixin, Strategy):
     """Opening Range Breakout with N-leg pyramiding (target promotes next leg)."""
 
@@ -196,18 +180,18 @@ class RangeBreakoutStrategy(AggregatingStrategyMixin, Strategy):
         self._first_entry_cutoff = int(config.first_entry_cutoff_minutes)
         self._reexecute_cutoff = int(config.reexecute_cutoff_minutes)
 
-        self._range_start_min = _hhmm_to_min(config.range_start_hhmm)
-        self._range_end_min = _hhmm_to_min(config.range_end_hhmm)
-        self._breakout_end_min = _hhmm_to_min(config.breakout_end_hhmm)
-        self._squareoff_min = _hhmm_to_min(config.squareoff_hhmm)
-        self._tz_delta = timedelta(minutes=int(config.timezone_offset_min))
+        self._range_start_min = hhmm_to_min(config.range_start_hhmm)
+        self._range_end_min = hhmm_to_min(config.range_end_hhmm)
+        self._breakout_end_min = hhmm_to_min(config.breakout_end_hhmm)
+        self._squareoff_min = hhmm_to_min(config.squareoff_hhmm)
+        self._tz_offset_min = int(config.timezone_offset_min)
 
         # Per-leg range end (in minutes). 0 in config ⇒ inherit shared.
         self._leg_range_end_min: list[int] = []
         for i in range(1, n + 1):
             override = int(getattr(config, f"leg{i}_range_end_hhmm"))
             self._leg_range_end_min.append(
-                _hhmm_to_min(override) if override > 0 else self._range_end_min
+                hhmm_to_min(override) if override > 0 else self._range_end_min
             )
 
         self._current_day: date | None = None
@@ -257,9 +241,7 @@ class RangeBreakoutStrategy(AggregatingStrategyMixin, Strategy):
         if bar is None:
             return
 
-        local_dt = datetime.fromtimestamp(bar.ts_event / 1e9, tz=timezone.utc) + self._tz_delta
-        local_min = local_dt.hour * 60 + local_dt.minute
-        local_date = local_dt.date()
+        local_min, local_date = bar_to_local(bar.ts_event, self._tz_offset_min)
 
         if self._current_day != local_date:
             if self._current_day is not None:
@@ -485,10 +467,7 @@ class RangeBreakoutStrategy(AggregatingStrategyMixin, Strategy):
         leg_no = idx + 1
         rh = self._leg_range_high[idx] if idx < len(self._leg_range_high) else None
         rl = self._leg_range_low[idx] if idx < len(self._leg_range_low) else None
-        if side == OrderSide.BUY:
-            reason = f"RBO leg{leg_no} BUY: price={price:.4f} > range_high={rh:.4f}" if rh is not None else f"RBO leg{leg_no} BUY @ {price:.4f}"
-        else:
-            reason = f"RBO leg{leg_no} SELL: price={price:.4f} < range_low={rl:.4f}" if rl is not None else f"RBO leg{leg_no} SELL @ {price:.4f}"
+        reason = rbo_reason(side, leg_no, price, rh, rl)
         self._submit_market(side, self._leg_qty[idx], reason)
         leg = legs[idx]
         leg.active = True

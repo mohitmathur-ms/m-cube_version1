@@ -13,6 +13,7 @@ from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
 from core.aggregating_strategy import AggregatingStrategyMixin
+from strategies._shared.entry_tags import four_ma_reason
 
 
 class FourMAConfig(StrategyConfig, frozen=True):
@@ -78,16 +79,14 @@ class FourMAStrategy(AggregatingStrategyMixin, Strategy):
                           int(self.config.ma3_period), int(self.config.ma4_period))
 
         if v1 > v2 > v3 > v4:
-            reason = (f"4MA BUY: ma{p1}>ma{p2}>ma{p3}>ma{p4} "
-                      f"({v1:.4f}/{v2:.4f}/{v3:.4f}/{v4:.4f})")
+            reason = four_ma_reason(OrderSide.BUY, (p1, p2, p3, p4), (v1, v2, v3, v4))
             if self.portfolio.is_flat(self.config.instrument_id):
                 self._submit_order(OrderSide.BUY, reason)
             elif self.portfolio.is_net_short(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
                 self._submit_order(OrderSide.BUY, reason)
         elif v1 < v2 < v3 < v4:
-            reason = (f"4MA SELL: ma{p1}<ma{p2}<ma{p3}<ma{p4} "
-                      f"({v1:.4f}/{v2:.4f}/{v3:.4f}/{v4:.4f})")
+            reason = four_ma_reason(OrderSide.SELL, (p1, p2, p3, p4), (v1, v2, v3, v4))
             if self.portfolio.is_flat(self.config.instrument_id):
                 self._submit_order(OrderSide.SELL, reason)
             elif self.portfolio.is_net_long(self.config.instrument_id):

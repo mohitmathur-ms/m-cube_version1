@@ -3,14 +3,74 @@
     {
       "user_id": "_default",
       "alias": "Default",
-      "multiplier": 6,
+      "multiplier": 1.0,
       "allowed_instruments": null
     },
     {
-      "user_id": "u_mownziwo",
-      "alias": "New User",
-      "multiplier": 1,
+      "user_id": "alice",
+      "alias": "Alice (FX)",
+      "multiplier": 2.0,
+      "allowed_instruments": [
+        "EURUSD",
+        "GBPUSD",
+        "USDJPY"
+      ]
+    },
+    {
+      "user_id": "bob",
+      "alias": "Bob (Crypto-only)",
+      "multiplier": 0.5,
+      "allowed_instruments": [
+        "BTCUSD"
+      ]
+    },
+    {
+      "user_id": "trader_safe",
+      "alias": "Junior",
+      "multiplier": 0.01,
+      "allowed_instruments": [
+        "EURUSD",
+        "GBPUSD",
+        "USDJPY"
+      ]
+    },
+    {
+      "user_id": "trader_agg",
+      "alias": "Senior",
+      "multiplier": 3.0,
       "allowed_instruments": null
+    },
+    {
+      "user_id": "runaway",
+      "alias": "Runaway-Multiplier",
+      "multiplier": 100000.0,
+      "allowed_instruments": [
+        "EURUSD",
+        "GBPUSD",
+        "USDJPY"
+      ]
+    },
+    {
+      "user_id": "alice_only",
+      "alias": "Alice EURUSD-only",
+      "multiplier": 1.5,
+      "allowed_instruments": [
+        "EURUSD"
+      ]
+    },
+    {
+      "user_id": "noaccess",
+      "alias": "Empty allowlist",
+      "multiplier": 1.0,
+      "allowed_instruments": []
+    },
+    {
+      "user_id": "case_test",
+      "alias": "Lowercase allowlist",
+      "multiplier": 1.0,
+      "allowed_instruments": [
+        "eurusd"
+      ]
     }
   ]
 }

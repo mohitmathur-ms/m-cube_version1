@@ -14,6 +14,7 @@ from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
 from core.aggregating_strategy import AggregatingStrategyMixin
+from strategies._shared.entry_tags import ema_reason
 
 
 class EMACrossConfig(StrategyConfig, frozen=True):
@@ -94,14 +95,13 @@ class EMACrossStrategy(AggregatingStrategyMixin, Strategy):
     def _submit_order(self, side: OrderSide) -> None:
         # Attach an indicator-aware tag so the orderbook's
         # "ENTRY DETAILED REASON" column carries the trigger detail.
-        fp = int(self.config.fast_ema_period)
-        sp = int(self.config.slow_ema_period)
-        fv = self.fast_ema.value
-        sv = self.slow_ema.value
-        if side == OrderSide.BUY:
-            reason = f"EMA Cross BUY: fast({fp})={fv:.4f} ≥ slow({sp})={sv:.4f}"
-        else:
-            reason = f"EMA Cross SELL: fast({fp})={fv:.4f} < slow({sp})={sv:.4f}"
+        reason = ema_reason(
+            side,
+            int(self.config.fast_ema_period),
+            int(self.config.slow_ema_period),
+            self.fast_ema.value,
+            self.slow_ema.value,
+        )
         order = self.order_factory.market(
             instrument_id=self.config.instrument_id,
             order_side=side,

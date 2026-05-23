@@ -54,9 +54,15 @@ jobs:
 
       - name: Compute report identifiers
         id: vars
+        # Path is keyed by IST push date/time then commit hash. The runner clock
+        # is UTC, so convert with TZ=Asia/Kolkata. ':' is illegal in paths, so the
+        # time uses dashes (HH-MM-SS).
         run: |
-          echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          echo "report_dir=html_reports/${GITHUB_ACTOR}/${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          IST_DATE=$(TZ='Asia/Kolkata' date +%F)         # e.g. 2026-05-23
+          IST_TIME=$(TZ='Asia/Kolkata' date +%H-%M-%S)   # e.g. 14-09-30
+          SHORT="${GITHUB_SHA::7}"
+          echo "short_sha=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "report_dir=html_reports/${GITHUB_ACTOR}/${IST_DATE}/${IST_TIME}/${SHORT}" >> "$GITHUB_OUTPUT"
 
       - name: Collect commit metadata + diff
         env:
