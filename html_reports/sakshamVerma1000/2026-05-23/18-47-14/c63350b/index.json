@@ -1,0 +1,11 @@
+{
+  "headline": "Fix COINBASE venue display in View Data, backport group-management flag to Path B node runner, and add html-report-generator Claude skill",
+  "branch": "Path_A_LowAPI",
+  "sha": "c63350b73a2d7f3c64bed01241c16bc9a83f28e6",
+  "short_sha": "c63350b",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/c63350b73a2d7f3c64bed01241c16bc9a83f28e6",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-23T13:18:51+00:00",
+  "ai": true
+}
