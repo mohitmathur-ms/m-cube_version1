@@ -4,6 +4,7 @@ Turns a ``PortfolioConfig`` into a plain dict and back. ``portfolio_from_dict``
 is schema-drift tolerant (``_filter_known_fields`` ignores unknown keys / fills
 missing ones with defaults) and runs the legacy ``trade_size`` → ``lots``
 migration (``_migrate_legacy_trade_size``) before constructing each slot.
+
 """
 
 from __future__ import annotations
