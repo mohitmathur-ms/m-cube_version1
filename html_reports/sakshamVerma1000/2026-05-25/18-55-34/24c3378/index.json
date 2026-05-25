@@ -1,0 +1,11 @@
+{
+  "headline": "Modularize core/backtest_runner into a 16-submodule package; add ntm3 NautilusTrader doc sub-agent",
+  "branch": "Path_A_LowAPI",
+  "sha": "24c33782fef3c2b12483e3aa0ec45703944b9894",
+  "short_sha": "24c3378",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/24c33782fef3c2b12483e3aa0ec45703944b9894",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-25T13:26:57+00:00",
+  "ai": true
+}
