@@ -28,6 +28,7 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 from core.csv_loader import DEFAULT_CSV_FOLDER, scan_csv_folder, get_display_label
 from core.nautilus_loader import load_csv_and_store, load_catalog
+from core.session_windows import refresh_all_venue_session_windows
 from core.backtest_runner import run_backtest, run_portfolio_backtest, _run_single_backtest_task
 from core.report_generator import generate_report, build_orderbook_dataframe, build_logs_dataframe
 from core.custom_strategy_loader import (
@@ -138,6 +139,14 @@ def catalog_status():
     catalog_path = request.args.get("path", CATALOG_PATH)
     if not Path(catalog_path).exists():
         return jsonify({"exists": False, "data_types": []})
+    # The dashboard hits this on every page load, so it doubles as the
+    # "refresh venue session windows from the catalog" trigger — picks up
+    # parquet files dropped in out-of-band. Per-file caching keeps it cheap
+    # (only new/changed files are re-read). Best-effort: never block status.
+    try:
+        refresh_all_venue_session_windows(catalog_path)
+    except Exception as e:
+        app.logger.warning("session window refresh failed: %s", e)
     try:
         catalog = load_catalog(catalog_path)
         data_types = catalog.list_data_types()
@@ -1795,6 +1804,15 @@ if __name__ == "__main__":
     print("  M_Cube Crypto Dashboard (HTML/CSS/JS)")
     print("  Open http://localhost:5000 in your browser")
     print("=" * 60)
+    # Sync venue session windows with whatever is currently in the catalog
+    # (covers parquet files dropped in out-of-band before this run).
+    try:
+        _sw = refresh_all_venue_session_windows(CATALOG_PATH)
+        if _sw:
+            print(f"  Session windows refreshed for {len(_sw)} venue(s): "
+                  + ", ".join(f"{v} {s}..{e}" for v, (s, e) in _sw.items()))
+    except Exception as _e:
+        print(f"  [warn] session window refresh failed: {_e}")
     # threaded=True so concurrent tab switches don't queue behind each other on
     # the dev server's single Werkzeug worker. The catalog read paths are
     # I/O-bound and safe to run from threads.

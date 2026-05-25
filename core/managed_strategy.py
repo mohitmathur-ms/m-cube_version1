@@ -123,6 +123,17 @@ _TGT_TYPE_CANON = {
 }
 
 
+# Crypto venues for the Mark Price gate (spec §3 "mark_price (crypto only)").
+# Mark Price is a crypto-exchange fair-value reference, so the engine only
+# honours the ``mark`` exit format on these venues; other instruments fall
+# back to OHLCV with a log. Venue name = the token after "." in the bar type
+# (e.g. "BTCUSD.CRYPTO-1-MINUTE-LAST-EXTERNAL" → "CRYPTO").
+_CRYPTO_VENUES = frozenset({
+    "CRYPTO", "BINANCE", "BYBIT", "OKX", "OKEX", "COINBASE", "KRAKEN",
+    "DERIBIT", "BITMEX", "BITSTAMP", "KUCOIN", "HUOBI", "GATEIO",
+})
+
+
 def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
     """Normalise an SL/Target type string to the engine's canonical value.
 
@@ -148,6 +159,7 @@ def resolve_trigger_hl(
     bid_low: float | None = None,
     ask_high: float | None = None,
     ask_low: float | None = None,
+    mark_price: float | None = None,
 ) -> tuple[float, float]:
     """Resolve the (high, low) an SL/Target trigger should consult.
 
@@ -160,11 +172,26 @@ def resolve_trigger_hl(
       (SL on ``ask_low``, TP on ``ask_high``); a SHORT leg consults the
       BID series (SL on ``bid_high``, TP on ``bid_low``). Falls back to
       OHLCV when the paired bid/ask values are missing (data gap).
+    * **Mark Price** (``mark``) — spec §3, crypto-only fair-value reference.
+      Proxied by the **previous bar's close** (passed as ``mark_price``) — the
+      last settled price ahead of the current bar; high and low both collapse
+      to it, so intra-bar wicks (the bar high/low) do NOT fire the SL/Target.
+      On the first bar (no previous close yet) ``mark_price`` is None/0 and it
+      falls back to the current ``close``. The crypto-only gate is enforced
+      upstream (``on_start`` downgrades to OHLCV on non-crypto venues); by the
+      time this runs ``mark`` is already crypto-validated.
 
     Pure function — unit-testable without an engine.
     """
     if exit_fmt == "ltp":
+        # LTP collapses to the bar's own last price.
         return close, close
+    if exit_fmt == "mark":
+        # Mark Price (proxy) = the PREVIOUS bar's close; collapse high/low to it
+        # so intra-bar wicks are ignored. Fall back to the current close before
+        # any previous close exists (first bar).
+        m = mark_price if (mark_price is not None and mark_price > 0) else close
+        return m, m
     if exit_fmt == "bidask" and None not in (bid_high, bid_low, ask_high, ask_low):
         if is_long:
             return ask_high, ask_low
@@ -284,6 +311,15 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Spec §1.2 1.2(d) ReEntry (price-wait re-entry).
     reentry_price: float = 0.0
     max_re_entries: int = 0
+    # Portfolio "ReExecute at Entry Price" / "ReExecute Same Contract at Entry
+    # Price" (spec §5.2 / §2.1). RUNTIME-injected during the portfolio ReExecute
+    # replay: the price the slot's pre-clip position was opened at, and its
+    # direction. When > 0 the strategy arms a one-shot price-wait at start so its
+    # FIRST re-entry waits until the instrument returns to that original entry
+    # price (reusing the §1.2(d) re-entry gate) instead of entering at the next
+    # signal's market price. 0.0 = no pin (plain ReExecute). Not user-saved.
+    reexec_entry_price: float = 0.0
+    reexec_entry_was_long: bool = True
     # Spec §1.2 1.2(c): when False, this leg ignores its own signals until
     # a sibling's "execute" action arms it via the cross-slot bus.
     armed_at_start: bool = True
@@ -453,6 +489,15 @@ class ManagedExitStrategy(Strategy):
         self._reentry_armed: bool = False
         self._reentry_target_price: float = 0.0
         self._reentry_was_long: bool = True
+        # Portfolio "ReExecute at Entry Price" (spec §5.2): when the replay
+        # injects a pre-clip entry price, arm the §1.2(d) price-wait at start so
+        # the slot's first re-entry waits until the instrument returns to that
+        # original entry price before the signal can fire.
+        _reexec_px = float(getattr(config, "reexec_entry_price", 0.0) or 0.0)
+        if _reexec_px > 0:
+            self._reentry_armed = True
+            self._reentry_target_price = _reexec_px
+            self._reentry_was_long = bool(getattr(config, "reexec_entry_was_long", True))
         self.re_entry_count: int = 0
         self.position_side = None  # "LONG" or "SHORT" or None
         self._expecting_close_fill = False  # next on_order_filled is a close, not an open
@@ -530,6 +575,11 @@ class ManagedExitStrategy(Strategy):
         self._fa_bid_bt: BarType | None = None
         self._fa_ask_bt: BarType | None = None
         self._fa_pending: dict[int, dict] = {}
+        # Mark Price (spec §3, approach B): rolling previous-bar close. The
+        # "mark" exit format triggers off this (the last settled price ahead of
+        # the current bar), not the current close — updated every bar in
+        # _on_primary_bar. 0.0 until the first bar is seen.
+        self._prev_close: float = 0.0
 
         # Extra strategy-subscribe bar types — composite bar types beyond the
         # primary signal one (``config.bar_type``). Parsed to BarType objects
@@ -693,6 +743,21 @@ class ManagedExitStrategy(Strategy):
                 )
                 self._exit_fmt = "ohlcv"
 
+        # Mark Price (spec §3) is crypto-only. The trigger reference is proxied
+        # by the bar close (resolve_trigger_hl), but the spec restricts it to
+        # crypto feeds — downgrade to OHLCV on non-crypto venues with a log.
+        if self._exit_fmt == "mark":
+            try:
+                _venue = str(self.config.bar_type.instrument_id.venue.value).upper()
+            except Exception:  # noqa: BLE001
+                _venue = ""
+            if _venue not in _CRYPTO_VENUES:
+                self.log.warning(
+                    f"Mark Price trigger is crypto-only; venue {_venue!r} is not "
+                    f"crypto — falling back to OHLCV trigger"
+                )
+                self._exit_fmt = "ohlcv"
+
         # Extra strategy-subscribe bar types — composite bar types beyond the
         # primary signal one. Subscribed so the strategy receives them and
         # they are available; the signal / SL / TP logic runs on the primary
@@ -834,6 +899,13 @@ class ManagedExitStrategy(Strategy):
         # delay starting point.
         self._current_bar_ts_ns = bar.ts_event
 
+        # Mark Price (spec §3, approach B): capture the PREVIOUS bar's close for
+        # this bar's trigger, then roll the rolling prev-close forward. Done
+        # before any early return so the series stays continuous across warm-up
+        # and squareoff bars.
+        _mark_prev_close = self._prev_close
+        self._prev_close = float(bar.close)
+
         # RBO state runs every bar, even before indicators warm up — the
         # range-monitoring window can start before the indicator gets enough
         # bars, and we still need to track high/low through that period.
@@ -889,6 +961,7 @@ class ManagedExitStrategy(Strategy):
                 self._exit_fmt, is_long, is_short, close,
                 float(bar.high), float(bar.low),
                 bid_high=bh, bid_low=bl, ask_high=ah, ask_low=al,
+                mark_price=_mark_prev_close,
             )
             self._check_exits(close, is_long, is_short, eff_high, eff_low)
         else:
@@ -1716,7 +1789,9 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      subscribe_bar_types: list | None = None,
                      allowed_weekdays: list | None = None,
                      portfolio_id: str = "",
-                     slot_id: str = "") -> ManagedExitConfig:
+                     slot_id: str = "",
+                     reexec_entry_price: float = 0.0,
+                     reexec_entry_was_long: bool = True) -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
 
     ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
@@ -1766,8 +1841,11 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     # type (the strategy aggregates these base streams to the same windows as
     # the primary when aggregating).
     _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
-    if _fmt not in ("ohlcv", "ltp", "bidask"):
+    if _fmt not in ("ohlcv", "ltp", "bidask", "mark"):
         _fmt = "ohlcv"
+    # "mark" (Mark Price, spec §3) passes through here; the crypto-only gate is
+    # enforced in ManagedExitStrategy.on_start (downgrades to OHLCV with a log
+    # on non-crypto venues) where the venue is known.
     _bid_bt, _ask_bt = ("", "")
     if _fmt == "bidask":
         _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(bar_type))
@@ -1814,6 +1892,8 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         reentry_price=float(getattr(exit_config, "reentry_price", 0.0) or 0.0),
         max_re_entries=int(getattr(exit_config, "max_re_entries", 0) or 0),
         armed_at_start=bool(getattr(exit_config, "armed_at_start", True)),
+        reexec_entry_price=float(reexec_entry_price or 0.0),
+        reexec_entry_was_long=bool(reexec_entry_was_long),
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
         # Intraday entry window (spec §9) — UTC minute-of-day, -1 = disabled.

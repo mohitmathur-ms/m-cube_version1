@@ -21,7 +21,9 @@ from core.csv_loader import QUANTITY_MAX
 from core.csv_loader import concat_side
 from core.csv_loader import load_csv
 from core.csv_loader import load_pair_mid
+from core.csv_loader import session_window_from_df
 from core.instrument_factory import create_instrument
+from core.venue_config import update_venue_session_window
 
 
 DEFAULT_CATALOG_PATH = "./catalog"
@@ -256,6 +258,17 @@ def load_csv_and_store(
 
     # Step 4: Save to catalog
     save_to_catalog(bars, instrument, catalog_path)
+
+    # Step 4b: Derive the venue's daily session window (UTC time-of-day extremes)
+    # from this data and union it into the venue's adapter config. Best-effort:
+    # update_venue_session_window swallows its own errors, but guard the
+    # derivation too so a malformed frame can never break a successful ingest.
+    try:
+        window = session_window_from_df(df)
+        if window is not None:
+            update_venue_session_window(venue, window[0], window[1])
+    except Exception:  # pragma: no cover - defensive; ingest already succeeded
+        pass
 
     bar_type_str = make_bar_type_str(instrument, timeframe=timeframe, price_type=price_type)
 

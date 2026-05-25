@@ -941,11 +941,17 @@ def _normalize_pf_action(action: str | None) -> str:
     return _LEGACY_PF_ACTION_ALIASES.get(action, action)
 
 
-# ReExecute-family actions all trigger clip-then-replay. The "at Entry Price"
-# variants currently fall back to immediate ReExecute because leg-level
-# price-wait re-entry is not yet wired (spec §1.2 1.2(d)).
+# ReExecute-family actions all trigger clip-then-replay (spec §2.4 / §5.2).
 _REEXECUTE_FAMILY_ACTIONS = (
     "ReExecute",
+    "ReExecute at Entry Price",
+    "ReExecute Same Contract at EntryPrice",
+)
+# The "at Entry Price" variants additionally pin each slot's first re-entry to
+# its pre-clip entry price (price-wait re-entry, spec §1.2(d) / §5.2). "Same
+# Contract" is automatic for FX (one instrument), so it shares the entry-price
+# pin. Plain "ReExecute" re-enters at the next signal's market price.
+_ENTRY_PRICE_REEXEC_ACTIONS = (
     "ReExecute at Entry Price",
     "ReExecute Same Contract at EntryPrice",
 )
@@ -953,6 +959,51 @@ _REEXECUTE_FAMILY_ACTIONS = (
 
 def _is_reexec_action(action: str) -> bool:
     return action in _REEXECUTE_FAMILY_ACTIONS
+
+
+def _is_entry_price_reexec(action: str) -> bool:
+    return action in _ENTRY_PRICE_REEXEC_ACTIONS
+
+
+def _entry_at_clip(positions_report, clip_ns: int):
+    """Return ``(entry_price, was_long)`` of the position open at ``clip_ns``.
+
+    For the portfolio "ReExecute at Entry Price" replay (spec §5.2): inspects a
+    slot's positions_report for the position spanning the clip timestamp
+    (``ts_opened ≤ clip_ns ≤ ts_closed``) and returns its open price + side, so
+    the replayed slot can wait for price to return to that level before
+    re-entering. Returns ``None`` when no position was open at the clip or the
+    report lacks the needed columns — caller then replays that slot as plain
+    ReExecute (no pin). Defensive: never raises.
+    """
+    try:
+        if positions_report is None or positions_report.empty:
+            return None
+        open_col = _pick_col(positions_report, ["ts_opened", "ts_init"])
+        close_col = _pick_col(positions_report, ["ts_closed", "ts_last"])
+        px_col = _pick_col(positions_report, ["avg_px_open", "AvgPxOpen", "avg_open"])
+        if not open_col or not close_col or not px_col:
+            return None
+        sqty_col = _pick_col(positions_report, ["signed_qty", "SignedQty"])
+        entry_col = _pick_col(positions_report, ["entry", "Entry"])
+        side_col = _pick_col(positions_report, ["side", "Side"])
+        best = None  # (ts_opened, idx)
+        for idx in positions_report.index:
+            o_ns = _vwap_ts_to_ns(positions_report.at[idx, open_col])
+            c_ns = _vwap_ts_to_ns(positions_report.at[idx, close_col])
+            if o_ns and o_ns <= clip_ns and (c_ns == 0 or c_ns >= clip_ns):
+                if best is None or o_ns > best[0]:
+                    best = (o_ns, idx)
+        if best is None:
+            return None
+        idx = best[1]
+        px = float(positions_report.at[idx, px_col])
+        was_long = _vwap_row_is_long(positions_report, idx, sqty_col, entry_col, side_col)
+        if px <= 0 or was_long is None:
+            return None
+        return (px, bool(was_long))
+    except Exception:
+        return None
 
 
 def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
@@ -2563,6 +2614,9 @@ def _run_single_slot(
     default_capture_underlying: bool = False,
     default_replay_cutoff_ns: int = 0,
     default_vwap_fill: bool = False,
+    default_directional_fill: bool = False,
+    default_reexec_entry_price: float = 0.0,
+    default_reexec_entry_was_long: bool = True,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -2762,12 +2816,25 @@ def _run_single_slot(
             )
             engine.add_instrument(instrument)
             engine.add_data(all_bars)
-            # VWAP proxy-fill (spec §4.2): index ASK/BID bars by ts before the
-            # bar list is dropped, so _extract_results can reprice SL/Target
-            # exits. None when the flag is off or no ASK/BID data is present.
+            # VWAP fill (spec §4.2/§3): index ASK/BID bars with the session-
+            # cumulative volume-weighted VWAP before the bar list is dropped, so
+            # _extract_results can reprice SL/Target exits. The session reset
+            # boundary comes from the venue's session_start_time (UTC). None when
+            # the flag is off or no ASK/BID data is present.
             vwap_lookup = (
-                _build_vwap_lookup(all_bars)
+                _build_vwap_lookup(all_bars, _session_start_minute(slot.bar_type_str))
                 if (default_vwap_fill or os.environ.get("_USE_VWAP_FILL", "0") == "1")
+                else None
+            )
+            # Directional-close fill (spec §8.1): index ASK/BID closes so the
+            # exit fill base can be repriced to the directional close. None when
+            # off or no ASK/BID data. Composes with the VWAP fill — VWAP owns the
+            # SL/Target leg exits (§4.2), the directional close is the base for
+            # the rest (squareoff/EOD, §8.1) — so it is built even when VWAP is on.
+            close_lookup = (
+                _build_close_lookup(all_bars)
+                if (default_directional_fill
+                    or os.environ.get("_USE_DIRECTIONAL_FILL", "0") == "1")
                 else None
             )
             # Free the bar list reference; Nautilus has copied into its internal cache.
@@ -2834,6 +2901,11 @@ def _run_single_slot(
                     subscribe_bar_types=eff_strategy_bar_types,
                     portfolio_id="",
                     slot_id=slot.slot_id,
+                    # Portfolio "ReExecute at Entry Price" (spec §5.2): the replay
+                    # injects the slot's pre-clip entry price so the first re-entry
+                    # waits for price to return to it. 0 = plain ReExecute.
+                    reexec_entry_price=default_reexec_entry_price,
+                    reexec_entry_was_long=default_reexec_entry_was_long,
                 )
                 strategy = ManagedExitStrategy(managed_config)
             else:
@@ -2871,7 +2943,7 @@ def _run_single_slot(
             fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
 
         with _phase("extract_results", phase_times):
-            results = _extract_results(engine, capital, fx_resolver, vwap_lookup)
+            results = _extract_results(engine, capital, fx_resolver, vwap_lookup, close_lookup)
             # Capture the underlying price series for portfolio-level
             # Underlying-Movement / Loss-and-Range SL (spec §2.1). Only built
             # when the portfolio actually uses an underlying SL type — keeps
@@ -2960,6 +3032,7 @@ def _extract_slot_from_group_reports(
     capital: float,
     fx_resolver,
     vwap_lookup: dict | None = None,
+    close_lookup: dict | None = None,
 ) -> dict:
     """Build one slot's result dict by filtering a shared-engine's reports by strategy_id.
 
@@ -2996,6 +3069,18 @@ def _extract_slot_from_group_reports(
             )
         except Exception:
             vwap_fill_adjustments = 0
+
+    # Directional-close exit fill (spec §8.1) — base for every exit; composes
+    # with the VWAP fill (vwap_active skips the SL/Target exits VWAP owns).
+    directional_fill_adjustments = 0
+    if close_lookup:
+        try:
+            directional_fill_adjustments = _apply_directional_close_fill(
+                slot_positions, close_lookup, slot_fills,
+                vwap_active=bool(vwap_lookup),
+            )
+        except Exception:
+            directional_fill_adjustments = 0
 
     # Per-trade realized PnL in base currency
     pnl_col = _pick_col(slot_positions, ["realized_pnl", "RealizedPnl", "pnl"]) if not slot_positions.empty else None
@@ -3114,6 +3199,8 @@ def _extract_slot_from_group_reports(
         "account_report": None,  # shared in a group, not per-slot
         "vwap_fill_applied": bool(vwap_fill_adjustments),
         "vwap_fill_adjustments": vwap_fill_adjustments,
+        "directional_fill_applied": bool(directional_fill_adjustments),
+        "directional_fill_adjustments": directional_fill_adjustments,
     }
 
 
@@ -3383,6 +3470,8 @@ def _run_slot_group(
     portfolio_name: str = "",
     default_replay_cutoff_ns: int = 0,
     default_vwap_fill: bool = False,
+    default_directional_fill: bool = False,
+    default_reexec_entry_prices: dict | None = None,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -3568,12 +3657,25 @@ def _run_slot_group(
             )
             engine.add_instrument(instrument)
             engine.add_data(all_bars)
-            # VWAP proxy-fill (spec §4.2): index ASK/BID bars before the list
-            # is dropped, so each slot's _extract_slot_from_group_reports can
-            # reprice SL/Target exits. None when the flag is off / no ASK-BID.
+            # VWAP fill (spec §4.2/§3): index ASK/BID bars with the session-
+            # cumulative volume-weighted VWAP before the list is dropped, so each
+            # slot's _extract_slot_from_group_reports can reprice SL/Target exits.
+            # Grouped slots share a bar type → one session start. None when the
+            # flag is off / no ASK-BID.
             vwap_lookup = (
-                _build_vwap_lookup(all_bars)
+                _build_vwap_lookup(
+                    all_bars,
+                    _session_start_minute(group[0][0].bar_type_str) if group else 0,
+                )
                 if (default_vwap_fill or os.environ.get("_USE_VWAP_FILL", "0") == "1")
+                else None
+            )
+            # Directional-close fill (spec §8.1) — sibling of vwap_lookup; built
+            # even when VWAP is on (they compose on disjoint exit sets).
+            close_lookup = (
+                _build_close_lookup(all_bars)
+                if (default_directional_fill
+                    or os.environ.get("_USE_DIRECTIONAL_FILL", "0") == "1")
                 else None
             )
             del all_bars
@@ -3640,6 +3742,12 @@ def _run_slot_group(
                         subscribe_bar_types=_group_sbt_eff.get(slot.slot_id, []),
                         portfolio_id=portfolio_name,
                         slot_id=slot.slot_id,
+                        # Portfolio "ReExecute at Entry Price" (spec §5.2) — per
+                        # slot pre-clip entry price injected by the replay.
+                        reexec_entry_price=(default_reexec_entry_prices or {}).get(
+                            slot.slot_id, (0.0, True))[0],
+                        reexec_entry_was_long=(default_reexec_entry_prices or {}).get(
+                            slot.slot_id, (0.0, True))[1],
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -3701,7 +3809,7 @@ def _run_slot_group(
                 )
                 r = _extract_slot_from_group_reports(
                     positions_report, fills_report, strategy_id, slot, capital, fx_resolver,
-                    vwap_lookup,
+                    vwap_lookup, close_lookup,
                 )
                 # Per-leg SL/target hit timestamps (spec §2.3) — read from the
                 # strategy instance (same insertion index as strategy_id) so
@@ -4026,6 +4134,20 @@ def run_portfolio_backtest(
     if vwap_fill_enabled:
         print(f"[VWAP_FILL] {pf_name!r}: conservative VWAP exit-fill enabled")
 
+    # Directional-close exit-fill model (spec execution_logic.html §8.1). The
+    # directional bid/ask close (long→bid, short→ask) is the base price for
+    # every exit, modelling the half-spread paid on exit. Enabled per-portfolio
+    # via ``directional_close_fill``, or globally via _USE_DIRECTIONAL_FILL.
+    # Composes with the VWAP fill per spec: VWAP owns the SL/Target leg exits
+    # (§4.2), the directional close is the base for the rest (squareoff/EOD,
+    # §8.1). Threaded to workers as default_directional_fill.
+    directional_fill_enabled = (
+        bool(getattr(portfolio, "directional_close_fill", False))
+        or os.environ.get("_USE_DIRECTIONAL_FILL", "0") == "1"
+    )
+    if directional_fill_enabled:
+        print(f"[DIRECTIONAL_FILL] {pf_name!r}: directional-close exit-fill enabled")
+
     # Calculate capital allocation per slot
     n = len(enabled_slots)
     capitals = {}
@@ -4104,7 +4226,8 @@ def run_portfolio_backtest(
     else:
         sorted_slots = sorted(enabled_slots, key=_duration_estimate, reverse=True)
 
-    def _run_all_slots(active_move_sl, fire_callbacks: bool, replay_cutoff_ns: int = 0):
+    def _run_all_slots(active_move_sl, fire_callbacks: bool, replay_cutoff_ns: int = 0,
+                       reexec_entry_prices: dict | None = None):
         """Submit every slot/group to a fresh ProcessPoolExecutor and collect
         results into ``{slot_id: result}``.
 
@@ -4155,6 +4278,11 @@ def run_portfolio_backtest(
                             default_capture_underlying=_capture_underlying,
                             default_replay_cutoff_ns=replay_cutoff_ns,
                             default_vwap_fill=vwap_fill_enabled,
+                            default_directional_fill=directional_fill_enabled,
+                            default_reexec_entry_price=(reexec_entry_prices or {}).get(
+                                slot.slot_id, (0.0, True))[0],
+                            default_reexec_entry_was_long=(reexec_entry_prices or {}).get(
+                                slot.slot_id, (0.0, True))[1],
                         )
                         futures[future] = ("single", [slot])
                     else:
@@ -4178,6 +4306,8 @@ def run_portfolio_backtest(
                             portfolio_name=pf_name,
                             default_replay_cutoff_ns=replay_cutoff_ns,
                             default_vwap_fill=vwap_fill_enabled,
+                            default_directional_fill=directional_fill_enabled,
+                            default_reexec_entry_prices=reexec_entry_prices,
                         )
                         futures[future] = ("group", [slot for slot, _cap in group])
             else:
@@ -4203,6 +4333,11 @@ def run_portfolio_backtest(
                         default_capture_underlying=_capture_underlying,
                         default_replay_cutoff_ns=replay_cutoff_ns,
                         default_vwap_fill=vwap_fill_enabled,
+                        default_directional_fill=directional_fill_enabled,
+                        default_reexec_entry_price=(reexec_entry_prices or {}).get(
+                            slot.slot_id, (0.0, True))[0],
+                        default_reexec_entry_was_long=(reexec_entry_prices or {}).get(
+                            slot.slot_id, (0.0, True))[1],
                     )
                     futures[future] = ("single", [slot])
 
@@ -4334,6 +4469,7 @@ def run_portfolio_backtest(
         _cap = _cap if _cap > 0 else 50
         _replays = 0
         _last_clip_ns = 0
+        _pass_slots = slot_results  # per-slot results of the pass that produced the clip
         while _replays < _cap:
             _events = result.get("pf_clip_events") or []
             _first = next((e for e in _events if _is_reexec_action(e[2])), None)
@@ -4342,12 +4478,27 @@ def run_portfolio_backtest(
             _clip_ns = _ts_iso_to_ns(_first[0])
             if _clip_ns <= 0 or _clip_ns <= _last_clip_ns:
                 break  # no forward progress — guard against a degenerate loop
+            # "ReExecute at Entry Price" / "Same Contract" (spec §5.2): capture
+            # each slot's pre-clip entry price so the replay pins the first
+            # re-entry to it (price-wait). Plain ReExecute leaves this None →
+            # market re-entry on the next signal.
+            _reexec_eps = None
+            if _is_entry_price_reexec(_first[2]):
+                _reexec_eps = {}
+                for _sid, _sr in (_pass_slots or {}).items():
+                    _ep = _entry_at_clip(_sr.get("positions_report"), _clip_ns)
+                    if _ep is not None:
+                        _reexec_eps[_sid] = _ep
+                print(f"[PF_REEXEC] entry-price pin: {len(_reexec_eps)} slot(s) "
+                      f"will wait for their pre-clip entry price")
             print(f"[PF_REEXEC] replay #{_replays + 1}: re-running slots flat from {_first[0]}")
             _seg_results, _seg_errors = _run_all_slots(
                 move_sl_settings, fire_callbacks=False, replay_cutoff_ns=_clip_ns,
+                reexec_entry_prices=_reexec_eps,
             )
             if not _seg_results:
                 break
+            _pass_slots = _seg_results  # next replay captures from this segment
             _seg_merged = _merge_portfolio_results(
                 portfolio, _seg_results, capitals, _seg_errors, user_id=user_id,
             )
@@ -4452,6 +4603,10 @@ def _merge_portfolio_results(
             # fills repriced for this slot; 0 / False when _USE_VWAP_FILL off.
             "vwap_fill_applied": bool(r.get("vwap_fill_applied")),
             "vwap_fill_adjustments": int(r.get("vwap_fill_adjustments", 0) or 0),
+            # Directional-close fill provenance (spec §8.1) — count of exit
+            # fills repriced to the directional bid/ask close for this slot.
+            "directional_fill_applied": bool(r.get("directional_fill_applied")),
+            "directional_fill_adjustments": int(r.get("directional_fill_adjustments", 0) or 0),
         }
 
     # Merge equity curves — sum balances at each timestamp
@@ -5198,6 +5353,7 @@ def _extract_results(
     starting_capital: float,
     fx_resolver: FxRateResolver | None = None,
     vwap_lookup: dict | None = None,
+    close_lookup: dict | None = None,
 ) -> dict:
     """Extract backtest results from the engine, converting per-position PnL
     into the account base currency via the supplied FX resolver.
@@ -5235,6 +5391,19 @@ def _extract_results(
             )
         except Exception:
             vwap_fill_adjustments = 0
+
+    # Directional-close exit fill (spec §8.1) — base price for every exit;
+    # composes with the VWAP fill, which owns the SL/Target leg exits when
+    # active (vwap_active skips them so the two stay on disjoint exit sets).
+    directional_fill_adjustments = 0
+    if close_lookup:
+        try:
+            directional_fill_adjustments = _apply_directional_close_fill(
+                positions_report, close_lookup, fills_report,
+                vwap_active=bool(vwap_lookup),
+            )
+        except Exception:
+            directional_fill_adjustments = 0
 
     account_report = None
     try:
@@ -5415,6 +5584,8 @@ def _extract_results(
         "account_report": account_report,
         "vwap_fill_applied": bool(vwap_fill_adjustments),
         "vwap_fill_adjustments": vwap_fill_adjustments,
+        "directional_fill_applied": bool(directional_fill_adjustments),
+        "directional_fill_adjustments": directional_fill_adjustments,
     }
 
 
@@ -5593,15 +5764,20 @@ def _ensure_final_equity_point(
     })
 
 
-# ─── VWAP proxy-fill model (spec §4.2 / 5. Logics/sl_tgt.html) ───────────────
+# ─── VWAP fill model (spec §4.2 / §3 / 5. Logics/sl_tgt.html) ────────────────
 #
-# Gated by the _USE_VWAP_FILL env flag. When on, SL/Target exit fills are
-# repriced to the conservative VWAP-proxy fill described in
-# "5. Logics/sl_tgt.html" — exit_price = vwap if vwap > hit_price else
-# hit_price. The catalog carries no intra-bar tick data, so the per-bar VWAP
-# is *proxied* by the bar's typical price (H+L+C)/3 of the opposite quote
-# side. All of this is runner-side post-run report surgery (same idiom as
-# _apply_portfolio_clip) — the engine and ManagedExitStrategy are untouched.
+# Enabled per-portfolio (vwap_exit_fill) or via the _USE_VWAP_FILL env flag.
+# When on, SL/Target exit fills are repriced to the conservative VWAP fill
+# described in "5. Logics/sl_tgt.html" — exit_price = vwap if vwap > hit_price
+# else hit_price. ``vwap`` is the spec §3 session-cumulative volume-weighted
+# VWAP, Σ((H+L+C)/3·volume)/Σ(volume) over the trading session (reset at the
+# venue's session_start_time, UTC), computed in _build_vwap_lookup from each
+# bar's volume. Where a session has no volume yet (zero/absent volume) it
+# degrades to the bar's typical price (H+L+C)/3. NOTE: per the spec volume
+# caveat, FX/commodity volume is broker quote-size, so the VWAP weights quote
+# depth there; crypto/index-futures feeds carry true traded volume. All of this
+# is runner-side post-run report surgery (same idiom as _apply_portfolio_clip)
+# — the engine and ManagedExitStrategy are untouched.
 
 # Close-order tag prefixes that mark an SL / Target exit (set by
 # ManagedExitStrategy._handle_exit). Squareoff and entry fills are excluded.
@@ -5609,34 +5785,100 @@ _VWAP_SL_PREFIXES = ("Stop Loss", "Trailing SL", "Reverse on SL")
 _VWAP_TP_PREFIXES = ("Take Profit", "Reverse on TP")
 
 
-def _build_vwap_lookup(bars) -> dict | None:
-    """Index ASK/BID bars by ts_event for the VWAP proxy-fill model.
-
-    Returns ``{"ask": {ts_ns: (typical, high, low)}, "bid": {...}}`` where
-    ``typical = (high + low + close) / 3`` is the per-bar VWAP proxy. Returns
-    ``None`` when no ASK/BID bars are present (LAST / crypto-only slots) —
-    callers treat ``None`` as "VWAP fill not applicable, leave fills as-is".
+def _session_start_minute(bar_type_str: str) -> int:
+    """Minute-of-day (UTC) the venue's trading session starts — the VWAP reset
+    boundary. Read from the venue's adapter config ``session_start_time``
+    ("HH:MM[:SS]" UTC, ``adapter_admin/adapters_config/<venue>.json``). Defaults
+    to 0 (midnight-UTC daily reset) when no config / unparseable.
     """
-    ask: dict[int, tuple] = {}
-    bid: dict[int, tuple] = {}
+    try:
+        cfg = load_adapter_config_for_bar_type(bar_type_str) or {}
+        s = str(cfg.get("session_start_time") or "").strip()
+        if not s:
+            return 0
+        parts = s.split(":")
+        hh = int(parts[0])
+        mm = int(parts[1]) if len(parts) > 1 else 0
+        return (hh % 24) * 60 + (mm % 60)
+    except Exception:
+        return 0
+
+
+def _vwap_session_bucket(ts_ns: int, session_start_min: int) -> int:
+    """Trading-session id for ``ts_ns`` (UTC), rolling at ``session_start_min``.
+
+    Bars in the same session share a bucket; the VWAP cumulation resets when the
+    bucket changes. ``session_start_min`` shifts the daily boundary off midnight
+    (e.g. an FX week starting 22:00 UTC → session_start_min = 1320).
+    """
+    total_min = ts_ns // 60_000_000_000  # ns → whole UTC minutes since epoch
+    return (total_min - session_start_min) // 1440
+
+
+def _build_vwap_lookup(bars, session_start_min: int = 0) -> dict | None:
+    """Index bars by ts_event with the spec session-cumulative VWAP.
+
+    Returns ``{"ask": {ts_ns: (vwap, high, low)}, "bid": {...}, "single": {...}}``.
+    ``vwap`` is the running volume-weighted typical price over the trading
+    session, per spec §3:
+
+        VWAP_N = Σ((H+L+C)/3 · volume) / Σ(volume)      (session start … bar N)
+
+    i.e. the same ``Σ(typical·vol)/Σ(vol)`` cumulation as ``aggregator._vwap``,
+    reset at the venue's ``session_start_min`` (UTC). Where no volume has yet
+    accumulated in the session (zero/absent volume) it falls back to the bar's
+    typical price.
+
+    ``ask``/``bid`` index the FX bid/ask trigger series (Format A); ``single``
+    indexes the slot's own primary series (MID / LAST / OHLCV — any non-bid/ask
+    price type) for the Format B fill, so crypto / OHLCV-only slots (no bid/ask)
+    still get a spec §4.2 Format B fill rather than nothing. Returns ``None``
+    only when there are no usable bars at all.
+    """
+    sides: dict[str, list[tuple]] = {"ask": [], "bid": [], "single": []}
     for bar in bars:
         bt = str(bar.bar_type)
         if "-ASK-" in bt:
-            side = ask
+            key = "ask"
         elif "-BID-" in bt:
-            side = bid
+            key = "bid"
         else:
-            continue
+            key = "single"  # MID / LAST / OHLCV primary series → Format B
         try:
             h = float(bar.high)
             l = float(bar.low)
             c = float(bar.close)
+            v = float(getattr(bar, "volume", 0.0) or 0.0)
         except (TypeError, ValueError):
             continue
-        side[int(bar.ts_event)] = ((h + l + c) / 3.0, h, l)
-    if not ask and not bid:
+        sides[key].append((int(bar.ts_event), h, l, c, v))
+    if not sides["ask"] and not sides["bid"] and not sides["single"]:
         return None
-    return {"ask": ask, "bid": bid}
+
+    def _running_vwap(rows: list[tuple]) -> dict[int, tuple]:
+        out: dict[int, tuple] = {}
+        rows.sort(key=lambda r: r[0])  # chronological — cumulation needs order
+        cum_pv = 0.0
+        cum_v = 0.0
+        cur_bucket: int | None = None
+        for ts, h, l, c, v in rows:
+            bucket = _vwap_session_bucket(ts, session_start_min)
+            if bucket != cur_bucket:  # new session — reset the cumulation
+                cur_bucket = bucket
+                cum_pv = 0.0
+                cum_v = 0.0
+            typical = (h + l + c) / 3.0
+            cum_pv += typical * v
+            cum_v += v
+            vwap = (cum_pv / cum_v) if cum_v > 0 else typical
+            out[ts] = (vwap, h, l)
+        return out
+
+    return {
+        "ask": _running_vwap(sides["ask"]),
+        "bid": _running_vwap(sides["bid"]),
+        "single": _running_vwap(sides["single"]),
+    }
 
 
 def _vwap_normalize_tag(tg) -> str:
@@ -5715,20 +5957,27 @@ def _vwap_adjust_pnl_cell(report, idx, pnl_col, delta: float) -> None:
 
 
 def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
-    """Reprice SL/Target exit fills to the conservative VWAP-proxy price.
+    """Reprice SL/Target exit fills to the conservative VWAP price.
 
-    Spec: 5. Logics/sl_tgt.html "SL & Target Fill Price Formula" —
-    ``exit_price = vwap if vwap > hit_price else hit_price``. ``vwap`` is the
-    opposite-quote-side per-bar typical price; ``hit_price`` is the
-    trigger-side bar extreme:
+    Spec §4.2: SELL legs use ``MAX(vwap, hit)`` (conservative, pay more); BUY
+    legs use ``MIN(vwap, hit)`` (conservative, receive less). ``vwap`` is the
+    **session-cumulative volume-weighted VWAP** (spec §3, ``Σ(typical·vol)/Σ(vol)``
+    reset per session — see ``_build_vwap_lookup``).
 
-      * long  leg (closed by selling at BID): vwap=bid typical,
+    Format A (Bid/Ask) when the bar has paired bid+ask:
+      * BUY  leg (close long, sell at BID): ``MIN(bid_vwap, hit)``,
         hit = ask_low (SL) / ask_high (Target)
-      * short leg (closed by buying  at ASK): vwap=ask typical,
+      * SELL leg (close short, buy at ASK): ``MAX(ask_vwap, hit)``,
         hit = bid_high (SL) / bid_low (Target)
 
-    Mutates ``positions_report``'s realized_pnl column in place (quote
-    currency); the caller's existing FX conversion / metric code picks the
+    Format B (single OHLCV/LAST/MID series) when there is no bid/ask
+    (crypto / OHLCV-only slots) — vwap and hit both from the slot's own series:
+      * BUY  leg: ``MIN(vwap, hit)``, hit = low (SL) / high (Target)
+      * SELL leg: ``MAX(vwap, hit)``, hit = high (SL) / low (Target)
+
+    Format C (LTP): no bid/ask and no volume series → no-op (fill stays the
+    engine's last price). Mutates ``positions_report``'s realized_pnl column in
+    place (quote currency); the caller's FX conversion / metric code picks the
     change up. Returns the number of positions adjusted.
     """
     if not vwap_lookup or positions_report is None or fills_report is None:
@@ -5766,6 +6015,7 @@ def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
 
     ask = vwap_lookup.get("ask", {})
     bid = vwap_lookup.get("bid", {})
+    single = vwap_lookup.get("single", {})
     qty_col = _pick_col(positions_report, ["peak_qty", "quantity", "Quantity"])
     sqty_col = _pick_col(positions_report, ["signed_qty", "SignedQty"])
     entry_col = _pick_col(positions_report, ["entry", "Entry"])
@@ -5777,10 +6027,6 @@ def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
         kind = exit_kind.get(ts_ns)
         if kind is None:
             continue
-        a = ask.get(ts_ns)
-        b = bid.get(ts_ns)
-        if a is None or b is None:
-            continue  # one quote side missing for this bar — fall back
         was_long = _vwap_row_is_long(positions_report, idx, sqty_col, entry_col, side_col)
         if was_long is None:
             continue
@@ -5791,17 +6037,177 @@ def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
             continue
         if qty <= 0 or actual_px <= 0:
             continue
-        ask_typ, ask_hi, ask_lo = a
-        bid_typ, bid_hi, bid_lo = b
-        if was_long:
-            vwap = bid_typ
-            hit = ask_lo if kind == "sl" else ask_hi
+
+        a = ask.get(ts_ns)
+        b = bid.get(ts_ns)
+        if a is not None and b is not None:
+            # Format A (Bid/Ask) — spec §4.2.
+            ask_vwap, ask_hi, ask_lo = a
+            bid_vwap, bid_hi, bid_lo = b
+            if was_long:
+                # BUY leg: close a long by SELLING at the BID → MIN(bid_vwap, hit),
+                # conservative (receive less). hit = ask_low (SL) / ask_high (TGT).
+                vwap = bid_vwap
+                hit = ask_lo if kind == "sl" else ask_hi
+                exit_px = vwap if vwap < hit else hit          # MIN
+            else:
+                # SELL leg: close a short by BUYING at the ASK → MAX(ask_vwap, hit),
+                # conservative (pay more). hit = bid_high (SL) / bid_low (TGT).
+                vwap = ask_vwap
+                hit = bid_hi if kind == "sl" else bid_lo
+                exit_px = vwap if vwap > hit else hit          # MAX
         else:
-            vwap = ask_typ
-            hit = bid_hi if kind == "sl" else bid_lo
-        exit_px = vwap if vwap > hit else hit
+            # Format B (single OHLCV/LAST/MID series) — spec §4.2. Used when the
+            # slot has no paired bid/ask (crypto / OHLCV-only). vwap and the
+            # hit (own bar high/low) come from the same single series.
+            s = single.get(ts_ns)
+            if s is None:
+                continue  # no series for this bar — leave the engine fill
+            s_vwap, s_hi, s_lo = s
+            if was_long:
+                # BUY leg: MIN(vwap, hit). hit = low (SL) / high (TGT).
+                hit = s_lo if kind == "sl" else s_hi
+                exit_px = s_vwap if s_vwap < hit else hit      # MIN
+            else:
+                # SELL leg: MAX(vwap, hit). hit = high (SL) / low (TGT).
+                hit = s_hi if kind == "sl" else s_lo
+                exit_px = s_vwap if s_vwap > hit else hit      # MAX
         # Long pnl rises with the exit price; short pnl falls with it.
         delta = (exit_px - actual_px) * qty if was_long else (actual_px - exit_px) * qty
+        if delta == 0.0:
+            continue
+        _vwap_adjust_pnl_cell(positions_report, idx, pnl_col, delta)
+        adjusted += 1
+    return adjusted
+
+
+# ─── Directional-close exit-fill model (spec execution_logic.html §8.1) ──────
+#
+# Gated by the per-portfolio ``directional_close_fill`` toggle (or the
+# ``_USE_DIRECTIONAL_FILL`` env override). Under MARKET exits the spec uses the
+# *directional close* as the fill base price, with a fallback chain:
+#
+#   SELL leg (close short → buy back):  ask_close → close → last_mtm → entry
+#   BUY  leg (close long  → sell out):  bid_close → close → last_mtm → entry
+#
+# Synth-MID FX slots otherwise fill at the MID close, which understates the
+# half-spread paid on exit. This post-run surgery reprices each closed
+# position's exit to the directional bid/ask close at the exit bar, modelling
+# that spread. When the bid/ask close is missing for a bar the engine's own
+# fill (the MID ``close`` rung of the chain) is kept — the deeper ``last_mtm``
+# / ``entry`` rungs are degenerate in a bar backtest and collapse to "leave
+# as-is". Mutually exclusive with the VWAP fill at the orchestrator level
+# (VWAP is the richer SL/Target model and wins when both are configured).
+
+
+def _build_close_lookup(bars) -> dict | None:
+    """Index ASK/BID bar *closes* by ts_event for the directional-close fill.
+
+    Returns ``{"ask": {ts_ns: ask_close}, "bid": {ts_ns: bid_close}}`` or
+    ``None`` when no ASK/BID bars are present (LAST / crypto-only slots), in
+    which case the directional-close fill is not applicable.
+    """
+    ask: dict[int, float] = {}
+    bid: dict[int, float] = {}
+    for bar in bars:
+        bt = str(bar.bar_type)
+        if "-ASK-" in bt:
+            side = ask
+        elif "-BID-" in bt:
+            side = bid
+        else:
+            continue
+        try:
+            side[int(bar.ts_event)] = float(bar.close)
+        except (TypeError, ValueError):
+            continue
+    if not ask and not bid:
+        return None
+    return {"ask": ask, "bid": bid}
+
+
+def _apply_directional_close_fill(
+    positions_report, close_lookup, fills_report=None, vwap_active: bool = False,
+) -> int:
+    """Reprice exit fills to the spec §8.1 directional close base price.
+
+    Per §8.1 the directional close is the base price for **every** MARKET exit
+    (Format A: a LONG leg closes on the BID close, a SHORT leg on the ASK
+    close; Format B/C: the bare close/ltp, which is what the engine already
+    filled — a no-op here, so only Format A repricing happens). When the
+    quote-side close is unavailable for the bar the engine's fill is left
+    untouched (the ``close`` rung of the spec fallback chain; the deeper
+    ``last_mtm``/``entry`` rungs are degenerate in a bar backtest).
+
+    This **composes** with the VWAP fill rather than replacing it. The spec
+    layers the VWAP enhancement on top of the directional close for leg
+    SL/Target hits only (§4.2 anchors that on the trigger extreme; §8.1's
+    Portfolio-SqOff enhancement anchors on the directional close). In this
+    per-slot engine SL/Target exits are leg-level, so they are owned by
+    ``_apply_vwap_fill`` (§4.2). Therefore when ``vwap_active`` is True this
+    function **skips** SL/Target-tagged exits (VWAP already repriced them) and
+    applies the directional close only to the remaining exits — squareoff,
+    end-of-day and other time-based closes, which §8.1 fills at the directional
+    close with no VWAP enhancement. When ``vwap_active`` is False the
+    directional close is the base for all exits including SL/Target.
+
+    Mutates ``positions_report``'s realized_pnl column in place (quote
+    currency); returns the number of positions repriced.
+    """
+    if not close_lookup or positions_report is None or positions_report.empty:
+        return 0
+    pnl_col = _pick_col(positions_report, ["realized_pnl", "RealizedPnl", "pnl"])
+    ts_col = _pick_col(positions_report, ["ts_closed", "ts_last"])
+    close_col = _pick_col(positions_report, ["avg_px_close", "AvgPxClose", "avg_close"])
+    if not pnl_col or not ts_col or not close_col:
+        return 0
+
+    # When the VWAP fill is active it owns the leg SL/Target fills (§4.2);
+    # collect their exit timestamps so the directional close skips them and the
+    # two models stay on disjoint exit sets (no double repricing).
+    sl_tp_ts: set[int] = set()
+    if vwap_active and fills_report is not None and not fills_report.empty:
+        fill_ts_col = _pick_col(fills_report, ["ts_init", "ts_last", "ts_event"])
+        tags_col = _pick_col(fills_report, ["tags", "Tags"])
+        if fill_ts_col and tags_col:
+            for ts_raw, tg in zip(fills_report[fill_ts_col].tolist(),
+                                  fills_report[tags_col].tolist()):
+                reason = _vwap_normalize_tag(tg).strip()
+                if reason.startswith(_VWAP_SL_PREFIXES) or reason.startswith(_VWAP_TP_PREFIXES):
+                    ts_ns = _vwap_ts_to_ns(ts_raw)
+                    if ts_ns:
+                        sl_tp_ts.add(ts_ns)
+
+    ask = close_lookup.get("ask", {})
+    bid = close_lookup.get("bid", {})
+    qty_col = _pick_col(positions_report, ["peak_qty", "quantity", "Quantity"])
+    sqty_col = _pick_col(positions_report, ["signed_qty", "SignedQty"])
+    entry_col = _pick_col(positions_report, ["entry", "Entry"])
+    side_col = _pick_col(positions_report, ["side", "Side"])
+
+    adjusted = 0
+    for idx in positions_report.index:
+        ts_ns = _vwap_ts_to_ns(positions_report.at[idx, ts_col])
+        if not ts_ns:
+            continue
+        if ts_ns in sl_tp_ts:
+            continue  # VWAP fill (§4.2) owns this leg SL/Target exit
+        was_long = _vwap_row_is_long(positions_report, idx, sqty_col, entry_col, side_col)
+        if was_long is None:
+            continue
+        # Directional close: long closes on the BID, short on the ASK.
+        dir_close = bid.get(ts_ns) if was_long else ask.get(ts_ns)
+        if dir_close is None:
+            continue  # quote-side close missing — keep the engine's MID-close fill
+        try:
+            actual_px = float(positions_report.at[idx, close_col])
+            qty = abs(float(positions_report.at[idx, qty_col])) if qty_col else 0.0
+        except (TypeError, ValueError):
+            continue
+        if qty <= 0 or actual_px <= 0 or dir_close <= 0:
+            continue
+        # Long pnl rises with the exit price; short pnl falls with it.
+        delta = (dir_close - actual_px) * qty if was_long else (actual_px - dir_close) * qty
         if delta == 0.0:
             continue
         _vwap_adjust_pnl_cell(positions_report, idx, pnl_col, delta)

@@ -295,39 +295,6 @@ if leg_gain &gt;= sl_trail["every"]:
 <h3>4.8 Leg Action Combination Rules</h3>
 <p>Max 3 actions. Invalid combos: KeepLegRunning+ReEntry, KeepLegRunning+SqOff, Re-Execute+ReEntry, &gt;3 actions, Execute without valid leg_id.</p>
 
-<h3>4.9 Leg-Level Trailing SL — Profit Lock (NEW) <span class="badge badge-shared">Added this revision</span></h3>
-<div class="fmt-block shared">
-  <h4><span class="badge badge-shared">Same in all three formats</span> — PnL-based profit-lock ratchet, mirror of Target §4.7</h4>
-  <p>Once the leg's PnL crosses an activation threshold, a profit <strong>floor</strong> is locked and ratchets upward as PnL grows. If PnL falls back to the floor, the leg exits with the locked profit protected.</p>
-  <p><strong>Distinct from §4.5 / §4.6:</strong> Move SL to Cost + Trail After Move SL move the SL <em>price level</em>, and Trail only activates <em>after</em> Move-to-Cost fires. This profit lock is a standalone <em>PnL floor</em> with its own activation threshold — it does not require Move-to-Cost first, and can run alongside the loss-limiting SL.</p>
-<pre><code># Activation:
-if leg_pnl &gt;= when_profit_reach:
-    active       = True
-    current_stop = lock_min_profit
-    anchor_pnl   = when_profit_reach
-    # log: LEG_TRAIL_SL_LOCK_ACTIVATED
-
-# Active phase (each bar):
-if leg_pnl &lt;= current_stop:
-    exit leg (SL_PROFIT_LOCK)                 # exit fill per §4.2, format-specific
-else:
-    gain = leg_pnl - anchor_pnl
-    if gain &gt;= trail_every:
-        steps         = int(gain / trail_every)
-        current_stop += steps × trail_by      # floor ratchets up — never down
-        anchor_pnl   += steps × trail_every
-        # log: LEG_TRAIL_SL_LOCK_UPDATED</code></pre>
-  <p>Fields: <code>enabled</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code>. All accept absolute or % input.</p>
-</div>
-<p><strong>Three-format dependence.</strong> The ratchet logic is format-agnostic (operates on <code>leg_pnl</code>). Only two pieces are format-specific:</p>
-<table>
-  <thead><tr><th>Step</th><th>Format A — Bid/Ask</th><th>Format B — OHLCV</th><th>Format C — LTP</th></tr></thead>
-  <tbody>
-    <tr><td>Mark price feeding <code>leg_pnl</code></td><td>SELL → <code>ask</code> side; BUY → <code>bid</code> side (cost to close); <code>mark_price</code> if configured (crypto)</td><td><code>close</code> (or <code>vwap</code>)</td><td><code>ltp</code></td></tr>
-    <tr><td>Exit fill when floor breached</td><td>per §4.2 — SELL <code>ask_vwap</code>/<code>bid_high</code>, BUY <code>bid_vwap</code>/<code>ask_low</code></td><td>per §4.2 — <code>vwap</code>/<code>high</code>/<code>low</code></td><td>per §4.2 — <code>ltp</code></td></tr>
-  </tbody>
-</table>
-
 <h2 id="portfolio">5. Portfolio-Level SL Execution</h2>
 
 <h3>5.1 Portfolio SL Types</h3>
@@ -383,7 +350,7 @@ if (combined_pnl - user_trail_anchor) &gt;= user_trailing_sl["every"]:
     user_sl -= steps × user_trailing_sl["by"]
     user_trail_anchor += steps × user_trailing_sl["every"]
     # log: USER_TRAIL_SL_UPDATED</code></pre>
-  <p><code>max_loss</code> accepts <strong>absolute input only</strong> (% removed at user level — see <code>sl_features.html</code> Level 3). <code>every</code>, <code>by</code> accept absolute or % input.</p>
+  <p><code>max_loss</code>, <code>every</code>, <code>by</code> accept <strong>absolute or % of allocation</strong> (engine-defined base; raw % not supported at user level — see <code>sl_features.html</code> Level 3 + TBD-6).</p>
 </div>
 
 <h2 id="reexec">7. ReExecute Gating Flags</h2>
@@ -562,7 +529,6 @@ BUY  exit:  fill = ltp</code></pre>
     <tr><td>4.6 Trail After Move SL</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
     <tr><td>4.7 Leg Actions</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
     <tr><td>4.8 Action Combination Rules</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
-    <tr><td>4.9 Leg-Level Trailing SL (Profit Lock)</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
     <tr><td>5.1 Portfolio SL Types</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
     <tr><td>5.2 SL Actions</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
     <tr><td>5.3 Portfolio Delay</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
@@ -591,6 +557,18 @@ BUY  exit:  fill = ltp</code></pre>
 <h3>Request</h3>
 <p>Add <strong>Portfolio Tags</strong> (also called Strategy Tags) as a way to <strong>group portfolios</strong> so that SL/Target can be assigned to a <em>subset</em> of strategies — between Portfolio and User in the evaluation hierarchy.</p>
 <p>A portfolio tag groups multiple portfolios sharing a common characteristic (e.g., strategy type, market regime, time-of-day window). Each tag has its own SL/Target. When a tag's SL fires, all portfolios in that tag are force-sqoff'd; portfolios in other tags continue unaffected. User-level SL remains the ultimate ceiling.</p>
+
+<h3>Tag-level controls (when implemented) <span class="badge badge-shared">Added this revision</span></h3>
+<p>Each strategy tag carries the <strong>same SL control set as a portfolio</strong>, evaluated on the tag's combined PnL across its portfolios:</p>
+<table>
+  <thead><tr><th>Control</th><th>Parameters</th></tr></thead>
+  <tbody>
+    <tr><td>Combined Loss SL</td><td><code>tag_sl_val</code> — force-sqoff all portfolios in the tag when tag combined loss ≥ <code>tag_sl_val</code></td></tr>
+    <tr><td>Trailing SL (2-param)</td><td><code>every</code> / <code>by</code> — tighten the tag loss-limit as tag profit grows</td></tr>
+  </tbody>
+</table>
+<p><strong>Input mode:</strong> absolute or <strong>% of allocation</strong> (engine-defined base; raw % not supported — same rule as the user level, since a tag SL force-squares a whole group of strategies).</p>
+<p>Profit-side controls for the tag (Combined Profit + Profit Lock) are specified in <code>execution_logic_target.html</code> §11.</p>
 
 <h3>Example</h3>
 <pre><code>User runs 100 strategies (= 1 algo)

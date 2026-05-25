@@ -13,6 +13,7 @@ concern's logic living directly in the directory's `__init__.py`.
 from core.csv_loader import (
     scan_csv_folder, get_display_label,      # discovery
     load_csv, concat_side, load_pair_mid,    # loading
+    session_window_from_df,                  # session window derivation
     clear_fx_scan_cache,                     # cache control
     DEFAULT_CSV_FOLDER, QUANTITY_MAX,        # constants
 )
@@ -43,6 +44,7 @@ introspection.
 | `csv_reader/` | Read a single CSV into a clean OHLCV DataFrame (PyArrow read, volume cap). | `load_csv` |
 | `side_concat/` | Concatenate one side's daily files in timestamp order (parallel thread pool). | `concat_side` |
 | `mid_merge/` | Row-wise MID from ASK+BID; load a pair's MID from its file lists. | `_merge_ask_bid_to_mid`, `load_pair_mid` |
+| `session_window/` | Derive a venue's daily session window (UTC time-of-day extremes) from loaded bars; persisted per venue at ingest by `core.venue_config.update_venue_session_window`. | `session_window_from_df` |
 
 ## Dependency graph (acyclic)
 

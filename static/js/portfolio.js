@@ -531,6 +531,7 @@ const Portfolio = {
         if (pf.exit_sell_first !== undefined) pf._ui.exit_sell_first = pf.exit_sell_first;
         if (pf.on_portfolio_complete) pf._ui.on_portfolio_complete = pf.on_portfolio_complete;
         if (pf.vwap_exit_fill !== undefined) pf._ui.vwap_exit_fill = pf.vwap_exit_fill;
+        if (pf.directional_close_fill !== undefined) pf._ui.directional_close_fill = pf.directional_close_fill;
         const ui = pf._ui;
 
         // Strategy tags summary
@@ -1313,6 +1314,9 @@ const Portfolio = {
                         </label>
                         <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer; margin-top:8px;" title="Spec §4.2/§8.1: reprice SL/Target exit fills to the conservative VWAP price (SELL=max(vwap,hit), BUY=min(vwap,hit)). Needs paired ASK/BID bars (FX/MID slots); no-op on LAST-only data.">
                             <input type="checkbox" id="pf-m-exit-vwapfill" ${(ui.vwap_exit_fill === true) ? 'checked' : ''}> Conservative VWAP Exit Fill
+                        </label>
+                        <label style="font-size:0.82rem; display:flex; align-items:center; gap:5px; cursor:pointer; margin-top:8px;" title="Spec §8.1: reprice each exit fill to the directional close of the exit bar — LONG legs close on the BID close, SHORT legs on the ASK close — modelling the half-spread paid on exit. Needs paired ASK/BID bars (FX/MID slots); no-op on LAST-only data. Composes with VWAP fill: VWAP owns SL/Target leg exits (§4.2), directional close is the base for squareoff/EOD exits (§8.1).">
+                            <input type="checkbox" id="pf-m-exit-dirfill" ${(ui.directional_close_fill === true) ? 'checked' : ''}> Directional-Close Exit Fill (§8.1)
                         </label>
                     </div>
                     <div style="flex:1; min-width:300px;">
@@ -2164,6 +2168,7 @@ const Portfolio = {
         pf._ui.exit_sell_first = document.getElementById("pf-m-exit-sellfirst")?.checked ?? true;
         pf._ui.on_portfolio_complete = document.getElementById("pf-m-exit-oncomplete")?.value || "None";
         pf._ui.vwap_exit_fill = document.getElementById("pf-m-exit-vwapfill")?.checked || false;
+        pf._ui.directional_close_fill = document.getElementById("pf-m-exit-dirfill")?.checked || false;
         // Persisted copies for the backend (Monitoring + ReExecute + Exit Settings).
         // Field names on pf match PortfolioConfig in models.py. Only
         // no_reexec_sl_cost has runtime effect (FX/crypto adaptation of
@@ -2184,6 +2189,7 @@ const Portfolio = {
         pf.exit_sell_first = pf._ui.exit_sell_first;
         pf.on_portfolio_complete = pf._ui.on_portfolio_complete;
         pf.vwap_exit_fill = pf._ui.vwap_exit_fill;
+        pf.directional_close_fill = pf._ui.directional_close_fill;
         // Other Settings. Mirror to both _ui (UI scratchpad) AND pf.<model_field>
         // so the strip-before-POST below preserves them for the server. Field
         // names on pf match PortfolioConfig in models.py.
@@ -2424,9 +2430,9 @@ const Portfolio = {
             </div>
             <div class="leg-tab-content" id="leg-tab-leg-stoploss" style="display:none;">
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <div class="form-group" style="flex:1; min-width:150px;" title="Three-format engine (spec §3). OHLCV: trigger on this slot's bar high/low. LTP: single price — trigger on close only. Bid/Ask: SELL exits trigger on the BID series, BUY on the ASK series (needs paired ASK/BID data).">
+                    <div class="form-group" style="flex:1; min-width:150px;" title="Three-format engine (spec §3). OHLCV: trigger on this slot's bar high/low. LTP: single price — trigger on close only. Bid/Ask: SELL exits trigger on the BID series, BUY on the ASK series (needs paired ASK/BID data). Mark Price: crypto-only fair-value proxy — trigger on the PREVIOUS bar's close, ignoring intra-bar wicks; falls back to OHLCV on non-crypto venues.">
                         <label class="form-label">Exit Price Format</label>
-                        <select class="form-control" id="leg-m-exitfmt">${[["ohlcv","OHLCV (Format B)"],["ltp","LTP (Format C)"],["bidask","Bid/Ask (Format A)"]].map(([v,l]) => `<option value="${v}" ${(ec.exit_price_format || "ohlcv") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+                        <select class="form-control" id="leg-m-exitfmt">${[["ohlcv","OHLCV (Format B)"],["ltp","LTP (Format C)"],["bidask","Bid/Ask (Format A)"],["mark","Mark Price (crypto)"]].map(([v,l]) => `<option value="${v}" ${(ec.exit_price_format || "ohlcv") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
                     <div class="form-group" style="flex:1; min-width:110px;" title="'atr' sizes the SL from Average True Range at entry (spec §1.1 fn.4).">
                         <label class="form-label">SL Type</label>
                         <select class="form-control" id="leg-m-sltype">${slTypes.map(t => `<option value="${t}" ${(ec.stop_loss_type || "none") === t ? "selected" : ""}>${t}</option>`).join("")}</select></div>

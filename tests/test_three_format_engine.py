@@ -60,6 +60,25 @@ def test_format_a_falls_back_to_ohlcv_when_pair_missing():
     assert (hi, lo) == (1.12, 1.08)
 
 
+def test_mark_price_uses_previous_bar_close():
+    # Mark Price (spec §3, approach B): trigger consults the PREVIOUS bar's
+    # close (passed as mark_price), so the current bar's high/low (a wick) AND
+    # its own close are ignored — high and low both = mark_price.
+    hi, lo = resolve_trigger_hl("mark", False, True, close=1.10,
+                                bar_high=1.12, bar_low=1.08, mark_price=1.095)
+    assert hi == 1.095 and lo == 1.095
+
+
+def test_mark_price_falls_back_to_close_on_first_bar():
+    # No previous close yet (mark_price None/0) → fall back to the current close.
+    hi, lo = resolve_trigger_hl("mark", True, False, close=1.10,
+                                bar_high=1.12, bar_low=1.08, mark_price=None)
+    assert hi == 1.10 and lo == 1.10
+    hi2, lo2 = resolve_trigger_hl("mark", True, False, close=1.10,
+                                  bar_high=1.12, bar_low=1.08, mark_price=0.0)
+    assert hi2 == 1.10 and lo2 == 1.10
+
+
 # ── _derive_bid_ask_bar_types ───────────────────────────────────────────────
 
 def test_derive_bid_ask_from_mid():
@@ -115,6 +134,24 @@ def test_config_ltp_threaded():
         "BTCUSD.CRYPTO-1-MINUTE-LAST-EXTERNAL",
     )
     assert cfg.exit_price_format == "ltp"
+
+
+def test_config_mark_passes_through():
+    # "mark" passes config_from_exit unchanged; the crypto-only gate is enforced
+    # later in on_start (needs a live venue), not here.
+    cfg = _managed_cfg(
+        ExitConfig(exit_price_format="mark"),
+        "BTCUSD.CRYPTO-1-MINUTE-LAST-EXTERNAL",
+    )
+    assert cfg.exit_price_format == "mark"
+
+
+def test_config_mark_case_insensitive():
+    cfg = _managed_cfg(
+        ExitConfig(exit_price_format="MARK"),
+        "BTCUSD.CRYPTO-1-MINUTE-LAST-EXTERNAL",
+    )
+    assert cfg.exit_price_format == "mark"
 
 
 def test_config_invalid_format_defaults_to_ohlcv():

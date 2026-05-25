@@ -34,6 +34,7 @@ from core.csv_loader.index_daily_scanner import (
 )
 from core.csv_loader.mid_merge import _merge_ask_bid_to_mid, load_pair_mid
 from core.csv_loader.scan_cache import clear_fx_scan_cache
+from core.csv_loader.session_window import session_window_from_df
 from core.csv_loader.side_concat import concat_side
 from core.csv_loader.timestamp_parser import _parse_timestamps
 
@@ -47,6 +48,7 @@ __all__ = [
     "concat_side",
     "load_pair_mid",
     "clear_fx_scan_cache",
+    "session_window_from_df",
     # Re-exported internals (back-compat for tests / introspection)
     "_parse_timestamps",
     "_merge_ask_bid_to_mid",

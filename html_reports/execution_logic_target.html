@@ -225,7 +225,7 @@ else:
         anchor_pnl += steps × trail_every
         # log: LEG_TRAIL_TARGET_UPDATED</code></pre>
   <p>Fields: <code>enabled</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code>. All accept absolute or % input.</p>
-  <p>Direct mirror of the Leg-Level Trailing SL (Profit Lock) on the SL side — see SL doc §4.9.</p>
+  <p>This is the <strong>single leg-level profit-lock</strong> — it lives on the profit side; the SL side keeps loss-limit + Move-SL-to-Cost + 2-param trailing (no duplicate profit-lock, per the clean design).</p>
 </div>
 
 <h2 id="portfolio">5. Portfolio-Level Target Execution</h2>
@@ -298,7 +298,7 @@ else:
         user_current_stop += steps × user_trail_by
         user_anchor_pnl += steps × user_trail_every
         # log: USER_TRAIL_TARGET_UPDATED</code></pre>
-  <p><code>max_profit</code> accepts <strong>absolute input only</strong> (% removed at user level — see <code>sl_features.html</code> Level 3). <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code> accept absolute or % input.</p>
+  <p><code>max_profit</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code> accept <strong>absolute or % of allocation</strong> (engine-defined base; raw % not supported at user level — see <code>sl_features.html</code> Level 3 + TBD-6).</p>
 </div>
 
 <h2 id="reexec">7. ReExecute Gating Flags</h2>
@@ -496,6 +496,18 @@ leg_start = _raw_ls or timing["start"]</code></pre>
 <h3>Request</h3>
 <p>Add <strong>Portfolio Tags</strong> (also called Strategy Tags) as a way to <strong>group portfolios</strong> so that SL/Target can be assigned to a <em>subset</em> of strategies — between Portfolio and User in the evaluation hierarchy.</p>
 <p>A portfolio tag groups multiple portfolios sharing a common characteristic (e.g., strategy type, market regime, time-of-day window). Each tag has its own SL/Target. When a tag's Target fires, all portfolios in that tag are force-sqoff'd; portfolios in other tags continue unaffected. User-level Target remains the ultimate ceiling.</p>
+
+<h3>Tag-level controls (when implemented) <span class="badge badge-shared">Added this revision</span></h3>
+<p>Each strategy tag carries the <strong>same Target control set as a portfolio</strong>, evaluated on the tag's combined PnL across its portfolios:</p>
+<table>
+  <thead><tr><th>Control</th><th>Parameters</th></tr></thead>
+  <tbody>
+    <tr><td>Combined Profit</td><td><code>tag_tgt_val</code> — exit the tag when tag combined profit ≥ <code>tag_tgt_val</code></td></tr>
+    <tr><td>Profit Lock</td><td><code>when_profit_reach</code> (Reach) · <code>lock_min_profit</code> (Lock) · <code>trail_every</code> (Every) · <code>trail_by</code> (By) — lock a profit floor for the tag and ratchet it up</td></tr>
+  </tbody>
+</table>
+<p><strong>Input mode:</strong> absolute or <strong>% of allocation</strong> (engine-defined base; raw % not supported — same rule as the user level).</p>
+<div class="callout"><strong>Profit Lock now exists at every level on the profit side:</strong> leg (§4.7), portfolio (§5.4), strategy tag (here), user (§6.1). The SL side keeps loss-limit + 2-param trailing at each level — <strong>no duplicate profit-lock</strong> (per the "clean" design decision).</div>
 
 <h3>Example</h3>
 <pre><code>User runs 100 strategies (= 1 algo)

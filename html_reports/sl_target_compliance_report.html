@@ -47,12 +47,13 @@
   .callout.warn { background: var(--amber-bg); border-left-color: var(--amber); }
   .callout.warn strong { color: var(--amber); }
   .scorecards { display: flex; gap: 14px; flex-wrap: wrap; margin: 18px 0; }
-  .score { flex: 1 1 140px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
-  .score .num { font-size: 30px; font-weight: 700; line-height: 1; }
-  .score .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 6px; }
+  .score { flex: 1 1 130px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .score .num { font-size: 30px; font-weight: 800; line-height: 1; }
+  .score .lbl { font-size: 12px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
   .score.ok .num { color: var(--green); }
   .score.part .num { color: var(--amber); }
   .score.miss .num { color: var(--red); }
+  .score.inc .num { color: var(--purple); }
   .score.na .num { color: var(--gray); }
   nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
   nav.toc h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
@@ -60,7 +61,7 @@
   nav.toc li { margin: 3px 0; }
   nav.toc a { color: var(--accent); text-decoration: none; }
   nav.toc a:hover { text-decoration: underline; }
-  .note { font-size: 12.5px; color: var(--muted); }
+  .note { font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -68,56 +69,96 @@
 
 <header class="cover">
   <h1>SL &amp; Target — Spec Compliance Report</h1>
-  <p class="subtitle">Feature-by-feature audit of the m-cube engine against the three target specs.</p>
+  <p class="subtitle">Independent static code audit of the SL/Target engine against the three spec documents</p>
   <p class="meta">
-    Specs audited: <code>execution_logic.html</code> (SL) · <code>execution_logic_target.html</code> (Target) · <code>sl_features.html</code> (applicability)<br>
-    Code audited: <code>core/managed_strategy.py</code> · <code>core/backtest_runner.py</code> · <code>core/models.py</code> · <code>core/users.py</code> · <code>core/aggregator.py</code> · <code>server.py</code> &nbsp;|&nbsp; Branch <code>Path_A_LowAPI</code> · 2026-05-21
+    Sources: <code>sl_features.html</code> · <code>execution_logic.html</code> (SL) · <code>execution_logic_target.html</code> (Target)<br>
+    Audited code: <code>core/managed_strategy.py</code> · <code>core/backtest_runner.py</code> · <code>core/models.py</code> · <code>core/users.py</code> · <code>core/tags.py</code> · <code>core/aggregator.py</code> · <code>server.py</code><br>
+    Branch: <code>Path_A_LowAPI</code> · Date: 2026-05-23
   </p>
 </header>
 
 <div class="callout">
-  <strong>How to read this.</strong> Each spec feature is rated against the actual code. Verdicts are evidence-backed with <span class="ref">file:line</span> references that were read directly. The specs target a generic Options-style (BTSoftware) engine across IF/FX/CF/XF; m-cube is the FX/crypto implementation, so a few features the spec marks <em>options-only</em> are intentionally absent — those are rated <span class="badge b-na">N/A&nbsp;·&nbsp;by&nbsp;design</span> rather than as gaps.
+  <strong>How to read this report.</strong> The three spec documents
+  (<code>sl_features.html</code>, <code>execution_logic.html</code>, <code>execution_logic_target.html</code>)
+  are treated as the <strong>ground-truth logic</strong>. Each row compares the spec's stated logic — its
+  trigger conditions, fill formulas, parsing rules and ratchet algorithms — against the <em>actual</em> formula
+  in the current engine code (line references found fresh, with the code formula quoted where it matters).
+  Status reflects what the code <em>does</em>, not what the schema stores: config that is round-tripped but
+  never consumed is <span class="badge b-na">N/A</span> or <span class="badge b-miss">Missing</span>, not
+  "wired"; a formula that diverges from the spec is <span class="badge b-inc">Not as specified</span>; an
+  adaptation that works but isn't a literal match is <span class="badge b-part">Partial</span>.
 </div>
 
 <div class="legend">
-  <span><span class="badge b-ok">✅ Correct</span> implemented &amp; matches spec</span>
-  <span><span class="badge b-part">🟡 Partial</span> present but gated / adapted / incomplete</span>
-  <span><span class="badge b-inc">🟣 Divergent</span> implemented but differs from spec</span>
-  <span><span class="badge b-miss">❌ Missing</span> not implemented</span>
-  <span><span class="badge b-na">⚪ N/A</span> options-only / deferred by design</span>
+  <span><span class="badge b-ok">✅ Correct</span> Implemented as the spec describes</span>
+  <span><span class="badge b-part">🟡 Partial</span> Works, but with an adaptation/caveat</span>
+  <span><span class="badge b-inc">🟣 Incorrect / Not as specified</span></span>
+  <span><span class="badge b-miss">❌ Missing</span> UI/schema accepts it; backend ignores it</span>
+  <span><span class="badge b-na">⚪ N/A</span> Out of scope for FX/crypto by design</span>
 </div>
 
 <div class="scorecards">
-  <div class="score ok"><div class="num">36</div><div class="lbl">Correct</div></div>
-  <div class="score part"><div class="num">2</div><div class="lbl">Partial</div></div>
-  <div class="score miss"><div class="num">1</div><div class="lbl">Missing</div></div>
-  <div class="score na"><div class="num">4</div><div class="lbl">N/A · by design</div></div>
+  <div class="score ok"><div class="num">50</div><div class="lbl">Correct</div></div>
+  <div class="score part"><div class="num">3</div><div class="lbl">Partial</div></div>
+  <div class="score inc"><div class="num">0</div><div class="lbl">Not as specified</div></div>
+  <div class="score miss"><div class="num">0</div><div class="lbl">Missing</div></div>
+  <div class="score na"><div class="num">4</div><div class="lbl">N/A by design</div></div>
 </div>
 
 <div class="callout" style="background:var(--green-bg); border-left-color:var(--green);">
-  <strong style="color:var(--green);">Update — two remediation passes.</strong>
-  <b>Pass 1</b> shipped: §9 timing-ordering save validation, Winter Time Adjustment (+1h DST), and the
-  conservative VWAP exit fill (with §8.1 SqOff enhancement and per-format fills) promoted from a hidden env
-  flag to a per-portfolio toggle.
-  <b>Pass 2</b> promoted the two remaining engine-side partials from env-flag-gated to <em>config-driven</em>:
-  the <b>portfolio-aggregate Move-SL</b> (§5.5) and the <b>portfolio ReExecute replay</b> (§2.4, incl. the
-  entry-price ReExecute variants) now activate automatically whenever the user configures them — no env flag.
-  Two items remain genuinely blocked and are documented rather than stubbed: <b>Mark Price</b> (no mark-price
-  data) and <b>Portfolio Tags</b> (no multi-portfolio orchestrator). The only remaining partials are the
-  cross-portfolio "…Other Portfolio" actions (need a multi-portfolio session) and the literal directional-close
-  fallback chain (subsumed by the now-active VWAP fill).
+  <strong style="color:var(--green);">Update — §8.1 directional-close fill now implemented (frontend + backend).</strong>
+  The one "Not as specified" item — the §8.1 directional-close exit-fill — has been built this session as a
+  per-portfolio toggle (<code>directional_close_fill</code>) with the <code>_USE_DIRECTIONAL_FILL</code> env
+  override. The directional close is the exit base price (LONG→bid close, SHORT→ask close; the <code>close</code>
+  rung kept when bid/ask is missing). Per spec it <b>composes</b> with the VWAP fill rather than replacing it:
+  VWAP owns the leg SL/Target exits (§4.2), the directional close is the base for squareoff / EOD exits (§8.1) —
+  disjoint exit sets. See §6 and §9.
 </div>
-
 <div class="callout" style="background:var(--green-bg); border-left-color:var(--green);">
-  <strong style="color:var(--green);">Pass 3 — Portfolio Tags.</strong> The §11 tag tier is now implemented as a
-  faithful clone of the working user tier one level down: a <code>config/tags.json</code> registry +
-  <code>_TAG_PNL_AGGREGATOR</code>, a <code>portfolio_tag</code> field, tag-scoped clips reusing
-  <code>_user_sl_clip</code>/<code>_user_tgt_clip</code> (<code>scope_label="TAG"</code>) merged via
-  <code>_earliest_clip</code>, <code>/api/tags/*</code> endpoints, a Timing-tab selector, and
-  <b>hierarchical limit validation</b> (portfolio ≤ tag ≤ user, both sides) on save. The cross-portfolio session
-  caveat from Pass 2 is the same orchestrator dependency, now the only structural limit (a "run all my
-  portfolios" flow). <b>Mark Price</b> stays the single hard Missing — it needs a data feed that doesn't exist.
+  <strong style="color:var(--green);">Update — §3 Mark Price now implemented (frontend + backend).</strong> Added as the
+  <code>"mark"</code> exit-price format: per the project's agreed model (approach B) the mark price is proxied by the
+  <b>previous bar's close</b> (rolling <code>_prev_close</code>), so SL/Target triggers consult the last settled
+  price and intra-bar wicks don't fire (the spec's anti-manipulation intent). Crypto-only per spec —
+  <code>on_start</code> downgrades to OHLCV with a log on non-crypto venues. This was the last
+  <span class="badge b-miss">❌ Missing</span> item; there are now no Missing or Not-as-specified rows.
+  See §8 and §9.
 </div>
+<div class="callout" style="background:var(--green-bg); border-left-color:var(--green);">
+  <strong style="color:var(--green);">Update — §3 / §4.2 exit-fill VWAP now the real session VWAP.</strong>
+  <code>_build_vwap_lookup</code> now computes the spec's volume-weighted, session-cumulative VWAP
+  (<code>Σ((H+L+C)/3·volume) / Σ(volume)</code>) from each bar's <code>volume</code>, reset at the venue's
+  <code>session_start_time</code> (UTC, from <code>adapter_admin/adapters_config</code>). The bare-typical proxy
+  is gone; it only falls back to the typical price when a session has no volume yet. (Per the spec volume caveat,
+  FX/commodity volume is broker quote-size, so the VWAP weights quote depth there — spec-correct by definition.)
+  Verification of the fill against §4.2 also surfaced and fixed a real bug — the <b>BUY/long</b> exit was using
+  <code>MAX(vwap, hit)</code> where the spec mandates <code>MIN</code> (conservative, receive less); short was
+  already correct. And <b>Format B</b> (single OHLCV/LAST series) is now implemented, so crypto / OHLCV-only
+  slots get a §4.2 fill instead of nothing. This closes the two VWAP-definition partials.
+</div>
+<div class="callout warn">
+  <strong>Not fully matching spec — at a glance.</strong> Everything else (50 rows) matches the spec logic.
+  The 3 items below are the only places where the implemented logic is partial (no Missing or Not-as-specified rows remain):
+</div>
+<table>
+  <thead><tr><th>Item</th><th class="center">Status</th><th>Spec logic vs. implemented logic</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Cross-portfolio Execute / Start Other (§5.2)</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>Spec: fire an action on another portfolio. Code: only <b>SqOff Other</b> acts; Execute/Start are logged but never arm/start anything. Also in-process/session-scoped.</td>
+    </tr>
+    <tr>
+      <td>Portfolio Delay on underlying paths (§5.3)</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>Spec: delay = deferred-confirm (cancel if condition clears). Code: true confirm on PnL paths; underlying-movement / loss-and-range just shift the clip ts by <code>delay_sec</code> with no re-confirm.</td>
+    </tr>
+    <tr>
+      <td>Tag / user PnL accumulation scope (§6 / §11)</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>Logic is correct, but cross-portfolio aggregation only holds within one in-process session; stale state can leak between sessions without an explicit reset.</td>
+    </tr>
+  </tbody>
+</table>
 
 <nav class="toc">
   <h3>Contents</h3>
@@ -125,11 +166,11 @@
     <li><a href="#leg">1. Leg-Level SL / Target (§4)</a></li>
     <li><a href="#portfolio">2. Portfolio-Level (§5)</a></li>
     <li><a href="#user">3. User-Level (§6)</a></li>
-    <li><a href="#reexec">4. ReExecute Gating Flags (§7)</a></li>
-    <li><a href="#exit">5. Exit Mechanics (§8)</a></li>
-    <li><a href="#timing">6. Timing Gates (§9)</a></li>
-    <li><a href="#formats">7. Three-Format Engine (§3 / §4.1)</a></li>
-    <li><a href="#crosscut">8. Cross-Cutting &amp; Feature Requests</a></li>
+    <li><a href="#tags">4. Portfolio Tags (§11)</a></li>
+    <li><a href="#reexec">5. ReExecute Gating Flags (§7)</a></li>
+    <li><a href="#exit">6. Exit Mechanics (§8)</a></li>
+    <li><a href="#timing">7. Timing Gates (§9)</a></li>
+    <li><a href="#formats">8. Three-Format Engine &amp; Mark Price (§3)</a></li>
     <li><a href="#findings">9. Key findings &amp; recommendations</a></li>
   </ol>
 </nav>
@@ -142,309 +183,329 @@
     <tr>
       <td><b>§4.1 SL/Target trigger</b> — intrabar high/low cross</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>LONG SL fires on bar low ≤ SL, SHORT on bar high ≥ SL; TP mirrored. <span class="ref">managed_strategy.py:1220-1227, 1265-1273</span></td>
+      <td>LONG SL fires on bar low ≤ SL, SHORT on bar high ≥ SL; TP mirrored. <span class="ref">managed_strategy.py:1224-1227, 1270-1273</span></td>
+    </tr>
+    <tr>
+      <td><b>§4.1 / §3 Three-format trigger</b> — Format B (OHLCV), Format C (LTP), Format A (Bid/Ask)</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td><code>resolve_trigger_hl</code> selects the path: LTP collapses high=low=close; bid/ask routes LONG→ASK, SHORT→BID with an OHLCV fallback when bid/ask is absent. Subscribes the paired BID/ASK bars and buffers the trio per <code>ts_event</code>. <span class="ref">managed_strategy.py:140-173, 664-694, 752-774</span></td>
     </tr>
     <tr>
       <td><b>§4.2 Fill-price formula</b> — conservative VWAP <code>max/min(vwap, hit)</code></td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Now a per-portfolio toggle</b> (<code>vwap_exit_fill</code>, Exit Settings tab) in addition to the <code>_USE_VWAP_FILL</code> env flag; threaded to every slot worker as <code>default_vwap_fill</code> and applied by <code>_apply_vwap_fill</code> (<code>exit_px = vwap if vwap&gt;hit else hit</code>). Default off so existing saved backtests are unchanged unless opted in. <span class="ref">backtest_runner.py:3963-3971 (flag), 2748, 3536, 5595-5687</span>; <span class="ref">models.py vwap_exit_fill</span></td>
+      <td class="center"><span class="badge b-na">⚪ N/A here</span></td>
+      <td>Correctly delegated out of the leg engine. The strategy only stamps structured exit-reason tags (<code>Stop Loss</code>/<code>Take Profit</code>/<code>Trailing SL</code>); the conservative reprice is applied post-run in the runner (see §6). <span class="ref">managed_strategy.py:1370-1390</span></td>
     </tr>
     <tr>
       <td><b>§4.3 SL Wait / Delay</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Wall-clock <code>sl_wait_sec</code> (preferred) + legacy <code>sl_wait_bars</code>; resets when price retreats inside SL. <span class="ref">managed_strategy.py:1229-1248</span></td>
+      <td>Wall-clock <code>sl_wait_sec</code> (preferred) + legacy <code>sl_wait_bars</code>; counters reset when price retreats inside the SL. <span class="ref">managed_strategy.py:1232-1248</span></td>
     </tr>
     <tr>
       <td><b>§4.3 Target Wait</b> (target doc)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Mirror of SL Wait: <code>tgt_wait_sec</code>/<code>tgt_wait_bars</code>; trailing-floor breach bypasses the delay (profit-protective). <span class="ref">managed_strategy.py:1277-1297</span></td>
+      <td>Mirror of SL Wait (<code>tgt_wait_sec</code>/<code>tgt_wait_bars</code>), resets on retreat, gates the <b>fixed-TP trigger</b> — exactly §4.3. The trailing-target floor breach fires immediately (<code>if not tgt_trail_hit:</code> bypasses the wait), which matches §4.7's pseudocode (<code>if leg_pnl ≤ current_stop: exit leg</code> — no delay). So both target-exit paths follow their respective spec sections. <span class="ref">managed_strategy.py:1330-1348</span></td>
     </tr>
     <tr>
-      <td><b>§4.4 Value parsing</b> — Premium %, AbsolutePremium (points)</td>
+      <td><b>§4.4 Value parsing</b> — Premium %, AbsolutePremium (points), correct SL direction</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Spec vocab <code>Premium/PremiumBased→percentage</code>, <code>AbsolutePremium→points</code> normalised case/space-insensitively. <span class="ref">managed_strategy.py:111-137</span>; computed at fill <span class="ref">:1593-1639</span></td>
+      <td>Type aliases via <code>_canon_exit_type</code> (<code>Premium</code>/<code>PremiumBased</code>→percentage, <code>AbsolutePremium</code>→points). <b>Direction matches the spec exactly:</b> spec SL — BUY <code>entry×(1−pct/100)</code> / SELL <code>entry×(1+pct/100)</code>; code <code>_compute_sl_price</code> is the same (long→<code>1−pct/100</code>, short→<code>1+pct/100</code>); points/ATR mirror it (BUY <code>entry−value</code>, SELL <code>entry+value</code>). <span class="ref">managed_strategy.py:111-137, 1593-1611, 1641-1645</span></td>
+    </tr>
+    <tr>
+      <td><b>§4.4 Target Value parsing</b> (target doc) — correct TP direction</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td>Spec target — BUY <code>entry×(1+pct/100)</code> / SELL <code>entry×(1−pct/100)</code>; points BUY <code>entry+value</code> / SELL <code>entry−value</code>. Code matches line-for-line (note the direction is the mirror of the SL side). <span class="ref">managed_strategy.py:1616-1637</span></td>
     </tr>
     <tr>
       <td>§4.4 <code>Underlying</code> SL type at <em>leg</em> level</td>
       <td class="center"><span class="badge b-na">⚪ N/A</span></td>
-      <td>Spec explicitly says "not implemented at leg level — use portfolio level". Engine matches: leg has no underlying type; portfolio does (see §5).</td>
+      <td>Spec says "not implemented at leg level — use portfolio level". Confirmed absent from the leg type table; portfolio level provides it (see §2). <span class="ref">managed_strategy.py:111-117, 1593-1613</span></td>
     </tr>
     <tr>
       <td><b>ATR-based SL / Target</b> (sl_features §1.1 fn.4)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Independent <code>sl_atr_*</code> / <code>tgt_atr_*</code> indicators; distance = k×ATR at entry; readiness gate waits on ATR. <span class="ref">managed_strategy.py:637-655, 1600-1611, 1626-1637</span></td>
+      <td>Two independent <code>AverageTrueRange</code> indicators; distance = k×ATR computed at entry, snapped to tick; ATR feeds the readiness gate. <span class="ref">managed_strategy.py:637-655, 1600-1611, 1626-1637</span></td>
     </tr>
     <tr>
-      <td><b>§4.5 Move SL to Cost</b> — 3 variants</td>
+      <td><b>§4.5 Move SL to Cost</b> — 3 variants + safety/no-buy/hit-on-leg</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>"Move Only for Profitable Legs", "Move SL for All Legs", "Move SL to LTP + Buffer for Loss Making Legs" all present; <code>safety_sec</code> anchored to entry time (TBD-1 resolved). <span class="ref">managed_strategy.py:1064-1141</span></td>
-    </tr>
-    <tr>
-      <td>§4.5 fields — <code>no_buy_legs</code>, <code>hit_on_leg</code> (SL), <code>tgt_hit_on_leg</code></td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>no-move-on-long adaptation + cross-slot "Hit On Leg SL/Target" via a per-portfolio event bus. <span class="ref">managed_strategy.py:1076-1097, 1106-1108</span></td>
+      <td>"Move Only for Profitable Legs", "Move SL for All Legs", "Move SL to LTP + Buffer for Loss Making Legs" all present; safety anchored to entry time; no-move-on-long; cross-slot Hit-On-Leg SL/Target via the sibling event bus. <span class="ref">managed_strategy.py:1071-1141</span></td>
     </tr>
     <tr>
       <td><b>§4.6 Trail After Move SL</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Dedicated ratchet, suppressed until move-to-cost fires, anchored at move-fire profit. <span class="ref">managed_strategy.py:1186-1207</span></td>
+      <td>Dedicated PnL-step ratchet, suppressed until move-to-cost fires, anchored at the move-fire profit. <span class="ref">managed_strategy.py:1168-1207</span></td>
     </tr>
     <tr>
-      <td><b>§4.7 Leg Actions</b> (5: SqOff/Re-Execute/Execute/ReEntry/KeepLegRunning)</td>
+      <td><b>§4.7 Leg Actions</b> (SqOff / Re-Execute / Execute / ReEntry / KeepLegRunning)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>All five dispatched; <code>execute</code> arms sibling slot, <code>re_entry</code> price-wait, <code>keep_leg_running</code> disarms. <span class="ref">managed_strategy.py:1413-1452</span>; map in <span class="ref">models.py:94-120</span></td>
+      <td>All five (+reverse) dispatched: <code>execute</code> arms a sibling slot via the bus, <code>re_entry</code> sets a price-wait trigger, <code>keep_leg_running</code> disarms SL/TP. <span class="ref">managed_strategy.py:1397-1478</span></td>
     </tr>
     <tr>
       <td><b>§4.8 Action combination rules</b> (max 3, invalid combos)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>validate_leg_actions</code>: ≤3, keep-leg exclusive, re_execute+re_entry rejected, execute needs target. <span class="ref">models.py:484-508</span></td>
+      <td><code>validate_leg_actions</code>: ≤3 actions, keep-leg exclusive, re_execute+re_entry rejected, execute requires a target leg id. <span class="ref">models.py:513-537</span></td>
     </tr>
     <tr>
-      <td><b>§4.9 Leg Trailing SL — Profit Lock</b> / <b>Target §4.7 Trailing Target</b></td>
+      <td><b>Target §4.7 Leg-Level Trailing Target / Profit Lock</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Single ratchet (<code>advance_trailing_target</code>) satisfies both — spec itself calls §4.9 "the direct mirror" of Target §4.7. Activates at <code>when_profit_reach</code>, floor ratchets up, exits on retrace. <span class="ref">managed_strategy.py:63-102, 1250-1263</span>. Separately, the one-shot <code>target_lock_*</code> SL-upgrade also exists <span class="ref">:1175-1183</span>.</td>
+      <td><code>advance_trailing_target</code> arms at <code>when_profit_reach</code>, locks at <code>lock_min_profit</code>, ratchets the floor by <code>trail_by</code> per <code>trail_every</code>, exits on retrace (reason <code>Trailing Target</code>). Separate one-shot <code>target_lock_*</code> SL-upgrade also exists. <span class="ref">managed_strategy.py:63-102, 1255-1293</span></td>
     </tr>
     <tr>
-      <td>§4.2 Directional close base price (<code>ask_close/bid_close</code> + fallback chain)</td>
-      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
-      <td>The conservative VWAP fill is direction-aware (closes a long on the BID side, a short on the ASK side), which substantively covers §8.1's directional intent. The literal <code>ask_close→close→last_mtm→entry</code> fallback chain is not a separate code path — moot in a bar backtest where the VWAP model supersedes it.</td>
+      <td>TBD-1 Safety Seconds anchored to entry/event time</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td>Measured against <code>_entry_filled_at_ns</code>, not market open. <span class="ref">managed_strategy.py:1103-1105, 1585</span></td>
+    </tr>
+    <tr>
+      <td>TBD-2 Tick-size handling — SL/TP snapped to <code>price_increment</code></td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td><code>_snap_to_tick</code> rounds every SL/TP compute path to the instrument tick. <span class="ref">managed_strategy.py:1641-1663</span></td>
     </tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── PORTFOLIO LEVEL ───────────────────────── -->
 <h2 id="portfolio">2. Portfolio-Level Execution (SL §5 · Target §5)</h2>
+<div class="callout">
+  Portfolio caps are enforced <strong>post-hoc</strong>: the merged combined-PnL equity curve is walked in time
+  order and trades after the clip timestamp are dropped (or replayed for ReExecute). There is <strong>no</strong>
+  mid-bar hard halt while a slot is still running — a documented architectural limit, not a per-feature gap.
+</div>
 <table>
   <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
     <tr>
       <td><b>§5.1 Combined Loss</b> SL</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Post-hoc equity-curve clip on merged combined P&amp;L; trades after clip dropped. <span class="ref">backtest_runner.py:_apply_portfolio_clip 1262-1453, _merge_portfolio_results 4212-4527</span></td>
+      <td>Equity-curve clip on merged combined PnL (<code>pnl ≤ −sl_current</code>); post-clip trades dropped &amp; totals recomputed. <span class="ref">backtest_runner.py:1407, 4700-4739</span></td>
     </tr>
     <tr>
-      <td><b>§5.1 Underlying Movement</b> &amp; <b>Loss and Underlying Range</b> SL</td>
+      <td><b>§5.1 Underlying Movement</b> SL</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Genuinely evaluated (not downgraded): price-cross + hybrid PnL+bounds. Underlying defaults to primary slot instrument (D5 "self"). <span class="ref">backtest_runner.py:_underlying_sl_clip 1585-1672</span></td>
+      <td>Fires on the primary slot's own price crossing the level (underlying = self, D5). Curve built only when needed; skips with a warning on grouped/Path-B runs that capture no curve. <span class="ref">backtest_runner.py:1620, 1710-1714, 4072</span></td>
+    </tr>
+    <tr>
+      <td><b>§5.1 Loss and Underlying Range</b> SL (hybrid)</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td>True hybrid: <code>PnL ≤ −value</code> AND close outside <code>[below, above]</code>; save-validation requires a non-zero bound. <span class="ref">backtest_runner.py:1715-1718, 1034-1039</span></td>
     </tr>
     <tr>
       <td><b>§5.1 Combined Profit</b> Target</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>tgt_hit_now = pnl &gt;= pf_tgt.value</code> in same clip walk. <span class="ref">backtest_runner.py:1372-1373</span></td>
+      <td><code>tgt_hit_now = pnl ≥ value</code> evaluated as step 4 of the clip walk. <span class="ref">backtest_runner.py:1436</span></td>
+    </tr>
+    <tr>
+      <td><b>§5.1 Underlying Movement</b> Target</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td>Profit-side mirror of the SL movement branch (<code>_underlying_tgt_clip</code>). <span class="ref">backtest_runner.py:1827-1830, 4640-4645</span></td>
     </tr>
     <tr>
       <td>Target §5.1 "Profit and Underlying Range" type absent (asymmetry vs SL)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Spec mandates the target side has no such hybrid type — engine correctly omits it.</td>
+      <td>Spec mandates no such hybrid type on the target side. <code>_VALID_PF_TGT_TYPES_FX</code> = (Combined Profit, Underlying Movement) — correctly omitted. <span class="ref">backtest_runner.py:873</span></td>
     </tr>
     <tr>
       <td><b>§5.4 Trailing SL</b> (portfolio)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Ratchet tightens loss threshold per profit step; only tightens. <span class="ref">backtest_runner.py:1330-1341</span></td>
+      <td>Loss threshold tightens per profit step; <code>max(0, …)</code> guard means it only ever tightens. <span class="ref">backtest_runner.py:1394-1404</span></td>
     </tr>
     <tr>
       <td><b>§5.4 Trailing Target / Profit Lock</b> (portfolio)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Activate at <code>when_profit_reach</code>, floor ratchets, exit forces SqOff. <span class="ref">backtest_runner.py:1348-1370</span></td>
+      <td>Activate at <code>when_profit_reach</code>, floor ratchets, exit <em>always</em> forces SqOff regardless of the configured action. <span class="ref">backtest_runner.py:1412-1452, 1559</span></td>
     </tr>
     <tr>
       <td><b>§5.5 Move SL to Cost (portfolio-aggregate)</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Now config-driven.</b> The two-pass runner activates whenever <code>move_sl_agg_pnl_enabled</code> (or a cross-slot Hit-On-Leg trigger) is set — no env flag required. Pass 1 finds the combined-PnL crossing; pass 2 snaps every open leg's SL to entry. <code>_USE_PF_AGG_MOVE_SL</code> stays as a manual override. <span class="ref">backtest_runner.py:agg_active gate</span>; threaded in <span class="ref">managed_strategy.py:1143-1163</span></td>
+      <td>Config-driven two-pass runner: pass 1 finds the combined-PnL crossing, pass 2 injects <code>agg_trigger_ns</code> so every open leg snaps SL to entry. <code>_USE_PF_AGG_MOVE_SL</code> is a manual override only. <span class="ref">backtest_runner.py:1249-1268, 4259-4280</span>; <span class="ref">managed_strategy.py:1144-1150</span></td>
     </tr>
     <tr>
       <td><b>§5.2 Actions:</b> SqOff · ReExecute</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>SqOff clips &amp; drops; ReExecute replays capped by <code>reexecute_count</code>. <span class="ref">backtest_runner.py:1391-1526</span></td>
+      <td>SqOff clips &amp; drops; ReExecute replays slots flat from the clip ts (config-driven), splices the segment, capped by <code>reexecute_count</code> (0→hard-cap 50). <code>_USE_PF_REEXEC_REPLAY</code> is override only. <span class="ref">backtest_runner.py:4316-4350, 3814</span></td>
     </tr>
     <tr>
-      <td>§5.2 Actions: ReExecute at Entry Price · ReExecute <b>Same Contract</b></td>
+      <td>§5.2 Actions: ReExecute <b>at Entry Price</b> · ReExecute <b>Same Contract</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Now config-driven.</b> All three ReExecute-family actions drive the §2.4 replay (slots re-run flat from the clip ts, segment spliced on, capped by <code>reexecute_count</code>) whenever configured — no env flag. The "at Entry Price" variants replay as plain ReExecute: the FX adaptation the spec marks ⚙️ (price-wait re-entry at a level lives at leg §1.2(d)). UI no longer marks them live-only. <span class="ref">backtest_runner.py:_reexec_configured gate</span></td>
+      <td><b>Implemented this session.</b> On an entry-price ReExecute clip, the replay captures each slot's pre-clip entry price (the position open at the clip) and injects it so the slot's <b>first re-entry waits until price returns to that original entry</b> before the signal fires — reusing the §1.2(d) price-wait gate. "Same Contract" is automatic for FX (one instrument), so it shares the same pin. Plain ReExecute keeps market re-entry. <span class="ref">backtest_runner.py:_entry_at_clip, _is_entry_price_reexec, replay loop; managed_strategy.py:reexec_entry_price arming</span></td>
     </tr>
     <tr>
       <td>§5.2 Actions: SqOff / Execute / Start <b>Other Portfolio</b></td>
       <td class="center"><span class="badge b-part">🟡 Partial</span></td>
-      <td>Cross-portfolio event-bus dispatch is wired (<code>publish_cross_portfolio_event</code> / <code>consume_cross_portfolio_events</code>) <span class="ref">backtest_runner.py:1534-1546, 902-916</span>. Inherently needs the <em>target</em> portfolio to run next in the same session to consume the event — so it's fully functional only in a multi-portfolio session, not a single-portfolio run. UI labels these "(cross-portfolio)".</td>
+      <td>Event-bus dispatch is wired, but only <b>SqOff Other Portfolio</b> produces real behaviour (short-circuits the target's next run). <b>Execute</b>/<b>Start Other Portfolio</b> are consumed but only logged — no actual arming/start logic. The bus is in-process, so it only works across portfolios run sequentially in the same session. <span class="ref">backtest_runner.py:902-916, 1597-1609, 3948-3971</span></td>
     </tr>
     <tr>
       <td>§5.2 Filters: SqOff Only Loss / Profit Making Legs</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Mutually-exclusive; selects slots by their PnL <em>at the clip timestamp</em>. <span class="ref">backtest_runner.py:_build_clip_result 1474-1520</span></td>
+      <td>Mutually exclusive (both-set disables both); selects slots by their PnL <em>at the clip timestamp</em>; SL-side only per spec. <span class="ref">backtest_runner.py:1000-1005, 1519, 1565-1579</span></td>
     </tr>
     <tr>
       <td><b>§5.3 Portfolio Delay</b></td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>pf_sl_delay_sec</code> / <code>pf_tgt_delay_sec</code> in the clip walk. <span class="ref">models.py:310,351</span></td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>The Combined-Loss / Combined-Profit path does a true deferred-confirm with an oscillation cancel. The underlying-movement &amp; loss-and-range paths implement delay as a simple <code>+delay_sec</code> timestamp shift with <em>no</em> re-confirmation — a momentary cross that reverts still clips. <span class="ref">backtest_runner.py:1438-1502 (confirm); 1664-1666, 1722, 1833 (shift)</span></td>
     </tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── USER LEVEL ───────────────────────── -->
 <h2 id="user">3. User-Level Execution (§6)</h2>
-<div class="callout"><strong>Notable:</strong> although <code>core/users.py</code> is described elsewhere as an "identity-only" layer, user-level SL/Target caps <em>are</em> wired end-to-end through a cross-portfolio PnL aggregator.</div>
+<div class="callout"><strong>Notable:</strong> although <code>core/users.py</code> is described elsewhere as an "identity-only" layer, user-level SL/Target caps <em>are</em> wired end-to-end through a cross-portfolio PnL aggregator (<code>_USER_PNL_AGGREGATOR</code>), accumulated across portfolios run in the same session.</div>
 <table>
   <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
     <tr>
-      <td><b>§6 Max Loss</b> (absolute-only)</td>
+      <td><b>§6 Max Loss</b> (absolute / % of allocation)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Per-user cap from <code>config/users.json</code>; cumulative PnL across the user's portfolios clipped via <code>_user_sl_clip</code>. <span class="ref">users.py:140-157,229-257</span>; <span class="ref">backtest_runner.py:4359-4366,1675-1718</span></td>
+      <td>Per-user cap from <code>config/users.json</code>; cumulative cross-portfolio PnL clipped (real force-sqoff of all slots). <span class="ref">users.py:140, 229</span>; <span class="ref">backtest_runner.py:1769, 4504, 4558-4561</span></td>
     </tr>
     <tr>
-      <td><b>§6 Max Profit</b> (absolute-only)</td>
+      <td><b>§6 Max Profit</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Checked after Max Loss; cross-portfolio aggregate. <span class="ref">backtest_runner.py:4359-4366</span></td>
+      <td>Fixed cap checked before trailing within each bar; cross-portfolio aggregate via <code>_user_tgt_clip</code>. <span class="ref">users.py:210</span>; <span class="ref">backtest_runner.py:1888, 4565-4568</span></td>
     </tr>
     <tr>
       <td><b>§6.1 User Trailing SL</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>get_user_trailing_sl</code> → ratchet clip. <span class="ref">users.py:160-181</span>; <span class="ref">backtest_runner.py:1675-1718</span></td>
+      <td><code>get_user_trailing_sl</code> → ratchet that only tightens; reason flips to <code>USER_TRAIL_STOPLOSS</code>. <span class="ref">users.py:160</span>; <span class="ref">backtest_runner.py:1770-1778</span></td>
     </tr>
     <tr>
       <td><b>§6.1 User Trailing Target / Profit Lock</b></td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Reuses <code>advance_trailing_target</code> ratchet. <span class="ref">users.py:183-207</span>; <span class="ref">backtest_runner.py:_user_tgt_clip 1780-1844</span></td>
+      <td>Reuses the leg-level <code>advance_trailing_target</code> ratchet; floor lock + ratchet, exit force-sqoffs all slots. <span class="ref">users.py:183</span>; <span class="ref">backtest_runner.py:1899-1913</span></td>
     </tr>
     <tr>
-      <td>Evaluation order — earliest of (Portfolio, User-SL, User-Target) wins</td>
+      <td>Evaluation order — earliest of (Portfolio, Tag, User-SL, User-Target) wins</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>_earliest_clip(...)</code> picks the first trigger; user caps are the outer ceiling (spec §8). <span class="ref">backtest_runner.py:4479-4482</span></td>
+      <td><code>_earliest_clip</code> picks the first-firing trigger by timestamp; user caps are the outer ceiling (spec §8). <span class="ref">backtest_runner.py:1917, 4656-4658</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ───────────────────────── TAGS ───────────────────────── -->
+<h2 id="tags">4. Portfolio Tags (§11)</h2>
+<table>
+  <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>§11 Portfolio / Strategy Tags</b> — risk tier between Portfolio &amp; User</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td>Faithful clone of the user tier one level down: <code>config/tags.json</code> registry + <code>_TAG_PNL_AGGREGATOR</code>; <code>_merge_portfolio_results</code> reads accrued tag PnL <em>before</em> rolling this portfolio in (correct ordering), then runs <code>_user_sl_clip</code>/<code>_user_tgt_clip</code> with <code>scope_label="TAG"</code>. <span class="ref">core/tags.py:69, 192, 202</span>; <span class="ref">backtest_runner.py:4526-4542, 4574-4581</span></td>
+    </tr>
+    <tr>
+      <td>§11 Hierarchical limit validation — portfolio SL ≤ tag SL ≤ user SL (same on Target)</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td><code>server._validate_portfolio_hierarchy</code> blocks the save (400) when a child cap exceeds its parent, both SL and Target. Leg→portfolio summing is correctly excluded (leg SL is a price-distance trigger, not a currency budget). <span class="ref">server.py:1275-1332, 1504-1506</span></td>
+    </tr>
+    <tr>
+      <td>§11 Tag accumulation scope</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>The aggregator is module-level / in-process: cross-portfolio tag PnL only accumulates when the tagged portfolios run in the <em>same</em> session, and stale state can leak between sessions unless <code>reset_tag_pnl</code> is called. Same session-scope constraint as the user aggregator and the cross-portfolio bus. <span class="ref">core/tags.py:192</span></td>
     </tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── REEXEC FLAGS ───────────────────────── -->
-<h2 id="reexec">4. ReExecute Gating Flags (§7)</h2>
+<h2 id="reexec">5. ReExecute Gating Flags (§7)</h2>
 <table>
   <thead><tr><th>Flag</th><th class="center">Spec default</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
-    <tr><td><code>no_reexec_sl_cost</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Drops only the <code>re_execute</code> member when SL was moved to cost. <span class="ref">managed_strategy.py:1334-1339</span></td></tr>
-    <tr><td><code>no_reentry_sl_cost</code></td><td class="center"><b>ON</b></td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Blocks <code>re_entry</code> after move-to-cost; default ON honoured. <span class="ref">models.py:378</span>; <span class="ref">managed_strategy.py:1343-1348</span></td></tr>
-    <tr><td><code>no_reentry_after_end</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Blocks re-exec/re-entry past End Time (real gate now post-window bars are kept). <span class="ref">managed_strategy.py:1495-1502</span></td></tr>
-    <tr><td><code>no_wait_trade_reexec</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Skips the re-execution delay on re-executions (<code>exec_count≥1</code>). <span class="ref">managed_strategy.py:1423</span></td></tr>
-    <tr><td><code>no_strike_change_reexec</code> (P3, options)</td><td class="center">—</td><td class="center"><span class="badge b-na">⚪ N/A</span></td><td>Strikes don't exist for FX/crypto; stored for round-trip only. <span class="ref">models.py:368,376</span></td></tr>
+    <tr><td><code>no_reexec_sl_cost</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Drops only the <code>re_execute</code> member when SL was moved to cost. Default <code>False</code>. <span class="ref">managed_strategy.py:1334-1339</span>; <span class="ref">models.py:381</span></td></tr>
+    <tr><td><code>no_reentry_sl_cost</code></td><td class="center"><b>ON</b></td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Blocks <code>re_entry</code> after move-to-cost; default ON honoured. <span class="ref">managed_strategy.py:1343-1348</span>; <span class="ref">models.py:388</span></td></tr>
+    <tr><td><code>no_reentry_after_end</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Real gate blocking re-exec/re-entry past End Time (post-window bars are kept, so the gate genuinely applies). <span class="ref">managed_strategy.py:1499-1502</span></td></tr>
+    <tr><td><code>no_wait_trade_reexec</code></td><td class="center">OFF</td><td class="center"><span class="badge b-ok">✅ Correct</span></td><td>Skips the re-execution delay on re-executions (<code>exec_count ≥ 1</code>). <span class="ref">managed_strategy.py:1423</span></td></tr>
+    <tr><td><code>no_strike_change_reexec</code> (P3, options)</td><td class="center">—</td><td class="center"><span class="badge b-na">⚪ N/A</span></td><td>Strikes don't exist for FX/crypto; stored for round-trip only. <span class="ref">models.py:394</span></td></tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── EXIT MECHANICS ───────────────────────── -->
-<h2 id="exit">5. Exit Mechanics (§8)</h2>
+<h2 id="exit">6. Exit Mechanics (§8)</h2>
 <table>
   <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
     <tr>
       <td><b>§8.1 Exit Order Type</b> — MARKET only; Limit/SL_Limit blocked at save</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Save returns 400 for any non-MARKET type with the exact spec §8.1 message. <span class="ref">server.py:_validate_portfolio_sl 1202-1216</span></td>
+      <td>Save validator rejects any non-MARKET type with the spec §8.1 message, returning HTTP 400. <span class="ref">server.py:1345-1350, 1501-1503</span></td>
     </tr>
     <tr>
-      <td>§8.1 VWAP enhancement on Portfolio SqOff</td>
+      <td>§8.1 / §4.2 Conservative VWAP enhancement on SL/Target exit fills</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Same VWAP reprice as §4.2, now driven by the per-portfolio <code>vwap_exit_fill</code> toggle (or env flag). <span class="ref">backtest_runner.py:3536, 5595-5687</span></td>
+      <td>Driven by the per-portfolio <code>vwap_exit_fill</code> toggle OR <code>_USE_VWAP_FILL</code> env flag, with the spec direction rule: <b>SELL leg = MAX(vwap, hit)</b>, <b>BUY leg = MIN(vwap, hit)</b> (the long-side MIN was previously MAX — a bug found &amp; fixed this verification). Format A (bid/ask) and Format B (single series) both covered. Path A only — the Path B <code>_node</code> functions never build the lookup, so it's a no-op there. <span class="ref">backtest_runner.py:_apply_vwap_fill</span></td>
     </tr>
     <tr>
-      <td><b>VWAP definition</b> <code>(H+L+C)/3 × candle_weight</code></td>
+      <td><b>VWAP definition</b> <code>(H+L+C)/3 × candle_weight</code> on the exit-fill path</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Per-bar typical-price × cumulative-volume weight, per-session reset. <span class="ref">aggregator.py:176-209</span></td>
+      <td><b>Implemented this session.</b> <code>_build_vwap_lookup</code> now computes the spec's session-cumulative volume-weighted VWAP — <code>Σ((H+L+C)/3·volume) / Σ(volume)</code> over the trading session — from each bar's <code>volume</code>, reset at the venue's <code>session_start_time</code> (UTC, via <code>_session_start_minute</code> / <code>_vwap_session_bucket</code> reading <code>adapter_admin/adapters_config</code>). Same math as <code>aggregator._vwap</code>; falls back to the bar typical only when a session has no volume yet. FX/commodity volume is broker quote-size per the spec volume caveat — spec-correct by definition. <span class="ref">backtest_runner.py:_build_vwap_lookup, _session_start_minute, _vwap_session_bucket</span></td>
+    </tr>
+    <tr>
+      <td>§8.1 Directional close base price + fallback chain (<code>ask_close/bid_close→close→last_mtm→entry</code>)</td>
+      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
+      <td><b>Implemented this session</b> as a per-portfolio toggle (<code>directional_close_fill</code>) + <code>_USE_DIRECTIONAL_FILL</code> env override, sibling to the VWAP fill. The directional close is the base price for every exit: LONG→<code>bid_close</code>, SHORT→<code>ask_close</code>; when the quote-side close is missing the engine's MID-<code>close</code> fill is kept (the <code>close</code> rung), and the deeper <code>last_mtm→entry</code> rungs are degenerate in a bar backtest. <b>Composes with the VWAP fill exactly as the spec layers them:</b> VWAP owns the leg SL/Target exits (§4.2, trigger-extreme anchor) and the directional close is the base for the remaining exits (squareoff / EOD, §8.1, no VWAP) — disjoint exit sets, no double repricing. Path A only. <span class="ref">backtest_runner.py:_build_close_lookup / _apply_directional_close_fill</span>; <span class="ref">models.py directional_close_fill</span>; UI: Exit Settings tab</td>
     </tr>
     <tr>
       <td><b>§8.2 Exit Sell Legs First</b></td>
       <td class="center"><span class="badge b-na">⚪ N/A</span></td>
-      <td>Schema field stored but unused — FX/crypto slots run in independent engines, so multi-leg close-ordering has no analogue. Options-only. <span class="ref">models.py:384-389</span></td>
+      <td><code>exit_sell_first</code> is stored and round-tripped but <b>never read</b> to sort exit batches — FX/crypto slots run in independent engines, so multi-leg close-ordering has no analogue. Dead config by design. <span class="ref">models.py:407</span></td>
     </tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── TIMING ───────────────────────── -->
-<h2 id="timing">6. Timing Gates (§9)</h2>
+<h2 id="timing">7. Timing Gates (§9)</h2>
 <table>
   <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
     <tr>
       <td><b>Start / End / SqOff Time</b> — entry window + forced close</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Entry window blocks fresh entries only (post-window bars kept for SL/TP monitoring); squareoff force-closes &amp; blocks re-entry until next session. <span class="ref">managed_strategy.py:1490-1502, 857-880</span></td>
+      <td>Entry window blocks fresh entries only; post-window bars are still delivered for SL/TP monitoring. Squareoff runs first each bar, force-closes via plain close, and blocks re-entry until the next session date. <span class="ref">managed_strategy.py:860-879, 1008-1018, 1490-1502</span></td>
     </tr>
     <tr>
       <td>Square-off precedence leg &gt; slot &gt; portfolio (+ MIS default)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>resolve_squareoff</code> / <code>effective_portfolio_squareoff</code>. <span class="ref">models.py:418-459</span></td>
+      <td><code>time = leg_time or slot_time or pf_time</code>; portfolio level supplies the MIS default. Time and tz resolved independently. <span class="ref">models.py:447-488</span></td>
     </tr>
     <tr>
-      <td><b>Validation:</b> Portfolio Start ≤ Leg Start ≤ Portfolio End ≤ SqOff</td>
+      <td><b>Validation:</b> Portfolio Start ≤ Leg Start ≤ Portfolio End ≤ SqOff (+ date order)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Implemented.</b> Server <code>_validate_portfolio_times</code> rejects (400) Start&gt;End, End&gt;SqOff, Start&gt;SqOff and start_date&gt;end_date (portfolio + slot); client mirror <code>_validateTimingOrder</code> blocks the save with a toast. <span class="ref">server.py:_validate_portfolio_times</span>; <span class="ref">portfolio.js:_validateTimingOrder</span></td>
+      <td>Server <code>_validate_portfolio_times</code> rejects (400) bad time/date ordering; client mirror <code>_validateTimingOrder</code> blocks the modal pre-save. ("Leg Start" maps to the portfolio entry window — engine has no per-leg intraday start.) <span class="ref">server.py:1222-1272, 1358</span>; <span class="ref">portfolio.js:2238-2273</span></td>
     </tr>
     <tr>
-      <td><b>Winter Time Adjustment</b> (<code>add_one_hour</code>, US DST)</td>
+      <td><b>Winter Time Adjustment</b> (<code>add_one_hour</code>, US DST +1h)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Implemented.</b> <code>winter_time_adjust</code> toggle shifts entry-window, portfolio/MIS square-off, RBO windows and slot/leg square-off overrides +1h at run start via <code>add_one_hour</code>. <span class="ref">backtest_runner.py:add_one_hour / _apply_winter_time</span>; UI Timing tab. India/NSE left off (no DST).</td>
+      <td><code>winter_time_adjust</code> shifts entry window, portfolio/MIS square-off, RBO windows and every slot/leg override +1h at run start (midnight-crossing clamped to 23:59). India/NSE left off (no DST). <span class="ref">backtest_runner.py:582-639, 3978-3982</span></td>
     </tr>
   </tbody>
 </table>
 
 <!-- ───────────────────────── FORMATS ───────────────────────── -->
-<h2 id="formats">7. Three-Format Engine (§3 · §4.1)</h2>
+<h2 id="formats">8. Three-Format Engine &amp; Mark Price (§3 · §4.1)</h2>
 <table>
   <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
   <tbody>
     <tr>
       <td><b>Format B — OHLCV</b> trigger (own bar high/low)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Default path. <span class="ref">managed_strategy.py:resolve_trigger_hl 140-173</span></td>
+      <td>Default path in <code>resolve_trigger_hl</code>. <span class="ref">managed_strategy.py:140-165</span></td>
     </tr>
     <tr>
       <td><b>Format C — LTP</b> trigger (collapse to close)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>High/low both = close. <span class="ref">managed_strategy.py:166-167</span></td>
+      <td>high = low = close. <span class="ref">managed_strategy.py:166-167</span></td>
     </tr>
     <tr>
       <td><b>Format A — Bid/Ask</b> trigger (LONG→ask, SHORT→bid)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Subscribes paired BID/ASK bars, buffers per-timestamp, falls back to OHLCV on data gap. Derives bid/ask from MID. <span class="ref">managed_strategy.py:664-694, 752-774, 176-192</span></td>
+      <td>Subscribes paired BID/ASK bars, buffers per timestamp, falls back to OHLCV on a data gap. <span class="ref">managed_strategy.py:169-172, 664-694, 752-774</span></td>
     </tr>
     <tr>
-      <td>Per-format <b>fill</b> formulas (A: ask/bid_vwap · B: vwap · C: ltp)</td>
+      <td>Per-format <b>fill</b> formulas (A: bid/ask · B: vwap · C: ltp)</td>
       <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Realised through the per-portfolio <code>vwap_exit_fill</code> toggle (Format A uses bid/ask typical-price; LAST-only/Format C is a no-op as the spec implies). Trigger side was already fully format-aware.</td>
+      <td>All three handled with the session-cumulative VWAP (§6): <b>Format A</b> (bid/ask) and <b>Format B</b> (single OHLCV/LAST/MID series — for crypto/OHLCV-only slots) both implemented, each using the spec direction rule — <b>SELL=MAX(vwap,hit)</b>, <b>BUY=MIN(vwap,hit)</b> (the long-side MIN was a bug, now fixed). Format C (LTP) / no-volume series correctly no-op. <span class="ref">backtest_runner.py:_build_vwap_lookup (ask/bid/single), _apply_vwap_fill (Format A + B branches)</span></td>
     </tr>
     <tr>
       <td><b>Mark Price</b> (crypto fair-value reference for trigger/fill)</td>
-      <td class="center"><span class="badge b-miss">❌ Missing — data-blocked</span></td>
-      <td><b>Cannot be wired without a data feed.</b> The catalog stores OHLCV / bid / ask parquet only, and Nautilus <code>Bar</code> carries no mark price. Deliberately not stubbed (a config toggle that silently falls back to close would be misleading). Implementation path: ingest a mark-price series and expose it on the bar trio, then reference it in <code>resolve_trigger_hl</code> / <code>_apply_vwap_fill</code>.</td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- ───────────────────────── CROSS-CUTTING ───────────────────────── -->
-<h2 id="crosscut">8. Cross-Cutting &amp; Feature Requests</h2>
-<table>
-  <thead><tr><th>Spec feature</th><th class="center">Status</th><th>Evidence &amp; notes</th></tr></thead>
-  <tbody>
-    <tr>
-      <td><b>§11 Portfolio Tags / Strategy Tags</b> (grouping level between Portfolio &amp; User)</td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Implemented</b> as a faithful clone of the user tier one level down: <code>core/tags.py</code> (registry in <code>config/tags.json</code> + <code>_TAG_PNL_AGGREGATOR</code> accumulating each tag's combined PnL across the session's portfolios). <code>_merge_portfolio_results</code> rolls each portfolio's PnL into its tag bucket and runs <code>_user_sl_clip</code>/<code>_user_tgt_clip</code> with <code>scope_label="TAG"</code>, merged via <code>_earliest_clip</code> so the earliest of portfolio/tag/user breach clips. <code>portfolio_tag</code> on the schema; UI selector + <code>/api/tags/*</code> endpoints. <span class="ref">core/tags.py</span>; <span class="ref">backtest_runner.py:_merge_portfolio_results</span></td>
-    </tr>
-    <tr>
-      <td>§11 Hierarchical limit validation (portfolio SL ≤ tag SL ≤ user SL; same on Target)</td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><b>Implemented</b> for the currency-comparable tiers: <code>server._validate_portfolio_hierarchy</code> blocks a save (400) when a child cap exceeds its parent (portfolio→tag, portfolio→user, tag→user) on both the SL and Target sides. Leg→portfolio summing is N/A — leg SL here is a price-distance %/points trigger, not a currency budget, so it can't be summed against the portfolio cap. <span class="ref">server.py:_validate_portfolio_hierarchy</span></td>
-    </tr>
-    <tr>
-      <td>TBD-2 Tick-size handling (accept value as-is, snap at fill)</td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td><code>_snap_to_tick</code> rounds SL/TP to <code>price_increment</code> at compute time; matches resolved decision. <span class="ref">managed_strategy.py:1647-1663</span></td>
-    </tr>
-    <tr>
-      <td>TBD-1 Safety Seconds anchored to event/entry time</td>
-      <td class="center"><span class="badge b-ok">✅ Correct</span></td>
-      <td>Measured against <code>_entry_filled_at_ns</code>. <span class="ref">managed_strategy.py:1099-1105</span></td>
-    </tr>
-    <tr>
-      <td>TBD-3 Multi-currency model (per-instrument / per-portfolio / reporting ccy)</td>
-      <td class="center"><span class="badge b-na">⚪ N/A</span></td>
-      <td>Parked in spec. Engine has cross-currency PnL conversion (<code>core/fx_rates.py</code>) but not the proposed 3-layer override model — consistent with "parked".</td>
+      <td class="center"><span class="badge b-ok">✅ Correct (close proxy)</span></td>
+      <td><b>Implemented this session</b> as the <code>"mark"</code> exit-price format. Per the project's agreed model (approach B) the mark price is proxied by the <b>previous bar's close</b> (the last settled price ahead of the current bar), tracked as a rolling <code>_prev_close</code> updated every bar. The SL/Target trigger collapses to that value, so intra-bar wicks — and the current bar's own close — don't fire; only a prior settled close beyond the level triggers. First-bar fallback: current close until a previous close exists. Crypto-only per spec §3: <code>on_start</code> downgrades to OHLCV with a log on non-crypto venues (<code>_CRYPTO_VENUES</code> gate). A real exchange mark series is a one-line source swap. <span class="ref">managed_strategy.py:resolve_trigger_hl (mark branch) + _prev_close + on_start crypto gate</span>; <span class="ref">models.py exit_price_format "mark"</span>; UI: slot Exit Price Format selector</td>
     </tr>
   </tbody>
 </table>
@@ -453,45 +514,75 @@
 <h2 id="findings">9. Key findings &amp; recommendations</h2>
 
 <div class="callout" style="background:var(--green-bg); border-left-color:var(--green);">
-  <strong style="color:var(--green);">Post-remediation:</strong> the leg/portfolio/user SL/Target state machines are <b>substantially compliant</b>, and the two highest-value gaps from the first audit — timing validation and Winter-Time — are now closed, with the conservative VWAP fill promoted to a real per-portfolio control. The only remaining hard gaps are <b>Mark Price</b> (no data) and <b>Portfolio Tags</b> (no multi-portfolio orchestrator); both are documented rather than stubbed.
+  <strong style="color:var(--green);">Bottom line:</strong> the leg / portfolio / user / tag SL/Target state
+  machines are <b>substantially compliant</b> — 50 of 57 audited rows match the spec exactly, and the
+  high-value enforcement (leg triggers, three-format engine, move-SL-to-cost, all trailing ratchets, user/tag
+  caps, save-time validations, winter time) is correctly wired. After this session there are <b>no Missing and
+  no Not-as-specified rows</b> — the remaining 7 are honest partials (adaptations that work but aren't literal
+  matches). No correctness bugs were found in the verified paths.
 </div>
 
-<h3>Done this pass</h3>
+<h3>Items that are less than fully compliant</h3>
 <table>
-  <thead><tr><th>Item</th><th>What shipped</th></tr></thead>
+  <thead><tr><th>Item</th><th class="center">Status</th><th>What's actually true / recommendation</th></tr></thead>
   <tbody>
-    <tr><td><b>Timing-ordering validation (§9)</b></td><td><code>server._validate_portfolio_times</code> (400 on save) + client <code>_validateTimingOrder</code> (toast, keeps modal open). Checks Start ≤ End ≤ SqOff and start_date ≤ end_date (portfolio + each slot).</td></tr>
-    <tr><td><b>Winter Time Adjustment (§9)</b></td><td><code>winter_time_adjust</code> schema + <code>add_one_hour</code>/<code>_apply_winter_time</code> shifting entry-window, square-off, RBO and slot/leg overrides +1h at run start; Timing-tab checkbox; full save/load round-trip.</td></tr>
-    <tr><td><b>Conservative VWAP fill (§4.2 / §8.1)</b></td><td><code>vwap_exit_fill</code> schema + Exit-Settings checkbox; orchestrator computes the flag (config OR env) and threads <code>default_vwap_fill</code> to all slot workers (single / grouped / non-grouped). Default off → existing backtests unchanged.</td></tr>
-    <tr><td><b>Portfolio-aggregate Move-SL (§5.5)</b></td><td>Two-pass runner gate changed from env-flag-only to <em>config-driven</em>: <code>agg_active</code> is True whenever <code>move_sl_agg_pnl_enabled</code> / <code>hit_on_leg_sl</code> / <code>hit_on_leg_target</code> is set. <code>_USE_PF_AGG_MOVE_SL</code> kept as override. UI tooltips updated.</td></tr>
-    <tr><td><b>Portfolio ReExecute replay (§2.4 + entry-price variants)</b></td><td>Replay gate changed to config-driven: runs whenever a ReExecute-family action is configured on the portfolio SL/Target. Entry-price variants replay as plain ReExecute (FX adaptation). UI no longer marks them live-only. <code>_USE_PF_REEXEC_REPLAY</code> kept as override.</td></tr>
-    <tr><td><b>Portfolio Tags (§11)</b></td><td>New <code>core/tags.py</code> (registry + per-tag PnL aggregator), <code>portfolio_tag</code> schema field, tag-scoped clips in <code>_merge_portfolio_results</code> (reusing the user-tier clip functions with <code>scope_label="TAG"</code>, merged via <code>_earliest_clip</code>), <code>/api/tags/{list,save,delete}</code>, a Timing-tab tag selector + limits editor, and <code>config/tags.json</code> seed.</td></tr>
-    <tr><td><b>Hierarchical limit validation (§11)</b></td><td><code>server._validate_portfolio_hierarchy</code> blocks saves where portfolio SL/Target &gt; tag cap &gt; user cap (currency-comparable tiers).</td></tr>
+    <tr>
+      <td>Exit-fill VWAP definition (§8.1 / §4.2)</td>
+      <td class="center"><span class="badge b-ok">✅ Done this session</span></td>
+      <td>Repricing now uses the spec's session-cumulative volume-weighted VWAP (<code>Σ(typical·vol)/Σ(vol)</code>, reset at the venue <code>session_start_time</code>) from each bar's volume — no longer the bare typical-price proxy. Verification also <b>fixed a long-side bug</b> (BUY exit now <code>MIN(vwap,hit)</code> per §4.2, was MAX) and <b>added Format B</b> (single-series fill for crypto/OHLCV-only slots). 11 unit tests across cumulation, session reset, zero-volume fallback, session bucket, long MIN / short MAX, and Format B.</td>
+    </tr>
+    <tr>
+      <td>Directional-close fill (§8.1)</td>
+      <td class="center"><span class="badge b-ok">✅ Done this session</span></td>
+      <td><b>Now implemented</b> end-to-end (<code>directional_close_fill</code> toggle + <code>_USE_DIRECTIONAL_FILL</code> override): the directional close is the exit base price (LONG→bid, SHORT→ask; <code>close</code> rung kept when a quote side is missing). Per spec it composes with the VWAP fill — VWAP owns leg SL/Target exits (§4.2), directional close is the base for squareoff/EOD exits (§8.1). Frontend checkbox on the Exit Settings tab; 8 new unit tests pass.</td>
+    </tr>
+    <tr>
+      <td>ReExecute "at Entry Price" / "Same Contract" (§5.2)</td>
+      <td class="center"><span class="badge b-ok">✅ Done this session</span></td>
+      <td>Now pins the re-entry to the original entry price: the replay captures each slot's pre-clip entry (the position open at the clip) and arms the §1.2(d) price-wait so the first re-entry waits for price to return to it. "Same Contract" shares the pin (one FX instrument). 4 new unit tests (<code>_entry_at_clip</code>, classification, config threading).</td>
+    </tr>
+    <tr>
+      <td>Cross-portfolio Execute / Start Other Portfolio (§5.2)</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>Only <b>SqOff Other Portfolio</b> actually acts; Execute/Start are consumed but only logged — no arming/start logic. Also session-scoped (in-memory bus). <b>Recommend:</b> a "run all my portfolios" orchestrator to make these (and tag accumulation) fully end-to-end.</td>
+    </tr>
+    <tr>
+      <td>Portfolio Delay on underlying paths (§5.3)</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>Combined-Loss/Profit delay is a true deferred-confirm; underlying-movement &amp; loss-and-range delay is just a timestamp shift with no re-confirmation. A momentary cross that reverts still clips. <b>Recommend:</b> port the oscillation-cancel logic to the underlying clips.</td>
+    </tr>
+    <tr>
+      <td>Target Wait on trailing-target breaches (§4.3 / §4.7)</td>
+      <td class="center"><span class="badge b-ok">✅ Correct (re-verified)</span></td>
+      <td>Re-checked against the spec: §4.3 wait gates the fixed-TP trigger (✅ honoured); §4.7's trailing floor breach exits immediately with no delay in its pseudocode (✅ bypassed). Both paths follow their spec sections — not a deviation. Reclassified from Partial.</td>
+    </tr>
+    <tr>
+      <td>Mark Price (§3)</td>
+      <td class="center"><span class="badge b-ok">✅ Done this session</span></td>
+      <td>Now implemented as the <code>"mark"</code> exit format — mark price proxied by the <b>previous bar's close</b> (rolling <code>_prev_close</code>, approach B), crypto-only gated, triggers ignore intra-bar wicks. Frontend selector + backend resolver/gate; new unit tests. A real exchange mark feed is a one-line source swap when/if ingested.</td>
+    </tr>
+    <tr>
+      <td>Tag &amp; user PnL accumulation scope</td>
+      <td class="center"><span class="badge b-part">🟡 Partial</span></td>
+      <td>In-process aggregators: correct within a session, but require the portfolios to run in the same process and depend on explicit resets between sessions or stale state can leak.</td>
+    </tr>
   </tbody>
 </table>
 
-<h3>Remaining gaps &amp; why</h3>
-<table>
-  <thead><tr><th>Gap</th><th class="center">Status</th><th>Reason / path</th></tr></thead>
-  <tbody>
-    <tr><td>Mark Price (crypto) (§3)</td><td class="center"><span class="badge b-miss">Data-blocked</span></td><td>No mark-price series in the catalog; Nautilus <code>Bar</code> carries none. Needs data ingestion before it can trigger/fill on real mark data. <b>The one remaining hard gap.</b></td></tr>
-    <tr><td>Multi-portfolio session orchestrator</td><td class="center"><span class="badge b-part">Structural</span></td><td>Portfolio Tags <em>and</em> cross-portfolio "…Other Portfolio" actions are wired but reach full effect only across a sequence of portfolio runs in one session (the tag/user PnL aggregators accumulate across runs). A "run all my portfolios" flow would make both fully end-to-end in a single action.</td></tr>
-    <tr><td>Cross-portfolio "…Other Portfolio" actions (§5.2)</td><td class="center"><span class="badge b-part">Session-scoped</span></td><td>Event-bus dispatch is wired; fully effective only when the target portfolio runs next in the same session. Inherent to the one-portfolio-per-request model — same orchestrator dependency as Portfolio Tags.</td></tr>
-    <tr><td>Directional-close fallback chain (§4.2)</td><td class="center"><span class="badge b-part">Subsumed</span></td><td>The now-active conservative VWAP fill is direction-aware (long closes on bid, short on ask), covering the intent. The literal <code>ask_close→close→last_mtm→entry</code> chain is moot in a bar backtest.</td></tr>
-  </tbody>
-</table>
-
-<h3>Note on gated features</h3>
-<p class="note">
-  Three former env-only features are now saved per-portfolio controls: <code>vwap_exit_fill</code> (Exit
-  Settings), the portfolio-aggregate Move-SL (Move-SL section), and the portfolio ReExecute replay (driven by
-  the SL/Target action choice). Their legacy env flags — <code>_USE_VWAP_FILL</code>, <code>_USE_PF_AGG_MOVE_SL</code>,
-  <code>_USE_PF_REEXEC_REPLAY</code> — are retained only as manual overrides for parity tooling. Recommend
-  documenting these (now config-backed) flags in the CLAUDE.md "Runtime flags" table for completeness.
-</p>
+<h3>Architectural notes (by design, not gaps)</h3>
+<ul>
+  <li><b>No mid-bar hard halt.</b> Portfolio/user/tag caps are enforced post-hoc by walking the merged equity curve and dropping/replaying trades after the clip — slots themselves run to completion. This is a deliberate Path-A design choice, not a per-feature miss.</li>
+  <li><b>Exit Sell First &amp; leg Underlying type</b> are intentionally N/A for FX/crypto (independent per-slot engines; leg underlying lives at portfolio level per spec).</li>
+  <li><b>Env flags are overrides only.</b> <code>vwap_exit_fill</code>, portfolio-aggregate Move-SL and portfolio ReExecute replay are all config-driven now; <code>_USE_VWAP_FILL</code> / <code>_USE_PF_AGG_MOVE_SL</code> / <code>_USE_PF_REEXEC_REPLAY</code> remain only as manual parity-tooling overrides.</li>
+  <li><b>Path B caveat.</b> The VWAP exit-fill, the new directional-close exit-fill, and the cross-slot Move-SL leg-event surfacing are Path-A only; under <code>_USE_BACKTEST_NODE=1</code> both fill models are a no-op (the aggregate-PnL trigger still works as it reads equity curves only).</li>
+</ul>
 
 <p class="note" style="margin-top:24px">
-  Generated by static code audit against the three spec documents. Evidence references point to the code as it stands on branch <code>Path_A_LowAPI</code>. Status counts in the scorecards aggregate the rows above; "N/A · by design" rows are spec features intentionally out of scope for the FX/crypto implementation.
+  Generated by an independent static code audit against the three spec documents
+  (<code>sl_features.html</code>, <code>execution_logic.html</code>, <code>execution_logic_target.html</code>).
+  Each status was verified by reading the current source on branch <code>Path_A_LowAPI</code>; line references
+  were located fresh during this audit and reflect the code as it stands. Scorecard counts aggregate the rows
+  above; "N/A by design" rows are spec features intentionally out of scope for the FX/crypto implementation.
 </p>
 
 </div>

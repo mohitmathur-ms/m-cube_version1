@@ -36,10 +36,21 @@
   "account_base_currency": "USD",
   "fx_conversion": {},
   "instruments": {
-    "XAUUSD": { "lot_size": 100, "trade_size": 100 },
-    "XAGUSD": { "lot_size": 5000, "trade_size": 5000 },
-    "LIGHTCMDUSD": { "lot_size": 1000, "trade_size": 1000 }
+    "XAUUSD": {
+      "lot_size": 100,
+      "trade_size": 100
+    },
+    "XAGUSD": {
+      "lot_size": 5000,
+      "trade_size": 5000
+    },
+    "LIGHTCMDUSD": {
+      "lot_size": 1000,
+      "trade_size": 1000
+    }
   },
   "created_at": "2026-05-19T00:00:00.000000",
-  "updated_at": "2026-05-19T00:00:00.000000"
+  "updated_at": "2026-05-23T16:59:30.779334",
+  "session_start_time": "00:00:00",
+  "session_end_time": "23:59:00"
 }
