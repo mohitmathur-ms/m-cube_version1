@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Where Do SL &amp; TP Come From If We Use Market Orders?</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #1c2128;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --green-bg: #0d2818;
+      --red: #f85149;
+      --red-bg: #2d1316;
+      --amber: #d29922;
+      --amber-bg: #2d2206;
+      --purple: #bc8cff;
+      --purple-bg: #1f1535;
+      --blue-bg: #0c2f4a;
+      --code-color: #ff7b72;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+    .container { max-width: 1240px; margin: 0 auto; padding: 32px 40px 80px; }
+    header.cover {
+      background: linear-gradient(135deg, #1f6feb 0%, #238636 100%);
+      color: white; padding: 36px; margin: -32px -40px 28px; border-radius: 0 0 12px 12px;
+    }
+    header.cover h1 { margin: 0 0 8px; font-size: 26px; }
+    header.cover .subtitle { margin: 0; font-size: 14px; opacity: 0.95; }
+    header.cover .meta { margin-top: 10px; font-size: 12px; opacity: 0.85; }
+    header.cover code { background: rgba(255,255,255,0.18); color: #fff; padding: 1px 6px; border-radius: 3px; }
+    h2 { font-size: 21px; margin-top: 36px; padding-bottom: 8px; border-bottom: 2px solid var(--border); color: var(--text); }
+    h3 { font-size: 16px; margin-top: 22px; color: var(--text); }
+    h4 { font-size: 14px; margin-top: 18px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    p { margin: 8px 0; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    table {
+      width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--panel-2); font-weight: 600; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--panel-2); }
+    td.center, th.center { text-align: center; white-space: nowrap; }
+    td.mono { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; }
+    code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; background: var(--panel-2); padding: 1px 6px; border-radius: 3px; color: var(--code-color); }
+    pre { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; overflow-x: auto; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+    pre code { background: transparent; padding: 0; color: var(--text); }
+    .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; line-height: 1.4; white-space: nowrap; }
+    .badge-ok { background: var(--green-bg); color: var(--green); }
+    .badge-warn { background: var(--amber-bg); color: var(--amber); }
+    .badge-info { background: var(--blue-bg); color: var(--accent); }
+    .badge-purple { background: var(--purple-bg); color: var(--purple); }
+    .badge-err { background: var(--red-bg); color: var(--red); }
+    .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+    .callout-ok { background: var(--green-bg); border-left: 4px solid var(--green); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+    .callout-warn { background: var(--amber-bg); border-left: 4px solid var(--amber); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+    .callout-tech { background: var(--purple-bg); border-left: 4px solid var(--purple); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+    .callout-tech strong { color: var(--purple); }
+    .simple { background: var(--panel-2); border-left: 4px solid var(--muted); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14.5px; }
+    .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+    nav.toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+    nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+    nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+    .small { font-size: 12px; color: var(--muted); }
+    .filebox { background: #010409; color: #f8f8f2; padding: 8px 14px; border-radius: 6px 6px 0 0; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px; margin-top: 12px; margin-bottom: 0; border: 1px solid var(--border); border-bottom: none; }
+    .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 6px 6px; border-top: none; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="cover">
+      <h1>Where Do SL &amp; TP Come From If We Use Market Orders?</h1>
+      <p class="subtitle">How m-cube applies stop-loss / take-profit when entries are instant market fills — and whether Nautilus limit orders are the right move</p>
+      <p class="meta">Generated 2026-05-23 • Source: <code>core/managed_strategy.py</code> • Topic: execution model</p>
+    </header>
+
+    <div class="callout">
+      This report answers a sharp question: <em>if every entry is an <code>order_factory.market(...)</code>
+      order that fills instantly, where does the stop-loss / take-profit even come from, and shouldn't we
+      use limit orders instead?</em> Short version: in m-cube, <strong>SL and TP are not orders at all</strong> —
+      they are price levels checked bar-by-bar in Python, and the position is closed with a market order when a
+      level is touched. Sections below:
+      <ul>
+        <li><a href="#sec-1">§1 — The short answer</a></li>
+        <li><a href="#sec-2">§2 — The entry path (instant market order)</a></li>
+        <li><a href="#sec-3">§3 — Where SL/TP are stored</a></li>
+        <li><a href="#sec-4">§4 — Where the SL/TP logic actually lives (the core answer)</a></li>
+        <li><a href="#sec-5">§5 — How the exit fires</a></li>
+        <li><a href="#sec-6">§6 — "Take a trade only when SL/target hits" — clearing up the confusion</a></li>
+        <li><a href="#sec-7">§7 — Should we use Nautilus limit orders instead?</a></li>
+        <li><a href="#sec-8">§8 — Caveats of the synthetic approach</a></li>
+      </ul>
+    </div>
+
+    <!-- ───────────────────────── §1 ───────────────────────── -->
+    <h2 id="sec-1">§1 — The short answer</h2>
+
+    <div class="simple">
+      Your trade <em>opens</em> the instant the signal fires — that part is a market order and it is correct.
+      The stop-loss and take-profit are not separate orders sitting at the broker. Instead, the program
+      remembers two prices ("close me out if price falls to X" and "close me out if price rises to Y") and on
+      <strong>every single bar</strong> it asks "did this bar touch X or Y?". The moment a bar does, it sells
+      out with another market order. So the trade really does <em>exit</em> only when SL or target is reached —
+      m-cube just enforces that itself, bar by bar, instead of leaving a resting order on the exchange.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> SL/TP are <em>synthetic</em>. On entry fill,
+      <code>ManagedExitStrategy</code> computes <code>self.current_sl</code> and
+      <code>self.current_tp</code> as plain <code>float</code> attributes
+      (<a href="../core/managed_strategy.py#L1592">managed_strategy.py:1592–1639</a>). Each
+      <code>on_bar</code> compares the bar's high/low against those floats
+      (<a href="../core/managed_strategy.py#L1220">1220–1297</a>) and, on a breach, calls
+      <code>close_all_positions(...)</code> — a market close. No <code>stop_market</code>,
+      <code>limit</code>, or <code>bracket</code> order is ever submitted in the production strategies; the
+      backtest engine never holds a resting protective order.
+    </div>
+
+    <table>
+      <tr><th>Concern</th><th>How m-cube handles it</th><th>Order type</th></tr>
+      <tr><td>Entry</td><td>Submit immediately when the signal function returns a side</td><td><span class="badge badge-info">MARKET</span></td></tr>
+      <tr><td>Stop-loss</td><td>Synthetic float, checked against each bar's low/high</td><td><span class="badge badge-purple">no order — Python check</span></td></tr>
+      <tr><td>Take-profit</td><td>Synthetic float, checked against each bar's high/low</td><td><span class="badge badge-purple">no order — Python check</span></td></tr>
+      <tr><td>Exit (SL or TP hit)</td><td><code>close_all_positions(...)</code> tagged with the reason</td><td><span class="badge badge-info">MARKET</span></td></tr>
+    </table>
+
+    <!-- ───────────────────────── §2 ───────────────────────── -->
+    <h2 id="sec-2">§2 — The entry path (instant market order)</h2>
+
+    <div class="simple">
+      When a strategy decides to go long or short, it places a "buy/sell at whatever the market is right now"
+      order. In a backtest that fills on the current bar — instantly. That is expected and fine; the entry is
+      not where SL/TP belongs.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>_submit_order(side)</code> builds a market order with
+      <code>TimeInForce.GTC</code> and submits it. The optional <code>tags=[reason]</code> carries the
+      entry-reason string through to <code>fills_report["tags"]</code> for the orderbook view. Every
+      production strategy (EMA Cross, RSI, Bollinger, Four MA, Range Breakout) routes through this exact
+      market path.
+    </div>
+
+    <div class="filebox">core/managed_strategy.py · _submit_order · lines 1684–1694</div>
+    <pre><code>kwargs = dict(
+    instrument_id=self.config.instrument_id,
+    order_side=side,
+    quantity=self.instrument.make_qty(self.config.trade_size),
+    time_in_force=TimeInForce.GTC,
+)
+if self._pending_entry_reason:
+    kwargs["tags"] = [self._pending_entry_reason]
+order = self.order_factory.market(**kwargs)   # &lt;-- MARKET ENTRY (fills instantly)
+self.submit_order(order)</code></pre>
+
+    <!-- ───────────────────────── §3 ───────────────────────── -->
+    <h2 id="sec-3">§3 — Where SL/TP are stored</h2>
+
+    <div class="simple">
+      The moment the entry fills, the program calculates the two exit prices and saves them. It does not send
+      them anywhere — they are just two numbers held in memory for as long as the trade is open.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> in the order-filled handler the engine sets <code>self.current_sl</code>
+      and <code>self.current_tp</code> based on the configured type — <code>percentage</code>,
+      <code>points</code>, <code>atr</code>, or <code>trailing</code> — snapping each to the instrument tick.
+      A type of <code>0.0</code> means "no SL/TP of that kind", which disables the corresponding check in §4.
+    </div>
+
+    <div class="filebox">core/managed_strategy.py · on_order_filled · lines 1592–1625 (abridged)</div>
+    <pre><code># --- Stop-loss ---
+if self.config.stop_loss_type in ("percentage", "trailing"):
+    self.current_sl = self._compute_sl_price(is_buy, self.config.stop_loss_value)
+elif self.config.stop_loss_type == "points":
+    self.current_sl = self._snap_to_tick(
+        self.entry_price - self.config.stop_loss_value if is_buy
+        else self.entry_price + self.config.stop_loss_value)
+elif self.config.stop_loss_type == "atr":
+    dist = atr_val * float(self.config.sl_atr_multiplier)
+    self.current_sl = self._snap_to_tick(... entry_price -/+ dist ...)
+else:
+    self.current_sl = 0.0      # no SL
+
+# --- Take-profit --- (percentage / points / atr, mirrored) ...
+#     self.current_tp = ...    or 0.0 for no TP</code></pre>
+
+    <table>
+      <tr><th>Type</th><th>SL meaning</th><th>TP meaning</th></tr>
+      <tr><td class="mono">percentage</td><td>% distance from entry</td><td>% distance from entry</td></tr>
+      <tr><td class="mono">points</td><td>fixed price points from entry</td><td>fixed price points from entry</td></tr>
+      <tr><td class="mono">atr</td><td><code>k × ATR</code> distance (volatility-adaptive)</td><td><code>k × ATR</code> distance</td></tr>
+      <tr><td class="mono">trailing</td><td>ratchets with profit (see §4)</td><td>—</td></tr>
+    </table>
+
+    <!-- ───────────────────────── §4 ───────────────────────── -->
+    <h2 id="sec-4">§4 — Where the SL/TP logic actually lives (the core answer)</h2>
+
+    <div class="simple">
+      This is the part you were looking for. On every bar, before deciding anything, the engine first
+      <em>updates</em> the stop (for trailing / move-to-cost / profit-lock), then asks two questions:
+      "did the bar dip to my stop?" and "did the bar reach my target?". If yes, it exits. There is no broker
+      order doing this — it is a simple comparison running once per bar inside <code>on_bar</code>.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the SL test is intrabar — a <em>long</em> leg's SL fires when
+      <code>bar_low &lt;= current_sl</code>; a <em>short</em> leg's when <code>bar_high &gt;= current_sl</code>.
+      The TP test is mirrored (long fires on <code>bar_high &gt;= current_tp</code>). Both support an optional
+      confirmation delay: <code>sl_wait_sec</code>/<code>tgt_wait_sec</code> (wall-clock) or the legacy
+      <code>sl_wait_bars</code>/<code>tgt_wait_bars</code> (bar count). Which price series feeds
+      <code>bar_high</code>/<code>bar_low</code> is decided by <code>resolve_trigger_hl(...)</code>
+      (<a href="../core/managed_strategy.py#L152">managed_strategy.py:152–173</a>): <strong>Format A</strong>
+      bid/ask (long SL on ask-low, short SL on bid-high), <strong>Format B</strong> the slot's own OHLCV
+      high/low, <strong>Format C</strong> LTP (high and low both collapse to <code>close</code>).
+    </div>
+
+    <div class="filebox">core/managed_strategy.py · on_bar · lines 1220–1227 (SL check)</div>
+    <pre><code># Check SL hit — intrabar: a LONG leg's SL fires when the bar LOW pierces it;
+# a SHORT leg's SL fires when the bar HIGH does.
+sl_hit = False
+if self.current_sl &gt; 0:
+    if is_long and bar_low &lt;= self.current_sl:
+        sl_hit = True
+    elif is_short and bar_high &gt;= self.current_sl:
+        sl_hit = True
+# ... optional sl_wait_sec / sl_wait_bars confirmation ...
+if sl_hit:
+    self._handle_exit("sl", is_long, close=close)
+    return</code></pre>
+
+    <div class="filebox">core/managed_strategy.py · on_bar · lines 1268–1293 (TP check, abridged)</div>
+    <pre><code>tp_condition = tgt_trail_hit                 # trailing-target floor also routes here
+if not tp_condition and self.current_tp &gt; 0:
+    if is_long and bar_high &gt;= self.current_tp:
+        tp_condition = True
+    elif is_short and bar_low &lt;= self.current_tp:
+        tp_condition = True
+if tp_condition:
+    # ... optional tgt_wait_sec / tgt_wait_bars confirmation ...
+    self._handle_exit("tp", is_long, close=close)</code></pre>
+
+    <h4>The on_bar exit flow, in order</h4>
+    <table>
+      <tr><th>#</th><th>Step (while in a position)</th><th>Lines</th></tr>
+      <tr><td class="center">1</td><td>Update highest profit, then move-SL-to-cost / target-lock / trailing-SL recalculation</td><td class="mono">~1071–1218</td></tr>
+      <tr><td class="center">2</td><td><strong>Check SL</strong> against bar low/high (with optional wait)</td><td class="mono">1220–1248</td></tr>
+      <tr><td class="center">3</td><td>Advance the leg-level trailing target / profit-lock</td><td class="mono">1250–1263</td></tr>
+      <tr><td class="center">4</td><td><strong>Check TP</strong> against bar high/low (with optional wait)</td><td class="mono">1265–1297</td></tr>
+    </table>
+    <p class="small">When flat, the same <code>on_bar</code> instead runs the signal function and, on a signal,
+    submits the market entry from §2 and computes the SL/TP floats from §3.</p>
+
+    <!-- ───────────────────────── §5 ───────────────────────── -->
+    <h2 id="sec-5">§5 — How the exit fires</h2>
+
+    <div class="simple">
+      When a stop or target is hit, the position is closed with another market order — and depending on your
+      configuration the strategy can then do nothing, try again, or flip to the opposite direction.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>_handle_exit(...)</code> →
+      <code>_close_with_reason(reason)</code> →
+      <code>self.close_all_positions(instrument_id, tags=[reason])</code>
+      (<a href="../core/managed_strategy.py#L1020">managed_strategy.py:1020–1034</a>). The reason tag
+      (e.g. <code>Stop Loss</code>, <code>Target</code>) propagates into the fills/orderbook view. The
+      post-exit action is dispatched from <code>on_sl_action</code> / <code>on_target_action</code>:
+      <code>close</code> (no-op, already flat), <code>re_execute</code> (re-arm after a delay),
+      <code>reverse</code> (submit a fresh market order on the opposite side and recompute SL/TP),
+      <code>execute</code> (arm a sibling slot via the cross-slot bus), or <code>re_entry</code>
+      (price-wait re-entry trigger).
+    </div>
+
+    <div class="filebox">core/managed_strategy.py · _close_with_reason · lines 1030–1034</div>
+    <pre><code>instrument_id = self.config.instrument_id
+kwargs = {}
+if reason:
+    kwargs["tags"] = [reason]
+self.close_all_positions(instrument_id, **kwargs)   # &lt;-- MARKET CLOSE</code></pre>
+
+    <!-- ───────────────────────── §6 ───────────────────────── -->
+    <h2 id="sec-6">§6 — "Take a trade only when SL/target hits" — clearing up the confusion</h2>
+
+    <div class="simple">
+      Your phrasing mixes two different ideas. One is "I want my trade to <em>exit</em> only when the stop or
+      target is reached" — that already happens (§4). The other is "I want my trade to <em>enter</em> only
+      after price comes to a level I chose" — that is a pending/limit entry order, which m-cube does not do
+      today. It's worth being clear about which one you mean, because the answer is completely different.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the instant market fill governs <em>when you get in</em>, not <em>when you
+      get out</em>. SL/TP are exit logic and are fully wired. A "wait for price, then enter" behavior would
+      require a resting <code>limit</code> / <code>stop_market</code> entry order (or a price-gate before
+      <code>_submit_order</code>) — see §7.
+    </div>
+
+    <table>
+      <tr><th>What you might mean</th><th>Is it already done?</th><th>Mechanism</th></tr>
+      <tr>
+        <td><strong>Exit</strong> the open trade when SL or target is reached</td>
+        <td><span class="badge badge-ok">YES — done</span></td>
+        <td>Synthetic bar-by-bar check in <code>on_bar</code> (§4), then market close (§5)</td>
+      </tr>
+      <tr>
+        <td><strong>Enter</strong> only after price reaches a chosen level (pending/limit entry)</td>
+        <td><span class="badge badge-err">NO — not implemented</span></td>
+        <td>Would need a resting limit/stop entry order or a pre-entry price gate (§7)</td>
+      </tr>
+    </table>
+
+    <!-- ───────────────────────── §7 ───────────────────────── -->
+    <h2 id="sec-7">§7 — Should we use Nautilus limit orders instead?</h2>
+
+    <div class="simple">
+      Limit/stop orders aren't a strict upgrade — they trade one set of assumptions for another. The synthetic
+      approach is simpler and supports clever trailing logic; exchange-native orders model fills more
+      realistically but are harder to combine with trailing/move-to-cost. Pick based on what you're trying to
+      measure.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> NautilusTrader can express all three patterns. A working
+      <strong>bracket/OCO</strong> example already exists in-repo at
+      <code>custom_strategies/custom_practice_strat3.py:135–178</code> — a <code>MARKET</code> entry with a
+      <code>STOP_MARKET</code> SL child and a <code>MARKET_IF_TOUCHED</code> TP child under
+      <code>ContingencyType.OUO</code>, submitted via <code>submit_order_list(...)</code>. The cost of moving
+      to exchange-native orders is that the trailing-SL, move-to-cost, target-lock, and SL/TP-wait features
+      built into <code>ManagedExitStrategy</code> would need to re-issue/modify orders each bar instead of
+      mutating a float.
+    </div>
+
+    <table>
+      <tr>
+        <th>Approach</th>
+        <th>What it models</th>
+        <th>Fill assumption</th>
+        <th>Complexity</th>
+        <th>When to use</th>
+      </tr>
+      <tr>
+        <td><strong>Synthetic SL/TP</strong><br><span class="badge badge-ok">current default</span></td>
+        <td>Exit when a bar touches a remembered price level</td>
+        <td>Filled at the exact level on touch (optimistic — see §8)</td>
+        <td><span class="badge badge-ok">Low</span> — one float comparison/bar</td>
+        <td>Research backtests; anything using trailing / move-to-cost / target-lock / SL-wait</td>
+      </tr>
+      <tr>
+        <td><strong>Bracket / OCO</strong><br>(<code>stop_market</code> SL + <code>limit</code>/MIT TP)</td>
+        <td>Protective orders actually rest on the simulated exchange</td>
+        <td>Engine fill model handles touch, gaps, partials</td>
+        <td><span class="badge badge-warn">Medium</span> — child orders + OCO bookkeeping</td>
+        <td>When fill realism / slippage / live-trading parity matters (Path B, future L4 execution layer)</td>
+      </tr>
+      <tr>
+        <td><strong>Limit entry</strong><br>(passive/pending)</td>
+        <td>Enter only if price comes to your level (vs instant market)</td>
+        <td>Fills only if the market trades through the limit; may never fill</td>
+        <td><span class="badge badge-err">High</span> — changes entry semantics, miss/queue modeling</td>
+        <td>Only if the strategy genuinely needs to wait for a pullback before entering</td>
+      </tr>
+    </table>
+
+    <div class="callout-ok">
+      <strong>Recommendation.</strong>
+      <ul style="margin:6px 0 0;">
+        <li><strong>Keep synthetic SL/TP as the default.</strong> It is deterministic, fast, and is the only
+        approach that cleanly supports the trailing / move-to-cost / profit-lock / SL-&amp;-target-wait logic
+        already wired into <code>ManagedExitStrategy</code>. For research backtesting this is the right tool.</li>
+        <li><strong>Reach for bracket/OCO orders</strong> only when you specifically need realistic fill
+        behavior (slippage, gap-throughs, partial fills) or want to mirror how live trading would behave —
+        this belongs in the future L4 execution layer / Path&nbsp;B, not the per-bar research path.</li>
+        <li><strong>Use limit <em>entry</em> orders</strong> only if the strategy's edge is genuinely about
+        waiting for price to come to you. That changes entry semantics (the order may never fill) and needs
+        deliberate fill modeling — don't adopt it just to "make SL/TP work", because SL/TP already work.</li>
+      </ul>
+    </div>
+
+    <!-- ───────────────────────── §8 ───────────────────────── -->
+    <h2 id="sec-8">§8 — Caveats of the synthetic approach</h2>
+
+    <div class="simple">
+      The bar-by-bar method is convenient but slightly optimistic. It assumes you always get filled at exactly
+      your stop/target price the moment a bar touches it. Real markets gap and slip, so live results can be a
+      bit worse than the backtest implies — keep that in mind when reading P&amp;L.
+    </div>
+
+    <div class="callout-warn">
+      <strong>Watch out for:</strong>
+      <ul style="margin:6px 0 0;">
+        <li><strong>Optimistic fills:</strong> a touch of <code>current_sl</code>/<code>current_tp</code> is
+        assumed to fill at that exact price with no slippage. A real stop can gap straight through and fill
+        worse.</li>
+        <li><strong>SL-before-TP ordering:</strong> within one bar the SL check runs before the TP check
+        (§4). If a single bar's range spans both levels, the SL wins — the engine cannot know the true
+        intrabar path.</li>
+        <li><strong>Format C (LTP):</strong> when the trigger series is last-price only, high and low both
+        collapse to <code>close</code>, so wicks that would have hit a level are invisible.</li>
+        <li><strong>Granularity:</strong> coarser bars (e.g. 1-day) make intrabar touches less precise; finer
+        bars give more faithful SL/TP timing.</li>
+      </ul>
+    </div>
+
+    <hr>
+    <p class="small">
+      Cross-references: <code>core/managed_strategy.py</code> (<code>_submit_order</code> 1679–1694,
+      SL/TP storage 1592–1639, SL check 1220–1248, TP check 1265–1297, <code>_close_with_reason</code>
+      1020–1034, <code>resolve_trigger_hl</code> 152–173); bracket example
+      <code>custom_strategies/custom_practice_strat3.py</code> 135–178.
+    </p>
+
+    <footer>Generated by html-report-generator • m-cube execution model • 2026-05-23</footer>
+  </div>
+</body>
+</html>

@@ -161,7 +161,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Recurse -Depth 2 -ErrorAction SilentlyContinue)",
       "Bash(venv/Scripts/python.exe -m flake8 . --select=E9,F63,F7,F82 --exclude=venv,.git,__pycache__ --statistics)",
-      "Bash(echo \"flake8 exit=$?\")"
+      "Bash(echo \"flake8 exit=$?\")",
+      "Bash(Select-Object -ExpandProperty Name)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
