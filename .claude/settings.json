@@ -168,7 +168,20 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Recurse -Filter \"*.html\")",
       "Bash(Select-Object FullName, Directory)",
-      "Bash(Format-List)"
+      "Bash(Format-List)",
+      "Bash(python -)",
+      "Bash(python _split_analyze.py)",
+      "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Force)",
+      "Bash(sed -n '13,30p' tests/test_vwap_and_agg_movesl.py)",
+      "Bash(sed -n '7,20p' tests/test_underlying_target.py)",
+      "Bash(sed -n '18,30p' tests/test_pf_reexec_replay.py)",
+      "Bash(python _split_generate.py)",
+      "Bash(python -m pyflakes core/backtest_runner/)",
+      "Bash(python -c \"import core.backtest_runner as b; print\\('reimport OK, file=', b.__file__\\)\")",
+      "WebFetch(domain:nautilustrader.io)",
+      "Bash(python -c \"import core.backtest_runner as b; print\\('NOW IMPORTING:', b.__file__\\)\")",
+      "Bash(python -c \"import core.backtest_runner as b; print\\('restored ->', b.__file__\\)\")",
+      "Bash(python -m pytest tests/ -q)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
