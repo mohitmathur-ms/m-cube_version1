@@ -181,7 +181,13 @@
       "WebFetch(domain:nautilustrader.io)",
       "Bash(python -c \"import core.backtest_runner as b; print\\('NOW IMPORTING:', b.__file__\\)\")",
       "Bash(python -c \"import core.backtest_runner as b; print\\('restored ->', b.__file__\\)\")",
-      "Bash(python -m pytest tests/ -q)"
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(where pdftoppm *)",
+      "Bash(\"C:\\\\Program Files\\\\Git\\\\mingw64\\\\bin\\\\pdftotext.exe\" -f 1 -l 1 \"Orders.pdf\" -)",
+      "Bash(echo \"=== exit: $? ===\")",
+      "Read(//c/Program Files/Git/mingw64/**)",
+      "Bash(winget search *)",
+      "Bash(winget install *)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",

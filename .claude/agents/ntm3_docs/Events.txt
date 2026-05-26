@@ -1,0 +1,398 @@
+5/25/26, 6:06 PM
+
+NautilusTrader Documentation
+
+Events
+Concepts
+Events
+Nautilus is event-driven: every state change in the system is represented by an event object that flows through the MessageBus to strategy and actor handlers. This guide covers the event types, how they are dispatched, and how order fills produce position events.
+
+Event categories
+
+Category Order Position Account Time
+
+Examples , , OrderAccepted OrderFilled OrderCanceled , PositionOpened PositionChanged
+AccountState
+TimeEvent
+
+Origin ExecutionEngine (from venue) ExecutionEngine (from fills) / ExecutionClient Portfolio Clock (timers and alerts)
+
+Handler dispatch
+When an event reaches a strategy, the system calls handlers in a fixed priority order. The first matching handler runs, then the next level, so you can handle events at whatever granularity you need.
+Order events
+1. Specific handler (e.g. ) on_order_filled 2. on_order_event (receives all order events) 3. on_event (receives everything)
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+1/8
+
+5/25/26, 6:06 PM
+Position events
+
+NautilusTrader Documentation
+
+1. Specific handler (e.g. ) on_position_opened 2. on_position_event (receives all position events) 3. on_event (receives everything)
+
+Time events
+Timers and alerts produce TimeEvent objects. Pass a callback when calling set_timer or set_time_alert to direct events to your own method. If you omit the callback, the event is delivered to on_event instead.
+
+Order events
+Each order event corresponds to a state transition in the order state machine. The ExecutionEngine applies the event to the order, updates the Cache , and publishes it on the MessageBus . The table below shows the primary transitions; partially filled and triggered orders support additional transitions documented in the full order state flow.
+
+Event
+OrderInitialized OrderDenied OrderEmulated OrderReleased OrderSubmitted OrderAccepted OrderRejected OrderTriggered OrderPendingUpdate
+
+Primary transition (created locally) Initialized -> Denied Initialized -> Emulated Emulated -> Released Initialized/Released -> Submitted Submitted -> Accepted Submitted -> Rejected Accepted -> Triggered Accepted -> PendingUpdate
+
+Handler
+on_order_initialized on_order_denied on_order_emulated on_order_released on_order_submitted on_order_accepted on_order_rejected on_order_triggered on_order_pending_update
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+2/8
+
+5/25/26, 6:06 PM
+Event
+OrderPendingCancel OrderUpdated OrderModifyRejected OrderCancelRejected OrderCanceled OrderExpired OrderFilled
+
+NautilusTrader Documentation
+
+Primary transition
+
+Handler
+
+Accepted -> PendingCancel
+
+on_order_pending_cancel
+
+PendingUpdate -> Accepted
+
+on_order_updated
+
+PendingUpdate -> Accepted
+
+on_order_modify_rejected
+
+PendingCancel -> Accepted
+
+on_order_cancel_rejected
+
+PendingCancel/Accepted -> Canceled on_order_canceled
+
+Accepted -> Expired
+
+on_order_expired
+
+Accepted -> Filled/PartiallyFilled
+
+on_order_filled
+
+Common order event fields
+All order events share these fields:
+
+Field
+trader_id strategy_id instrument_id client_order_id venue_order_id account_id reconciliation event_id ts_event ts_init
+
+Description Trader instance identifier. Strategy that submitted the order. Instrument for the order. Clientassigned order identifier. Venueassigned order identifier. Account the order belongs to. Whether generated during reconciliation. Unique event identifier. Timestamp when the event occurred. Timestamp when the event was created.
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+3/8
+
+5/25/26, 6:06 PM
+
+NautilusTrader Documentation
+
+Individual events add type-specific fields (e.g. OrderFilled adds last_qty , last_px , trade_id ,
+
+commission ). See the API reference for the full field list per event type.
+
+yOovuercraidnemoixn_boortdhera_pepvreonatchtoesh.andle all order events in one place. The specific handlers fire first, so
+
+Position events
+Position events are a direct consequence of fill events. The ExecutionEngine processes each OrderFilled , updates or creates a position, and emits the corresponding position event.
+
+Event
+PositionOpened PositionChanged PositionClosed
+
+When it fires First fill creates a new position. Subsequent fill changes quantity or side. Fill reduces quantity to zero.
+
+Handler
+on_position_opened on_position_changed on_position_closed
+
+From fill to position: the causal chain
+The following diagram shows how a single OrderFilled event produces a position event. This is the key link between order management and position tracking.
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+4/8
+
+5/25/26, 6:06 PM
+Venue
+
+NautilusTrader Documentation
+
+ExecutionEngine
+
+Cache
+
+OrderFilled apply fill to order
+
+Strategy
+
+update order state determine position ID
+
+alt
+
+[No existing position]
+
+add new Position
+
+PositionOpened
+
+[Position open, not closed by fill]
+
+update Position
+
+PositionChanged
+
+[Fill closes the position]
+
+update Position
+
+PositionClosed
+
+Venue
+
+ExecutionEngine
+
+Cache
+
+Strategy
+
+Step by step:
+
+1. Fill arrives. The ExecutionEngine receives an OrderFilled event from the venue adapter.
+
+2. Order state updates. The engine applies the fill to the order object and writes the updated order to the Cache .
+
+3. Position ID resolved. The engine determines which position this fill belongs to, based on OMS type and strategy configuration.
+
+4. Position created or updated. Three outcomes:
+
+No position exists for this ID: the engine creates a Position from the fill, adds it to the
+
+, and emits . Cache
+
+PositionOpened
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+5/8
+
+5/25/26, 6:06 PM
+
+NautilusTrader Documentation
+
+Position exists and remains open after the fill: the engine applies the fill to the position,
+
+updates the Cache , and emits . PositionChanged
+
+Position exists and closes (quantity reaches zero): the engine applies the fill, updates
+
+the , and emits . Cache
+
+PositionClosed
+
+5. Flip case. When a fill reverses the position (e.g. long 10 filled sell 15), the engine splits the fill into two parts: one that closes the original position ( PositionClosed ) and one that opens the new position ( PositionOpened ).
+
+Position event fields
+
+Field
+trader_id strategy_id instrument_id position_id account_id opening_order_id closing_order_id entry side signed_qty quantity peak_qty last_qty last_px currency
+
+Opened Changed Closed Description
+
+
+
+ Trader instance identifier.
+
+
+
+ Strategy that owns the position.
+
+
+
+ Instrument for the position.
+
+
+
+ Unique position identifier.
+
+
+
+ Account the position belongs to.
+
+
+
+ Order that opened the position.
+
+-
+
+-
+
+ Order that closed the position.
+
+
+
+ Side of the opening fill.
+
+
+
+ Current position side.
+
+
+
+ Signed quantity (negative=short).
+
+
+
+ Unsigned position quantity.
+
+-
+
+
+
+ Largest quantity held.
+
+
+
+ Quantity of the last fill.
+
+
+
+ Price of the last fill.
+
+
+
+ Settlement currency.
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+6/8
+
+5/25/26, 6:06 PM
+Field
+avg_px_open avg_px_close realized_return realized_pnl unrealized_pnl duration_ns ts_opened ts_closed event_id ts_event ts_init
+
+NautilusTrader Documentation
+Opened Changed Closed Description
+
+
+
+ Average entry price.
+
+-
+
+
+
+ Average exit price.
+
+-
+
+
+
+ Realized return as a ratio.
+
+-
+
+
+
+ Realized profit and loss.
+
+-
+
+
+
+ Unrealized profit and loss.
+
+-
+
+-
+
+ Time held in nanoseconds.
+
+-
+
+
+
+ Timestamp when position opened.
+
+-
+
+-
+
+ Timestamp when position closed.
+
+
+
+ Unique event identifier.
+
+
+
+ Timestamp of the triggering fill.
+
+
+
+ Timestamp when event was created.
+
+Tracing orders to positions
+The Cache provides methods to navigate between orders and positions:
+
+# From a position, find all orders that contributed fills orders = self.cache.orders_for_position(position.id)
+# From an order, find the position it belongs to position = self.cache.position_for_order(order.client_order_id)
+# The opening order is stored directly on the position opening_order_id = position.opening_order_id
+
+Account events
+
+AccountState events represent balance and margin snapshots. They fire when: The venue reports an account update (via the execution client).
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+7/8
+
+5/25/26, 6:06 PM
+
+NautilusTrader Documentation
+
+The Portfolio recalculates account state after a position update (for margin accounts with
+
+enabled). calculate_account_state
+
+Account state contains balances, margins, account type, and base currency. The Portfolio subscribes to these events internally to maintain exposure and balance tracking.
+
+Event subscriptions
+Beyond strategy handlers, actors can subscribe to specific event streams for instruments they do not trade. These subscriptions use the MessageBus directly and do not involve the . DataEngine
+
+Method
+subscribe_order_fills() subscribe_order_cancels()
+
+Handler
+on_order_filled() on_order_canceled()
+
+Receives All fills for an instrument. All cancels for an instrument.
+
+These are useful for monitoring actors that track execution quality or fill rates across strategies without participating in order management. For details and examples, see Order fill subscriptions and Order cancel subscriptions.
+
+Related guides
+Orders - Order types and state machine. Positions - Position lifecycle and PnL. Execution - Execution flow and risk checks. Strategies - Handler implementations in strategies. Architecture - Data and execution flow patterns.
+
+Data Previous Page
+
+Options Next Page
+
+https://nautilustrader.io/docs/latest/concepts/events/
+
+8/8
+
+
