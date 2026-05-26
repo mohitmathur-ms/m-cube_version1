@@ -54,7 +54,21 @@
       "Bash(Get-ChildItem -Path \"d:\\\\mcube_test_version_1_updated\\\\m-cube_version1\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py'\\).read\\(\\)\\); print\\('backtest_runner.py OK'\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/managed_strategy.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/models.py'\\).read\\(\\)\\); print\\('all syntax OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('core/backtest_runner.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/managed_strategy.py'\\).read\\(\\)\\); ast.parse\\(open\\('core/models.py'\\).read\\(\\)\\); print\\('all syntax OK'\\)\")",
+      "Bash(Get-ChildItem *)",
+      "Bash(powershell *)",
+      "Bash(python3 -c ' *)",
+      "Bash(cat *)",
+      "Bash(python -m py_compile ./core/backtest_runner/__init__.py)",
+      "Bash(xargs wc -l)",
+      "Bash(cat)",
+      "Bash(venv/Scripts/python.exe /tmp/pf_summary.py)",
+      "Bash(venv/Scripts/python.exe -c \"from core.strategies import STRATEGY_REGISTRY as R; [print\\(k, '->', list\\(v['params'].keys\\(\\)\\)\\) for k,v in R.items\\(\\)]\")",
+      "Bash(TRACE_LABEL=single_pathA _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py single)",
+      "Bash(TRACE_LABEL=single_pathB _USE_BACKTEST_NODE=1 _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py single)",
+      "Bash(TRACE_LABEL=slot_EDGE03_pathA _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py slot:EDGE_03_formatA_atr)",
+      "Bash(TRACE_LABEL=group_EDGE03_pathA _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py group:EDGE_03_formatA_atr)",
+      "Bash(TRACE_LABEL=pf_EDGE03_pathA_perslot _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py portfolio:EDGE_03_formatA_atr)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"
