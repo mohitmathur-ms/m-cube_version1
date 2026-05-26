@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exploratory native bracket order validation: simulation scripts, E2E tests, code reviews, and HTML report added (feature-flagged, implementation not yet in this diff) — cdc43fc</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">feature/order-type-validation</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/cdc43fcb4409640d5111e8353023b3cd715eef81'><code>cdc43fc</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>Exploratory native bracket order validation: simulation scripts, E2E tests, code reviews, and HTML report added (feature-flagged, implementation not yet in this diff)</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-05-26 13:01 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>The team is exploring whether replacing the platform&#x27;s current trade-exit mechanism with a more realistic &quot;bracket order&quot; approach would make backtests more accurate. Right now, when a stop-loss or take-profit level is breached, the system detects it only after a full price bar closes and then sends a simple market order — meaning the actual fill often happens at the bar&#x27;s closing price rather than the intended level. Across a sample of test cases, this gap averages about 7 pips of slippage.</p><p>The new idea places all three orders — entry, stop-loss, and take-profit — together in a single submission at the moment the trade opens. The exchange simulator then walks through each bar&#x27;s price path from open to high to low to close, triggering the stop or target at the exact level the moment price touches it. Across the same sample cases, average slippage drops to about 1.7 pips. The approach is limited to simple fixed stop-loss plus fixed take-profit setups; anything requiring ongoing decisions (a trailing stop, profit-locking, waiting several bars to confirm, or re-entering after a loss) still uses the original Python-based logic.</p><p>This commit does not ship the feature to production. It adds all the validation tools needed to evaluate the idea safely: a three-phase simulation suite, a standalone end-to-end test, two automated code reviews, and a formatted HTML report documenting the findings. The underlying engine change in `core/managed_strategy.py` is referenced throughout these artifacts but is NOT part of this commit — it exists as a separate body of uncommitted work evaluated here.</p><p>Two bugs were found and corrected during the review. In one edge case an ATR-based leg with a cold (not yet initialized) ATR indicator could enter a trade with no exit management at all — now it falls back safely to the Python exit path. A second issue caused native bracket exits to log a less informative exit reason tag than the Python path, which would have broken the tearsheet&#x27;s exit-reason columns; that tag format is now aligned.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>All 12 files in this push are new additions. The actual implementation changes — `_classify_exit_mode`, `_submit_bracket`, `_compute_sl_tp`, the `on_order_filled` branching, and `on_position_closed` flat-reset in `core/managed_strategy.py` — are referenced throughout the artifacts at specific line numbers (e.g. `:165`, `:1125`, `:1877`, `:2021`) but are absent from the diff stat. They exist as pre-existing uncommitted edits evaluated by this commit&#x27;s artifacts.</p><p>The classification logic (`_classify_exit_mode`) routes a leg to `&quot;native_bracket&quot;` only when: `_USE_NATIVE_BRACKET=1` is set, both a fixed SL and fixed TP are present (percentage/points/ATR), the SL and TP actions are both `&quot;close&quot;`, and no trailing / target-lock / sl_wait / tgt_wait / RBO / Move-SL features are active. All other legs fall through to `&quot;python&quot;`. This is evaluated once per leg at config-build time via `config_from_exit`.</p><p>For native legs, `_submit_bracket` calls `order_factory.bracket(entry_order_type=MARKET, sl_trigger_price=…, tp_price=…, tp_post_only=False, sl_tags=[…], tp_tags=[…])` and submits the resulting `OrderList` via `submit_order_list`. The three orders carry `ContingencyType.OTO` (entry triggers SL+TP children) with SL↔TP as `OUO` (one fill cancels the other), both `reduce_only`. `on_order_filled` branches on `event.order_type`: `MARKET` → entry fill; `STOP_MARKET` or `LIMIT` → child exit (handled by `on_position_closed` which resets the leg state). `_on_primary_bar` skips `_check_exits` for native legs; `_force_squareoff` calls `cancel_all_orders` before `close_all_positions` to clear resting children race-free. The venue must be configured with `bar_adaptive_high_low_ordering=True` for correct intra-bar SL-vs-TP ordering.</p><p>The simulation suite decomposes the flow into three isolated scripts (`sim_phase1_signal.py` → custom `BarAggregator` OHLC correctness on 5-min windows; `sim_phase2_bracket.py` → bracket order contingency and fill mechanics; `sim_phase3_python_exit.py` → Python exit path parity). `sim_sltp_accuracy.py` runs the real `BacktestEngine` for a fixed scenario matrix comparing market-close fills versus bracket fills across three cases. `sim_native_bracket_e2e.py` exercises the full production path (config classification + real engine run) and exits non-zero on any failure. `tests/test_native_bracket.py` and `tests/test_multi_tf_exits.py` integrate into the existing `pytest` suite; all 259 existing tests pass with the flag both off and on.</p><p>The code reviews also make a factual correction: L-1 (the unmanaged-position fallback) was initially described as unreachable, but `_classify_exit_mode` admits ATR legs (`sl_atr_multiplier &gt; 0`) before the ATR indicator is warm, so `_compute_sl_tp` genuinely returns 0.0 on the first signal, making the fallback reachable. The fix — `self._exit_mode = &quot;python&quot;` plus `log.warning` before submitting the plain market entry — is confirmed present and re-seeds exit state via the `on_order_filled` Python branch.</p><p>The diff is truncated: the full content of `sim_phase2_bracket.py`, `sim_phase3_python_exit.py`, `sim_sltp_accuracy.py`, `tests/test_multi_tf_exits.py`, and `tests/test_native_bracket.py` is not visible. `.github/scripts/conceptgraph_svg.py` is a standalone SVG renderer (radial layout, no JS deps) for the AI-authored concept graph used by the HTML-report-skill pipeline; it is unrelated to the bracket-order logic.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>The most significant change is the intra-bar SL/TP fill accuracy improvement. Case D from the slippage report — a bar that spans both the stop (1.09900) and the target (1.10200) within a single minute:</p><p>Bar OHLC: O 1.10000 / H 1.10260 / L 1.09850 / C 1.10100</p><p>Market-order path:  checks after bar closes → fills TP exit at bar close → 1.10100  (slip = -10.0 pips from the 1.10200 target)
+  Native-bracket path: O→H→L→C sweep fires SL resting order first (low 1.09850 &lt; SL 1.09900) → fills at trigger price 1.09900  (slip = 0.0 pips)</p><p>The bracket correctly identifies that the stop was hit before the target on the bar&#x27;s downswing and fills at the exact trigger price. The Python market path would have incorrectly exited at the take-profit side and filled 10 pips away from the intended level.</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><svg viewBox="0 0 940 474" width="100%" role="img" aria-label="dependency graph" style="max-width:940px"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker></defs><text x="150" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depended on by</text><text x="470" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Changed files</text><text x="790" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depends on</text><line x1="595" y1="135" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="183" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="231" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="279" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="423" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="423" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><g><title>scripts/generate_native_bracket_report.py</title><rect x="345" y="70" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/generate_native_brack…</text></g><g><title>scripts/sim_native_bracket_e2e.py</title><rect x="345" y="118" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/sim_native_bracket_e2…</text></g><g><title>scripts/sim_phase1_signal.py</title><rect x="345" y="166" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/sim_phase1_signal.py</text></g><g><title>scripts/sim_phase2_bracket.py</title><rect x="345" y="214" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/sim_phase2_bracket.py</text></g><g><title>scripts/sim_phase3_python_exit.py</title><rect x="345" y="262" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/sim_phase3_python_exi…</text></g><g><title>scripts/sim_sltp_accuracy.py</title><rect x="345" y="310" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/sim_sltp_accuracy.py</text></g><g><title>tests/test_multi_tf_exits.py</title><rect x="345" y="358" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_multi_tf_exits.py</text></g><g><title>tests/test_native_bracket.py</title><rect x="345" y="406" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_native_bracket.py</text></g><g><title>core/aggregator.py</title><rect x="665" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/aggregator.py</text></g><g><title>core/instrument_factory/__init__.py</title><rect x="665" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">instrument_factory/__init__.py</text></g><g><title>core/managed_strategy.py</title><rect x="665" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/managed_strategy.py</text></g><g><title>core/models/__init__.py</title><rect x="665" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">models/__init__.py</text></g></svg></div><table class='dep'><thead><tr><th>Changed file</th><th>Depended on by &larr;</th><th>Depends on &rarr;</th></tr></thead><tbody><tr><td><code>scripts/generate_native_bracket_report.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>scripts/sim_native_bracket_e2e.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/managed_strategy.py</code><br><code>core/models/__init__.py</code></td></tr><tr><td><code>scripts/sim_phase1_signal.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/aggregator.py</code></td></tr><tr><td><code>scripts/sim_phase2_bracket.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/aggregator.py</code></td></tr><tr><td><code>scripts/sim_phase3_python_exit.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/aggregator.py</code></td></tr><tr><td><code>scripts/sim_sltp_accuracy.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>tests/test_multi_tf_exits.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/aggregator.py</code><br><code>core/instrument_factory/__init__.py</code><br><code>core/managed_strategy.py</code><br><code>core/models/__init__.py</code></td></tr><tr><td><code>tests/test_native_bracket.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/managed_strategy.py</code><br><code>core/models/__init__.py</code></td></tr></tbody></table><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.github/scripts/conceptgraph_svg.py</code></li><li><code>coding-toolkit/code-reviews/2026-05-26-16-11-native-bracket-orders.md</code></li><li><code>coding-toolkit/code-reviews/2026-05-26-16-53-native-bracket-l1-l2-fixes.md</code></li><li><code>html_reports/native_bracket_orders_report.html</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.github/scripts/conceptgraph_svg.py</code></td><td>new: standalone SVG renderer for AI-authored concept graphs (radial layout, no JS/CDN); used by the HTML-report-skill pipeline, unrelated to bracket-order logic</td></tr><tr><td><code>coding-toolkit/code-reviews/2026-05-26-16-11-native-bracket-orders.md</code></td><td>new: first automated code review of the native-bracket implementation; raised L-1 (unmanaged fallback) and L-2 (exit-reason tag mismatch)</td></tr><tr><td><code>coding-toolkit/code-reviews/2026-05-26-16-53-native-bracket-l1-l2-fixes.md</code></td><td>new: follow-up review confirming L-1 and L-2 are fixed; also corrects predecessor&#x27;s claim that L-1 was unreachable</td></tr><tr><td><code>html_reports/native_bracket_orders_report.html</code></td><td>new: static self-contained HTML report comparing Market vs Bracket SL/TP accuracy; includes Mermaid knowledge graph, plain-English and technical explanations, and slippage tables</td></tr><tr><td><code>scripts/generate_native_bracket_report.py</code></td><td>new: script that drives sim_sltp_accuracy.py, collects live fill data, and re-renders native_bracket_orders_report.html</td></tr><tr><td><code>scripts/sim_native_bracket_e2e.py</code></td><td>new: end-to-end test against the real production code path (config_from_exit classification + BacktestEngine run); exits non-zero on failure</td></tr><tr><td><code>scripts/sim_phase1_signal.py</code></td><td>new: isolated phase-1 test proving BarAggregator builds correct 5-min OHLC from 1-min bars and signals only on 5-min boundaries</td></tr><tr><td><code>scripts/sim_phase2_bracket.py</code></td><td>new: isolated phase-2 test of bracket order contingency and fill mechanics (diff truncated)</td></tr><tr><td><code>scripts/sim_phase3_python_exit.py</code></td><td>new: isolated phase-3 test verifying Python exit path parity alongside the bracket path (diff truncated)</td></tr><tr><td><code>scripts/sim_sltp_accuracy.py</code></td><td>new: Market vs Bracket fill accuracy harness; defines CASES matrix, run_case(), and _label_and_slip() used by the report generator (diff truncated)</td></tr><tr><td><code>tests/test_multi_tf_exits.py</code></td><td>new: pytest suite for multi-timeframe exit behavior (diff truncated)</td></tr><tr><td><code>tests/test_native_bracket.py</code></td><td>new: pytest suite directly testing native bracket order classification and engine wiring (diff truncated)</td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>CRITICAL GAP: core/managed_strategy.py changes implementing _classify_exit_mode, _submit_bracket, _compute_sl_tp, and on_order_filled/on_position_closed routing are NOT in this diff — they exist as uncommitted edits. The commit captures only validation artifacts; the implementation itself has not been committed.</li><li>sim_native_bracket_e2e.py should be promoted to a pytest in tests/ so native-bracket routing is covered by the regular suite and CI; currently it is an ad-hoc script that must be run manually.</li><li>verify_session_changes.py crashes on a stale core/backtest_runner.py path (pre-existing, unrelated to this change) — the project&#x27;s main verification gate is currently broken.</li><li>EXIT DETAILED REASON for native-bracket legs uses the approximate signal-bar close (ref_price) as the entry price because the true fill price is unknown at submit time; this creates a reporting asymmetry vs the Python path which carries the real fill price. Accepted as-is but would break any downstream parser of the DETAILED REASON column for native-bracket rows.</li><li>The diff is truncated: sim_phase2_bracket.py, sim_phase3_python_exit.py, sim_sltp_accuracy.py, tests/test_multi_tf_exits.py, and tests/test_native_bracket.py are only partially or not visible — their full content cannot be verified from this diff alone.</li><li>Exploratory branch — commit message explicitly states this will not be merged unless native brackets are confirmed superior; slippage improvement is real but the decision is pending further evaluation.</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat <span class='chip warn'>truncated</span></h2>
+    <pre>.github/scripts/conceptgraph_svg.py                | 189 ++++++++++++++++
+ .../2026-05-26-16-11-native-bracket-orders.md      | 121 +++++++++++
+ .../2026-05-26-16-53-native-bracket-l1-l2-fixes.md | 158 ++++++++++++++
+ html_reports/native_bracket_orders_report.html     | 129 +++++++++++
+ scripts/generate_native_bracket_report.py          | 237 +++++++++++++++++++++
+ scripts/sim_native_bracket_e2e.py                  | 175 +++++++++++++++
+ scripts/sim_phase1_signal.py                       | 193 +++++++++++++++++
+ scripts/sim_phase2_bracket.py                      | 176 +++++++++++++++
+ scripts/sim_phase3_python_exit.py                  | 196 +++++++++++++++++
+ scripts/sim_sltp_accuracy.py                       | 234 ++++++++++++++++++++
+ tests/test_multi_tf_exits.py                       | 194 +++++++++++++++++
+ tests/test_native_bracket.py                       | 150 +++++++++++++
+ 12 files changed, 2152 insertions(+)</pre>
+  </section>
+
+  <footer>
+    Commit cdc43fcb4409640d5111e8353023b3cd715eef81 on <strong>feature/order-type-validation</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>

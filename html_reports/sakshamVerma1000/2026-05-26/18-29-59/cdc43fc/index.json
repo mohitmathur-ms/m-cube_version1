@@ -1,0 +1,11 @@
+{
+  "headline": "Exploratory native bracket order validation: simulation scripts, E2E tests, code reviews, and HTML report added (feature-flagged, implementation not yet in this diff)",
+  "branch": "feature/order-type-validation",
+  "sha": "cdc43fcb4409640d5111e8353023b3cd715eef81",
+  "short_sha": "cdc43fc",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/cdc43fcb4409640d5111e8353023b3cd715eef81",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-26T13:01:49+00:00",
+  "ai": true
+}
