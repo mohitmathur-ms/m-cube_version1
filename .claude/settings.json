@@ -175,7 +175,17 @@
       "Bash(python tests/smoke_tests/smoke_test_logics_audit.py)",
       "Bash(venv/Scripts/python.exe scripts/verify_grouping_parity.py --portfolio portfolios/_default/EDGE_02_quad_mixed.json)",
       "Bash(Get-ChildItem -Path \"D:\\\\m-cube_version1\\\\core\\\\backtest_runner\" -Directory)",
-      "Bash(Sort-Object Name)"
+      "Bash(Sort-Object Name)",
+      "Read(//c/Users/HP/.claude/skills/code-review-reporter/**)",
+      "Bash(python .github/scripts/mermaid_graph.py)",
+      "Read(//c/Users/HP/.claude/skills/**)",
+      "Read(//c/Users/HP/.claude/plugins/**)",
+      "Bash(python -c \"import nautilus_trader,os;print\\(os.path.dirname\\(nautilus_trader.__file__\\)\\)\")",
+      "Bash(ls trading/strategy.pyx)",
+      "Bash(ls common/factories.pyx)",
+      "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\m-cube_version1\\\\html_reports\")",
+      "PowerShell(\"ready\")",
+      "PowerShell($f = \"d:\\\\m-cube_version1\\\\html_reports\\\\RANDOM_REPORT.HTML\"; $c = Get-Content $f -Raw; \"Exists: $\\(Test-Path $f\\)\"; \"Size: $\\([math]::Round\\(\\(Get-Item $f\\).Length/1KB,1\\)\\) KB\"; \"Has DOCTYPE: $\\($c.StartsWith\\('<!DOCTYPE'\\)\\)\"; \"Has closing html: $\\($c.TrimEnd\\(\\).EndsWith\\('</html>'\\)\\)\")"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",
