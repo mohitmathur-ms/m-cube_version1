@@ -230,7 +230,13 @@ except TypeError as e:
 # ─────────────────────────────────────────────────────────────────────────────
 section("4.  Bug fix: _run_slot_group bars_load uses .extend (not append+nesting)")
 
-src = Path("core/backtest_runner.py").read_text(encoding="utf-8")
+# backtest_runner is now a package (core/backtest_runner/<concern>/__init__.py);
+# concatenate every module so the string-presence checks below still find code
+# regardless of which concern sub-module it landed in after the split.
+src = "\n".join(
+    p.read_text(encoding="utf-8")
+    for p in sorted(Path("core/backtest_runner").rglob("*.py"))
+)
 
 # The old buggy line was:  bar_type_strs_to_load.append(pair)
 # The fix changed it to:   bar_type_strs_to_load.extend(paired_strs)

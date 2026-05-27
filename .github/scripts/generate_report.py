@@ -49,7 +49,7 @@ DOMAIN_CONTEXT = (
     "tearsheets. Backend layers: L0 data ingest (core/csv_loader, aggregator, "
     "nautilus_loader) -> ParquetDataCatalog; L1 pure entry strategies (strategies/); "
     "L2 ManagedExitStrategy (core/managed_strategy.py) the SL/TP/trailing engine; "
-    "L3 portfolio orchestration (core/backtest_runner.py); server.py exposes the Flask "
+    "L3 portfolio orchestration (core/backtest_runner/); server.py exposes the Flask "
     "REST API. There is no live execution layer."
 )
 

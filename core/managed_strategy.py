@@ -6,6 +6,7 @@ Used by the portfolio system to add exit management to any strategy from the sig
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -17,7 +18,7 @@ from nautilus_trader.indicators import (
     SimpleMovingAverage,
 )
 from nautilus_trader.model.data import Bar, BarType
-from nautilus_trader.model.enums import OrderSide, TimeInForce
+from nautilus_trader.model.enums import OrderSide, OrderType, TimeInForce
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
@@ -123,6 +124,17 @@ _TGT_TYPE_CANON = {
 }
 
 
+# Crypto venues for the Mark Price gate (spec §3 "mark_price (crypto only)").
+# Mark Price is a crypto-exchange fair-value reference, so the engine only
+# honours the ``mark`` exit format on these venues; other instruments fall
+# back to OHLCV with a log. Venue name = the token after "." in the bar type
+# (e.g. "BTCUSD.CRYPTO-1-MINUTE-LAST-EXTERNAL" → "CRYPTO").
+_CRYPTO_VENUES = frozenset({
+    "CRYPTO", "BINANCE", "BYBIT", "OKX", "OKEX", "COINBASE", "KRAKEN",
+    "DERIBIT", "BITMEX", "BITSTAMP", "KUCOIN", "HUOBI", "GATEIO",
+})
+
+
 def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
     """Normalise an SL/Target type string to the engine's canonical value.
 
@@ -137,6 +149,66 @@ def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
     return table.get(key, str(value).strip())
 
 
+def _classify_exit_mode(cfg: dict) -> str:
+    """Resolve a leg's exit firing mechanism from its (canonicalised) config.
+
+    Returns ``"native_bracket"`` only for a *plain* leg — fixed SL **and** fixed
+    TP, close-only, with no dynamic exit management — and only when the rollout
+    flag ``_USE_NATIVE_BRACKET=1`` is set. Such legs submit a NautilusTrader
+    bracket at entry and let the matching engine fire SL/TP at the trigger/limit
+    price (better fill accuracy). Everything else returns ``"python"`` and keeps
+    the L2 state machine, which is the only path able to express trailing SL,
+    target-lock, SL/Target-wait, ATR-trailing, re_execute/reverse, RBO, etc.
+
+    ``cfg`` is the kwargs dict assembled in ``config_from_exit`` (values already
+    canonicalised), so this sees the same flags the strategy will run with.
+    """
+    if os.environ.get("_USE_NATIVE_BRACKET") != "1":
+        return "python"
+
+    sl_type = cfg.get("stop_loss_type", "none")
+    tp_type = cfg.get("target_type", "none")
+    # A bracket needs both a STOP_MARKET child and a LIMIT child, so both SL and
+    # TP must be present and of a fixed (non-trailing) kind.
+    if sl_type not in ("percentage", "points", "atr"):
+        return "python"
+    if tp_type not in ("percentage", "points", "atr"):
+        return "python"
+    if sl_type == "atr":
+        if float(cfg.get("sl_atr_multiplier", 0.0) or 0.0) <= 0:
+            return "python"
+    elif float(cfg.get("stop_loss_value", 0.0) or 0.0) <= 0:
+        return "python"
+    if tp_type == "atr":
+        if float(cfg.get("tgt_atr_multiplier", 0.0) or 0.0) <= 0:
+            return "python"
+    elif float(cfg.get("target_value", 0.0) or 0.0) <= 0:
+        return "python"
+
+    # No dynamic exit management — any of these requires the Python engine.
+    if cfg.get("trailing_sl_offset") or cfg.get("trailing_sl_step"):
+        return "python"
+    if float(cfg.get("target_lock_trigger", 0.0) or 0.0) > 0:
+        return "python"
+    if cfg.get("tgt_trail_enabled"):
+        return "python"
+    if int(cfg.get("sl_wait_bars", 0) or 0) > 0 or int(cfg.get("sl_wait_sec", 0) or 0) > 0:
+        return "python"
+    if int(cfg.get("tgt_wait_bars", 0) or 0) > 0 or int(cfg.get("tgt_wait_sec", 0) or 0) > 0:
+        return "python"
+    if cfg.get("rbo_enabled") or cfg.get("move_sl_enabled"):
+        return "python"
+
+    # Close-only actions — re_execute / reverse / execute / re_entry /
+    # keep_leg_running all need the Python state machine.
+    sl_actions = parse_leg_actions(cfg.get("on_sl_action", "close"))
+    tp_actions = parse_leg_actions(cfg.get("on_target_action", "close"))
+    if sl_actions not in ([], ["close"]) or tp_actions not in ([], ["close"]):
+        return "python"
+
+    return "native_bracket"
+
+
 def resolve_trigger_hl(
     exit_fmt: str,
     is_long: bool,
@@ -148,6 +220,7 @@ def resolve_trigger_hl(
     bid_low: float | None = None,
     ask_high: float | None = None,
     ask_low: float | None = None,
+    mark_price: float | None = None,
 ) -> tuple[float, float]:
     """Resolve the (high, low) an SL/Target trigger should consult.
 
@@ -160,17 +233,32 @@ def resolve_trigger_hl(
       (SL on ``ask_low``, TP on ``ask_high``); a SHORT leg consults the
       BID series (SL on ``bid_high``, TP on ``bid_low``). Falls back to
       OHLCV when the paired bid/ask values are missing (data gap).
+    * **Mark Price** (``mark``) — spec §3, crypto-only fair-value reference.
+      Proxied by the **previous bar's close** (passed as ``mark_price``) — the
+      last settled price ahead of the current bar; high and low both collapse
+      to it, so intra-bar wicks (the bar high/low) do NOT fire the SL/Target.
+      On the first bar (no previous close yet) ``mark_price`` is None/0 and it
+      falls back to the current ``close``. The crypto-only gate is enforced
+      upstream (``on_start`` downgrades to OHLCV on non-crypto venues); by the
+      time this runs ``mark`` is already crypto-validated.
 
     Pure function — unit-testable without an engine.
     """
     if exit_fmt == "ltp":
+        # LTP collapses to the bar's own last price.
         return close, close
+    if exit_fmt == "mark":
+        # Mark Price (proxy) = the PREVIOUS bar's close; collapse high/low to it
+        # so intra-bar wicks are ignored. Fall back to the current close before
+        # any previous close exists (first bar).
+        m = mark_price if (mark_price is not None and mark_price > 0) else close
+        return m, m
     if exit_fmt == "bidask" and None not in (bid_high, bid_low, ask_high, ask_low):
         if is_long:
             return ask_high, ask_low
         if is_short:
             return bid_high, bid_low
-    return bar_high, bar_low
+    return bar_high, bar_low  
 
 
 def _derive_bid_ask_bar_types(primary_bar_type_str: str) -> tuple[str, str]:
@@ -243,6 +331,28 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # old Nautilus-internal composite (``INTERNAL@``) aggregation.
     aggregate_to_bar_type: str = ""
 
+    # Multi-timeframe exit cadence. Only meaningful when aggregating
+    # (``aggregate_to_bar_type`` set). When True, the entry signal still runs on
+    # the emitted aggregated bar, but SL / TP / trailing-SL / target-lock and
+    # time-based square-off are RE-CHECKED on every BASE bar (e.g. 1-minute)
+    # instead of only at the aggregated window close. Exit *levels* are still
+    # computed at entry from the aggregated series — only the checking cadence
+    # becomes the base timeframe. No effect when not aggregating. Default off ⇒
+    # unchanged behaviour (exits run on the aggregated bar).
+    exit_check_on_base_bar: bool = False
+
+    # Exit firing mechanism (resolved per-leg in ``config_from_exit``):
+    #   "python"         — the L2 state machine checks SL/TP in on_bar and
+    #                      submits a MARKET close on breach (original behaviour,
+    #                      fills at the bar close).
+    #   "native_bracket" — entry is submitted as a NautilusTrader bracket
+    #                      (MARKET entry + STOP_MARKET SL + LIMIT TP); the
+    #                      matching engine sweeps each bar's O/H/L/C and fires
+    #                      the resting SL/TP at the trigger/limit price. Only
+    #                      assigned for plain "fixed SL + fixed TP, close-only"
+    #                      legs, and only when env ``_USE_NATIVE_BRACKET=1``.
+    exit_mode: str = "python"
+
     # Exit management
     stop_loss_type: str = "none"
     stop_loss_value: float = 0.0
@@ -284,6 +394,15 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # Spec §1.2 1.2(d) ReEntry (price-wait re-entry).
     reentry_price: float = 0.0
     max_re_entries: int = 0
+    # Portfolio "ReExecute at Entry Price" / "ReExecute Same Contract at Entry
+    # Price" (spec §5.2 / §2.1). RUNTIME-injected during the portfolio ReExecute
+    # replay: the price the slot's pre-clip position was opened at, and its
+    # direction. When > 0 the strategy arms a one-shot price-wait at start so its
+    # FIRST re-entry waits until the instrument returns to that original entry
+    # price (reusing the §1.2(d) re-entry gate) instead of entering at the next
+    # signal's market price. 0.0 = no pin (plain ReExecute). Not user-saved.
+    reexec_entry_price: float = 0.0
+    reexec_entry_was_long: bool = True
     # Spec §1.2 1.2(c): when False, this leg ignores its own signals until
     # a sibling's "execute" action arms it via the cross-slot bus.
     armed_at_start: bool = True
@@ -453,6 +572,15 @@ class ManagedExitStrategy(Strategy):
         self._reentry_armed: bool = False
         self._reentry_target_price: float = 0.0
         self._reentry_was_long: bool = True
+        # Portfolio "ReExecute at Entry Price" (spec §5.2): when the replay
+        # injects a pre-clip entry price, arm the §1.2(d) price-wait at start so
+        # the slot's first re-entry waits until the instrument returns to that
+        # original entry price before the signal can fire.
+        _reexec_px = float(getattr(config, "reexec_entry_price", 0.0) or 0.0)
+        if _reexec_px > 0:
+            self._reentry_armed = True
+            self._reentry_target_price = _reexec_px
+            self._reentry_was_long = bool(getattr(config, "reexec_entry_was_long", True))
         self.re_entry_count: int = 0
         self.position_side = None  # "LONG" or "SHORT" or None
         self._expecting_close_fill = False  # next on_order_filled is a close, not an open
@@ -530,6 +658,11 @@ class ManagedExitStrategy(Strategy):
         self._fa_bid_bt: BarType | None = None
         self._fa_ask_bt: BarType | None = None
         self._fa_pending: dict[int, dict] = {}
+        # Mark Price (spec §3, approach B): rolling previous-bar close. The
+        # "mark" exit format triggers off this (the last settled price ahead of
+        # the current bar), not the current close — updated every bar in
+        # _on_primary_bar. 0.0 until the first bar is seen.
+        self._prev_close: float = 0.0
 
         # Extra strategy-subscribe bar types — composite bar types beyond the
         # primary signal one (``config.bar_type``). Parsed to BarType objects
@@ -547,6 +680,16 @@ class ManagedExitStrategy(Strategy):
         # emitted aggregated bar (signal indicators + ATR(s)). ``_agg_pending``
         # pairs primary/bid/ask aggregated bars by window-close ts for Format A.
         self._agg_to_str: str = str(getattr(config, "aggregate_to_bar_type", "") or "")
+        # When aggregating, re-check exits on every BASE bar (multi-timeframe:
+        # signal on the aggregated bar, SL/TP/trailing/square-off on the base
+        # bar). Only takes effect once ``_aggregating`` is True (set in on_start).
+        self._exit_check_on_base_bar: bool = bool(
+            getattr(config, "exit_check_on_base_bar", False)
+        )
+        # Exit firing mechanism (resolved in config_from_exit). "native_bracket"
+        # ⇒ SL/TP are resting STOP_MARKET/LIMIT orders the matching engine fires;
+        # the Python per-bar _check_exits is skipped for this leg.
+        self._exit_mode: str = str(getattr(config, "exit_mode", "python") or "python")
         self._aggregating: bool = False
         self._primary_agg: BarAggregator | None = None
         self._bid_agg: BarAggregator | None = None
@@ -693,6 +836,21 @@ class ManagedExitStrategy(Strategy):
                 )
                 self._exit_fmt = "ohlcv"
 
+        # Mark Price (spec §3) is crypto-only. The trigger reference is proxied
+        # by the bar close (resolve_trigger_hl), but the spec restricts it to
+        # crypto feeds — downgrade to OHLCV on non-crypto venues with a log.
+        if self._exit_fmt == "mark":
+            try:
+                _venue = str(self.config.bar_type.instrument_id.venue.value).upper()
+            except Exception:  # noqa: BLE001
+                _venue = ""
+            if _venue not in _CRYPTO_VENUES:
+                self.log.warning(
+                    f"Mark Price trigger is crypto-only; venue {_venue!r} is not "
+                    f"crypto — falling back to OHLCV trigger"
+                )
+                self._exit_fmt = "ohlcv"
+
         # Extra strategy-subscribe bar types — composite bar types beyond the
         # primary signal one. Subscribed so the strategy receives them and
         # they are available; the signal / SL / TP logic runs on the primary
@@ -716,6 +874,22 @@ class ManagedExitStrategy(Strategy):
                 self.log.warning(f"Could not subscribe strategy bar type {s!r} ({e})")
                 self._extra_sub_bts.discard(bt)
 
+        # Multi-timeframe exit cadence (signal on the aggregated bar, exits on
+        # every base bar) only has meaning while aggregating. Disable it (silent)
+        # when not aggregating so the flag is a harmless no-op on plain slots.
+        # Format A (bid/ask) base-bar exits are not yet wired — fall back to the
+        # aggregated-bar exit check with a log so behaviour is explicit.
+        if self._exit_check_on_base_bar:
+            if not self._aggregating:
+                self._exit_check_on_base_bar = False
+            elif self._exit_fmt == "bidask":
+                self.log.warning(
+                    "exit_check_on_base_bar is not yet supported with the "
+                    "bid/ask (Format A) exit trigger; exits will be checked on "
+                    "the aggregated bar as before"
+                )
+                self._exit_check_on_base_bar = False
+
     def on_bar(self, bar: Bar) -> None:
         # Extra strategy-subscribe bar types are received so they are
         # available, but the single-signal logic runs on the primary bar
@@ -729,6 +903,9 @@ class ManagedExitStrategy(Strategy):
         # aggregation). Returns None mid-window.
         if self._aggregating:
             if self._exit_fmt != "bidask":
+                if self._exit_check_on_base_bar:
+                    self._on_bar_aggregating_split(bar)
+                    return
                 agg = self._primary_agg.on_bar(bar)
                 if agg is None:
                     return
@@ -784,6 +961,37 @@ class ManagedExitStrategy(Strategy):
             return all(ind.initialized for ind in self._agg_indicators)
         return self.indicators_initialized()
 
+    def _on_bar_aggregating_split(self, bar: Bar) -> None:
+        """Multi-timeframe dispatch (``exit_check_on_base_bar``, non-bidask).
+
+        The signal/entry runs on the emitted AGGREGATED bar (e.g. 5-min) while
+        SL/TP/trailing/square-off re-check on every BASE bar (e.g. 1-min):
+
+        1. Run the exit phase on this base bar (square-off + SL/TP using the base
+           bar's OHLC). Exit *levels* were fixed at entry from the aggregated
+           series — only the checking cadence is the base timeframe.
+        2. Feed the base bar to the aggregator. When a window closes, feed the
+           aggregated bar to the indicators, step RBO on it, and run the entry
+           phase — unless an exit/square-off already fired on this same base bar
+           (preserves "no entry on the bar an exit fired").
+        """
+        self._current_bar_ts_ns = bar.ts_event
+        mark_prev = self._roll_mark_price(bar)
+
+        suppress_entry = False
+        # Exits presume an open position, which presumes indicators were ready to
+        # enter; gate anyway so square-off doesn't fire during warm-up.
+        if self._indicators_ready():
+            suppress_entry = self._run_exit_phase(bar, None, None, mark_prev)
+
+        agg = self._primary_agg.on_bar(bar)
+        if agg is not None:
+            self._feed_indicators(agg)
+            if self._rbo_enabled:
+                self._rbo_step(agg)
+            if not suppress_entry and self._indicators_ready():
+                self._run_entry_phase(agg)
+
     def _on_bar_aggregating_bidask(self, bar: Bar) -> None:
         """Format A under aggregation: feed each base stream to its aggregator
         and dispatch when the (primary, bid, ask) aggregated trio for a window
@@ -826,6 +1034,16 @@ class ManagedExitStrategy(Strategy):
                 self._feed_indicators(g["primary"])
                 self._on_primary_bar(g["primary"], g.get("bid"), g.get("ask"))
 
+    def _roll_mark_price(self, bar: Bar) -> float:
+        """Mark Price (spec §3, approach B): return the PREVIOUS bar's close for
+        this bar's trigger, then roll the rolling prev-close forward. Kept in one
+        place so the series stays continuous whichever bar drives the exits (the
+        aggregated bar in single-timeframe mode, the base bar in multi-timeframe
+        mode)."""
+        prev = self._prev_close
+        self._prev_close = float(bar.close)
+        return prev
+
     def _on_primary_bar(self, bar: Bar, bid_bar: Bar | None = None,
                         ask_bar: Bar | None = None) -> None:
         # Cache the current bar's timestamp so _handle_exit can stamp
@@ -833,6 +1051,10 @@ class ManagedExitStrategy(Strategy):
         # every call site. on_order_filled also reads it for the re-entry
         # delay starting point.
         self._current_bar_ts_ns = bar.ts_event
+
+        # Mark Price: capture prev close before any early return so the series
+        # stays continuous across warm-up and squareoff bars.
+        _mark_prev_close = self._roll_mark_price(bar)
 
         # RBO state runs every bar, even before indicators warm up — the
         # range-monitoring window can start before the indicator gets enough
@@ -843,7 +1065,25 @@ class ManagedExitStrategy(Strategy):
         if not self._indicators_ready():
             return
 
-        close = float(bar.close)
+        # Exits first (squareoff → SL/TP), then a fresh entry only when the exit
+        # phase did not handle the position / squareoff this bar. This preserves
+        # the original "no entry on the same bar an exit fired" envelope.
+        if not self._run_exit_phase(bar, bid_bar, ask_bar, _mark_prev_close):
+            self._run_entry_phase(bar)
+
+    def _run_exit_phase(self, bar: Bar, bid_bar: Bar | None,
+                        ask_bar: Bar | None, mark_prev_close: float) -> bool:
+        """Square-off envelope + SL/TP/trailing checks for one bar.
+
+        Returns True when a fresh entry must be SUPPRESSED for this bar — i.e.
+        squareoff is active for today, or the strategy held a position when the
+        phase ran (whether or not an exit fired). Returns False only when flat
+        and squareoff is inactive, in which case the caller runs the entry phase.
+
+        In single-timeframe mode this is called on the (aggregated) primary bar.
+        In multi-timeframe mode (``exit_check_on_base_bar``) it is called on every
+        base bar, so SL/TP and square-off re-evaluate at the base resolution.
+        """
         # Use this strategy's OWN state rather than ``self.portfolio.is_flat(...)``,
         # which aggregates across every strategy trading the same (venue, instrument).
         # Aggregation is wrong when multiple strategies share an engine (Direction B
@@ -872,27 +1112,51 @@ class ManagedExitStrategy(Strategy):
                     # squareoff doesn't accidentally re_execute or reverse.
                     self._force_squareoff()
                 self._squareoff_done_date = local_date
-                return  # No entries on the squareoff bar itself.
+                return True  # No entries on the squareoff bar itself.
 
-            # Already squared off today — skip both exit and entry logic.
+            # Already squared off today — suppress both exit and entry logic.
             if self._squareoff_done_date == local_date:
-                return
+                return True
 
         if not is_flat:
-            # Three-format trigger reference (spec §3 / §4.1) — see
-            # resolve_trigger_hl. Format A passes the paired bid/ask OHLC.
-            bh = float(bid_bar.high) if bid_bar is not None else None
-            bl = float(bid_bar.low) if bid_bar is not None else None
-            ah = float(ask_bar.high) if ask_bar is not None else None
-            al = float(ask_bar.low) if ask_bar is not None else None
-            eff_high, eff_low = resolve_trigger_hl(
-                self._exit_fmt, is_long, is_short, close,
-                float(bar.high), float(bar.low),
-                bid_high=bh, bid_low=bl, ask_high=ah, ask_low=al,
-            )
-            self._check_exits(close, is_long, is_short, eff_high, eff_low)
-        else:
-            self._check_entries(close, is_flat, is_long, is_short)
+            # Native-bracket legs delegate SL/TP to resting STOP_MARKET/LIMIT
+            # orders the matching engine fires on the bar sweep — no Python
+            # exit check. (Squareoff above still force-closes + cancels.)
+            if self._exit_mode != "native_bracket":
+                close = float(bar.close)
+                # Three-format trigger reference (spec §3 / §4.1) — see
+                # resolve_trigger_hl. Format A passes the paired bid/ask OHLC.
+                bh = float(bid_bar.high) if bid_bar is not None else None
+                bl = float(bid_bar.low) if bid_bar is not None else None
+                ah = float(ask_bar.high) if ask_bar is not None else None
+                al = float(ask_bar.low) if ask_bar is not None else None
+                eff_high, eff_low = resolve_trigger_hl(
+                    self._exit_fmt, is_long, is_short, close,
+                    float(bar.high), float(bar.low),
+                    bid_high=bh, bid_low=bl, ask_high=ah, ask_low=al,
+                    mark_price=mark_prev_close,
+                )
+                self._check_exits(close, is_long, is_short, eff_high, eff_low)
+            return True  # held a position this bar → no fresh entry.
+
+        return False
+
+    def _run_entry_phase(self, bar: Bar) -> None:
+        """Fresh-entry evaluation for one bar. Assumes the indicator-readiness
+        gate and RBO step have already run for this driving bar. In multi-timeframe
+        mode this is the aggregated bar; in single-timeframe mode it is the primary
+        bar. Independently honours the squareoff lock so an entry on the aggregated
+        bar cannot fire after a base bar squared the leg off earlier in the day."""
+        if self.position_side is not None:
+            return
+        if self._squareoff_min >= 0 and self._squareoff_done_date is not None:
+            local_date = datetime.fromtimestamp(
+                bar.ts_event / 1e9, tz=self._utc_tz
+            ).astimezone(self._squareoff_tz).date()
+            if self._squareoff_done_date == local_date:
+                return
+        close = float(bar.close)
+        self._check_entries(close, True, False, False)
 
     # ─────────────────────────────────────────────────────────────────────
     # RBO (Range Breakout) — per-day state machine.
@@ -1010,6 +1274,10 @@ class ManagedExitStrategy(Strategy):
         # Same close-fill flag as _handle_exit; without it on_order_filled would
         # mis-classify the closing fill as a new entry.
         self._expecting_close_fill = True
+        # Native-bracket leg: cancel the resting SL/TP children first so they
+        # can't fire on the same sweep as the squareoff close (race-free).
+        if self._exit_mode == "native_bracket":
+            self.cancel_all_orders(self.config.instrument_id)
         hh = self._squareoff_min // 60
         mm = self._squareoff_min % 60
         tz_name = getattr(self._squareoff_tz, "key", None) or str(self._squareoff_tz)
@@ -1544,8 +1812,14 @@ class ManagedExitStrategy(Strategy):
             side, detailed_reason = ret, None
         if side is not None:
             self._pending_entry_reason = detailed_reason
-            self._submit_order(side)
-            self._set_exit_levels(side)
+            if self._exit_mode == "native_bracket":
+                # SL/TP are computed from the signal-bar close (the entry has
+                # not filled yet) and submitted as a bracket; the matching
+                # engine fires them. ``close`` is this bar's close.
+                self._submit_bracket(side, close)
+            else:
+                self._submit_order(side)
+                self._set_exit_levels(side)
 
     def _set_exit_levels(self, side: OrderSide) -> None:
         # Will be set on next bar when we know the fill price
@@ -1561,6 +1835,20 @@ class ManagedExitStrategy(Strategy):
         """
         if self._expecting_close_fill:
             self._expecting_close_fill = False
+            return
+
+        # Native-bracket leg: the SL/TP are resting STOP_MARKET/LIMIT children
+        # the engine fires — there is no Python exit monitoring to seed. A
+        # non-MARKET fill here is one of those children closing the position;
+        # the flat reset is handled in on_position_closed. A MARKET fill is the
+        # entry: record just enough state for reporting and re-entry.
+        if self._exit_mode == "native_bracket":
+            if event.order_type != OrderType.MARKET:
+                return
+            self.entry_price = float(event.last_px)
+            self.position_side = "LONG" if event.order_side == OrderSide.BUY else "SHORT"
+            self.highest_profit = 0.0
+            self._entry_filled_at_ns = self._current_bar_ts_ns
             return
 
         self.entry_price = float(event.last_px)
@@ -1589,54 +1877,80 @@ class ManagedExitStrategy(Strategy):
         is_buy = event.order_side == OrderSide.BUY
         self.position_side = "LONG" if is_buy else "SHORT"
 
-        # Compute SL (snap to instrument tick — TBD-2 resolved)
-        if self.config.stop_loss_type in ("percentage", "trailing"):
-            self.current_sl = self._compute_sl_price(is_buy, self.config.stop_loss_value)
-        elif self.config.stop_loss_type == "points":
-            if is_buy:
-                self.current_sl = self._snap_to_tick(self.entry_price - self.config.stop_loss_value)
-            else:
-                self.current_sl = self._snap_to_tick(self.entry_price + self.config.stop_loss_value)
-        elif self.config.stop_loss_type == "atr":
+        # Compute the initial SL/TP trigger prices from the fill price. Snapped
+        # to the instrument tick inside the helper (TBD-2). The native-bracket
+        # path reuses the same helper, but off the signal-bar close instead.
+        self.current_sl, self.current_tp = self._compute_sl_tp(is_buy, self.entry_price)
+
+    def on_position_closed(self, event) -> None:
+        """Native-bracket lifecycle: reset to flat when SL/TP (or squareoff)
+        closes the position, so the next signal can re-enter.
+
+        Position events are the idiomatic flat signal — a fill that reduces the
+        net position to zero emits this. The surviving OUO child is auto-cancelled
+        (reduce-only on a now-flat position). The Python path manages its own
+        state in _handle_exit / _force_squareoff and does not rely on this.
+        """
+        if self._exit_mode != "native_bracket":
+            return
+        self._reset_exit_state()
+
+    def _compute_sl_tp(self, is_buy: bool, ref_price: float) -> tuple[float, float]:
+        """Return ``(sl, tp)`` trigger prices for ``ref_price`` and side.
+
+        Mirrors the per-type SL/TP formulas (percentage / points / atr; SL also
+        handles "trailing", whose *initial* level is a percentage). ``ref_price``
+        is the actual fill price on the Python path and the signal-bar close on
+        the native-bracket path. A leg side that is unset or whose ATR is not yet
+        valid yields ``0.0`` for that side. Both are snapped to the tick grid.
+        """
+        # ----- Stop-loss -----
+        sl_type = self.config.stop_loss_type
+        if sl_type in ("percentage", "trailing"):
+            pct = self.config.stop_loss_value
+            sl = ref_price * (1 - pct / 100) if is_buy else ref_price * (1 + pct / 100)
+            sl = self._snap_to_tick(sl)
+        elif sl_type == "points":
+            sl = self._snap_to_tick(
+                ref_price - self.config.stop_loss_value if is_buy
+                else ref_price + self.config.stop_loss_value
+            )
+        elif sl_type == "atr":
             # Volatility-adaptive SL (spec §1.1 fn.4): distance = k × ATR.
-            # BUY  → SL below entry; SELL → SL above entry.
             atr_val = float(self._atr.value) if self._atr is not None and self._atr.initialized else 0.0
             dist = atr_val * float(self.config.sl_atr_multiplier)
-            if dist > 0:
-                if is_buy:
-                    self.current_sl = self._snap_to_tick(self.entry_price - dist)
-                else:
-                    self.current_sl = self._snap_to_tick(self.entry_price + dist)
-            else:
-                self.current_sl = 0.0
+            sl = (
+                self._snap_to_tick(ref_price - dist if is_buy else ref_price + dist)
+                if dist > 0 else 0.0
+            )
         else:
-            self.current_sl = 0.0
+            sl = 0.0
 
-        # Compute TP (snap to instrument tick)
-        if self.config.target_type == "percentage":
-            if is_buy:
-                self.current_tp = self._snap_to_tick(self.entry_price * (1 + self.config.target_value / 100))
-            else:
-                self.current_tp = self._snap_to_tick(self.entry_price * (1 - self.config.target_value / 100))
-        elif self.config.target_type == "points":
-            if is_buy:
-                self.current_tp = self._snap_to_tick(self.entry_price + self.config.target_value)
-            else:
-                self.current_tp = self._snap_to_tick(self.entry_price - self.config.target_value)
-        elif self.config.target_type == "atr":
+        # ----- Take-profit -----
+        tp_type = self.config.target_type
+        if tp_type == "percentage":
+            tp = (
+                ref_price * (1 + self.config.target_value / 100) if is_buy
+                else ref_price * (1 - self.config.target_value / 100)
+            )
+            tp = self._snap_to_tick(tp)
+        elif tp_type == "points":
+            tp = self._snap_to_tick(
+                ref_price + self.config.target_value if is_buy
+                else ref_price - self.config.target_value
+            )
+        elif tp_type == "atr":
             # Volatility-adaptive Target (spec §1.1 fn.4): distance = k × ATR.
-            # BUY  → TP above entry; SELL → TP below entry.
             atr_val = float(self._tgt_atr.value) if self._tgt_atr is not None and self._tgt_atr.initialized else 0.0
             dist = atr_val * float(self.config.tgt_atr_multiplier)
-            if dist > 0:
-                if is_buy:
-                    self.current_tp = self._snap_to_tick(self.entry_price + dist)
-                else:
-                    self.current_tp = self._snap_to_tick(self.entry_price - dist)
-            else:
-                self.current_tp = 0.0
+            tp = (
+                self._snap_to_tick(ref_price + dist if is_buy else ref_price - dist)
+                if dist > 0 else 0.0
+            )
         else:
-            self.current_tp = 0.0
+            tp = 0.0
+
+        return sl, tp
 
     def _compute_sl_price(self, is_long: bool, pct: float) -> float:
         if is_long:
@@ -1693,6 +2007,72 @@ class ManagedExitStrategy(Strategy):
         self.submit_order(order)
         self._pending_entry_reason = None
 
+    def _submit_bracket(self, side: OrderSide, ref_price: float) -> None:
+        """Submit a native bracket: MARKET entry + STOP_MARKET SL + LIMIT TP.
+
+        SL/TP trigger prices are computed from ``ref_price`` (the signal-bar
+        close, since the entry has not filled yet). The matching engine then
+        sweeps each bar's O/H/L/C and fires the resting SL/TP at the
+        trigger/limit price — far more accurate than the Python market-close.
+        Falls back to a plain market entry if either level can't be computed
+        (e.g. ATR not yet valid), so a leg never silently fails to enter.
+        """
+        is_buy = side == OrderSide.BUY
+        sl, tp = self._compute_sl_tp(is_buy, ref_price)
+        if sl <= 0 or tp <= 0:
+            # Reachable: an ATR leg is classified native_bracket on
+            # sl_atr_multiplier>0 alone (_classify_exit_mode), so on the first
+            # signal the ATR can still be cold and _compute_sl_tp returns 0.0.
+            # Switch this leg to the Python exit path so it is still monitored —
+            # otherwise _on_primary_bar (the native-bracket guard) skips
+            # _check_exits and the position would have no resting SL/TP and no
+            # Python monitoring (unbounded risk). The switch is permanent for
+            # this instance: we don't flip back once the ATR warms up, to keep a
+            # single run's exit semantics uniform and avoid per-trade mode flap.
+            self.log.warning(
+                f"native_bracket: SL/TP unavailable (sl={sl}, tp={tp}) — falling "
+                f"back to Python exit management for this leg"
+            )
+            self._exit_mode = "python"
+            self._submit_order(side)
+            # No-op today (_set_exit_levels is a stub); the real SL/TP are seeded
+            # from the actual fill price in on_order_filled's Python branch. Kept
+            # for symmetry with the non-native entry dispatch.
+            self._set_exit_levels(side)
+            return
+        # Tag the resting SL/TP children with reasons whose prefix matches the
+        # Python path ("Stop Loss" / "Take Profit"). The orderbook builder splits
+        # the closing fill's tag on the first ":" for the EXIT REASON column, so
+        # this keeps native-bracket legs consistent with Python legs (and keeps
+        # downstream prefix string-matches working). The actual fill price/pct is
+        # unknown at submit time, so the detail shows the exact trigger level and
+        # the approximate (signal-bar) entry.
+        sl_op = "≤" if is_buy else "≥"
+        tp_op = "≥" if is_buy else "≤"
+        sl_reason = f"Stop Loss: native bracket SL={sl:.4f} (entry ~{ref_price:.4f}, trigger {sl_op})"
+        tp_reason = f"Take Profit: native bracket TP={tp:.4f} (entry ~{ref_price:.4f}, trigger {tp_op})"
+        bracket = self.order_factory.bracket(
+            instrument_id=self.config.instrument_id,
+            order_side=side,
+            quantity=self.instrument.make_qty(self.config.trade_size),
+            entry_order_type=OrderType.MARKET,
+            sl_trigger_price=self.instrument.make_price(sl),
+            tp_price=self.instrument.make_price(tp),
+            # A close-only TP just needs to fill when price reaches it; the
+            # factory default post_only=True can be rejected as a taker on L1
+            # bar data, so disable it.
+            tp_post_only=False,
+            time_in_force=TimeInForce.GTC,
+            entry_tags=[self._pending_entry_reason] if self._pending_entry_reason else None,
+            sl_tags=[sl_reason],
+            tp_tags=[tp_reason],
+        )
+        self.submit_order_list(bracket)
+        # Mirror the levels into state for reporting/orderbook parity.
+        self.current_sl = sl
+        self.current_tp = tp
+        self._pending_entry_reason = None
+
     def on_stop(self) -> None:
         # Drain trailing partial windows (no order action — matches Nautilus,
         # which never emits an in-progress window).
@@ -1716,7 +2096,9 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      subscribe_bar_types: list | None = None,
                      allowed_weekdays: list | None = None,
                      portfolio_id: str = "",
-                     slot_id: str = "") -> ManagedExitConfig:
+                     slot_id: str = "",
+                     reexec_entry_price: float = 0.0,
+                     reexec_entry_was_long: bool = True) -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
 
     ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
@@ -1766,8 +2148,11 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     # type (the strategy aggregates these base streams to the same windows as
     # the primary when aggregating).
     _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
-    if _fmt not in ("ohlcv", "ltp", "bidask"):
+    if _fmt not in ("ohlcv", "ltp", "bidask", "mark"):
         _fmt = "ohlcv"
+    # "mark" (Mark Price, spec §3) passes through here; the crypto-only gate is
+    # enforced in ManagedExitStrategy.on_start (downgrades to OHLCV with a log
+    # on non-crypto venues) where the venue is known.
     _bid_bt, _ask_bt = ("", "")
     if _fmt == "bidask":
         _bid_bt, _ask_bt = _derive_bid_ask_bar_types(str(bar_type))
@@ -1786,6 +2171,7 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         ask_bar_type=_ask_bt,
         subscribe_bar_types=[],
         aggregate_to_bar_type=_aggregate_to,
+        exit_check_on_base_bar=bool(getattr(exit_config, "exit_check_on_base_bar", False)),
         stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,
@@ -1814,6 +2200,8 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         reentry_price=float(getattr(exit_config, "reentry_price", 0.0) or 0.0),
         max_re_entries=int(getattr(exit_config, "max_re_entries", 0) or 0),
         armed_at_start=bool(getattr(exit_config, "armed_at_start", True)),
+        reexec_entry_price=float(reexec_entry_price or 0.0),
+        reexec_entry_was_long=bool(reexec_entry_was_long),
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
         # Intraday entry window (spec §9) — UTC minute-of-day, -1 = disabled.
@@ -1882,4 +2270,8 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                 move_sl_hit_on_leg_sl=getattr(move_sl_settings, "hit_on_leg_sl", False),
                 move_sl_hit_on_leg_target=getattr(move_sl_settings, "hit_on_leg_target", False),
             )
+
+    # Resolve the exit firing mechanism last, so the classifier sees every
+    # finalised flag (rbo_enabled / move_sl_enabled are only added above).
+    kwargs["exit_mode"] = _classify_exit_mode(kwargs)
     return ManagedExitConfig(**kwargs)

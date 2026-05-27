@@ -161,7 +161,21 @@
       "Bash(echo \"exit=$?\")",
       "Bash(Get-ChildItem -Path \"d:\\\\m-cube_version1\" -Recurse -Depth 2 -ErrorAction SilentlyContinue)",
       "Bash(venv/Scripts/python.exe -m flake8 . --select=E9,F63,F7,F82 --exclude=venv,.git,__pycache__ --statistics)",
-      "Bash(echo \"flake8 exit=$?\")"
+      "Bash(echo \"flake8 exit=$?\")",
+      "Bash(python scripts/_split_backtest_runner.py)",
+      "Bash(venv/Scripts/python.exe -c \"import core.backtest_runner as b; print\\('IMPORT OK'\\); print\\('file:', b.__file__\\); print\\('has run_portfolio_backtest:', hasattr\\(b,'run_portfolio_backtest'\\)\\); print\\('has BacktestNode:', hasattr\\(b,'BacktestNode'\\)\\); print\\('all len:', len\\(b.__all__\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -)",
+      "Bash(venv/Scripts/python.exe -c \"import core.backtest_runner as b; import server; print\\('IMPORT OK: package + server'\\); missing=[s for s in b.__all__ if not hasattr\\(b,s\\)]; print\\('missing __all__ exports:', missing or 'NONE'\\)\")",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Read(//tmp/**)",
+      "Bash(/d/m-cube_version1/venv/Scripts/python.exe verify_session_changes.py)",
+      "PowerShell(Get-Content README_APP.md | Select-String -Pattern '\\\\]\\\\\\(\\(core/[^\\)#]+\\)\\\\\\)' -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique | ForEach-Object { if \\(-not \\(Test-Path $_.TrimEnd\\('/'\\)\\)\\) { \"MISSING: $_\" } }; \"done\")",
+      "PowerShell(Test-Path \"core/backtest_runner.py\"; Test-Path \"core\\\\backtest_runner.py\"; \\(Get-Location\\).Path)",
+      "Bash(git worktree *)",
+      "Bash(python tests/smoke_tests/smoke_test_logics_audit.py)",
+      "Bash(venv/Scripts/python.exe scripts/verify_grouping_parity.py --portfolio portfolios/_default/EDGE_02_quad_mixed.json)",
+      "Bash(Get-ChildItem -Path \"D:\\\\m-cube_version1\\\\core\\\\backtest_runner\" -Directory)",
+      "Bash(Sort-Object Name)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",

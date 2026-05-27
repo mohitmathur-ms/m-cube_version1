@@ -45,7 +45,7 @@ def _rel(repo_root: Path, path: Path) -> str:
 
 def _module_name_for(repo_root: Path, path: Path) -> str:
     """Dotted module name for a file, e.g. core/models/__init__.py -> 'core.models',
-    core/backtest_runner.py -> 'core.backtest_runner'."""
+    core/backtest_runner/__init__.py -> 'core.backtest_runner'."""
     rel = path.resolve().relative_to(repo_root.resolve())
     parts = list(rel.parts)
     if parts[-1] == "__init__.py":
