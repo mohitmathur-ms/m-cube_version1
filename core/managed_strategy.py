@@ -2051,6 +2051,7 @@ class ManagedExitStrategy(Strategy):
         tp_op = "≥" if is_buy else "≤"
         sl_reason = f"Stop Loss: native bracket SL={sl:.4f} (entry ~{ref_price:.4f}, trigger {sl_op})"
         tp_reason = f"Take Profit: native bracket TP={tp:.4f} (entry ~{ref_price:.4f}, trigger {tp_op})"
+        
         bracket = self.order_factory.bracket(
             instrument_id=self.config.instrument_id,
             order_side=side,
