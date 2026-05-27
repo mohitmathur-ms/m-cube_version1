@@ -1,0 +1,11 @@
+{
+  "headline": "Research report: how NautilusTrader routes SL/TP orders in live trading (venue vs Python monitoring)",
+  "branch": "feature/order-type-validation",
+  "sha": "38c8a21ee4ec5c3a71024676ab5fd5c652884658",
+  "short_sha": "38c8a21",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/38c8a21ee4ec5c3a71024676ab5fd5c652884658",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-27T07:24:54+00:00",
+  "ai": true
+}
