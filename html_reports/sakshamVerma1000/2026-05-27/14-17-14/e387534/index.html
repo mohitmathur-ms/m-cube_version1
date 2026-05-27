@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add two automated code-review reports and expand Claude tool permissions — e387534</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  /* Mermaid knowledge-graph container (the diagram itself is themed via
+     mermaid.initialize({theme:"dark"}) plus per-node classDefs in mermaid_graph.py). */
+  .mermaid { background: var(--surface); border: 1px solid var(--border);
+             border-radius: 12px; padding: 16px; margin: 8px 0 10px; text-align: center;
+             overflow-x: auto; }
+  .graph-legend { font-size: 0.76rem; color: var(--muted); margin: 0 0 16px; }
+  .graph-legend span { display: inline-block; margin-right: 14px; }
+  .graph-legend .gl-class { color: var(--orange); }
+  .graph-legend .gl-func { color: var(--blue); }
+  .graph-legend .gl-config, .graph-legend .gl-changed { color: var(--green); }
+  .graph-legend .gl-concept { color: var(--purple); }
+  .graph-legend .gl-file { color: var(--muted); }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:"dark", securityLevel:"loose"});</script>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">feature/order-type-validation</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/e387534680031c6c5251422e22098864dece1e37'><code>e387534</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>Add two automated code-review reports and expand Claude tool permissions</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-05-27 08:48 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>This push records the results of two automated code reviews that were run against recent changes to the project.</p><p>The first review examined new code that generates visual knowledge-graph diagrams in push reports. It passed with minor notes: the diagram library is loaded from the internet using a loose version tag (meaning future updates could silently change how old reports look), and some small style inconsistencies were flagged. Overall the code was judged sound.</p><p>The second review examined a research document that explored how stop-loss and take-profit orders are monitored in a live trading environment. It passed with one factual note: a code snippet quoted in the document omitted one branch of the actual source code, which could mislead a reader even though it does not affect the conclusions. One stray blank line with extra spaces was also found in a backend source file.</p><p>Finally, the project&#x27;s automation settings were updated to allow Claude to run a wider set of commands during future code-review sessions, including reading skill and plugin files and running certain validation scripts.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>Three files changed. `.claude/settings.json` gains nine new `allow` entries: `Read` access to the local Claude skills and plugins directories (`//c/Users/HP/.claude/skills/**`, `//c/Users/HP/.claude/plugins/**`), a `Bash` call to `python .github/scripts/mermaid_graph.py` (self-check for the new Mermaid builder), two `Bash` calls to probe Nautilus source files (`ls trading/strategy.pyx`, `ls common/factories.pyx`), a `Bash` one-liner to print the installed `nautilus_trader` package path, and two `PowerShell` commands for creating the `html_reports/` directory and validating a rendered HTML report file.</p><p>`coding-toolkit/code-reviews/2026-05-27-13-38-mermaid-knowledge-graph.md` is a new 114-line review of commit `3d3fff2` (Mermaid graph in push reports). Key findings: [P-1] `mermaid@10` in `generate_report.py:613` is a floating CDN tag — pinning to an exact version (e.g. `mermaid@10.9.1`) would make archived reports render identically; [S-1] `securityLevel:&quot;loose&quot;` in the Mermaid `initialize()` call is unnecessary because `_mlabel` already strips all dangerous characters; [S-2] `from_concept` in `mermaid_graph.py:164` quotes edge labels (`--&gt;|&quot;rel&quot;|`) while `from_depgraph` at `:115` emits them unquoted; [S-3] nodes introduced only via edges default to `kind=&quot;concept&quot;` coloring regardless of their true kind. Strengths highlighted: `_mlabel`&#x27;s sanitization coverage, the graceful degradation chain (concept graph → depgraph → note), and consistent renaming of `_graph_section` across all three call sites in `generate_report.py`.</p><p>`coding-toolkit/code-reviews/2026-05-27-13-46-live-env-sltp-report.md` is a 139-line review of commit `38c8a21` (live-env SL/TP research report). One Logic finding [L-1]: the HTML report quotes `trading/strategy.pyx:891-897` as a two-branch `if/else` but the actual source has three branches — the `elif order.exec_algorithm_id is not None: send_algo_command(...)` arm is omitted, making the snippet non-verbatim. Style findings: [S-1] a blank line with 8 trailing spaces at `managed_strategy.py:2054`; [S-2] `support_contingent_orders=True` is described as an m-cube setting when it is actually a NautilusTrader `add_venue` default never explicitly set in the repo; [S-3] missing trailing newline in the HTML file.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>The sharpest finding is L-1 in the live-env SL/TP review: the research report presents this as the complete order-routing logic in `trading/strategy.pyx:891-897`:</p><p>```python
+# As quoted in the report (2-branch)
+if order.emulation_trigger != TriggerType.NO_TRIGGER:
+    self._manager.send_emulator_command(command)
+else:
+    self._manager.send_risk_command(command)   # &quot;sent directly to venue&quot;
+```</p><p>But the real source has a third branch:</p><p>```python
+# Actual source (3-branch)
+if order.emulation_trigger != TriggerType.NO_TRIGGER:
+    self._manager.send_emulator_command(command)
+elif order.exec_algorithm_id is not None:          # ← omitted in report
+    self._manager.send_algo_command(command, order.exec_algorithm_id)
+else:
+    self._manager.send_risk_command(command)
+```</p><p>The conclusion (default bracket orders go to the venue) is unaffected, but any reader who copies the snippet as a verbatim source quote is holding an edited version of the code.</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='muted'>No knowledge graph could be produced for this push.</p><h3>Dependency detail</h3><p class='sub'>Detailed file view &mdash; arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><p class='muted'>No first-party Python files changed in this push, so there is no import graph to draw. See the table below for the full changed-file list.</p></div><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.claude/settings.json</code></li><li><code>coding-toolkit/code-reviews/2026-05-27-13-38-mermaid-knowledge-graph.md</code></li><li><code>coding-toolkit/code-reviews/2026-05-27-13-46-live-env-sltp-report.md</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.claude/settings.json</code></td><td>expanded allow-list with 9 new tool permissions for Claude review sessions (CDN script check, skill/plugin reads, Nautilus source probes, PowerShell report validation).</td></tr><tr><td><code>coding-toolkit/code-reviews/2026-05-27-13-38-mermaid-knowledge-graph.md</code></td><td>new automated review of the Mermaid knowledge-graph push-report feature (commit 3d3fff2); verdict PASS, 4 findings.</td></tr><tr><td><code>coding-toolkit/code-reviews/2026-05-27-13-46-live-env-sltp-report.md</code></td><td>new automated review of the live-env SL/TP research document (commit 38c8a21); verdict PASS_WITH_WARNINGS, 4 findings including one Logic finding on a non-verbatim source quote.</td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>P-1 unresolved: generate_report.py:613 still loads mermaid@10 (floating tag); pin to an exact semver before the next release to avoid non-reproducible rendering of archived reports.</li><li>L-1 unresolved: Live_Env_Monitoring_sl_tp.html:104-108 presents a 2-branch routing snippet as verbatim; add the omitted exec_algorithm_id branch or label the snippet as simplified.</li><li>S-1 unresolved: managed_strategy.py:2054 has a stray blank line with 8 trailing spaces introduced by commit 38c8a21; should be cleaned up.</li><li>settings.json allow-list now includes broad glob patterns for local skill/plugin directories (//c/Users/HP/.claude/skills/**) — these are machine-specific Windows paths that will silently no-op on other developers&#x27; machines or CI.</li><li>No pytest coverage for mermaid_graph.py sanitization guarantees (_mlabel strips, never-raises contract) — the review recommends adding this; the security argument for dropping securityLevel:loose depends on it.</li><li>S-2 in live-env report: support_contingent_orders=True wording implies m-cube configures it explicitly; reword to &#x27;NautilusTrader add_venue default&#x27; to avoid confusion.</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat</h2>
+    <pre>.claude/settings.json                              |  12 +-
+ .../2026-05-27-13-38-mermaid-knowledge-graph.md    | 114 +++++++++++++++++
+ .../2026-05-27-13-46-live-env-sltp-report.md       | 139 +++++++++++++++++++++
+ 3 files changed, 264 insertions(+), 1 deletion(-)</pre>
+  </section>
+
+  <footer>
+    Commit e387534680031c6c5251422e22098864dece1e37 on <strong>feature/order-type-validation</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>

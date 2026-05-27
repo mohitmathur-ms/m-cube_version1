@@ -1,0 +1,11 @@
+{
+  "headline": "Add two automated code-review reports and expand Claude tool permissions",
+  "branch": "feature/order-type-validation",
+  "sha": "e387534680031c6c5251422e22098864dece1e37",
+  "short_sha": "e387534",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/e387534680031c6c5251422e22098864dece1e37",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-27T08:48:21+00:00",
+  "ai": true
+}
