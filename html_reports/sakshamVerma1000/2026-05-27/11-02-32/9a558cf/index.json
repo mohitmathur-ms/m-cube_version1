@@ -1,0 +1,11 @@
+{
+  "headline": "Decompose the 5,809-line core/backtest_runner.py monolith into a 17-module sub-package and expand README with NautilusTrader internals documentation",
+  "branch": "feature/order-type-validation",
+  "sha": "9a558cfdb503a70ae3fa00025c5cdfb03e94cce6",
+  "short_sha": "9a558cf",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/9a558cfdb503a70ae3fa00025c5cdfb03e94cce6",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-27T05:34:14+00:00",
+  "ai": true
+}
