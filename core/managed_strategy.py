@@ -441,6 +441,10 @@ class ManagedExitStrategy(Strategy):
         self.highest_profit = 0.0
         self.current_sl = 0.0
         self.current_tp = 0.0
+        # ATR value used to size an atr-type SL at entry. Surfaced in the SL
+        # exit reason tag (atr@entry=…) so orderbook-only verification can
+        # check expected_sl = entry ∓ mult × ATR without engine internals.
+        self._atr_at_entry: float = 0.0
         self.sl_wait_count = 0
         self._sl_wait_started_ns: int = 0  # First-breach timestamp for sl_wait_sec
         # Target Wait (spec §4.3) — mirror of the SL-wait state.
@@ -1440,13 +1444,21 @@ class ManagedExitStrategy(Strategy):
             raw_pct = 0.0
         # Convention: positive pct == in profit (matches profit_pct elsewhere).
         pct = raw_pct if was_long else -raw_pct
+        # Format prices at the instrument's own precision so the logged SL is
+        # tick-exact (a flat :.4f truncates the 5th decimal on FX, which makes
+        # orderbook-only tick-snap verification impossible).
+        prec = self.instrument.price_precision if self.instrument else 4
         if exit_type == "sl":
             op = "≤" if was_long else "≥"
             label = "Trailing SL" if self._was_trailed else "Stop Loss"
             if "reverse" in actions:
                 label = "Reverse on SL"
-            reason = (f"{label}: price={close:.4f} {op} SL={self.current_sl:.4f} "
-                      f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
+            reason = (f"{label}: price={close:.{prec}f} {op} SL={self.current_sl:.{prec}f} "
+                      f"(entry {self.entry_price:.{prec}f}, {pct:+.2f}%)")
+            # For atr-type SLs, expose the ATR used at entry so a verifier can
+            # check expected_sl = entry ∓ mult × ATR purely from the orderbook.
+            if self.config.stop_loss_type == "atr":
+                reason += f" [atr@entry={self._atr_at_entry:.{prec}f}]"
         else:  # tp
             op = "≥" if was_long else "≤"
             if "reverse" in actions:
@@ -1457,10 +1469,10 @@ class ManagedExitStrategy(Strategy):
                 label = "Take Profit"
             if self._tp_was_trail:
                 reason = (f"{label}: profit {pct:+.2f}% fell to locked floor "
-                          f"{self._tgt_trail_stop:+.2f}% (entry {self.entry_price:.4f})")
+                          f"{self._tgt_trail_stop:+.2f}% (entry {self.entry_price:.{prec}f})")
             else:
-                reason = (f"{label}: price={close:.4f} {op} TP={self.current_tp:.4f} "
-                          f"(entry {self.entry_price:.4f}, {pct:+.2f}%)")
+                reason = (f"{label}: price={close:.{prec}f} {op} TP={self.current_tp:.{prec}f} "
+                          f"(entry {self.entry_price:.{prec}f}, {pct:+.2f}%)")
 
         # 1.2(e) KeepLegRunning: ignore the trigger entirely. Position remains
         # open; SL/TP are disarmed for the rest of this trade so we don't
@@ -1674,6 +1686,7 @@ class ManagedExitStrategy(Strategy):
             # Volatility-adaptive SL (spec §1.1 fn.4): distance = k × ATR.
             # BUY  → SL below entry; SELL → SL above entry.
             atr_val = float(self._atr.value) if self._atr is not None and self._atr.initialized else 0.0
+            self._atr_at_entry = atr_val
             dist = atr_val * float(self.config.sl_atr_multiplier)
             if dist > 0:
                 if is_buy:
@@ -1683,6 +1696,7 @@ class ManagedExitStrategy(Strategy):
             else:
                 self.current_sl = 0.0
         else:
+            self._atr_at_entry = 0.0
             self.current_sl = 0.0
 
         # Compute TP (snap to instrument tick)

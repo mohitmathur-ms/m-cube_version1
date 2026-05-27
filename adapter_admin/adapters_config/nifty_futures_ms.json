@@ -24,5 +24,7 @@
   "account_base_currency": "INR",
   "fx_conversion": {},
   "created_at": "2026-05-19T16:46:15.439516",
-  "updated_at": "2026-05-19T16:46:15.439516"
+  "updated_at": "2026-05-27T15:43:51.204218",
+  "session_start_time": "09:15:00",
+  "session_end_time": "19:14:00"
 }

@@ -72,7 +72,7 @@ Folders are grouped by role. The two most important things to find your way arou
 | Folder | What it stores |
 |---|---|
 | [csv/](csv/) | **Raw input data**. Subfolders `fx_csv/` (1-min ASK / BID CSV exports per pair) and `commodities_csv/` (commodity 1-min bars). This is what gets ingested into the catalog. |
-| [catalog/](catalog/) | NautilusTrader `ParquetDataCatalog` — the single source of truth that `server.py` and the runner read from. Aggregated parquets live at `catalog/data/bar/<bar_type>/`; **every higher-timeframe bar (5m, 15m, 30m, 1h, 2h, 1d, 1w, 1mo) produced by the aggregator ends up here**. Instrument definitions live at `catalog/data/currency_pair/`; feature sidecars at `catalog/features/bar/`. |
+| [catalog/](catalog/) | NautilusTrader `ParquetDataCatalog` — the single source of truth that `server.py` and the runner read from. Aggregated parquets live at `catalog/data/bar/<bar_type>/`; **every higher-timeframe bar (5m, 15m, 30m, 1h, 2h, 1d, 1w, 1mo) produced by the aggregator ends up here**. Instrument definitions live at `catalog/data/currency_pair/`. |
 | [data/](data/) | Debug snapshots from sniffer / engine-dispatch runs (raw 1-min CSVs, `order_events/`). Not used by production code paths. |
 | [temp_csv/](temp_csv/) | Short-lived per-run output: `fills.csv`, `positions.csv`, `account.csv`, `summary.csv` written by smoke scripts such as [scripts/run_ema_cross_april2024.py](scripts/run_ema_cross_april2024.py). |
 
@@ -164,7 +164,7 @@ Folders are grouped by role. The two most important things to find your way arou
 
 ## The Aggregation Pipeline — Where & How
 
-**Aggregation happens in [core/aggregator.py](core/aggregator.py).** Public entry points: `aggregate_ohlcv(df_1min, timeframe)` for a single timeframe and `aggregate_to_timeframes(...)` for the full fan-out. Bucketing uses `closed='right', label='right'`: the bar stamped at `T` aggregates the 1-min bars in the half-open window `(T − N, T]`. Volume is summed and clipped to `QUANTITY_MAX`. RSI / ATR / EMA / VWAP feature sidecars are computed post-aggregation.
+**Aggregation happens in [core/aggregator.py](core/aggregator.py).** Public entry points: `aggregate_ohlcv(df_1min, timeframe)` for a single timeframe and `aggregate_to_timeframes(...)` for the full fan-out. Bucketing uses `closed='right', label='right'`: the bar stamped at `T` aggregates the 1-min bars in the half-open window `(T − N, T]`. Volume is summed and clipped to `QUANTITY_MAX`.
 
 It is invoked from three places:
 - The `/api/csv/load` endpoint in [server.py](server.py) when fresh CSVs are ingested via the UI.

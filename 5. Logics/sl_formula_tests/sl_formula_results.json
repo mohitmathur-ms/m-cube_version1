@@ -1,0 +1,1146 @@
+[
+  {
+    "test_id": "PCT-05",
+    "name": "Percentage SL 0.05% \u2014 expected = entry \u00d7 (1\u22130.05/100), tick-snapped",
+    "status": "ok",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.05,
+      "sl_atr_multiplier": 0.0
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry\u00d7(1\u22130.05/100)).",
+    "tick": 1e-05,
+    "orderbook_trades": 3,
+    "n_sl_exits": 2,
+    "mean_sl_distance": 0.00052849,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05452,
+        "engine_sl": 1.05452,
+        "atr_at_entry": null,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.054119,
+        "expected_sl": 1.05359,
+        "engine_sl": 1.05359,
+        "atr_at_entry": null,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "percentage SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05452 engine_sl=1.05452 diff=2.22e-16"
+      },
+      {
+        "label": "percentage SL #2 (LONG)",
+        "detail": "entry=1.05412 expected_sl=1.05359 engine_sl=1.05359 diff=0.00e+00"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "2 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "3/3",
+    "elapsed_sec": 2.7
+  },
+  {
+    "test_id": "PCT-10",
+    "name": "Percentage SL 0.1% \u2014 expected = entry \u00d7 (1\u22130.1/100), tick-snapped",
+    "status": "fail",
+    "params": {
+      "stop_loss_type": "percentage",
+      "stop_loss_value": 0.1,
+      "sl_atr_multiplier": 0.0
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry\u00d7(1\u22130.1/100)).",
+    "tick": 1e-05,
+    "orderbook_trades": 3,
+    "n_sl_exits": 3,
+    "mean_sl_distance": 0.00105109,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05505,
+        "engine_sl": 1.05504,
+        "atr_at_entry": null,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.054844,
+        "expected_sl": 1.0559,
+        "engine_sl": 1.05589,
+        "atr_at_entry": null,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.055181,
+        "expected_sl": 1.05624,
+        "engine_sl": 1.05624,
+        "atr_at_entry": null,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "percentage SL #3 (SHORT)",
+        "detail": "entry=1.05518 expected_sl=1.05624 engine_sl=1.05624 diff=0.00e+00"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "3 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [
+      {
+        "label": "percentage SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05505 engine_sl=1.05504 diff=1.00e-05"
+      },
+      {
+        "label": "percentage SL #2 (SHORT)",
+        "detail": "entry=1.05484 expected_sl=1.0559 engine_sl=1.05589 diff=1.00e-05"
+      }
+    ],
+    "verification_count": "2/4",
+    "elapsed_sec": 2.6
+  },
+  {
+    "test_id": "PTS-0005",
+    "name": "Points SL 0.0005 \u2014 expected = entry \u2213 0.0005, tick-snapped",
+    "status": "ok",
+    "params": {
+      "stop_loss_type": "points",
+      "stop_loss_value": 0.0005,
+      "sl_atr_multiplier": 0.0
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry\u22130.0005).",
+    "tick": 1e-05,
+    "orderbook_trades": 3,
+    "n_sl_exits": 3,
+    "mean_sl_distance": 0.00049849,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05449,
+        "engine_sl": 1.05449,
+        "atr_at_entry": null,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.054178,
+        "expected_sl": 1.05368,
+        "engine_sl": 1.05368,
+        "atr_at_entry": null,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053801,
+        "expected_sl": 1.0543,
+        "engine_sl": 1.0543,
+        "atr_at_entry": null,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "points SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05449 engine_sl=1.05449 diff=2.22e-16"
+      },
+      {
+        "label": "points SL #2 (LONG)",
+        "detail": "entry=1.05418 expected_sl=1.05368 engine_sl=1.05368 diff=2.22e-16"
+      },
+      {
+        "label": "points SL #3 (SHORT)",
+        "detail": "entry=1.0538 expected_sl=1.0543 engine_sl=1.0543 diff=0.00e+00"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "3 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "4/4",
+    "elapsed_sec": 3.3
+  },
+  {
+    "test_id": "PTS-0010",
+    "name": "Points SL 0.001 \u2014 expected = entry \u2213 0.001, tick-snapped",
+    "status": "ok",
+    "params": {
+      "stop_loss_type": "points",
+      "stop_loss_value": 0.001,
+      "sl_atr_multiplier": 0.0
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry\u22130.001).",
+    "tick": 1e-05,
+    "orderbook_trades": 4,
+    "n_sl_exits": 3,
+    "mean_sl_distance": 0.00099724,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05499,
+        "engine_sl": 1.05499,
+        "atr_at_entry": null,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.055826,
+        "expected_sl": 1.05483,
+        "engine_sl": 1.05483,
+        "atr_at_entry": null,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.055862,
+        "expected_sl": 1.05686,
+        "engine_sl": 1.05686,
+        "atr_at_entry": null,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "points SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05499 engine_sl=1.05499 diff=0.00e+00"
+      },
+      {
+        "label": "points SL #2 (LONG)",
+        "detail": "entry=1.05583 expected_sl=1.05483 engine_sl=1.05483 diff=2.22e-16"
+      },
+      {
+        "label": "points SL #3 (SHORT)",
+        "detail": "entry=1.05586 expected_sl=1.05686 engine_sl=1.05686 diff=2.22e-16"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "3 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "4/4",
+    "elapsed_sec": 2.5
+  },
+  {
+    "test_id": "NONE",
+    "name": "No SL \u2014 leg never stopped (negative fixture)",
+    "status": "ok",
+    "params": {
+      "stop_loss_type": "none",
+      "stop_loss_value": 0.0,
+      "sl_atr_multiplier": 0.0
+    },
+    "expected": "No 'Stop Loss' exits appear in the orderbook.",
+    "tick": 1e-05,
+    "orderbook_trades": 440,
+    "n_sl_exits": 0,
+    "mean_sl_distance": 0.0,
+    "sample": [],
+    "checks_passed": [
+      {
+        "label": "no_sl_exits",
+        "detail": "0 Stop Loss exits (want 0)"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "1/1",
+    "elapsed_sec": 4.1
+  },
+  {
+    "test_id": "ATR-10",
+    "name": "ATR SL period 14 \u00d7 1.0 \u2014 expected = entry \u2213 1.0\u00d7ATR, tick-snapped",
+    "status": "fail",
+    "params": {
+      "stop_loss_type": "atr",
+      "stop_loss_value": 0.0,
+      "sl_atr_multiplier": 1.0,
+      "sl_atr_period": 14
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry \u2213 1.0\u00d7ATR@entry).",
+    "tick": 1e-05,
+    "orderbook_trades": 41,
+    "n_sl_exits": 40,
+    "mean_sl_distance": 0.00018018,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05418,
+        "engine_sl": 1.05418,
+        "atr_at_entry": 0.00019,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.05403,
+        "expected_sl": 1.05386,
+        "engine_sl": 1.05386,
+        "atr_at_entry": 0.00017,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053619,
+        "expected_sl": 1.05344,
+        "engine_sl": 1.05344,
+        "atr_at_entry": 0.00018,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053401,
+        "expected_sl": 1.05359,
+        "engine_sl": 1.05359,
+        "atr_at_entry": 0.00019,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053351,
+        "expected_sl": 1.05355,
+        "engine_sl": 1.05355,
+        "atr_at_entry": 0.0002,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053369,
+        "expected_sl": 1.05324,
+        "engine_sl": 1.05324,
+        "atr_at_entry": 0.00013,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053181,
+        "expected_sl": 1.05332,
+        "engine_sl": 1.05332,
+        "atr_at_entry": 0.00014,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053079,
+        "expected_sl": 1.05292,
+        "engine_sl": 1.05292,
+        "atr_at_entry": 0.00016,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053519,
+        "expected_sl": 1.05331,
+        "engine_sl": 1.05331,
+        "atr_at_entry": 0.00021,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053378,
+        "expected_sl": 1.05315,
+        "engine_sl": 1.05315,
+        "atr_at_entry": 0.00023,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053328,
+        "expected_sl": 1.053,
+        "engine_sl": 1.053,
+        "atr_at_entry": 0.00033,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053199,
+        "expected_sl": 1.05297,
+        "engine_sl": 1.05297,
+        "atr_at_entry": 0.00023,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053359,
+        "expected_sl": 1.05309,
+        "engine_sl": 1.05309,
+        "atr_at_entry": 0.00027,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053574,
+        "expected_sl": 1.05307,
+        "engine_sl": 1.05308,
+        "atr_at_entry": 0.0005,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053176,
+        "expected_sl": 1.05267,
+        "engine_sl": 1.05267,
+        "atr_at_entry": 0.00051,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053368,
+        "expected_sl": 1.05309,
+        "engine_sl": 1.05309,
+        "atr_at_entry": 0.00028,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053239,
+        "expected_sl": 1.05303,
+        "engine_sl": 1.05303,
+        "atr_at_entry": 0.00021,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053251,
+        "expected_sl": 1.0534,
+        "engine_sl": 1.0534,
+        "atr_at_entry": 0.00015,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053149,
+        "expected_sl": 1.05301,
+        "engine_sl": 1.05301,
+        "atr_at_entry": 0.00014,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052761,
+        "expected_sl": 1.05294,
+        "engine_sl": 1.05294,
+        "atr_at_entry": 0.00018,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052192,
+        "expected_sl": 1.05241,
+        "engine_sl": 1.05241,
+        "atr_at_entry": 0.00022,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.051983,
+        "expected_sl": 1.05223,
+        "engine_sl": 1.05223,
+        "atr_at_entry": 0.00025,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.051838,
+        "expected_sl": 1.0515,
+        "engine_sl": 1.0515,
+        "atr_at_entry": 0.00034,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.051599,
+        "expected_sl": 1.05139,
+        "engine_sl": 1.05139,
+        "atr_at_entry": 0.00021,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.051669,
+        "expected_sl": 1.05156,
+        "engine_sl": 1.05156,
+        "atr_at_entry": 0.00011,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "atr SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05418 engine_sl=1.05418 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #2 (LONG)",
+        "detail": "entry=1.05403 expected_sl=1.05386 engine_sl=1.05386 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #3 (LONG)",
+        "detail": "entry=1.05362 expected_sl=1.05344 engine_sl=1.05344 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #4 (SHORT)",
+        "detail": "entry=1.0534 expected_sl=1.05359 engine_sl=1.05359 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #5 (SHORT)",
+        "detail": "entry=1.05335 expected_sl=1.05355 engine_sl=1.05355 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #6 (LONG)",
+        "detail": "entry=1.05337 expected_sl=1.05324 engine_sl=1.05324 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #7 (SHORT)",
+        "detail": "entry=1.05318 expected_sl=1.05332 engine_sl=1.05332 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #8 (LONG)",
+        "detail": "entry=1.05308 expected_sl=1.05292 engine_sl=1.05292 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #9 (LONG)",
+        "detail": "entry=1.05352 expected_sl=1.05331 engine_sl=1.05331 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #10 (LONG)",
+        "detail": "entry=1.05338 expected_sl=1.05315 engine_sl=1.05315 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #11 (LONG)",
+        "detail": "entry=1.05333 expected_sl=1.053 engine_sl=1.053 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #12 (LONG)",
+        "detail": "entry=1.0532 expected_sl=1.05297 engine_sl=1.05297 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #13 (LONG)",
+        "detail": "entry=1.05336 expected_sl=1.05309 engine_sl=1.05309 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #15 (LONG)",
+        "detail": "entry=1.05318 expected_sl=1.05267 engine_sl=1.05267 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #16 (LONG)",
+        "detail": "entry=1.05337 expected_sl=1.05309 engine_sl=1.05309 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #17 (LONG)",
+        "detail": "entry=1.05324 expected_sl=1.05303 engine_sl=1.05303 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #18 (SHORT)",
+        "detail": "entry=1.05325 expected_sl=1.0534 engine_sl=1.0534 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #19 (LONG)",
+        "detail": "entry=1.05315 expected_sl=1.05301 engine_sl=1.05301 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #20 (SHORT)",
+        "detail": "entry=1.05276 expected_sl=1.05294 engine_sl=1.05294 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #21 (SHORT)",
+        "detail": "entry=1.05219 expected_sl=1.05241 engine_sl=1.05241 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #22 (SHORT)",
+        "detail": "entry=1.05198 expected_sl=1.05223 engine_sl=1.05223 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #23 (LONG)",
+        "detail": "entry=1.05184 expected_sl=1.0515 engine_sl=1.0515 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #24 (LONG)",
+        "detail": "entry=1.0516 expected_sl=1.05139 engine_sl=1.05139 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #25 (LONG)",
+        "detail": "entry=1.05167 expected_sl=1.05156 engine_sl=1.05156 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #26 (LONG)",
+        "detail": "entry=1.05155 expected_sl=1.05142 engine_sl=1.05142 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #27 (SHORT)",
+        "detail": "entry=1.05139 expected_sl=1.05153 engine_sl=1.05153 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #28 (SHORT)",
+        "detail": "entry=1.05127 expected_sl=1.05137 engine_sl=1.05137 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #29 (SHORT)",
+        "detail": "entry=1.05121 expected_sl=1.05128 engine_sl=1.05128 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #30 (SHORT)",
+        "detail": "entry=1.05126 expected_sl=1.05133 engine_sl=1.05133 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #31 (LONG)",
+        "detail": "entry=1.05133 expected_sl=1.05125 engine_sl=1.05125 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #32 (SHORT)",
+        "detail": "entry=1.0511 expected_sl=1.05118 engine_sl=1.05118 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #33 (LONG)",
+        "detail": "entry=1.05119 expected_sl=1.05107 engine_sl=1.05107 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #34 (LONG)",
+        "detail": "entry=1.05124 expected_sl=1.05115 engine_sl=1.05115 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #35 (LONG)",
+        "detail": "entry=1.05154 expected_sl=1.05143 engine_sl=1.05143 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #36 (LONG)",
+        "detail": "entry=1.05148 expected_sl=1.05137 engine_sl=1.05137 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #37 (LONG)",
+        "detail": "entry=1.05152 expected_sl=1.05142 engine_sl=1.05142 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #38 (LONG)",
+        "detail": "entry=1.05141 expected_sl=1.0513 engine_sl=1.0513 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #39 (SHORT)",
+        "detail": "entry=1.05126 expected_sl=1.05137 engine_sl=1.05137 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #40 (SHORT)",
+        "detail": "entry=1.05137 expected_sl=1.05148 engine_sl=1.05148 diff=2.22e-16"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "40 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [
+      {
+        "label": "atr SL #14 (LONG)",
+        "detail": "entry=1.05357 expected_sl=1.05307 engine_sl=1.05308 diff=1.00e-05"
+      }
+    ],
+    "verification_count": "40/41",
+    "elapsed_sec": 2.8
+  },
+  {
+    "test_id": "ATR-15",
+    "name": "ATR SL period 14 \u00d7 1.5 \u2014 expected = entry \u2213 1.5\u00d7ATR, tick-snapped",
+    "status": "fail",
+    "params": {
+      "stop_loss_type": "atr",
+      "stop_loss_value": 0.0,
+      "sl_atr_multiplier": 1.5,
+      "sl_atr_period": 14
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry \u2213 1.5\u00d7ATR@entry).",
+    "tick": 1e-05,
+    "orderbook_trades": 16,
+    "n_sl_exits": 15,
+    "mean_sl_distance": 0.00034357,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05428,
+        "engine_sl": 1.05427,
+        "atr_at_entry": 0.00019,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.054109,
+        "expected_sl": 1.05387,
+        "engine_sl": 1.05387,
+        "atr_at_entry": 0.00016,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053574,
+        "expected_sl": 1.05282,
+        "engine_sl": 1.05283,
+        "atr_at_entry": 0.0005,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053655,
+        "expected_sl": 1.05292,
+        "engine_sl": 1.05293,
+        "atr_at_entry": 0.00049,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053629,
+        "expected_sl": 1.05336,
+        "engine_sl": 1.05335,
+        "atr_at_entry": 0.00018,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053501,
+        "expected_sl": 1.05379,
+        "engine_sl": 1.05378,
+        "atr_at_entry": 0.00019,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053581,
+        "expected_sl": 1.05379,
+        "engine_sl": 1.05379,
+        "atr_at_entry": 0.00014,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.05354,
+        "expected_sl": 1.05377,
+        "engine_sl": 1.05376,
+        "atr_at_entry": 0.00015,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053619,
+        "expected_sl": 1.05335,
+        "engine_sl": 1.05334,
+        "atr_at_entry": 0.00018,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053269,
+        "expected_sl": 1.05295,
+        "engine_sl": 1.05296,
+        "atr_at_entry": 0.00021,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053251,
+        "expected_sl": 1.05357,
+        "engine_sl": 1.05357,
+        "atr_at_entry": 0.00021,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053369,
+        "expected_sl": 1.05313,
+        "engine_sl": 1.05314,
+        "atr_at_entry": 0.00016,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053439,
+        "expected_sl": 1.05317,
+        "engine_sl": 1.05317,
+        "atr_at_entry": 0.00018,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053698,
+        "expected_sl": 1.05337,
+        "engine_sl": 1.05337,
+        "atr_at_entry": 0.00022,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.054307,
+        "expected_sl": 1.05386,
+        "engine_sl": 1.05386,
+        "atr_at_entry": 0.0003,
+        "ok": true
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "atr SL #2 (LONG)",
+        "detail": "entry=1.05411 expected_sl=1.05387 engine_sl=1.05387 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #7 (SHORT)",
+        "detail": "entry=1.05358 expected_sl=1.05379 engine_sl=1.05379 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #11 (SHORT)",
+        "detail": "entry=1.05325 expected_sl=1.05357 engine_sl=1.05357 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #13 (LONG)",
+        "detail": "entry=1.05344 expected_sl=1.05317 engine_sl=1.05317 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #14 (LONG)",
+        "detail": "entry=1.0537 expected_sl=1.05337 engine_sl=1.05337 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #15 (LONG)",
+        "detail": "entry=1.05431 expected_sl=1.05386 engine_sl=1.05386 diff=0.00e+00"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "15 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [
+      {
+        "label": "atr SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05428 engine_sl=1.05427 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #3 (LONG)",
+        "detail": "entry=1.05357 expected_sl=1.05282 engine_sl=1.05283 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #4 (LONG)",
+        "detail": "entry=1.05366 expected_sl=1.05292 engine_sl=1.05293 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #5 (LONG)",
+        "detail": "entry=1.05363 expected_sl=1.05336 engine_sl=1.05335 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #6 (SHORT)",
+        "detail": "entry=1.0535 expected_sl=1.05379 engine_sl=1.05378 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #8 (SHORT)",
+        "detail": "entry=1.05354 expected_sl=1.05377 engine_sl=1.05376 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #9 (LONG)",
+        "detail": "entry=1.05362 expected_sl=1.05335 engine_sl=1.05334 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #10 (LONG)",
+        "detail": "entry=1.05327 expected_sl=1.05295 engine_sl=1.05296 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #12 (LONG)",
+        "detail": "entry=1.05337 expected_sl=1.05313 engine_sl=1.05314 diff=1.00e-05"
+      }
+    ],
+    "verification_count": "7/16",
+    "elapsed_sec": 2.7
+  },
+  {
+    "test_id": "ATR-20",
+    "name": "ATR SL period 14 \u00d7 2.0 \u2014 expected = entry \u2213 2.0\u00d7ATR, tick-snapped",
+    "status": "fail",
+    "params": {
+      "stop_loss_type": "atr",
+      "stop_loss_value": 0.0,
+      "sl_atr_multiplier": 2.0,
+      "sl_atr_period": 14
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry \u2213 2.0\u00d7ATR@entry).",
+    "tick": 1e-05,
+    "orderbook_trades": 15,
+    "n_sl_exits": 15,
+    "mean_sl_distance": 0.00047658,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05437,
+        "engine_sl": 1.05437,
+        "atr_at_entry": 0.00019,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053527,
+        "expected_sl": 1.05257,
+        "engine_sl": 1.05257,
+        "atr_at_entry": 0.00048,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053176,
+        "expected_sl": 1.05216,
+        "engine_sl": 1.05216,
+        "atr_at_entry": 0.00051,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052673,
+        "expected_sl": 1.05331,
+        "engine_sl": 1.05331,
+        "atr_at_entry": 0.00032,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052583,
+        "expected_sl": 1.05304,
+        "engine_sl": 1.05304,
+        "atr_at_entry": 0.00023,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.052978,
+        "expected_sl": 1.0526,
+        "engine_sl": 1.05259,
+        "atr_at_entry": 0.00019,
+        "ok": false
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.052909,
+        "expected_sl": 1.05269,
+        "engine_sl": 1.05269,
+        "atr_at_entry": 0.00011,
+        "ok": true
+      },
+      {
+        "direction": "LONG",
+        "entry": 1.053029,
+        "expected_sl": 1.05273,
+        "engine_sl": 1.05274,
+        "atr_at_entry": 0.00015,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052861,
+        "expected_sl": 1.05326,
+        "engine_sl": 1.05326,
+        "atr_at_entry": 0.0002,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052992,
+        "expected_sl": 1.05343,
+        "engine_sl": 1.05343,
+        "atr_at_entry": 0.00022,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052272,
+        "expected_sl": 1.05271,
+        "engine_sl": 1.05271,
+        "atr_at_entry": 0.00022,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052312,
+        "expected_sl": 1.05275,
+        "engine_sl": 1.05275,
+        "atr_at_entry": 0.00022,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052773,
+        "expected_sl": 1.05311,
+        "engine_sl": 1.05312,
+        "atr_at_entry": 0.00017,
+        "ok": false
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052911,
+        "expected_sl": 1.05329,
+        "engine_sl": 1.05329,
+        "atr_at_entry": 0.00019,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.052932,
+        "expected_sl": 1.05331,
+        "engine_sl": 1.0533,
+        "atr_at_entry": 0.00019,
+        "ok": false
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "atr SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05437 engine_sl=1.05437 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #2 (LONG)",
+        "detail": "entry=1.05353 expected_sl=1.05257 engine_sl=1.05257 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #3 (LONG)",
+        "detail": "entry=1.05318 expected_sl=1.05216 engine_sl=1.05216 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #4 (SHORT)",
+        "detail": "entry=1.05267 expected_sl=1.05331 engine_sl=1.05331 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #5 (SHORT)",
+        "detail": "entry=1.05258 expected_sl=1.05304 engine_sl=1.05304 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #7 (LONG)",
+        "detail": "entry=1.05291 expected_sl=1.05269 engine_sl=1.05269 diff=2.22e-16"
+      },
+      {
+        "label": "atr SL #9 (SHORT)",
+        "detail": "entry=1.05286 expected_sl=1.05326 engine_sl=1.05326 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #10 (SHORT)",
+        "detail": "entry=1.05299 expected_sl=1.05343 engine_sl=1.05343 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #11 (SHORT)",
+        "detail": "entry=1.05227 expected_sl=1.05271 engine_sl=1.05271 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #12 (SHORT)",
+        "detail": "entry=1.05231 expected_sl=1.05275 engine_sl=1.05275 diff=0.00e+00"
+      },
+      {
+        "label": "atr SL #14 (SHORT)",
+        "detail": "entry=1.05291 expected_sl=1.05329 engine_sl=1.05329 diff=0.00e+00"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "15 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [
+      {
+        "label": "atr SL #6 (LONG)",
+        "detail": "entry=1.05298 expected_sl=1.0526 engine_sl=1.05259 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #8 (LONG)",
+        "detail": "entry=1.05303 expected_sl=1.05273 engine_sl=1.05274 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #13 (SHORT)",
+        "detail": "entry=1.05277 expected_sl=1.05311 engine_sl=1.05312 diff=1.00e-05"
+      },
+      {
+        "label": "atr SL #15 (SHORT)",
+        "detail": "entry=1.05293 expected_sl=1.05331 engine_sl=1.0533 diff=1.00e-05"
+      }
+    ],
+    "verification_count": "12/16",
+    "elapsed_sec": 2.9
+  },
+  {
+    "test_id": "ATR-30",
+    "name": "ATR SL period 14 \u00d7 3.0 \u2014 expected = entry \u2213 3.0\u00d7ATR, tick-snapped",
+    "status": "fail",
+    "params": {
+      "stop_loss_type": "atr",
+      "stop_loss_value": 0.0,
+      "sl_atr_multiplier": 3.0,
+      "sl_atr_period": 14
+    },
+    "expected": "Every Stop Loss exit's engine SL equals snap(entry \u2213 3.0\u00d7ATR@entry).",
+    "tick": 1e-05,
+    "orderbook_trades": 2,
+    "n_sl_exits": 2,
+    "mean_sl_distance": 0.00063311,
+    "sample": [
+      {
+        "direction": "SHORT",
+        "entry": 1.053992,
+        "expected_sl": 1.05456,
+        "engine_sl": 1.05456,
+        "atr_at_entry": 0.00019,
+        "ok": true
+      },
+      {
+        "direction": "SHORT",
+        "entry": 1.053892,
+        "expected_sl": 1.05458,
+        "engine_sl": 1.05459,
+        "atr_at_entry": 0.00023,
+        "ok": false
+      }
+    ],
+    "checks_passed": [
+      {
+        "label": "atr SL #1 (SHORT)",
+        "detail": "entry=1.05399 expected_sl=1.05456 engine_sl=1.05456 diff=2.22e-16"
+      },
+      {
+        "label": "produced_sl_exits",
+        "detail": "2 Stop Loss exits"
+      }
+    ],
+    "checks_failed": [
+      {
+        "label": "atr SL #2 (SHORT)",
+        "detail": "entry=1.05389 expected_sl=1.05458 engine_sl=1.05459 diff=1.00e-05"
+      }
+    ],
+    "verification_count": "2/3",
+    "elapsed_sec": 2.6
+  },
+  {
+    "test_id": "ATR-SWEEP",
+    "name": "ATR multiplier sweep \u2014 distance monotonicity",
+    "status": "ok",
+    "params": {
+      "multipliers": [
+        1.0,
+        1.5,
+        2.0,
+        3.0
+      ]
+    },
+    "expected": "Mean SL distance grows monotonically with the ATR multiplier.",
+    "orderbook_trades": 0,
+    "n_sl_exits": 72,
+    "sample": [],
+    "checks_passed": [
+      {
+        "label": "mean_sl_distance_increases_with_multiplier",
+        "detail": "mult 1.0\u2192dist 0.000180; mult 1.5\u2192dist 0.000344; mult 2.0\u2192dist 0.000477; mult 3.0\u2192dist 0.000633"
+      }
+    ],
+    "checks_failed": [],
+    "verification_count": "1/1",
+    "elapsed_sec": 0.0
+  }
+]

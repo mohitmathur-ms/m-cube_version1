@@ -187,7 +187,10 @@
       "Bash(echo \"=== exit: $? ===\")",
       "Read(//c/Program Files/Git/mingw64/**)",
       "Bash(winget search *)",
-      "Bash(winget install *)"
+      "Bash(winget install *)",
+      "PowerShell(Remove-Item -Recurse -Force catalog\\\\features; Write-Output \"Deleted. Exists now: $\\(Test-Path catalog\\\\features\\)\")",
+      "PowerShell(venv\\\\Scripts\\\\python.exe -m pytest tests\\\\test_aggregator.py -q 2>&1)",
+      "PowerShell(venv\\\\Scripts\\\\python.exe scripts\\\\aggregate_catalog.py --help 2>&1)"
     ],
     "additionalDirectories": [
       "d:\\m-cube_version1",

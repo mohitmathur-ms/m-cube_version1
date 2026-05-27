@@ -3,9 +3,6 @@
 Reads ``<symbol>.<venue>-1-MINUTE-<side>-EXTERNAL`` from a Nautilus
 ``ParquetDataCatalog`` and writes new BarTypes for each requested target
 timeframe (5-MINUTE, 30-MINUTE, 1-HOUR, 2-HOUR, 1-DAY, 1-WEEK, 1-MONTH).
-Optionally also emits a sidecar parquet of derived features per
-``(instrument, side, timeframe)`` tuple at
-``<catalog>/features/bar/<bartype>.parquet``.
 
 Bucketing convention is left-open ``(T-N, T]`` — see ``core.aggregator`` for the
 math and the notebook ``ipynb/aggregate_1min_to_5min.ipynb`` for the parity
@@ -39,7 +36,6 @@ from nautilus_trader.model.data import Bar
 from core.aggregator import (
     TIMEFRAME_TO_RULE,
     aggregate_ohlcv,
-    aggregate_with_features,
 )
 from core.instrument_factory import create_instrument
 from core.nautilus_loader import (
@@ -85,10 +81,6 @@ def _bar_dir(catalog_path: str, bar_type_str: str) -> Path:
     return Path(catalog_path) / "data" / "bar" / bar_type_str
 
 
-def _features_path(catalog_path: str, bar_type_str: str) -> Path:
-    return Path(catalog_path) / "features" / "bar" / f"{bar_type_str}.parquet"
-
-
 def aggregate_one(
     symbol: str,
     side: str,
@@ -97,9 +89,7 @@ def aggregate_one(
     *,
     venue: str = "FOREX_MS",
     price_precision: int | None = None,
-    with_features: bool = True,
     overwrite: bool = True,
-    vwap_session: str | None = "1D",
     week_anchor: str = "SUN",
 ) -> dict:
     """Aggregate one (symbol, side, timeframe) tuple. Returns a metrics dict."""
@@ -128,17 +118,7 @@ def aggregate_one(
     metrics["load_seconds"] = round(time.time() - t_load, 2)
 
     t_agg = time.time()
-    if with_features:
-        agg = aggregate_with_features(
-            df_1min,
-            timeframe,
-            vwap_session=vwap_session,
-            week_anchor=week_anchor,
-        )
-        ohlcv_df = agg[["open", "high", "low", "close", "volume"]]
-    else:
-        ohlcv_df = aggregate_ohlcv(df_1min, timeframe, week_anchor=week_anchor)
-        agg = None
+    ohlcv_df = aggregate_ohlcv(df_1min, timeframe, week_anchor=week_anchor)
     metrics["agg_seconds"] = round(time.time() - t_agg, 2)
     metrics["dst_bar_count"] = len(ohlcv_df)
 
@@ -159,16 +139,8 @@ def aggregate_one(
     save_to_catalog(bars, instrument, catalog_path)
     metrics["write_seconds"] = round(time.time() - t_write, 2)
 
-    if with_features and agg is not None:
-        t_feat = time.time()
-        feat_path = _features_path(catalog_path, dst_bar_type_str)
-        feat_path.parent.mkdir(parents=True, exist_ok=True)
-        agg.to_parquet(feat_path, index=True)
-        metrics["features_path"] = str(feat_path)
-        metrics["features_seconds"] = round(time.time() - t_feat, 2)
-
     metrics["total_seconds"] = round(time.time() - t0, 2)
-    del df_1min, ohlcv_df, bars, agg
+    del df_1min, ohlcv_df, bars
     gc.collect()
     return metrics
 
@@ -184,12 +156,8 @@ def main() -> None:
     ap.add_argument("--venue", default="FOREX_MS")
     ap.add_argument("--price-precision", type=int, default=None,
                     help="Override price precision (FX typical: 5; USDJPY: 3)")
-    ap.add_argument("--features", action=argparse.BooleanOptionalAction, default=True,
-                    help="Also write a per-tuple feature sidecar parquet (default true)")
     ap.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=True,
                     help="Delete the destination BarType directory before writing (default true)")
-    ap.add_argument("--vwap-session", default="1D",
-                    help='VWAP reset cadence (pandas freq, e.g. "1D"); pass "none" for cumulative')
     ap.add_argument("--week-anchor", default="SUN", choices=["SUN", "MON", "FRI"])
     ap.add_argument("--pair-workers", type=int, default=0,
                     help="Parallel workers across (symbol, side, timeframe). 0 = auto.")
@@ -198,8 +166,6 @@ def main() -> None:
     unknown = [tf for tf in args.timeframes if tf not in TIMEFRAME_TO_RULE]
     if unknown:
         raise SystemExit(f"unknown timeframes: {unknown}. valid: {list(TIMEFRAME_TO_RULE)}")
-
-    vwap_session = None if args.vwap_session.lower() == "none" else args.vwap_session
 
     tasks = [
         (symbol, side, tf)
@@ -230,9 +196,7 @@ def main() -> None:
                 symbol, side, tf, args.catalog,
                 venue=args.venue,
                 price_precision=args.price_precision,
-                with_features=args.features,
                 overwrite=args.overwrite,
-                vwap_session=vwap_session,
                 week_anchor=args.week_anchor,
             )
             all_metrics.append(m)
@@ -248,9 +212,7 @@ def main() -> None:
                     symbol, side, tf, args.catalog,
                     venue=args.venue,
                     price_precision=args.price_precision,
-                    with_features=args.features,
                     overwrite=args.overwrite,
-                    vwap_session=vwap_session,
                     week_anchor=args.week_anchor,
                 ): (symbol, side, tf)
                 for symbol, side, tf in tasks
