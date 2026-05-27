@@ -4,6 +4,13 @@ name: Push Change Report
 # pushed changes (plain-English + technical) and commit it back into the repo at
 # html_reports/<github-username>/<short-sha>/. See .github/scripts/ for the generator.
 #
+# Every report embeds a Mermaid KNOWLEDGE GRAPH (.github/scripts/mermaid_graph.py):
+# the AI-authored concept graph of the entities the change touches when an AI
+# backend is configured, otherwise a deterministic import graph derived from
+# depgraph.py — so a graph is always present. Mermaid is loaded from a CDN and
+# rendered in the browser at view time, so no extra build-step dependency is
+# needed here; the workflow only runs generate_report.py as before.
+#
 # `paths-ignore` on html_reports/** stops the report commit from re-triggering
 # this workflow (otherwise it would loop on its own bot commit).
 

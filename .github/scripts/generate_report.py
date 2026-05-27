@@ -35,6 +35,7 @@ from pathlib import Path
 from _style import BASE_CSS
 import depgraph
 import depgraph_svg
+import mermaid_graph
 
 MODEL = os.environ.get("MODEL", "claude-sonnet-4-6")
 MAX_TOKENS = 2000
@@ -67,6 +68,14 @@ SYSTEM_STATIC = (
     "change in this push. Make it tangible: a small before/after, a representative "
     "code path or call, or a sample input -> output. Reference real symbols from the "
     "diff. Keep it short (a few lines / one short paragraph).\n"
+    "  4. concept_graph: a small KNOWLEDGE GRAPH of the key entities this change "
+    "touches and how they relate. Use 4-10 nodes and 3-12 edges, drawn from REAL "
+    "symbols in the diff (classes, functions, configs, or domain concepts such as "
+    "ManagedExitStrategy / ExitConfig / on_bar). Each node = {id, kind} where kind is "
+    "one of: class, function, config, concept, file. Each edge = {source, relation, "
+    "target} where source/target are node ids and relation is a short verb phrase "
+    "(e.g. 'calls', 'wraps', 'configures', 'reads', 'submits'). This is rendered as a "
+    "Mermaid diagram, so prefer a connected graph that tells the story of the change.\n"
     "Base everything ONLY on the provided diff and metadata; do not invent changes "
     "you cannot see. If the diff is truncated, say so and reason about what is visible. "
     "Always call the submit_report tool with your answer.\n\n"
@@ -118,6 +127,41 @@ REPORT_TOOL = {
                 "type": "array",
                 "description": "Short bullet strings of risks, gaps or follow-ups. May be empty.",
                 "items": {"type": "string"},
+            },
+            "concept_graph": {
+                "type": "object",
+                "description": "A small knowledge graph (4-10 nodes, 3-12 edges) of the "
+                "key entities this change touches and how they relate. Rendered as a "
+                "Mermaid diagram. Use real symbol names from the diff.",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string", "description": "Entity name (a real symbol from the diff)."},
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["class", "function", "config", "concept", "file"],
+                                    "description": "Node category, used for coloring.",
+                                },
+                            },
+                            "required": ["id", "kind"],
+                        },
+                    },
+                    "edges": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {"type": "string", "description": "Source node id."},
+                                "relation": {"type": "string", "description": "Short verb phrase, e.g. 'calls', 'wraps', 'reads'."},
+                                "target": {"type": "string", "description": "Target node id."},
+                            },
+                            "required": ["source", "relation", "target"],
+                        },
+                    },
+                },
             },
         },
         "required": ["headline", "plain_english", "technical", "example", "changed_files", "risks_or_followups"],
@@ -195,6 +239,21 @@ def _normalize_report(report: dict) -> dict:
     elif not isinstance(risks, list):
         report["risks_or_followups"] = []
 
+    # concept_graph -> always a {"nodes": [...], "edges": [...]} dict so the
+    # Mermaid renderer never has to guess. A model that omits it or returns a
+    # wrong type just yields an empty graph (the deterministic depgraph fallback
+    # then supplies the Mermaid diagram).
+    cg = report.get("concept_graph")
+    if isinstance(cg, dict):
+        nodes = cg.get("nodes")
+        edges = cg.get("edges")
+        report["concept_graph"] = {
+            "nodes": nodes if isinstance(nodes, list) else [],
+            "edges": edges if isinstance(edges, list) else [],
+        }
+    else:
+        report["concept_graph"] = {"nodes": [], "edges": []}
+
     return report
 
 
@@ -223,9 +282,13 @@ def _generate_via_cli(meta: dict) -> tuple[dict | None, str | None]:
     if not exe:
         return None, "claude CLI not found on PATH."
 
+    # Required fields + the optional concept_graph (the knowledge-graph data).
+    # _normalize_report tolerates a missing/malformed concept_graph, so asking
+    # for it here is safe even on the looser CLI/prose path.
+    hint_keys = list(REQUIRED_FIELDS) + ["concept_graph"]
     schema_hint = json.dumps(
         {k: REPORT_TOOL["input_schema"]["properties"][k].get("description", "")
-         for k in REQUIRED_FIELDS},
+         for k in hint_keys},
         indent=2,
     )
     prompt = (
@@ -393,18 +456,70 @@ def _build_graph(meta: dict) -> dict | None:
         return None
 
 
-def _graph_section(graph: dict | None) -> str:
-    """Render the dependency-graph SVG + adjacency tables, or a graceful note."""
+def _mermaid_section(report: dict | None, graph: dict | None) -> str:
+    """Render the Mermaid knowledge graph for this push.
+
+    Prefers the AI-authored concept graph (a semantic map of the entities the
+    change touches). When that is empty — e.g. degraded/metadata-only mode — it
+    falls back to a Mermaid rendering of the deterministic import graph, so
+    EVERY report still carries a knowledge graph. Returns a graceful note only
+    when neither source has any edges to draw.
+    """
+    cg = (report or {}).get("concept_graph") or {}
+    src, caption, legend = "", "", ""
+    if isinstance(cg, dict):
+        src = mermaid_graph.from_concept(cg.get("nodes"), cg.get("edges"))
+        if src:
+            caption = (
+                "Knowledge graph of the key entities this change touches and how "
+                "they relate (AI-authored from the diff)."
+            )
+            legend = (
+                "<span class='gl-class'>&#9632; class</span>"
+                "<span class='gl-func'>&#9632; function</span>"
+                "<span class='gl-config'>&#9632; config</span>"
+                "<span class='gl-concept'>&#9632; concept</span>"
+                "<span class='gl-file'>&#9632; file</span>"
+            )
+    if not src:
+        src = mermaid_graph.from_depgraph(graph)
+        if src:
+            caption = (
+                "Import knowledge graph (deterministic): arrows point "
+                "<strong>importer &rarr; imported</strong> "
+                "(&ldquo;depends on&rdquo;)."
+            )
+            legend = (
+                "<span class='gl-changed'>&#9632; changed in this push</span>"
+                "<span class='gl-file'>&#9632; neighbour file</span>"
+            )
+    if not src:
+        return "<p class='muted'>No knowledge graph could be produced for this push.</p>"
+    return (
+        f"<p class='sub'>{caption}</p>"
+        f"<div class='mermaid'>{src}</div>"
+        f"<p class='graph-legend'>{legend}</p>"
+    )
+
+
+def _graph_section(report: dict | None, graph: dict | None) -> str:
+    """Mermaid knowledge graph, then the deterministic SVG + adjacency tables."""
+    mermaid_html = _mermaid_section(report, graph)
     if graph is None:
-        return "<p class='muted'>Dependency graph could not be computed for this push.</p>"
+        return mermaid_html
     svg = depgraph_svg.render_svg(graph)
     tables = depgraph_svg.render_tables(graph)
     legend = (
-        "<p class='sub'>Arrows point <strong>importer &rarr; imported</strong> "
+        "<p class='sub'>Detailed file view &mdash; arrows point "
+        "<strong>importer &rarr; imported</strong> "
         "(&ldquo;depends on&rdquo;). Middle column = files changed in this push; "
         "left = files that import them; right = files they import.</p>"
     )
-    return f"{legend}<div class='depgraph'>{svg}</div>{tables}"
+    return (
+        f"{mermaid_html}"
+        f"<h3>Dependency detail</h3>{legend}"
+        f"<div class='depgraph'>{svg}</div>{tables}"
+    )
 
 
 # Most components now live in _style.py (the guide-style kit). Only the few
@@ -433,6 +548,18 @@ PAGE_CSS = BASE_CSS + """
   ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
   .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
             border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  /* Mermaid knowledge-graph container (the diagram itself is themed via
+     mermaid.initialize({theme:"dark"}) plus per-node classDefs in mermaid_graph.py). */
+  .mermaid { background: var(--surface); border: 1px solid var(--border);
+             border-radius: 12px; padding: 16px; margin: 8px 0 10px; text-align: center;
+             overflow-x: auto; }
+  .graph-legend { font-size: 0.76rem; color: var(--muted); margin: 0 0 16px; }
+  .graph-legend span { display: inline-block; margin-right: 14px; }
+  .graph-legend .gl-class { color: var(--orange); }
+  .graph-legend .gl-func { color: var(--blue); }
+  .graph-legend .gl-config, .graph-legend .gl-changed { color: var(--green); }
+  .graph-legend .gl-concept { color: var(--purple); }
+  .graph-legend .gl-file { color: var(--muted); }
   footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
 """
 
@@ -472,7 +599,7 @@ def render_html(meta: dict, report: dict | None, error: str | None,
         if report and (report or {}).get("example")
         else "<p class='muted'>No worked example generated for this push.</p>"
     )
-    graph_html = _graph_section(graph)
+    graph_html = _graph_section(report, graph)
 
     diffstat = escape(meta.get("diffstat", "").strip() or "(no diff stat)")
     diff_note = " <span class='chip warn'>truncated</span>" if meta.get("diff_truncated") else ""
@@ -483,6 +610,8 @@ def render_html(meta: dict, report: dict | None, error: str | None,
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(headline)} — {escape(short_sha)}</title>
 <style>{PAGE_CSS}</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({{startOnLoad:true, theme:"dark", securityLevel:"loose"}});</script>
 </head><body>
 <div class="wrap">
   <header class="cover">
