@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Mermaid knowledge-graph rendering to push-change reports — 3d3fff2</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  /* Mermaid knowledge-graph container (the diagram itself is themed via
+     mermaid.initialize({theme:"dark"}) plus per-node classDefs in mermaid_graph.py). */
+  .mermaid { background: var(--surface); border: 1px solid var(--border);
+             border-radius: 12px; padding: 16px; margin: 8px 0 10px; text-align: center;
+             overflow-x: auto; }
+  .graph-legend { font-size: 0.76rem; color: var(--muted); margin: 0 0 16px; }
+  .graph-legend span { display: inline-block; margin-right: 14px; }
+  .graph-legend .gl-class { color: var(--orange); }
+  .graph-legend .gl-func { color: var(--blue); }
+  .graph-legend .gl-config, .graph-legend .gl-changed { color: var(--green); }
+  .graph-legend .gl-concept { color: var(--purple); }
+  .graph-legend .gl-file { color: var(--muted); }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:"dark", securityLevel:"loose"});</script>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">feature/order-type-validation</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/3d3fff2cba3eca92a713fef68e756d9f06e82d65'><code>3d3fff2</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>Add Mermaid knowledge-graph rendering to push-change reports</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-05-27 07:58 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>Every time code is pushed to this repository, a GitHub Action automatically generates a change-report webpage summarising what was modified. Previously that report contained a technical file-dependency diagram useful mainly to engineers.</p><p>This update adds a visual &quot;knowledge graph&quot; to every report — a diagram showing the key concepts, classes, and functions a change touches and how they relate to each other. The goal is to give any reader an immediate picture of what a push is really about, not just which files moved.</p><p>When the AI backend is available it authors the graph itself, drawing on real symbol names from the diff and expressing meaningful relationships. When the AI is unavailable the system automatically falls back to a graph built from the project&#x27;s file-import structure, so a diagram is always present in every report.</p><p>The diagrams are drawn by the Mermaid.js library loaded from a public CDN and rendered inside the browser when the report page is opened. No extra build step is needed in the GitHub Actions workflow.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>A new module `.github/scripts/mermaid_graph.py` provides two public rendering functions. `from_concept(nodes, edges)` accepts the AI-authored semantic graph (list of `{id, kind}` nodes and `{source, relation, target}` edges) and emits Mermaid `graph LR` DSL. `from_depgraph(graph)` consumes the existing `depgraph.py` output as a deterministic fallback. Both functions remap real identifiers to safe tokens (`n0`, `n1`, …) because symbol names and file paths contain characters (`/`, `.`, `[`, `|`) that break Mermaid&#x27;s parser; human-readable text lives in quoted node labels. Per-kind `classDef` blocks apply GitHub-dark palette colours matching `_style.py`.</p><p>In `generate_report.py` the change touches four layers. (1) `SYSTEM_STATIC` gains a fourth instruction asking the model to produce a `concept_graph` field (4–10 nodes, 3–12 edges drawn from real diff symbols). (2) `REPORT_TOOL`&#x27;s JSON schema gains a matching `concept_graph` object with fully-typed `nodes[]` and `edges[]` arrays. (3) `_normalize_report()` coerces any malformed or missing `concept_graph` to a well-formed `{&quot;nodes&quot;: [], &quot;edges&quot;: []}` dict so downstream rendering never raises. (4) `_graph_section(graph)` is refactored to `_graph_section(report, graph)` which calls the new `_mermaid_section(report, graph)`: that helper tries `mermaid_graph.from_concept()` first, falls back to `mermaid_graph.from_depgraph()`, and returns a graceful note only when both yield empty strings. The pre-existing SVG detail view is preserved below the Mermaid block under an `&lt;h3&gt;Dependency detail&lt;/h3&gt;` heading.</p><p>The HTML template gains a CDN `&lt;script&gt;` tag for Mermaid 10, an `mermaid.initialize({startOnLoad:true, theme:&quot;dark&quot;, securityLevel:&quot;loose&quot;})` call, CSS for `.mermaid` container (dark surface, rounded border) and `.graph-legend` colour-key spans per node kind. `push-report.yml` receives only a documentation comment block — no workflow steps change because Mermaid is browser-rendered.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>Before this push `_graph_section(graph)` returned only the deterministic SVG or a &quot;could not be computed&quot; note.</p><p>After, given a report where the AI returned:
+```
+concept_graph = {
+  &quot;nodes&quot;: [{&quot;id&quot;: &quot;from_concept&quot;, &quot;kind&quot;: &quot;function&quot;}, {&quot;id&quot;: &quot;mermaid_graph&quot;, &quot;kind&quot;: &quot;file&quot;}],
+  &quot;edges&quot;: [{&quot;source&quot;: &quot;generate_report&quot;, &quot;relation&quot;: &quot;imports&quot;, &quot;target&quot;: &quot;mermaid_graph&quot;}]
+}
+```
+`mermaid_graph.from_concept(nodes, edges)` emits:
+```
+graph LR
+  n0[&quot;from_concept&quot;]
+  n1[&quot;mermaid_graph&quot;]
+  n2[&quot;generate_report&quot;]
+  n2 --&gt;|&quot;imports&quot;| n1
+  class n0 kfunc;
+  class n1 kfile;
+  classDef kfunc fill:#10243f,stroke:#58a6ff,...
+```
+That string is wrapped in `&lt;div class=&#x27;mermaid&#x27;&gt;…&lt;/div&gt;` and the CDN script renders it to SVG in the browser.</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Knowledge graph of the key entities this change touches and how they relate (AI-authored from the diff).</p><div class='mermaid'>graph LR
+  n0["generate_report.py"]
+  n1["mermaid_graph.py"]
+  n2["from_concept"]
+  n3["from_depgraph"]
+  n4["_mermaid_section"]
+  n5["_graph_section"]
+  n6["concept_graph"]
+  n7["REPORT_TOOL"]
+  n8["_normalize_report"]
+  n0 -->|"imports"| n1
+  n4 -->|"calls"| n2
+  n4 -->|"falls back to"| n3
+  n5 -->|"calls"| n4
+  n7 -->|"defines schema for"| n6
+  n8 -->|"validates"| n6
+  n0 -->|"passes to"| n5
+  n2 -->|"reads"| n6
+  n1 -->|"emits Mermaid DSL for"| n6
+  class n0 kfile;
+  class n1 kfile;
+  class n2 kfunc;
+  class n3 kfunc;
+  class n4 kfunc;
+  class n5 kfunc;
+  class n6 kconfig;
+  class n7 kconfig;
+  class n8 kfunc;
+  classDef kclass fill:#3a2a12,stroke:#f0883e,color:#ffd9b3;
+  classDef kfunc fill:#10243f,stroke:#58a6ff,color:#cfe6ff;
+  classDef kconfig fill:#11261a,stroke:#3fb950,color:#c9f5d4;
+  classDef kconcept fill:#241a3a,stroke:#bc8cff,color:#e6d6ff;
+  classDef kfile fill:#1c2230,stroke:#8b949e,color:#d6deea;
+  classDef kchanged fill:#11261a,stroke:#3fb950,color:#c9f5d4,stroke-width:2px;
+  classDef kdep fill:#1c2230,stroke:#8b949e,color:#d6deea;</div><p class='graph-legend'><span class='gl-class'>&#9632; class</span><span class='gl-func'>&#9632; function</span><span class='gl-config'>&#9632; config</span><span class='gl-concept'>&#9632; concept</span><span class='gl-file'>&#9632; file</span></p><h3>Dependency detail</h3><p class='sub'>Detailed file view &mdash; arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><p class='muted'>No first-party Python files changed in this push, so there is no import graph to draw. See the table below for the full changed-file list.</p></div><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.github/scripts/generate_report.py</code></li><li><code>.github/scripts/mermaid_graph.py</code></li><li><code>.github/workflows/push-report.yml</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.github/scripts/generate_report.py</code></td><td>adds concept_graph to AI prompt and tool schema, normalises output, wires Mermaid into HTML rendering pipeline</td></tr><tr><td><code>.github/scripts/mermaid_graph.py</code></td><td>new module; renders AI concept graphs and depgraph fallbacks as Mermaid DSL text</td></tr><tr><td><code>.github/workflows/push-report.yml</code></td><td>documentation comment only; no workflow step changes</td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>Mermaid loaded from cdn.jsdelivr.net at view time — reports won&#x27;t render graphs if CDN is unreachable or blocked</li><li>securityLevel:&quot;loose&quot; permits HTML inside Mermaid node labels; _mlabel strips most dangerous chars but does not fully sanitise — mild XSS risk if attacker-controlled symbol names reach the diagram</li><li>_MAX_NODES=16 / _MAX_EDGES=22 in mermaid_graph.py exceed the 4-10 / 3-12 caps advertised to the model in the prompt — model may legitimately emit up to 10 nodes and they render fine, but the cap mismatch could allow slightly larger graphs than intended</li><li>No unit tests for mermaid_graph.py; correctness relies solely on the __main__ self-check at the bottom of the file</li><li>mermaid_graph.py is missing a trailing newline (minor lint issue)</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat</h2>
+    <pre>.github/scripts/generate_report.py | 143 ++++++++++++++++++++++++++--
+ .github/scripts/mermaid_graph.py   | 185 +++++++++++++++++++++++++++++++++++++
+ .github/workflows/push-report.yml  |   7 ++
+ 3 files changed, 328 insertions(+), 7 deletions(-)</pre>
+  </section>
+
+  <footer>
+    Commit 3d3fff2cba3eca92a713fef68e756d9f06e82d65 on <strong>feature/order-type-validation</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>
