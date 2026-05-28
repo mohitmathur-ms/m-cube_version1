@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIMIT Order Report — SL/TP Callback Exit vs Direct LIMIT (with Order Emulator)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --green-bg: #0d2818;
+    --red: #f85149;
+    --red-bg: #2d1316;
+    --amber: #d29922;
+    --amber-bg: #2d2206;
+    --purple: #bc8cff;
+    --purple-bg: #1f1535;
+    --blue-bg: #0c2f4a;
+    --code-color: #ff7b72;
+    --teal: #4dd0e1;
+    --teal-bg: #08272d;
+    --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    font-size: 15.5px;
+  }
+  .container { max-width: 1240px; margin: 0 auto; padding: 32px 40px 80px; }
+
+  header.cover {
+    background: linear-gradient(135deg, #1f6feb 0%, #6f3fb0 55%, #238636 100%);
+    color: #fff;
+    padding: 40px 36px;
+    margin: -32px -40px 28px;
+    border-radius: 0 0 14px 14px;
+    box-shadow: var(--shadow);
+  }
+  header.cover h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; font-size: 15px; opacity: 0.95; }
+  header.cover .meta { margin-top: 12px; font-size: 12.5px; opacity: 0.88; }
+  header.cover code {
+    background: rgba(255,255,255,0.18); color: #fff;
+    padding: 1px 6px; border-radius: 3px;
+  }
+
+  h2 {
+    font-size: 22px; margin-top: 38px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--border);
+    color: var(--text);
+  }
+  h3 { font-size: 16.5px; margin-top: 22px; color: var(--text); }
+  h4 {
+    font-size: 13px; margin-top: 18px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  p { margin: 8px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 13.5px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  th, td {
+    text-align: left; padding: 9px 12px;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  th {
+    background: var(--panel-2); font-weight: 600; font-size: 11.5px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--panel-2); }
+  td.center, th.center { text-align: center; white-space: nowrap; }
+  td.num, th.num {
+    text-align: right; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px;
+  }
+  td.mono {
+    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px;
+  }
+
+  code {
+    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px;
+    background: var(--panel-2); padding: 1px 6px; border-radius: 3px;
+    color: var(--code-color);
+  }
+  pre {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 18px; overflow-x: auto;
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55; color: var(--text);
+  }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    font-size: 12px; font-weight: 600;
+    border-radius: 4px; line-height: 1.4; white-space: nowrap;
+  }
+  .badge-ok    { background: var(--green-bg);  color: var(--green); }
+  .badge-warn  { background: var(--amber-bg);  color: var(--amber); }
+  .badge-info  { background: var(--blue-bg);   color: var(--accent); }
+  .badge-purple{ background: var(--purple-bg); color: var(--purple); }
+  .badge-err   { background: var(--red-bg);    color: var(--red); }
+  .badge-teal  { background: var(--teal-bg);   color: var(--teal); }
+
+  .callout, .callout-ok, .callout-warn, .callout-tech, .simple {
+    padding: 13px 18px; margin: 12px 0; font-size: 14.5px;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout      { background: var(--blue-bg);   border-left: 4px solid var(--accent); }
+  .callout-ok   { background: var(--green-bg);  border-left: 4px solid var(--green); }
+  .callout-warn { background: var(--amber-bg);  border-left: 4px solid var(--amber); }
+  .callout-tech { background: var(--purple-bg); border-left: 4px solid var(--purple); }
+  .callout-tech strong { color: var(--purple); }
+  .simple       { background: var(--panel-2);   border-left: 4px solid var(--muted); }
+  .simple::before {
+    content: "Plain English: ";
+    font-weight: 700; color: var(--muted);
+    font-size: 11.5px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 20px; margin: 20px 0;
+  }
+  nav.toc h3 {
+    margin: 0 0 10px; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted);
+  }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  .filebox {
+    background: #010409; color: #f8f8f2;
+    padding: 8px 14px; border-radius: 6px 6px 0 0;
+    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px;
+    margin-top: 14px; margin-bottom: 0;
+    border: 1px solid var(--border); border-bottom: none;
+  }
+  .filebox + pre, .filebox + table {
+    margin-top: 0; border-radius: 0 0 6px 6px; border-top: none;
+  }
+
+  .small { font-size: 12px; color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  footer {
+    margin-top: 40px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 12px;
+  }
+
+  /* Two-column code side-by-side for Section 4.6 */
+  .twocol {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  @media (max-width: 900px) { .twocol { grid-template-columns: 1fr; } }
+
+  /* Knowledge graph container */
+  .kg-wrap {
+    background: #06080d; border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin: 16px 0;
+    overflow-x: auto;
+  }
+  .kg-wrap svg { display: block; width: 100%; height: auto; min-width: 980px; }
+
+  /* Scenario header cards */
+  .scenario-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; margin: 18px 0 8px;
+  }
+  .scenario-card .tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.4px; padding: 3px 9px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+  }
+  .tag-s1 { background: var(--green-bg); color: var(--green); }
+  .tag-s2 { background: var(--purple-bg); color: var(--purple); }
+
+  ol.steps { padding-left: 22px; }
+  ol.steps li { padding: 4px 0; }
+
+  .kv { width: 100%; }
+  .kv td:first-child { color: var(--muted); width: 38%; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="cover">
+    <h1>LIMIT Order Report — SL/TP Callback Exit vs Direct LIMIT (with Order Emulator)</h1>
+    <p class="subtitle">Two NautilusTrader order-handling scenarios contrasted end-to-end, with a Knowledge Graph of the kernel data-flow.</p>
+    <p class="meta">Generated 2026-05-28 &middot; NautilusTrader <code>1.224.0</code> &middot; Sourced from the 28 concept PDFs under <code>.claude/agents/ntm3_docs/</code> via the <code>ntm3</code> subagent.</p>
+  </header>
+
+  <div class="callout">
+    This report walks through two distinct ways a strategy can exit (or enter) a position in NautilusTrader, both phrased the way the user described them. <strong>Scenario&nbsp;1</strong> keeps SL/TP as Python variables and fires a MARKET order from inside a callback handler when the price crosses. <strong>Scenario&nbsp;2</strong> sends a LIMIT order directly, and depending on the value of <code>emulation_trigger</code>, the order either rests on the venue or is held locally by the <code>OrderEmulator</code> until a trigger condition fires.
+    <br><br>Every concept is presented twice — a <em>Plain English</em> block first, then a <em>Technical (Nautilus)</em> block with PDF citations. A unified inline-SVG <em>Knowledge Graph</em> in <a href="#sec-5">Section&nbsp;5</a> ties both scenarios to the same kernel components so they can be compared at a glance.
+  </div>
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-1">At-a-glance comparison</a></li>
+      <li><a href="#sec-2">Glossary of kernel components</a></li>
+      <li><a href="#sec-3">Scenario 1 — Manual SL/TP via callback (MARKET exit)</a></li>
+      <li><a href="#sec-4">Scenario 2 — Direct LIMIT (NO_TRIGGER vs emulated)</a></li>
+      <li><a href="#sec-5">Knowledge Graph</a></li>
+      <li><a href="#sec-6">Performance: slippage analysis</a></li>
+      <li><a href="#sec-7">OrderStatus state machine</a></li>
+      <li><a href="#sec-8">Where this lives in m-cube</a></li>
+      <li><a href="#sec-9">References (PDF citations)</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-1">1 &nbsp;·&nbsp; At-a-glance comparison</h2>
+
+  <div class="simple">
+    Two side-by-side ways of getting out of (or into) a position. The left column is the m-cube production exit pattern — the strategy itself watches the price and slams a market order when the line is crossed. The right column is the broker-resident way — you tell the venue your exact price and either let it sit, or hold it locally and watch a separate trigger stream until conditions are right.
+  </div>
+
+  <div class="callout-tech">
+    <strong>Technically:</strong> A <code>MARKET</code> order cannot be emulated by the local <code>OrderEmulator</code> — the emulation matrix marks it as <em>"Can emulate: n/a. Released type: n/a"</em> (<code>Orders.txt</code> lines&nbsp;669–717). A <code>LIMIT</code> with <code>emulation_trigger=TriggerType.NO_TRIGGER</code> bypasses the emulator entirely and is sent natively to the venue; with any other <code>TriggerType</code> value, the <code>OrderEmulator</code> holds it in <code>EMULATED</code> state until the trigger condition fires, then releases it (transformed into a <code>MARKET</code> order) into the <code>ExecutionEngine</code> via the <code>RELEASED</code> state (<code>Orders.txt</code> lines&nbsp;582–593, 644–668, 678–717).
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>Scenario 1 — Manual MARKET</th>
+        <th>Scenario 2 — Direct LIMIT (± emulator)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Order type submitted</td><td><span class="badge badge-ok">MarketOrder</span></td><td><span class="badge badge-purple">LimitOrder</span></td></tr>
+      <tr><td>TIF default</td><td><code>GTC</code> (<code>Orders.txt</code>&nbsp;230)</td><td><code>GTC</code> (<code>Orders.txt</code>&nbsp;249)</td></tr>
+      <tr><td>Goes through <code>OrderEmulator</code>?</td><td><span class="badge badge-err">No</span> — MARKET cannot emulate (<code>Orders.txt</code>&nbsp;692)</td><td>Only if <code>emulation_trigger != NO_TRIGGER</code> (<code>Orders.txt</code>&nbsp;593)</td></tr>
+      <tr><td><code>RiskEngine</code> check count</td><td>Once at submit</td><td>Twice when emulated (submit + on-release) — <code>Orders.txt</code>&nbsp;650 step 5</td></tr>
+      <tr><td>Rests on venue book?</td><td>No (taker, immediate)</td><td>Yes if <code>NO_TRIGGER</code>; No if emulated (only the released MARKET reaches the venue)</td></tr>
+      <tr><td>Backtest fill price (bar data)</td><td>Bar N's close (or worse via <code>FillModel.prob_slippage</code>)</td><td>The limit price when the synthesized book crosses, possibly during the Phase-1 OHLC sweep</td></tr>
+      <tr><td>Slippage sensitive?</td><td>Yes — <code>FillModel.prob_slippage</code> applies to takers</td><td>Only on taker side; passive LIMITs depend on <code>prob_fill_on_limit</code></td></tr>
+      <tr><td>Reacts to between-bar wicks?</td><td>No (motivates <code>sl_wait_bars</code>)</td><td>Yes — matching engine evaluates the OHLC sweep in Phase 1</td></tr>
+      <tr><td>Where in m-cube</td><td><code>core/managed_strategy.py</code> (production exit engine)</td><td>Available via <code>OrderFactory.limit()</code> to user strategies; not used in the m-cube exit path</td></tr>
+      <tr><td><strong>Typical slippage cost (per trade)</strong></td><td><span class="badge badge-err">High</span> &nbsp; intra-bar latency + <code>prob_slippage</code> + half-spread (see <a href="#sec-6">&sect;6</a>)</td><td><span class="badge badge-ok">Zero</span> for native LIMIT (<code>NO_TRIGGER</code>, <code>post_only=True</code>); <span class="badge badge-warn">Low</span> (~1 tick) when emulated and released as MARKET</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-2">2 &nbsp;·&nbsp; Glossary of kernel components</h2>
+
+  <div class="callout">
+    The same handful of kernel components appear in both scenarios — only the <em>path</em> through them differs. The glossary below pairs each component with a plain-English description and a technical one citing the concept PDFs.
+  </div>
+
+  <h3>Strategy</h3>
+  <div class="simple">The Python class you write. It receives price updates, decides what to do, and submits orders. The user's "strategy callback handlers" are the methods named <code>on_bar</code>, <code>on_quote_tick</code>, <code>on_trade_tick</code>, etc., which the framework calls automatically.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Subclass of <code>nautilus_trader.trading.strategy.Strategy</code>. Inherits the Actor handler surface — full list (<code>Rust.txt</code> lines&nbsp;276–375): <code>on_start</code>, <code>on_stop</code>, <code>on_quote</code>, <code>on_trade</code>, <code>on_bar</code>, <code>on_book_deltas</code>, <code>on_book</code>, <code>on_instrument</code>, <code>on_mark_price</code>, <code>on_index_price</code>, <code>on_funding_rate</code>, <code>on_option_greeks</code>. Adds the trading handlers <code>on_order_*</code> and <code>on_position_*</code> (<code>Events.txt</code> lines&nbsp;42–88). Handler dispatch is priority-ordered: specific (<code>on_order_filled</code>) → category (<code>on_order_event</code>) → catch-all (<code>on_event</code>) — first matching level runs (<code>Events.txt</code>&nbsp;20–34).
+  </div>
+
+  <h3>OrderFactory</h3>
+  <div class="simple">A helper attached to every Strategy as <code>self.order_factory</code>. It builds correctly-shaped order objects so you don't have to fill in trader-IDs, init-IDs, timestamps, etc., yourself.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> From <code>Orders.txt</code>&nbsp;220–222: "<em>OrderFactory takes care of lower level details — such as ensuring the correct trader ID and strategy ID are assigned, generation of a necessary initialization ID and timestamp.</em>" Surface methods: <code>.market(...)</code>, <code>.limit(...)</code>, <code>.stop_market(...)</code>, <code>.stop_limit(...)</code>, <code>.market_to_limit(...)</code>, <code>.market_if_touched(...)</code>, <code>.limit_if_touched(...)</code>, <code>.trailing_stop_market(...)</code>, <code>.trailing_stop_limit(...)</code>, <code>.bracket(...)</code>. Every factory accepts <code>emulation_trigger</code> (default <code>TriggerType.NO_TRIGGER</code>).
+  </div>
+
+  <h3>MessageBus</h3>
+  <div class="simple">An internal post-office. Strategies don't call the risk engine directly — they publish a message ("please submit this order") and the bus routes it to whatever component should handle it next.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Three messaging patterns (<code>MessageBus.txt</code>&nbsp;8–13): point-to-point command/request/response, pub-sub on topics, and event broadcast. Strategy holds it as <code>self.msgbus</code>. The trading command path <em>(SubmitOrder, ModifyOrder, CancelOrder, …)</em> is dispatched through it from <code>Strategy</code> to whichever engine is the registered handler (see Execution flow below).
+  </div>
+
+  <h3>Cache</h3>
+  <div class="simple">An in-memory store of "current truth" — every quote/trade/bar that arrived, every open order, every live position. Strategies read from it instead of querying the venue.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Examples in <code>Cache.txt</code>&nbsp;25–53 and 212–219. <code>DataEngine</code> writes to the Cache as each tick/bar arrives, then <code>Strategy</code> handler methods read it (<code>self.cache.orders_open(...)</code>, <code>self.cache.position(position_id)</code>, <code>self.cache.is_order_emulated(client_order_id)</code>). The emulated-order helpers are critical for Scenario 2-B since the Python order reference is invalidated when the emulator releases the order.
+  </div>
+
+  <h3>RiskEngine</h3>
+  <div class="simple">A pre-trade safety gate. Before any order reaches the venue, it checks for things like "is the price precision right?", "do you have enough cash?", "are you over the submit-rate limit?", "is trading currently halted?". Failures raise an <code>OrderDenied</code> event.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Validations enumerated in <code>Execution.txt</code>&nbsp;154–174:
+    <ul style="margin:6px 0 0 18px; padding:0;">
+      <li>Price/trigger-price precision matches the instrument.</li>
+      <li>Positive prices (unless instrument class allows negatives).</li>
+      <li>Quantity precision and base-quantity min/max bounds.</li>
+      <li>GTD orders not already expired.</li>
+      <li><code>reduce_only</code> orders don't increase the referenced position.</li>
+      <li>Engine-level <code>max_notional_per_order</code> and instrument <code>max_notional</code>.</li>
+      <li>Cash-account balance impact for non-margin accounts.</li>
+      <li>Submit and modify rate limits (<code>max_order_submit_rate</code>).</li>
+      <li><code>TradingState</code> (<code>ACTIVE</code> / <code>HALTED</code> / <code>REDUCING</code>) — lines&nbsp;170–173.</li>
+    </ul>
+    Failure at submit emits <code>OrderDenied</code>; failure at modify emits <code>OrderModifyRejected</code>.
+  </div>
+
+  <h3>OrderEmulator</h3>
+  <div class="simple">A local "fake venue" for order types the real venue doesn't support — or that you want to evaluate against a specific price feed (last trade, mark price, mid-price, …). It holds the order, watches the trigger stream you chose, and releases the order to the real venue when the condition is met.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Activated when an order's <code>emulation_trigger</code> is anything other than <code>TriggerType.NO_TRIGGER</code> (<code>Orders.txt</code>&nbsp;571, 582–593). Emulatable order types (<code>Orders.txt</code>&nbsp;678–717): <code>STOP_MARKET</code>, <code>STOP_LIMIT</code>, <code>MARKET_IF_TOUCHED</code>, <code>LIMIT_IF_TOUCHED</code>, <code>TRAILING_STOP_MARKET</code>, <code>TRAILING_STOP_LIMIT</code>, and <code>LIMIT</code> (when its <code>emulation_trigger</code> is not <code>NO_TRIGGER</code>). On release the order is transformed and the emulation trigger is set to <code>NONE</code>; an <code>OrderReleased</code> event is emitted (<code>Orders.txt</code>&nbsp;644–668). Crucially, an emulated <code>LIMIT</code> releases as a <code>MARKET</code> order (<code>Orders.txt</code>&nbsp;586, 700) — not as a native LIMIT.
+  </div>
+
+  <h3>ExecutionEngine &amp; ExecutionClient</h3>
+  <div class="simple">The plumbing that actually talks to the venue (or, in a backtest, to the <code>SimulatedExchange</code>). The engine is generic; the client is the venue-specific adapter that translates the framework's command into the venue's protocol.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> Routing rule from <code>Execution.txt</code>&nbsp;38–52: <em>"submit_order(...) routes to OrderEmulator for emulated orders, to an ExecAlgorithm when exec_algorithm_id is set, and to the RiskEngine otherwise. From there: → ExecAlgorithm → RiskEngine → ExecutionEngine → ExecutionClient."</em> The <code>ExecutionEngine</code> also detects overfills (<code>Order.is_duplicate_fill()</code> and <code>allow_overfills</code> config flag — <code>Execution.txt</code>&nbsp;409–443), applies fills to the <code>Cache</code>, and republishes <code>OrderFilled</code>/<code>PositionOpened</code>/<code>PositionChanged</code>/<code>PositionClosed</code> via the <code>MessageBus</code>.
+  </div>
+
+  <h3>Venue / SimulatedExchange + MatchingEngine + FillModel</h3>
+  <div class="simple">In live trading, the real exchange. In a backtest, an internal simulator that maintains an order book, matches incoming orders against it, and uses a fill model to decide whether (and at what price) each order gets filled.</div>
+  <div class="callout-tech">
+    <strong>Technically:</strong> The backtest per-timestamp loop has three phases (<code>Backtesting.txt</code>&nbsp;294–352):
+    <ol style="margin:6px 0 0 18px; padding:0;">
+      <li><strong>Exchange processes data</strong> — <code>SimulatedExchange</code> updates its book and iterates the <code>MatchingEngine</code> to fill <em>existing</em> resting orders.</li>
+      <li><strong>Strategy receives data</strong> — <code>DataEngine</code> dispatches to <code>on_bar</code> / <code>on_quote_tick</code> / <code>on_trade_tick</code>.</li>
+      <li><strong>Settle venues</strong> — engine drains queued venue commands and re-iterates the matching engine, so orders submitted <em>inside</em> <code>on_bar</code> settle in the same timestamp.</li>
+    </ol>
+    <code>FillModel</code> options include <code>BestPriceFillModel</code>, <code>OneTickSlippageFillModel</code>, <code>TwoTierFillModel</code>, <code>ThreeTierFillModel</code>, <code>ProbabilisticFillModel</code>, <code>SizeAwareFillModel</code>, <code>LimitOrderPartialFillModel</code>, <code>MarketHoursFillModel</code>, <code>VolumeSensitiveFillModel</code>, <code>CompetitionAwareFillModel</code> (<code>Backtesting.txt</code>&nbsp;987–1047).
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-3">3 &nbsp;·&nbsp; Scenario 1 — Manual SL/TP via callback (MARKET exit)</h2>
+
+  <div class="scenario-card">
+    <span class="tag tag-s1">SCENARIO 1</span>
+    Strategy holds SL and TP as plain Python variables on <code>self</code>. Each new bar/tick calls back into <code>on_bar</code>; the strategy compares the live price against those variables and, when either threshold is crossed, builds a <code>MarketOrder</code> via <code>self.order_factory.market(...)</code> and calls <code>self.submit_order(order)</code> to flatten the position.
+  </div>
+
+  <h3>3.1 Plain English definition</h3>
+  <div class="simple">
+    The trader writes a strategy that watches every new bar/tick itself. On each price update, it compares the live price against a stop-loss and a take-profit it is keeping in its own head (plain Python variables). When either is crossed, it immediately sends a "sell at market" order. The venue (or the simulator in a backtest) fills that market order at the next available price. There is no special "exit order" sitting at the broker — the strategy does the watching, and the broker only ever sees the final market order that flattens the position.
+  </div>
+
+  <h3>3.2 Technical (Nautilus) definition</h3>
+  <div class="callout-tech">
+    <strong>Technically:</strong> A vanilla <code>MarketOrder</code> with <code>emulation_trigger=TriggerType.NO_TRIGGER</code> (implicit; MARKET cannot be emulated — <code>Orders.txt</code>&nbsp;692). Default <code>TimeInForce</code> is <code>GTC</code> (<code>Orders.txt</code>&nbsp;230); honest practice is to set <code>TimeInForce.IOC</code> on an exit/flatten. Built by <code>self.order_factory.market(instrument_id, OrderSide.BUY|SELL, Quantity, time_in_force, reduce_only, tags)</code> (<code>Orders.txt</code>&nbsp;220–242). Submission flows <code>Strategy → MessageBus → RiskEngine → ExecutionEngine → ExecutionClient → Venue/SimulatedExchange</code> (<code>Execution.txt</code>&nbsp;38–52). The fill comes back as <code>OrderFilled</code> on the <code>MessageBus</code> and is dispatched to <code>on_order_filled</code> (<code>Events.txt</code>&nbsp;20–34).
+  </div>
+
+  <h3>3.3 Step-by-step flow</h3>
+  <ol class="steps">
+    <li><code>DataEngine</code> dispatches <code>on_bar(bar)</code> — Phase 2 of the per-timestamp loop.</li>
+    <li>Strategy compares <code>bar.high &ge; self.tp</code> or <code>bar.low &le; self.sl</code>.</li>
+    <li>If triggered, build the exit order:
+        <code>order = self.order_factory.market(instrument_id, OrderSide.SELL, qty, time_in_force=TimeInForce.IOC, reduce_only=True)</code>.</li>
+    <li><code>self.submit_order(order)</code> publishes a <code>SubmitOrder</code> command on the <code>MessageBus</code>.</li>
+    <li>The bus routes it to <code>RiskEngine</code> (no emulation, no ExecAlgorithm).</li>
+    <li><code>RiskEngine</code> validates → forwards to <code>ExecutionEngine</code>.</li>
+    <li><code>ExecutionEngine</code> picks the registered <code>ExecutionClient</code> for the venue and forwards.</li>
+    <li><code>SimulatedExchange</code> + <code>MatchingEngine</code> fill in Phase 3 of the <em>same</em> timestamp (no latency model) or in Phase 1 of the next timestamp (with <code>LatencyModel</code> ≥ bar interval).</li>
+    <li>Fill events propagate back as <code>OrderFilled</code> → <code>on_order_filled</code> and <code>PositionClosed</code> → <code>on_position_closed</code>.</li>
+  </ol>
+
+  <h3>3.4 Minimal code</h3>
+  <div class="filebox">strategies/sl_tp_callback_exit.py &nbsp;·&nbsp; illustrative</div>
+<pre><code>from nautilus_trader.model.enums import OrderSide, TimeInForce
+from nautilus_trader.model.objects import Quantity
+from nautilus_trader.trading.strategy import Strategy
+
+
+class CallbackSLTP(Strategy):
+    def on_start(self):
+        self.subscribe_bars(self.config.bar_type)
+        self.sl = None
+        self.tp = None
+
+    def on_bar(self, bar):
+        # ENTRY (omitted) sets self.sl and self.tp at fill time
+
+        pos = self.cache.position_for_order(self.client_order_id)
+        if pos is None or pos.is_closed:
+            return
+
+        # Manual SL/TP comparison in the callback
+        triggered = (
+            (pos.side.value == "LONG"  and (bar.low  &lt;= self.sl or bar.high &gt;= self.tp)) or
+            (pos.side.value == "SHORT" and (bar.high &gt;= self.sl or bar.low  &lt;= self.tp))
+        )
+        if not triggered:
+            return
+
+        exit_side = OrderSide.SELL if pos.side.value == "LONG" else OrderSide.BUY
+        order = self.order_factory.market(
+            instrument_id=pos.instrument_id,
+            order_side=exit_side,
+            quantity=Quantity.from_int(int(pos.quantity)),
+            time_in_force=TimeInForce.IOC,   # default would be GTC
+            reduce_only=True,
+            tags=["EXIT_SLTP"],
+        )
+        self.submit_order(order)             # MessageBus → RiskEngine → ExecEngine → Venue
+</code></pre>
+
+  <h3>3.5 Why MARKET cannot be emulated</h3>
+  <div class="callout-tech">
+    <strong>Technically:</strong> The emulation matrix in <code>Orders.txt</code>&nbsp;669–717 marks <code>MARKET</code> as <em>"Can emulate: n/a. Released type: n/a"</em>. The OrderEmulator only exists to mimic <em>conditional/passive</em> types (<code>STOP_MARKET</code>, <code>STOP_LIMIT</code>, <code>MARKET_IF_TOUCHED</code>, <code>LIMIT_IF_TOUCHED</code>, <code>TRAILING_STOP_*</code>, and <code>LIMIT</code> with a non-<code>NO_TRIGGER</code> trigger) on venues that don't natively support them. A <code>MARKET</code> order has nothing to wait for — it takes liquidity immediately, so there is no "trigger" to evaluate locally.
+  </div>
+
+  <h3>3.6 Backtest fill mechanics</h3>
+  <div class="callout">
+    Per <code>Backtesting.txt</code>&nbsp;294–352, the engine runs a three-phase loop each timestamp: <em>Exchange processes data → Strategy receives data → Settle venues</em>. A MARKET submitted from <code>on_bar(N)</code> settles inside the same cycle and matches against the top of book — for L1 / quote / trade / bar data, MARKET BUY fills at the best ask and MARKET SELL at the best bid (<code>Backtesting.txt</code>&nbsp;386–440). With L2/L3 book it can walk levels (partial taker). Adverse slippage is governed by <code>FillModel.prob_slippage</code> (<code>Backtesting.txt</code>&nbsp;535–565, 1051–1107); at <code>prob_slippage=0.5</code> a MARKET BUY has a 50/50 chance of paying <code>ask + 1 tick</code>.
+  </div>
+
+  <div class="callout">
+    Crucial bar-data timing detail (<code>Backtesting.txt</code> line&nbsp;933): <em>"Bar N's OHLC sequence processes before <code>on_bar(N)</code> fires. Without a <code>LatencyModel</code>, an order submitted from <code>on_bar</code> settles immediately and matches against the current book, whose top reflects bar N's close."</em> So the <code>on_bar</code>-submitted MARKET fills at the <strong>close of bar N</strong> (no latency model) or the close of bar N+1 (with <code>LatencyModel(base_latency_nanos &ge; bar_interval)</code>).
+  </div>
+
+  <h3>3.7 Gotchas</h3>
+  <div class="callout-warn">
+    <strong>on_stop fills are silent.</strong> <code>Backtesting.txt</code>&nbsp;359–366 — <code>OrderFilled</code> / <code>PositionClosed</code> from <code>close_all_positions()</code> in <code>on_stop</code> never re-enter <code>on_order_filled</code> / <code>on_position_closed</code>.
+  </div>
+  <div class="callout-warn">
+    <strong>Between-bar wick risk → <code>sl_wait_bars</code>.</strong> The strategy inspects the <em>closed</em> bar, so the exit price is ≈ bar N close, not the SL price itself. A native <code>STOP_MARKET</code> resting at the SL would have filled at the SL during the Phase-1 H/L sweep. Single-bar wicks that pierce SL and recover will exit a callback-based strategy at the close — locking in slippage with no upside. m-cube's <code>core/managed_strategy.py</code> <code>sl_wait_bars</code> confirmation pattern trades first-bar latency for fewer whipsaws.
+  </div>
+  <div class="callout-warn">
+    <strong>position_id under NETTING.</strong> <code>Execution.txt</code>&nbsp;133–152 — under <code>NETTING</code>, <code>position_id</code> is deterministic (<code>{instrument_id}-{strategy_id}</code>). Passing a custom <code>position_id</code> to <code>submit_order</code> yields <code>OrderDenied</code>. <code>Strategy.close_position()</code> is safe (it forwards <code>position.id</code>). For arbitrary IDs configure <code>oms_type=HEDGING</code>.
+  </div>
+  <div class="callout-warn">
+    <strong>Submitting MARKET while a prior exit MARKET is in-flight.</strong> Guard with <code>self.cache.orders_open(...)</code> or a local <code>self._exit_pending</code> flag, otherwise duplicate exits land.
+  </div>
+  <div class="callout-warn">
+    <strong>TIF default = <code>GTC</code></strong> (<code>Orders.txt</code>&nbsp;230). <code>TimeInForce.IOC</code> is the more honest choice for a flatten command.
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-4">4 &nbsp;·&nbsp; Scenario 2 — Direct LIMIT (NO_TRIGGER vs emulated)</h2>
+
+  <div class="scenario-card">
+    <span class="tag tag-s2">SCENARIO 2</span>
+    Strategy submits a LIMIT order directly. The crucial parameter is <code>emulation_trigger</code>. With <code>TriggerType.NO_TRIGGER</code>, the order is sent straight to the venue and rests on the order book. With any other <code>TriggerType</code> value (e.g. <code>BID_ASK</code>, <code>LAST_PRICE</code>, <code>MARK_PRICE</code>) the local <code>OrderEmulator</code> holds the order in <code>EMULATED</code> state, subscribes to the relevant data feed, and releases the order to the <code>ExecutionEngine</code> only when the trigger condition fires.
+  </div>
+
+  <h3>4.1 Plain English definition</h3>
+  <div class="simple">
+    The trader knows the exact price they want, so they place a resting price-tagged order at that level. Two flavours: (a) the order is sent straight to the venue and sits on the venue's order book until the market touches it; or (b) Nautilus keeps the order locally — it watches a chosen "trigger price" stream (best bid/ask, last trade, mark price, etc.) and only releases the order to the venue when the trigger condition is met. The choice between (a) and (b) is one parameter, <code>emulation_trigger</code>: <code>NO_TRIGGER</code> means "send to venue now"; anything else means "hold locally and watch this price stream."
+  </div>
+
+  <h3>4.2 Technical (Nautilus) definition</h3>
+  <div class="callout-tech">
+    <strong>Technically:</strong> A <code>LimitOrder</code> built via <code>self.order_factory.limit(instrument_id, OrderSide.SELL|BUY, quantity, price, time_in_force, expire_time, post_only, reduce_only, display_qty, emulation_trigger, tags)</code> (<code>Orders.txt</code>&nbsp;244–252). Quote: <em>"NO_TRIGGER: disables local emulation completely and order is fully submitted to the venue. DEFAULT: which is the same as BID_ASK. BID_ASK: emulated using quotes to trigger. LAST_PRICE: emulated using trades to trigger. … For LIMIT orders being emulated, the limit price will be compared against the specified trigger type to determine when to release the order as a MARKET order."</em> (<code>Orders.txt</code>&nbsp;582–586). The release-type table (<code>Orders.txt</code>&nbsp;700) confirms: an emulated <code>LIMIT</code> releases as a <code>MARKET</code> order, not as a native LIMIT.
+  </div>
+
+  <h3>4.3 Branch A — <code>emulation_trigger = NO_TRIGGER</code> (native LIMIT)</h3>
+  <ol class="steps">
+    <li>Strategy builds: <code>order = self.order_factory.limit(..., emulation_trigger=TriggerType.NO_TRIGGER)</code>.</li>
+    <li><code>self.submit_order(order)</code> → <code>MessageBus</code>.</li>
+    <li>Bus routes to <code>RiskEngine</code> (default; no emulation).</li>
+    <li><code>RiskEngine</code> validates → <code>ExecutionEngine</code>.</li>
+    <li><code>ExecutionEngine</code> → <code>ExecutionClient</code> → Venue.</li>
+    <li>Venue rests the LIMIT on its book; <code>OrderAccepted</code> comes back; later <code>OrderFilled</code> or <code>OrderCanceled</code> (e.g. <code>post_only</code> crossed).</li>
+  </ol>
+
+  <h3>4.4 Branch B — <code>emulation_trigger != NO_TRIGGER</code> (held by local emulator)</h3>
+  <ol class="steps">
+    <li>Strategy builds: <code>order = self.order_factory.limit(..., emulation_trigger=TriggerType.LAST_PRICE)</code> (or <code>BID_ASK</code>, <code>MARK_PRICE</code>, …).</li>
+    <li><code>self.submit_order(order)</code> → <code>MessageBus</code>.</li>
+    <li><code>RiskEngine</code> pre-trade check runs (<code>Orders.txt</code>&nbsp;650 step 2).</li>
+    <li><code>OrderEmulator</code> receives the order → state becomes <code>EMULATED</code>; emits <code>OrderEmulated</code>.</li>
+    <li>Emulator subscribes to the needed market data (Quote / Trade / Mark / Index, depending on trigger) and feeds its internal <code>MatchingCore</code> (<code>Orders.txt</code>&nbsp;666).</li>
+    <li>When the trigger condition fires:
+      <ul style="margin:4px 0 4px 18px;">
+        <li>Order is <strong>transformed to a MARKET order</strong> (per release-type table, <code>Orders.txt</code>&nbsp;700).</li>
+        <li><code>emulation_trigger</code> is set to <code>NONE</code>.</li>
+        <li>State transitions to <code>RELEASED</code>; <code>OrderReleased</code> event is emitted.</li>
+      </ul>
+    </li>
+    <li><code>RiskEngine</code> re-validates the released order (<code>Orders.txt</code>&nbsp;650 step 5) — this can still fail (e.g. balance now insufficient) and emit <code>OrderDenied</code>.</li>
+    <li><code>ExecutionEngine</code> → <code>ExecutionClient</code> → Venue.</li>
+    <li>Venue fills the MARKET — <code>OrderFilled</code> propagates back to <code>on_order_filled</code>.</li>
+  </ol>
+
+  <h3>4.5 <code>TriggerType</code> reference</h3>
+  <div class="callout">
+    The full table for <code>emulation_trigger</code> values, sourced from <code>Orders.txt</code>&nbsp;588–642.
+  </div>
+  <table>
+    <thead>
+      <tr><th>TriggerType</th><th>Monitors</th><th>Effect on LIMIT</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>NO_TRIGGER</code></td><td><span class="badge badge-info">nothing</span></td><td>Disables emulation; order goes straight to the venue as a native LIMIT.</td></tr>
+      <tr><td><code>DEFAULT</code></td><td>same as <code>BID_ASK</code></td><td>Held locally; watches quotes.</td></tr>
+      <tr><td><code>BID_ASK</code></td><td><span class="badge badge-teal">QuoteTicks</span> — best bid (sells) / best ask (buys)</td><td>Release when ask ≤ limit (buy) or bid ≥ limit (sell).</td></tr>
+      <tr><td><code>LAST_PRICE</code></td><td><span class="badge badge-teal">TradeTicks</span> — most recent trade</td><td>Release on next trade satisfying the limit.</td></tr>
+      <tr><td><code>DOUBLE_LAST</code></td><td>two consecutive last trades</td><td><code>LAST_PRICE</code> with 2-in-a-row confirmation.</td></tr>
+      <tr><td><code>DOUBLE_BID_ASK</code></td><td>two consecutive quotes</td><td><code>BID_ASK</code> with 2-in-a-row confirmation.</td></tr>
+      <tr><td><code>LAST_OR_BID_ASK</code></td><td>either feed</td><td>First to qualify wins.</td></tr>
+      <tr><td><code>MID_POINT</code></td><td><code>(bid + ask) / 2</code></td><td>Theoretical mid-price triggering.</td></tr>
+      <tr><td><code>MARK_PRICE</code></td><td>venue mark</td><td>Useful for futures/perps.</td></tr>
+      <tr><td><code>INDEX_PRICE</code></td><td>venue index</td><td>Derivatives tracking an index.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.6 Code snippets — both branches side-by-side</h3>
+  <div class="twocol">
+    <div>
+      <div class="filebox">Branch A &nbsp;·&nbsp; native LIMIT (<code>NO_TRIGGER</code>)</div>
+<pre><code>from nautilus_trader.model.enums import (
+    OrderSide, TimeInForce, TriggerType,
+)
+from nautilus_trader.model.objects import Price, Quantity
+
+order = self.order_factory.limit(
+    instrument_id=self.instrument_id,
+    order_side=OrderSide.BUY,
+    quantity=Quantity.from_int(10),
+    price=Price.from_str("1.0850"),
+    time_in_force=TimeInForce.GTC,
+    post_only=True,
+    reduce_only=False,
+    emulation_trigger=TriggerType.NO_TRIGGER,
+)
+self.submit_order(order)
+# Strategy → MessageBus → RiskEngine → ExecutionEngine
+# → ExecutionClient → Venue (resting LIMIT)
+</code></pre>
+    </div>
+    <div>
+      <div class="filebox">Branch B &nbsp;·&nbsp; emulated LIMIT (<code>LAST_PRICE</code>)</div>
+<pre><code>from nautilus_trader.model.enums import (
+    OrderSide, TimeInForce, TriggerType,
+)
+from nautilus_trader.model.objects import Price, Quantity
+
+order = self.order_factory.limit(
+    instrument_id=self.instrument_id,
+    order_side=OrderSide.BUY,
+    quantity=Quantity.from_int(10),
+    price=Price.from_str("1.0850"),
+    time_in_force=TimeInForce.GTC,
+    post_only=False,
+    reduce_only=False,
+    emulation_trigger=TriggerType.LAST_PRICE,
+)
+self.submit_order(order)
+# Strategy → MessageBus → RiskEngine (pre)
+# → OrderEmulator (EMULATED) → subscribes TradeTicks
+# → trigger fires → transforms to MARKET → RELEASED
+# → RiskEngine (revalidate) → ExecutionEngine → Venue
+</code></pre>
+    </div>
+  </div>
+
+  <h3>4.7 Backtest fill mechanics for LIMIT</h3>
+  <div class="callout">
+    Per <code>Backtesting.txt</code>&nbsp;386–440: <strong>L2/L3 book</strong> → "<em>Order's limit price when matched (maker)</em>"; <strong>L1 / quote / trade / bar</strong> → "<em>Limit price</em>" (single-level book) — fills as soon as the synthesized top-of-book crosses; with bar data the OHLC sweep processes during Phase 1, so a resting LIMIT can fill <em>before</em> <code>on_bar</code> fires. The <code>prob_fill_on_limit</code> knob (default <code>1.0</code>) governs the probabilistic queue position: at <code>0.0</code> the LIMIT only fills when the price level is <em>crossed</em> (back of queue); at <code>1.0</code> it fills the moment the level is <em>touched</em> (<code>Backtesting.txt</code>&nbsp;1088–1093). With <code>liquidity_consumption=True</code> on L1 data, only fills against displayed/observed liquidity per crossed quote — partial fills as fresh quotes arrive (<code>Backtesting.txt</code>&nbsp;567–622).
+  </div>
+
+  <h3>4.8 Gotchas</h3>
+  <div class="callout-warn">
+    <strong>The emulator needs the right data feed.</strong> <code>Orders.txt</code>&nbsp;666: <em>"The OrderEmulator will subscribe to any needed market data … to update the matching core."</em> If <code>emulation_trigger=LAST_PRICE</code> but you only feed bars in the backtest (no <code>TradeTick</code> data), the emulator never releases. Same trap for <code>MARK_PRICE</code> / <code>INDEX_PRICE</code> on venues that don't publish those streams.
+  </div>
+  <div class="callout-warn">
+    <strong>Don't hold a Python reference to an emulated order.</strong> <code>Orders.txt</code>&nbsp;739: <em>"The order object transforms when the emulated order is released. Use the Cache instead"</em> — <code>self.cache.orders_emulated(...)</code>, <code>self.cache.is_order_emulated(...)</code>, <code>order.is_emulated</code>.
+  </div>
+  <div class="callout-warn">
+    <strong>Risk checks run twice.</strong> <code>Orders.txt</code>&nbsp;650 step 5 and 746 item 3: pre-trade <em>and</em> on-release. An emulated order can still be denied at release time. Listen for <code>OrderDenied</code> even post-emulation.
+  </div>
+  <div class="callout-warn">
+    <strong>LIMIT release type is MARKET.</strong> When emulating a LIMIT (<code>Orders.txt</code>&nbsp;586, 700), release is a MARKET — no price guarantee on the actual fill. Use <code>STOP_LIMIT</code> or <code>LIMIT_IF_TOUCHED</code> if you want post-trigger price protection.
+  </div>
+  <div class="callout-warn">
+    <strong><code>emulation_trigger=NO_TRIGGER</code> &ne; "no emulator anywhere".</strong> It bypasses the local emulator for <em>this</em> order only. If the venue doesn't natively support your STOP type, you must set a real trigger.
+  </div>
+  <div class="callout-warn">
+    <strong>GTD without <code>expire_time</code></strong> → <code>OrderDenied</code> (<code>Orders.txt</code>&nbsp;176–177).
+  </div>
+  <div class="callout-warn">
+    <strong><code>post_only</code> crossed marketable LIMIT</strong> is auto-cancelled by most venues — handle <code>OrderCanceled</code> defensively.
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-5">5 &nbsp;·&nbsp; Knowledge Graph</h2>
+
+  <div class="simple">
+    The graph below puts both scenarios in the same diagram. The top swim lane is Scenario 1 — the strategy hand-rolls SL/TP in its callback and fires a MARKET order. The bottom swim lane is Scenario 2 — a LIMIT order whose path forks at a single decision: <em>is the emulation trigger set?</em>. If not, the order goes straight to the venue (top branch of the fork); if it is, the local OrderEmulator holds it, watches the chosen trigger stream, and only then releases it (as a MARKET) to the venue.
+  </div>
+
+  <div class="kg-wrap">
+    <svg viewBox="0 0 1200 820" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Knowledge graph of Scenario 1 vs Scenario 2">
+      <defs>
+        <!-- Arrowheads -->
+        <marker id="arrow-cmd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+        </marker>
+        <marker id="arrow-evt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3fb950"/>
+        </marker>
+        <marker id="arrow-cache" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+        </marker>
+        <marker id="arrow-emu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#bc8cff"/>
+        </marker>
+      </defs>
+
+      <!-- Background lanes -->
+      <rect x="10" y="40"  width="1180" height="350" rx="10" fill="#0b1a13" stroke="#1a3a26" stroke-width="1"/>
+      <rect x="10" y="420" width="1180" height="390" rx="10" fill="#1a1230" stroke="#3a1f55" stroke-width="1"/>
+
+      <!-- Lane titles -->
+      <text x="28" y="68" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#3fb950">SCENARIO&nbsp;1 — Callback MARKET (manual SL/TP)</text>
+      <text x="28" y="448" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#bc8cff">SCENARIO&nbsp;2 — Direct LIMIT (NO_TRIGGER vs emulated)</text>
+
+      <!-- ============ Scenario 1 nodes ============ -->
+      <!-- DataEngine + Cache feeder -->
+      <g>
+        <rect x="40"  y="100" width="130" height="56" rx="8" fill="#1c2128" stroke="#8b949e" stroke-width="1.4"/>
+        <text x="105" y="125" font-family="Segoe UI, sans-serif" font-size="12" fill="#e6edf3" text-anchor="middle" font-weight="700">DataEngine</text>
+        <text x="105" y="142" font-family="Segoe UI, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">+ Cache</text>
+      </g>
+
+      <!-- Strategy S1 -->
+      <g>
+        <rect x="210" y="100" width="150" height="80" rx="8" fill="#0d2818" stroke="#3fb950" stroke-width="1.6"/>
+        <text x="285" y="124" font-family="Segoe UI, sans-serif" font-size="13" fill="#3fb950" text-anchor="middle" font-weight="700">Strategy</text>
+        <text x="285" y="143" font-family="Segoe UI, sans-serif" font-size="11" fill="#e6edf3" text-anchor="middle">on_bar / on_quote_tick</text>
+        <text x="285" y="159" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle" font-style="italic">self.sl, self.tp (Python state)</text>
+      </g>
+
+      <!-- OrderFactory.market -->
+      <g>
+        <rect x="395" y="100" width="160" height="56" rx="8" fill="#2d2206" stroke="#d29922" stroke-width="1.5"/>
+        <text x="475" y="124" font-family="Segoe UI, sans-serif" font-size="12" fill="#d29922" text-anchor="middle" font-weight="700">OrderFactory.market()</text>
+        <text x="475" y="142" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">reduce_only=True, IOC</text>
+      </g>
+
+      <!-- MessageBus S1 -->
+      <g>
+        <rect x="585" y="100" width="115" height="56" rx="8" fill="#0c2f4a" stroke="#58a6ff" stroke-width="1.4"/>
+        <text x="642" y="125" font-family="Segoe UI, sans-serif" font-size="12" fill="#58a6ff" text-anchor="middle" font-weight="700">MessageBus</text>
+        <text x="642" y="142" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">SubmitOrder</text>
+      </g>
+
+      <!-- RiskEngine S1 -->
+      <g>
+        <rect x="725" y="100" width="115" height="56" rx="8" fill="#2d1316" stroke="#f85149" stroke-width="1.4"/>
+        <text x="782" y="125" font-family="Segoe UI, sans-serif" font-size="12" fill="#f85149" text-anchor="middle" font-weight="700">RiskEngine</text>
+        <text x="782" y="142" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">pre-trade checks</text>
+      </g>
+
+      <!-- ExecutionEngine S1 -->
+      <g>
+        <rect x="865" y="100" width="145" height="56" rx="8" fill="#0c2f4a" stroke="#58a6ff" stroke-width="1.4"/>
+        <text x="937" y="125" font-family="Segoe UI, sans-serif" font-size="12" fill="#58a6ff" text-anchor="middle" font-weight="700">ExecutionEngine</text>
+        <text x="937" y="142" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">+ ExecutionClient</text>
+      </g>
+
+      <!-- Venue S1 -->
+      <g>
+        <rect x="1035" y="90" width="135" height="80" rx="8" fill="#08272d" stroke="#4dd0e1" stroke-width="1.6"/>
+        <text x="1102" y="114" font-family="Segoe UI, sans-serif" font-size="12" fill="#4dd0e1" text-anchor="middle" font-weight="700">Venue</text>
+        <text x="1102" y="132" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#e6edf3" text-anchor="middle">SimulatedExchange</text>
+        <text x="1102" y="148" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle">MatchingEngine + FillModel</text>
+        <text x="1102" y="163" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle" font-style="italic">MARKET fills @ best ask/bid</text>
+      </g>
+
+      <!-- Edges S1 forward -->
+      <line x1="170" y1="138" x2="208" y2="138" stroke="#8b949e" stroke-width="1.4" stroke-dasharray="2 3" marker-end="url(#arrow-cache)"/>
+      <text x="189" y="130" font-size="9.5" fill="#8b949e" text-anchor="middle">bars/ticks</text>
+
+      <line x1="360" y1="130" x2="393" y2="130" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="377" y="122" font-size="9.5" fill="#8b949e" text-anchor="middle">build</text>
+
+      <line x1="555" y1="130" x2="583" y2="130" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="569" y="122" font-size="9.5" fill="#8b949e" text-anchor="middle">submit</text>
+
+      <line x1="700" y1="130" x2="723" y2="130" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+
+      <line x1="840" y1="130" x2="863" y2="130" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="852" y="122" font-size="9.5" fill="#8b949e" text-anchor="middle">validated</text>
+
+      <line x1="1010" y1="130" x2="1033" y2="130" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="1022" y="122" font-size="9.5" fill="#8b949e" text-anchor="middle">route</text>
+
+      <!-- S1 fill event return (curved arrow below the nodes) -->
+      <path d="M 1100 170 Q 700 280 285 180" fill="none" stroke="#3fb950" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrow-evt)"/>
+      <text x="700" y="270" font-size="11" fill="#3fb950" text-anchor="middle" font-weight="600">OrderFilled → on_order_filled (via MessageBus)</text>
+
+      <!-- Layer ribbon S1 bottom -->
+      <text x="600" y="365" font-size="10.5" fill="#3fb950" text-anchor="middle" font-style="italic">Scenario 1: MARKET cannot be emulated (Orders.txt 692) — no OrderEmulator in this lane.</text>
+
+      <!-- ============ Scenario 2 nodes ============ -->
+      <!-- Strategy S2 -->
+      <g>
+        <rect x="40"  y="500" width="150" height="80" rx="8" fill="#1f1535" stroke="#bc8cff" stroke-width="1.6"/>
+        <text x="115" y="524" font-family="Segoe UI, sans-serif" font-size="13" fill="#bc8cff" text-anchor="middle" font-weight="700">Strategy</text>
+        <text x="115" y="543" font-family="Segoe UI, sans-serif" font-size="11" fill="#e6edf3" text-anchor="middle">submit_order(LIMIT)</text>
+        <text x="115" y="559" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle" font-style="italic">user-supplied price</text>
+      </g>
+
+      <!-- OrderFactory.limit -->
+      <g>
+        <rect x="220" y="510" width="160" height="56" rx="8" fill="#2d2206" stroke="#d29922" stroke-width="1.5"/>
+        <text x="300" y="534" font-family="Segoe UI, sans-serif" font-size="12" fill="#d29922" text-anchor="middle" font-weight="700">OrderFactory.limit()</text>
+        <text x="300" y="552" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">price + emulation_trigger</text>
+      </g>
+
+      <!-- MessageBus S2 -->
+      <g>
+        <rect x="410" y="510" width="115" height="56" rx="8" fill="#0c2f4a" stroke="#58a6ff" stroke-width="1.4"/>
+        <text x="467" y="535" font-family="Segoe UI, sans-serif" font-size="12" fill="#58a6ff" text-anchor="middle" font-weight="700">MessageBus</text>
+        <text x="467" y="552" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#8b949e" text-anchor="middle">SubmitOrder</text>
+      </g>
+
+      <!-- Decision diamond -->
+      <g>
+        <polygon points="640,540 730,500 820,540 730,580" fill="#2d2206" stroke="#d29922" stroke-width="1.8"/>
+        <text x="730" y="535" font-family="Segoe UI, sans-serif" font-size="11" fill="#d29922" text-anchor="middle" font-weight="700">emulation_trigger</text>
+        <text x="730" y="552" font-family="Segoe UI, sans-serif" font-size="11" fill="#d29922" text-anchor="middle" font-weight="700">== NO_TRIGGER ?</text>
+      </g>
+
+      <line x1="555" y1="538" x2="638" y2="538" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+
+      <!-- Branch A (Yes) - up and right -->
+      <path d="M 820 540 L 870 540 L 870 460 L 920 460" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="855" y="528" font-size="11" fill="#3fb950" font-weight="700">YES</text>
+
+      <!-- Branch B (No) - down and right -->
+      <path d="M 820 540 L 870 540 L 870 660 L 920 660" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+      <text x="855" y="608" font-size="11" fill="#f85149" font-weight="700">NO</text>
+
+      <!-- Branch A: RiskEngine - ExecutionEngine - Venue -->
+      <g>
+        <rect x="920" y="432" width="105" height="56" rx="8" fill="#2d1316" stroke="#f85149" stroke-width="1.4"/>
+        <text x="972" y="457" font-family="Segoe UI, sans-serif" font-size="12" fill="#f85149" text-anchor="middle" font-weight="700">RiskEngine</text>
+        <text x="972" y="475" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle">pre-trade</text>
+      </g>
+      <g>
+        <rect x="1045" y="432" width="125" height="56" rx="8" fill="#0c2f4a" stroke="#58a6ff" stroke-width="1.4"/>
+        <text x="1107" y="457" font-family="Segoe UI, sans-serif" font-size="12" fill="#58a6ff" text-anchor="middle" font-weight="700">ExecEngine</text>
+        <text x="1107" y="475" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle">+ ExecutionClient</text>
+      </g>
+
+      <line x1="1025" y1="460" x2="1043" y2="460" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+
+      <!-- Branch A venue label (resting LIMIT) -->
+      <g>
+        <rect x="1045" y="372" width="125" height="48" rx="8" fill="#08272d" stroke="#4dd0e1" stroke-width="1.6"/>
+        <text x="1107" y="392" font-family="Segoe UI, sans-serif" font-size="12" fill="#4dd0e1" text-anchor="middle" font-weight="700">Venue</text>
+        <text x="1107" y="410" font-family="Segoe UI, sans-serif" font-size="9.5" fill="#8b949e" text-anchor="middle">resting LIMIT on book</text>
+      </g>
+      <line x1="1107" y1="432" x2="1107" y2="422" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+
+      <!-- Branch B: pre-RiskEngine -->
+      <g>
+        <rect x="920" y="632" width="105" height="56" rx="8" fill="#2d1316" stroke="#f85149" stroke-width="1.4"/>
+        <text x="972" y="657" font-family="Segoe UI, sans-serif" font-size="12" fill="#f85149" text-anchor="middle" font-weight="700">RiskEngine</text>
+        <text x="972" y="675" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle">pre-check</text>
+      </g>
+
+      <!-- Branch B: OrderEmulator -->
+      <g>
+        <rect x="1045" y="612" width="135" height="100" rx="8" fill="#1f1535" stroke="#bc8cff" stroke-width="1.8"/>
+        <text x="1112" y="634" font-family="Segoe UI, sans-serif" font-size="12" fill="#bc8cff" text-anchor="middle" font-weight="700">OrderEmulator</text>
+        <text x="1112" y="652" font-family="Segoe UI, sans-serif" font-size="10" fill="#e6edf3" text-anchor="middle">state: EMULATED</text>
+        <text x="1112" y="668" font-family="Segoe UI, sans-serif" font-size="10" fill="#e6edf3" text-anchor="middle">MatchingCore</text>
+        <text x="1112" y="685" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle" font-style="italic">trigger fires →</text>
+        <text x="1112" y="700" font-family="Segoe UI, sans-serif" font-size="10" fill="#8b949e" text-anchor="middle" font-style="italic">RELEASED as MARKET</text>
+      </g>
+      <line x1="1025" y1="660" x2="1043" y2="660" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-cmd)"/>
+
+      <!-- Subscribed feed arrow into OrderEmulator -->
+      <path d="M 115 580 Q 600 770 1112 712" fill="none" stroke="#8b949e" stroke-width="1.2" stroke-dasharray="2 4" marker-end="url(#arrow-cache)"/>
+      <text x="600" y="785" font-size="10.5" fill="#8b949e" text-anchor="middle" font-style="italic">OrderEmulator subscribes to Quote / Trade / Mark / Index ticks (Orders.txt 666)</text>
+
+      <!-- Branch B: release back to RiskEngine -->
+      <path d="M 1045 612 L 1010 612 L 1010 500 L 1025 500" fill="none" stroke="#bc8cff" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrow-emu)"/>
+      <text x="940" y="565" font-size="10" fill="#bc8cff" text-anchor="middle">OrderReleased</text>
+      <text x="940" y="578" font-size="10" fill="#bc8cff" text-anchor="middle">(transformed → MARKET)</text>
+
+      <!-- Branch B: revalidated to ExecEngine — re-uses the same RiskEngine & ExecEngine boxes from Branch A -->
+      <text x="940" y="495" font-size="9.5" fill="#8b949e" text-anchor="middle">re-validate</text>
+
+      <!-- Branch B: ExecEngine to Venue MARKET fill -->
+      <path d="M 1107 488 L 1107 740" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-evt)"/>
+      <g>
+        <rect x="1045" y="740" width="125" height="48" rx="8" fill="#08272d" stroke="#4dd0e1" stroke-width="1.4"/>
+        <text x="1107" y="760" font-family="Segoe UI, sans-serif" font-size="11.5" fill="#4dd0e1" text-anchor="middle" font-weight="700">Venue (MARKET fill)</text>
+        <text x="1107" y="777" font-family="Segoe UI, sans-serif" font-size="9.5" fill="#8b949e" text-anchor="middle">OrderFilled → handler</text>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Legend table directly below the SVG -->
+  <table>
+    <thead>
+      <tr><th>Legend</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span style="display:inline-block;width:30px;height:0;border-top:2px solid #58a6ff;vertical-align:middle"></span> &nbsp; solid blue</td><td>Command — <code>SubmitOrder</code>, <code>route</code>, <code>validated</code>.</td></tr>
+      <tr><td><span style="display:inline-block;width:30px;height:0;border-top:2px dashed #3fb950;vertical-align:middle"></span> &nbsp; dashed green</td><td>Event — <code>OrderFilled</code>, <code>OrderAccepted</code>.</td></tr>
+      <tr><td><span style="display:inline-block;width:30px;height:0;border-top:2px dashed #bc8cff;vertical-align:middle"></span> &nbsp; dashed purple</td><td>Emulator release — <code>OrderReleased</code>, transformed to MARKET.</td></tr>
+      <tr><td><span style="display:inline-block;width:30px;height:0;border-top:2px dotted #8b949e;vertical-align:middle"></span> &nbsp; dotted gray</td><td>Data feed — bars/ticks into <code>Cache</code>; subscriptions into <code>OrderEmulator</code>.</td></tr>
+      <tr><td><span class="badge badge-ok">green</span> nodes</td><td>Strategy in Scenario 1 lane.</td></tr>
+      <tr><td><span class="badge badge-purple">purple</span> nodes</td><td>Strategy / OrderEmulator in Scenario 2 lane.</td></tr>
+      <tr><td><span class="badge badge-warn">amber</span> nodes</td><td>OrderFactory output (Market / Limit) and the decision diamond.</td></tr>
+      <tr><td><span class="badge badge-info">blue</span> nodes</td><td>Bus / Engines / Clients.</td></tr>
+      <tr><td><span class="badge badge-err">red</span> nodes</td><td><code>RiskEngine</code> (pre-trade gate; runs twice on emulated orders).</td></tr>
+      <tr><td><span class="badge badge-teal">teal</span> nodes</td><td>Venue / SimulatedExchange.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout-tech">
+    <strong>Technically:</strong> Edge walk-through, with citations.
+    <ul style="margin:6px 0 0 18px;">
+      <li><strong>DataEngine → Strategy</strong> (dotted gray): per-timestamp Phase 2 of the backtest loop — <code>DataEngine</code> dispatches <code>on_bar</code> / <code>on_quote_tick</code> / <code>on_trade_tick</code> after writing the tick/bar to the <code>Cache</code> (<code>Cache.txt</code>&nbsp;31–35; <code>Backtesting.txt</code>&nbsp;312, 322–326).</li>
+      <li><strong>Strategy → OrderFactory → MessageBus</strong> (solid blue): <code>self.order_factory.market(...) / .limit(...)</code> then <code>self.submit_order(order)</code> publishes a <code>SubmitOrder</code> command (<code>Orders.txt</code>&nbsp;220–252; <code>Execution.txt</code>&nbsp;36).</li>
+      <li><strong>MessageBus → RiskEngine</strong> (Scenario 1 and Scenario 2-A): default routing rule (<code>Execution.txt</code>&nbsp;38–44) — <em>"routes to RiskEngine otherwise"</em>.</li>
+      <li><strong>Decision diamond</strong> in Scenario 2: <em>"NO_TRIGGER: disables local emulation completely and order is fully submitted to the venue"</em> (<code>Orders.txt</code>&nbsp;582–586). Any other <code>TriggerType</code> activates emulation.</li>
+      <li><strong>RiskEngine (pre-check) → OrderEmulator</strong> (Scenario 2-B): <code>Orders.txt</code>&nbsp;650 step 2 — RiskEngine runs first; emulator receives only post-check.</li>
+      <li><strong>OrderEmulator → data feed subscriptions</strong> (dotted gray): <code>Orders.txt</code>&nbsp;666 — <em>"The OrderEmulator will subscribe to any needed market data … to update the matching core."</em></li>
+      <li><strong>OrderEmulator → RiskEngine</strong> (dashed purple): on trigger, order transforms to MARKET and emits <code>OrderReleased</code>; RiskEngine re-validates (<code>Orders.txt</code>&nbsp;650 step 5, 700).</li>
+      <li><strong>RiskEngine → ExecutionEngine → ExecutionClient → Venue</strong> (solid blue): <code>Execution.txt</code>&nbsp;38–52.</li>
+      <li><strong>Venue → Strategy</strong> (dashed green): fill events propagate back through <code>ExecutionEngine</code> and the <code>MessageBus</code> to <code>on_order_filled</code> / <code>on_position_*</code> (<code>Events.txt</code>&nbsp;17–34, 173–207).</li>
+    </ul>
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-6">6 &nbsp;·&nbsp; Performance: slippage analysis</h2>
+
+  <h3>6.1 What slippage is</h3>
+  <div class="simple">
+    Slippage is the gap between the price you <em>intended</em> to trade at and the price you <em>actually</em> got. Every tick of slippage is a real cost — it comes straight out of your PnL on every single trade. Lower slippage = more profit kept. There are three sources you can lose money to: (a) crossing the bid-ask spread whenever you take liquidity, (b) the venue's tick-level adverse drift (modeled in Nautilus by <code>prob_slippage</code>), and (c) intra-bar latency — the gap between when your signal <em>fires</em> and when the order actually <em>fills</em>.
+  </div>
+
+  <h3>6.2 How Nautilus models slippage</h3>
+  <div class="callout-tech">
+    <strong>Technically:</strong> <code>FillModel.prob_slippage</code> (default <code>0.0</code>; documented in <code>Backtesting.txt</code>&nbsp;535–565 and 1051–1107) is the per-fill probability of one tick of adverse slippage on every taker fill at L1 / bar / quote / trade granularity. At <code>prob_slippage=0.5</code>, a MARKET BUY has a 50/50 chance of paying <code>ask + 1 tick</code>. Bar-data fills add a latency component (<code>Backtesting.txt</code> line&nbsp;933): <em>"Without a <code>LatencyModel</code>, an order submitted from <code>on_bar</code> settles immediately and matches against the current book, whose top reflects bar N's close."</em> That intra-bar drift between threshold-cross and bar-close is real, unmodeled slippage that hits <em>only</em> the callback path. Fill-price tables (<code>Backtesting.txt</code>&nbsp;386–440): L1/quote/trade/bar → MARKET BUY at best ask, MARKET SELL at best bid; LIMIT → its own limit price. For passive LIMITs, <code>prob_fill_on_limit</code> (default <code>1.0</code>; <code>Backtesting.txt</code>&nbsp;1088–1093) governs queue position — at <code>0.0</code> the LIMIT only fills when the price level is <em>crossed</em>.
+  </div>
+
+  <h3>6.3 Slippage components per scenario</h3>
+  <div class="callout">
+    The decomposition below isolates each source of slippage and tags it per scenario. Green = no exposure, amber = limited exposure, red = full exposure.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Slippage component</th>
+        <th>Scenario 1 — callback MARKET</th>
+        <th>Scenario 2A — native LIMIT (<code>NO_TRIGGER</code>)</th>
+        <th>Scenario 2B — emulated LIMIT → MARKET</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Bid-ask spread cost (taker half-spread)</td>
+        <td><span class="badge badge-err">Yes</span> &nbsp; always taker</td>
+        <td><span class="badge badge-ok">No</span> if <code>post_only=True</code> (maker)</td>
+        <td><span class="badge badge-err">Yes</span> &nbsp; released as taker MARKET</td>
+      </tr>
+      <tr>
+        <td><code>prob_slippage</code> tick exposure</td>
+        <td><span class="badge badge-err">Yes</span> on every fill</td>
+        <td><span class="badge badge-ok">No</span> &nbsp; LIMIT fills at its own price</td>
+        <td><span class="badge badge-warn">Yes</span>, but only one tick at release</td>
+      </tr>
+      <tr>
+        <td>Intra-bar latency penalty (signal → fill)</td>
+        <td><span class="badge badge-err">Yes</span> &nbsp; fills at bar N <em>close</em>, not at threshold</td>
+        <td><span class="badge badge-ok">No</span> &nbsp; Phase-1 OHLC sweep matches at limit price</td>
+        <td><span class="badge badge-ok">No</span> &nbsp; emulator releases on the exact triggering tick</td>
+      </tr>
+      <tr>
+        <td>Whipsaw exposure (single-bar wicks)</td>
+        <td><span class="badge badge-err">High</span> &nbsp; sees bar after the fact</td>
+        <td><span class="badge badge-ok">None</span> &nbsp; price-touched or not</td>
+        <td><span class="badge badge-warn">Low</span> &nbsp; depends on trigger feed granularity</td>
+      </tr>
+      <tr>
+        <td>Non-fill risk</td>
+        <td><span class="badge badge-ok">None</span> &nbsp; MARKET always fills</td>
+        <td><span class="badge badge-err">High</span> &nbsp; may never touch limit</td>
+        <td><span class="badge badge-warn">Medium</span> &nbsp; depends on trigger condition</td>
+      </tr>
+      <tr>
+        <td>Typical worst-case slippage</td>
+        <td><span class="badge badge-err">Full bar range</span> (threshold→close) + 1 prob tick + half-spread</td>
+        <td><span class="badge badge-ok">0 ticks</span> (or maker rebate)</td>
+        <td><span class="badge badge-warn">~1 tick</span> + half-spread</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.4 Quantitative ranking — least to most slippage</h3>
+  <div class="callout-ok">
+    <strong>Ranking</strong> (LEAST adverse slippage → MOST adverse slippage):
+    <ol style="margin:8px 0 0 22px;">
+      <li><strong>Scenario 2A with <code>post_only=True</code></strong> — native maker LIMIT. <span class="badge badge-ok">Zero slippage</span>; you get the exact limit price or you don't fill at all. Some venues even pay you a maker rebate.</li>
+      <li><strong>Scenario 2A with <code>post_only=False</code></strong> — native marketable LIMIT. Fills at limit price or better on the taker side; no <code>prob_slippage</code> exposure because LIMIT matches at its own price.</li>
+      <li><strong>Scenario 2B (emulated LIMIT → released MARKET)</strong> — <span class="badge badge-warn">~1 tick</span> of <code>prob_slippage</code> plus half-spread on release. <em>No</em> intra-bar latency penalty — the emulator releases on the exact triggering tick, not on the next bar.</li>
+      <li><strong>Scenario 1 (callback MARKET)</strong> — <span class="badge badge-err">worst on slippage</span>: full intra-bar latency (entire range from threshold to bar close) <em>plus</em> <code>prob_slippage</code> <em>plus</em> the half-spread. On volatile bars this can drift many ticks past the threshold.</li>
+    </ol>
+  </div>
+
+  <h3>6.5 Recommendation — the answer to "which scenario has less slippage?"</h3>
+  <div class="callout">
+    <strong>If your goal is the minimum slippage path, use Scenario 2A — a native <code>LIMIT</code> order with <code>emulation_trigger=TriggerType.NO_TRIGGER</code> and <code>post_only=True</code>.</strong> This is the only scenario where you are guaranteed to fill at your chosen price (or not at all). The next-best option is <strong>Scenario 2B</strong> (emulated LIMIT that releases as MARKET) — you give up zero-slippage but you gain a guaranteed fill once the trigger fires, with at most one tick of adverse drift. <strong>Scenario 1 (callback MARKET) is the worst on slippage</strong> by a wide margin — it pays the half-spread, the <code>prob_slippage</code> tick, <em>and</em> the entire intra-bar drift from threshold to bar close.
+  </div>
+
+  <h3>6.6 The tradeoff — why m-cube still uses Scenario 1</h3>
+  <div class="callout-warn">
+    <strong>The lowest-slippage path is also the highest non-fill-risk path.</strong> A native LIMIT (Scenario 2A) protects price but may never fill — leaving you exposed if the market moves away. m-cube's exit engine in [core/managed_strategy.py](core/managed_strategy.py) uses Scenario 1 precisely <em>because</em> the exit <em>must</em> happen when SL is hit, regardless of slippage cost. The slippage-vs-fill-certainty tradeoff is fundamental:
+    <ul style="margin:6px 0 0 18px;">
+      <li><strong>Scenario 2A</strong> — choose when non-fill is tolerable (e.g. limit-entry strategies where missing the entry is acceptable).</li>
+      <li><strong>Scenario 2B</strong> — choose when you need a guaranteed exit/entry with minimal slippage and have the trigger data feed available in your backtest.</li>
+      <li><strong>Scenario 1</strong> — choose only when callback-driven exit logic is genuinely required (multi-bar confirmation via <code>sl_wait_bars</code>, trailing stops indexed off custom indicator state, RBO logic, etc.).</li>
+    </ul>
+  </div>
+
+  <h3>6.7 Worked numerical example</h3>
+  <div class="callout-tech">
+    <strong>Setup:</strong> long EURUSD position. Adverse bar with <code>O=1.0850</code>, <code>H=1.0852</code>, <code>L=1.0805</code>, <code>C=1.0810</code> — bar drops hard and closes near its low. Stop-loss set at <code>SL = 1.0825</code>. Tick size <code>0.0001</code>. Backtest knobs: <code>prob_slippage=0.5</code>, half-spread = 0.5 tick. The bar's low (1.0805) pierces the SL (1.0825), so all three scenarios trigger an exit on this bar.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Scenario</th>
+        <th>Exit fill price</th>
+        <th>Adverse slippage from SL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Scenario 1</strong> — callback MARKET fires in <code>on_bar(N)</code>, fills at bar close</td>
+        <td><code>1.0810</code> (bar close) ± 1 tick from <code>prob_slippage</code> ± 0.5 tick spread</td>
+        <td><span class="badge badge-err">~15 ticks adverse</span> + spread + prob_slippage = <strong>≈ 16 ticks total</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Scenario 2A</strong> — native resting LIMIT (or STOP_MARKET) at 1.0825, fills in Phase-1 OHLC sweep when L pierces it</td>
+        <td><code>1.0825</code> (limit price, taker side of the sweep)</td>
+        <td><span class="badge badge-ok">0 ticks</span></td>
+      </tr>
+      <tr>
+        <td><strong>Scenario 2B</strong> — emulated LIMIT with <code>emulation_trigger=LAST_PRICE</code>, releases as MARKET when last trade ≤ 1.0825</td>
+        <td><code>~1.0824</code> (1 tick adverse after trigger) ± 0.5 spread</td>
+        <td><span class="badge badge-warn">≈ 1 tick adverse</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout-ok">
+    <strong>Check.</strong>
+    <ul style="margin:6px 0 0 18px;">
+      <li>Scenario 1: intended exit at SL = 1.0825, actual exit at C = 1.0810. Distance = 1.0825 − 1.0810 = 0.0015 = <strong>15 ticks adverse</strong>. Plus 0.5 tick from the half-spread + 0.5 tick from the 50% <code>prob_slippage</code> expected value = <strong>~16 ticks total</strong>.</li>
+      <li>Scenario 2A: limit/stop price = 1.0825, fill price = 1.0825. Distance = 0. <strong>0 ticks slippage</strong> (this is what LIMIT guarantees by definition).</li>
+      <li>Scenario 2B: trigger fires at last-trade = 1.0825, MARKET released, fills at ~1.0824 (one tick adverse — the next available bid). <strong>≈ 1 tick adverse</strong>.</li>
+      <li><strong>Bottom line:</strong> Scenario 1 costs ~16× more in slippage than Scenario 2B and is uncountably worse than Scenario 2A. These numbers are conservative — on news bars or thinly-traded sessions Scenario 1 can drift 5–10× worse, while Scenario 2A still costs zero.</li>
+    </ul>
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-7">7 &nbsp;·&nbsp; OrderStatus state machine</h2>
+
+  <div class="simple">
+    The order's life as a state machine. Scenario 1 visits a short path — the order is created, sent, accepted, then filled. Scenario 2-B (emulated) inserts two extra states near the start: <code>EMULATED</code> while the emulator is watching the trigger, and <code>RELEASED</code> the moment the trigger fires and the order is handed off.
+  </div>
+
+  <div class="callout-tech">
+    <strong>Technically:</strong> Full enumeration from <code>Orders.txt</code>&nbsp;24–152.
+    Active-local (non-terminal): <code>INITIALIZED</code>, <code>EMULATED</code>, <code>RELEASED</code>.
+    In-flight: <code>SUBMITTED</code>, <code>PENDING_UPDATE</code>, <code>PENDING_CANCEL</code>.
+    Open on venue: <code>ACCEPTED</code>, <code>TRIGGERED</code>, <code>PENDING_UPDATE</code>, <code>PENDING_CANCEL</code>, <code>PARTIALLY_FILLED</code>.
+    Closed (terminal): <code>DENIED</code>, <code>REJECTED</code>, <code>CANCELED</code>, <code>EXPIRED</code>, <code>FILLED</code>.
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>State</th><th>Visited in Scenario 1?</th><th>Visited in Scenario 2-A (<code>NO_TRIGGER</code>)?</th><th>Visited in Scenario 2-B (emulated)?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>INITIALIZED</code></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td></tr>
+      <tr><td><code>DENIED</code> (terminal)</td><td>possible</td><td>possible</td><td>possible at submit <em>or</em> at release</td></tr>
+      <tr><td><code>EMULATED</code></td><td><span class="badge badge-err">no</span></td><td><span class="badge badge-err">no</span></td><td><span class="badge badge-ok">yes</span></td></tr>
+      <tr><td><code>RELEASED</code></td><td><span class="badge badge-err">no</span></td><td><span class="badge badge-err">no</span></td><td><span class="badge badge-ok">yes</span></td></tr>
+      <tr><td><code>SUBMITTED</code></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td></tr>
+      <tr><td><code>ACCEPTED</code></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span> (rests on book)</td><td><span class="badge badge-ok">yes</span> (as MARKET — brief)</td></tr>
+      <tr><td><code>REJECTED</code> (terminal)</td><td>possible (venue NACK)</td><td>possible</td><td>possible</td></tr>
+      <tr><td><code>PARTIALLY_FILLED</code></td><td>rare (MARKET on L2/L3 walking book)</td><td><span class="badge badge-ok">common</span> for resting LIMIT</td><td>rare (released MARKET)</td></tr>
+      <tr><td><code>FILLED</code> (terminal)</td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td><td><span class="badge badge-ok">yes</span></td></tr>
+      <tr><td><code>CANCELED</code> (terminal)</td><td>possible</td><td>possible (e.g. <code>post_only</code> crossed)</td><td>possible (Strategy.cancel before trigger)</td></tr>
+      <tr><td><code>EXPIRED</code> (terminal)</td><td>possible (GTD)</td><td>possible (GTD)</td><td>possible (GTD on emulator side)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-8">8 &nbsp;·&nbsp; Where this lives in m-cube</h2>
+
+  <div class="simple">
+    Scenario 1 is exactly how the m-cube exit engine works in production today. Scenario 2 is supported infrastructure for user strategies, but the m-cube exit path does not use the LIMIT-with-emulation pattern.
+  </div>
+
+  <div class="callout">
+    <strong>Scenario 1</strong> is implemented by <a href="core/managed_strategy.py">core/managed_strategy.py</a> — the <code>ManagedExitStrategy</code> wraps every signal function from <code>core/signals.py:SIGNAL_REGISTRY</code> with the manual SL/TP/trailing/squareoff/RBO state machine. The <code>sl_wait_bars</code> confirmation pattern documented in [CLAUDE.md](CLAUDE.md) and the leg → slot → portfolio square-off precedence are all evaluated inside <code>on_bar</code>; the exit itself is a MARKET order submitted via <code>self.submit_order(self.order_factory.market(...))</code>.
+  </div>
+
+  <div class="callout">
+    <strong>Scenario 2</strong> is available to user strategies via <code>self.order_factory.limit(...)</code> (with or without an <code>emulation_trigger</code>) but is not used in the m-cube exit path. The L1 entry strategies under <a href="strategies/">strategies/</a> generally use MARKET entries; LIMIT/emulated patterns are open for new user-supplied strategies under <code>custom_strategies/&lt;user_id&gt;/</code> registered via <a href="core/custom_strategy_loader.py">core/custom_strategy_loader.py</a>.
+  </div>
+
+  <div class="callout">
+    <strong>Adjacent reading already in <code>html_reports/</code>:</strong>
+    <ul style="margin:6px 0 0 18px;">
+      <li><a href="order_emulator_report.html">order_emulator_report.html</a> — broader OrderEmulator deep-dive.</li>
+      <li><a href="mkt_limit_order_tradeoff.html">mkt_limit_order_tradeoff.html</a> — MARKET vs LIMIT cost / slippage tradeoff for m-cube backtests.</li>
+      <li><a href="sl_tp_with_market_orders_explained.html">sl_tp_with_market_orders_explained.html</a> — narrative companion focused on Scenario 1.</li>
+    </ul>
+  </div>
+
+  <!-- ============================================================== -->
+  <h2 id="sec-9">9 &nbsp;·&nbsp; References (PDF citations)</h2>
+
+  <div class="callout">
+    Every technical claim above is grounded in one of these concept docs at <code>d:\m-cube_version1\.claude\agents\ntm3_docs\</code>. Line ranges are preserved verbatim from the <code>ntm3</code> subagent's research dump for traceability.
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Document</th><th>Sections used here</th><th>What it covers</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>Orders.txt</code></td><td>24–152, 156–252, 386–514, 543–561, 563–717, 739–746</td><td>OrderStatus state machine; TimeInForce; OrderFactory surface; ContingencyType; OrderEmulator (matrix, triggers, release rules, gotchas).</td></tr>
+      <tr><td><code>Execution.txt</code></td><td>8–14, 17–50, 133–152, 154–174, 176–303, 409–443</td><td>Routing rule (Strategy → … → ExecutionClient); RiskEngine validations; ContingencyType behavior; ExecutionEngine overfill detection.</td></tr>
+      <tr><td><code>Events.txt</code></td><td>12–18, 20–34, 42–88, 173–207</td><td>Handler dispatch priority; trading event catalogue; fill → position propagation.</td></tr>
+      <tr><td><code>Cache.txt</code></td><td>25–53, 212–219</td><td>Data → Cache → Strategy callback chain; <code>self.cache</code> helpers including emulated-order lookups.</td></tr>
+      <tr><td><code>MessageBus.txt</code></td><td>8–13, 1–120</td><td>Three messaging patterns; <code>self.msgbus</code> command/request/pub-sub.</td></tr>
+      <tr><td><code>Backtesting.txt</code></td><td>8, 280–650, 900–1130</td><td>Per-timestamp three-phase loop; fill-price tables (L1/L2/L3 + bar/quote/trade); <code>FillModel</code> + <code>LatencyModel</code>; bar-data timing.</td></tr>
+      <tr><td><code>Adapters.txt</code></td><td>84–119</td><td>Concrete Strategy lifecycle examples (<code>on_start</code> + <code>subscribe_*</code> + <code>on_bar</code> + <code>on_trade_tick</code>); ExecutionClient role.</td></tr>
+      <tr><td><code>Rust.txt</code></td><td>276–375</td><td>Authoritative Actor/Strategy handler list mirrored from the Rust core.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout-warn">
+    Three concept <code>.txt</code> extractions are empty in the docs library (<code>Startegies.txt</code> [sic], <code>Actors.txt</code>, <code>Architecture.txt</code>), and the source PDFs cannot currently be re-extracted on this host. Strategy lifecycle / handler / architecture facts in this report are therefore sourced from the docs that <em>do</em> cover the same surface in passing (the table above).
+  </div>
+
+  <footer>
+    Generated 2026-05-28 — Sourced by the <code>ntm3</code> subagent from the NautilusTrader 1.224.0 concept PDFs at <code>d:\m-cube_version1\.claude\agents\ntm3_docs\</code>.
+  </footer>
+</div>
+</body>
+</html>
