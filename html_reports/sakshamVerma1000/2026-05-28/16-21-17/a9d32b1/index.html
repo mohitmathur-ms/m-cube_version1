@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SL formula verification harness, LIMIT-vs-MARKET slippage report, test portfolio library, and Coinbase venue name bug fix — a9d32b1</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">Path_A_LowAPI</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/a9d32b15282d0141a17b1afd00ecda9624057320'><code>a9d32b1</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>SL formula verification harness, LIMIT-vs-MARKET slippage report, test portfolio library, and Coinbase venue name bug fix</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-05-28 10:53 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>The team built an automated quality-check system to verify that the platform&#x27;s stop-loss calculations are mathematically correct. It runs real backtests with known inputs and checks that every stop-loss price the engine actually places matches the formula it is supposed to use. The results, now saved in the repository, show that fixed stop-losses (percentage and points-based) are correct, but ATR-based stop-losses have a small but consistent one-pip rounding error that shows up more often with larger multipliers.</p><p>A research report was produced comparing two ways the platform can enter trades: sending a limit order directly to the exchange, versus using a strategy callback that fires a market order when conditions are met. The comparison focuses on slippage — how much worse the real fill price is versus the intended price — and the findings are saved as HTML tearsheets.</p><p>A large library of ready-to-run test portfolios was added to make it easier to reproduce and test specific engine behaviors. There are 65+ portfolio files organised into four groups: cross-portfolio edge cases, leg-level exit logic, portfolio-level logic, and data-format variations. Each group has its own documented README.</p><p>A bug was fixed in the Coinbase venue configuration: the venue name was listed as &#x27;COINBASE&#x27; when it should be &#x27;COINBASE_MS&#x27; to match the instrument IDs used in backtests. Without this fix, any Coinbase backtest would silently fail. Session trading hours were also added to the Coinbase and Nifty Futures venue configs.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>The most substantial new artefact is `verify_leg_sl_formulas.py` (382 lines) and its companion `tests/smoke_tests/verify_leg_sl_formulas_report.py` (278 lines). The harness drives nine fixture portfolios (NONE / PCT-05 / PCT-10 / PTS-0005 / PTS-0010 / ATR-10/-15/-20/-30, all in `5. Logics/sl_formula_tests/portfolios/`) through the live Flask `/api/portfolio/run` endpoint, extracts the orderbook, and for each SL exit cross-checks `engine_sl` against the analytically-expected `snap(entry ± multiplier × ATR)`. Results are persisted to `5. Logics/sl_formula_tests/sl_formula_results.json` (1 146 lines). All nine run-results are present in this commit, meaning the harness was both written and executed in this push.</p><p>The results expose a systematic ±1-tick (1e-05) rounding discrepancy in ATR-mode SL placement inside `core/managed_strategy.py`. The error direction alternates (sometimes engine_sl is one tick too high, sometimes one tick too low), pointing to a floating-point precision issue in the tick-snapping step when `entry ∓ k × ATR` sits very close to a tick boundary. Failure rates: ATR-10 1/41, ATR-15 9/15, ATR-20 4/15, ATR-30 1/2. PCT-10 also fails with the same 1-tick pattern on 2/3 trades.</p><p>`core/managed_strategy.py` is modified (24 lines changed) but the diff is truncated; the exact change is not visible. It is likely related to the ATR/percentage SL rounding investigation or to session-time integration (see venue config changes below).</p><p>`html_reports/LIMIT_ORDER_REPORT.html` (1 054 lines) and `html_reports/order_emulator_report.html` (723 lines) are static tearsheets comparing NautilusTrader&#x27;s native LIMIT-order path with the current m-cube pattern of submitting a MARKET order from `on_order_filled`/`on_bar` strategy callbacks, from a slippage standpoint.</p><p>`portfolios/testing/` adds 65+ JSON portfolio files and a 174-line README. Files follow four namespaces: TC-xx (same-bar precedence, trail-step breach, cross-portfolio race), TL-xx (SL pct/points/ATR, wait bars, move-cost, re-execute/reverse actions), TP-xx (combined portfolio loss/profit, underlying SL/target, trailing, move-cost at portfolio level, cross-portfolio halt), TX-xx (data formats, MIS cutoff, NRML carry, timeframes, tick-snap).</p><p>`adapter_admin/adapters_config/coinbase_ms.json`: `venue` field corrected from `&quot;COINBASE&quot;` to `&quot;COINBASE_MS&quot;` — the venue string must match the InstrumentId prefix or the engine cannot resolve the instrument. Also adds `session_start_time: &quot;00:00:00&quot;` / `session_end_time: &quot;23:59:00&quot;`. `nifty_futures_ms.json` gains the same session fields (`09:15:00` / `19:14:00`).</p><p>`scripts/aggregate_catalog.py` is modified (42 lines; diff truncated). `README_APP.md` simultaneously removes two references to RSI/ATR/EMA/VWAP feature sidecars from the catalog and aggregation pipeline descriptions, suggesting the sidecar-compute step was stripped from the aggregator in this push, though the exact code change is not visible.</p><p>`core/backtest_runner/simple_backtest_runner_readme.md` (389 lines) is a new human-readable documentation file dropped inside the `core/backtest_runner/` package directory, describing each sub-module (profiling, bar_types, bar_filters, path_b, rbo, slot_execution, portfolio_clip, etc.). Its presence implies this directory is already a package, consistent with the earlier modular refactor of `backtest_runner.py`.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>The ATR-15 test (1.5× multiplier) illustrates the confirmed rounding bug:</p><p>entry  = 1.053992  (SHORT, EURUSD 1-min MID)
+  ATR    = 0.00019
+  formula: SL = snap(1.053992 + 1.5 × 0.00019) = snap(1.054277) = 1.05428
+  engine_sl returned by backtest = 1.05427   ← 1 tick (1e-05) low</p><p>The same off-by-one pattern repeats for 9 of 15 SL exits in ATR-15 and is confirmed across ATR-10, ATR-20, and ATR-30. By contrast, the PTS-0005 (fixed-points) test shows:</p><p>entry = 1.053992  (SHORT)
+  formula: SL = snap(1.053992 + 0.0005) = 1.05449
+  engine_sl = 1.05449   ← exact match</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><svg viewBox="0 0 940 570" width="100%" role="img" aria-label="dependency graph" style="max-width:940px"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker></defs><text x="150" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depended on by</text><text x="470" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Changed files</text><text x="790" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depends on</text><line x1="275" y1="87" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="135" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="183" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="231" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="279" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="423" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="327" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="279" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="327" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="375" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="423" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="471" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="519" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="231" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="231" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="231" x2="665" y2="279" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="231" x2="665" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><g><title>core/backtest_runner/__init__.py</title><rect x="25" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">backtest_runner/__init__.py</text></g><g><title>core/backtest_runner/orchestration/__init__.py</title><rect x="25" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">orchestration/__init__.py</text></g><g><title>core/backtest_runner/portfolio_clip/__init__.py</title><rect x="25" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">portfolio_clip/__init__.py</text></g><g><title>core/backtest_runner/slot_execution/__init__.py</title><rect x="25" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">slot_execution/__init__.py</text></g><g><title>scripts/capture_order_events.py</title><rect x="25" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/capture_order_events.…</text></g><g><title>tests/test_leg_target_features.py</title><rect x="25" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_leg_target_feature…</text></g><g><title>tests/test_pf_reexec_replay.py</title><rect x="25" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_pf_reexec_replay.py</text></g><g><title>tests/test_run_on_days_strategy_gate.py</title><rect x="25" y="406" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_run_on_days_strate…</text></g><g><title>tests/test_strategy_subscribe_tf.py</title><rect x="25" y="454" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="475" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_strategy_subscribe…</text></g><g><title>tests/test_three_format_engine.py</title><rect x="25" y="502" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="523" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_three_format_engin…</text></g><g><title>core/managed_strategy.py</title><rect x="345" y="70" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/managed_strategy.py</text></g><g><title>scripts/aggregate_catalog.py</title><rect x="345" y="118" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">scripts/aggregate_catalog.py</text></g><g><title>tests/smoke_tests/verify_leg_sl_formulas_report.py</title><rect x="345" y="166" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">smoke_tests/verify_leg_sl_for…</text></g><g><title>verify_leg_sl_formulas.py</title><rect x="345" y="214" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">verify_leg_sl_formulas.py</text></g><g><title>core/aggregator.py</title><rect x="665" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/aggregator.py</text></g><g><title>core/backtest_runner/__init__.py</title><rect x="665" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">backtest_runner/__init__.py</text></g><g><title>core/instrument_factory/__init__.py</title><rect x="665" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">instrument_factory/__init__.py</text></g><g><title>core/instrument_factory/catalog_lookup/__init__.py</title><rect x="665" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">catalog_lookup/__init__.py</text></g><g><title>core/models/__init__.py</title><rect x="665" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">models/__init__.py</text></g><g><title>core/nautilus_loader.py</title><rect x="665" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/nautilus_loader.py</text></g><g><title>core/report_generator.py</title><rect x="665" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/report_generator.py</text></g><g><title>core/signals.py</title><rect x="665" y="406" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/signals.py</text></g></svg></div><table class='dep'><thead><tr><th>Changed file</th><th>Depended on by &larr;</th><th>Depends on &rarr;</th></tr></thead><tbody><tr><td><code>core/managed_strategy.py</code></td><td><code>core/backtest_runner/__init__.py</code><br><code>core/backtest_runner/orchestration/__init__.py</code><br><code>core/backtest_runner/portfolio_clip/__init__.py</code><br><code>core/backtest_runner/slot_execution/__init__.py</code><br><code>scripts/capture_order_events.py</code><br><code>tests/test_leg_target_features.py</code><br><code>tests/test_pf_reexec_replay.py</code><br><code>tests/test_run_on_days_strategy_gate.py</code><br><code>tests/test_strategy_subscribe_tf.py</code><br><code>tests/test_three_format_engine.py</code></td><td><code>core/aggregator.py</code><br><code>core/models/__init__.py</code><br><code>core/signals.py</code></td></tr><tr><td><code>scripts/aggregate_catalog.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/aggregator.py</code><br><code>core/instrument_factory/__init__.py</code><br><code>core/nautilus_loader.py</code></td></tr><tr><td><code>tests/smoke_tests/verify_leg_sl_formulas_report.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>verify_leg_sl_formulas.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/backtest_runner/__init__.py</code><br><code>core/instrument_factory/catalog_lookup/__init__.py</code><br><code>core/models/__init__.py</code><br><code>core/report_generator.py</code></td></tr></tbody></table><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.claude/agent-memory/ntm3/MEMORY.md</code></li><li><code>.claude/agent-memory/ntm3/project_docs_library_empty.md</code></li><li><code>.claude/settings.json</code></li><li><code>.claude/settings.local.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/ATR-10.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/ATR-15.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/ATR-20.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/ATR-30.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/NONE.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/PCT-05.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/PCT-10.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/PTS-0005.json</code></li><li><code>5. Logics/sl_formula_tests/portfolios/PTS-0010.json</code></li><li><code>5. Logics/sl_formula_tests/sl_formula_results.json</code></li><li><code>README_APP.md</code></li><li><code>adapter_admin/adapters_config/coinbase_ms.json</code></li><li><code>adapter_admin/adapters_config/nifty_futures_ms.json</code></li><li><code>core/backtest_runner/simple_backtest_runner_readme.md</code></li><li><code>html_reports/LIMIT_ORDER_REPORT.html</code></li><li><code>html_reports/order_emulator_report.html</code></li><li><code>portfolios/testing/README.md</code></li><li><code>portfolios/testing/TC-01_samebar_precedence_A.json</code></li><li><code>portfolios/testing/TC-01_samebar_precedence_B.json</code></li><li><code>portfolios/testing/TC-02_trailstep_breach.json</code></li><li><code>portfolios/testing/TC-03_movecost_gap.json</code></li><li><code>portfolios/testing/TC-04_reexec_instant_restop.json</code></li><li><code>portfolios/testing/TC-05_trail_vs_fixed.json</code></li><li><code>portfolios/testing/TC-06_crosspf_race_A.json</code></li><li><code>portfolios/testing/TC-06_crosspf_race_B.json</code></li><li><code>portfolios/testing/TC-07_boundary_threshold.json</code></li><li><code>portfolios/testing/TL-01_sl_pct.json</code></li><li><code>portfolios/testing/TL-02_sl_points.json</code></li><li><code>portfolios/testing/TL-03_sl_atr.json</code></li><li><code>portfolios/testing/TL-04_tgt_pct.json</code></li><li><code>portfolios/testing/TL-05_tgt_points.json</code></li><li><code>portfolios/testing/TL-06_sl_wait.json</code></li><li><code>portfolios/testing/TL-07_movecost_profitonly.json</code></li><li><code>portfolios/testing/TL-08_movecost_all.json</code></li><li><code>portfolios/testing/TL-09_movecost_ltpbuffer.json</code></li><li><code>portfolios/testing/TL-10_trail_after_move.json</code></li><li><code>portfolios/testing/TL-11_action_sqoff.json</code></li><li><code>portfolios/testing/TL-12_action_reexecute.json</code></li><li><code>portfolios/testing/TL-13_action_reentry.json</code></li><li><code>portfolios/testing/TL-14_action_keeplegrunning.json</code></li><li><code>portfolios/testing/TL-15_action_execute.json</code></li><li><code>portfolios/testing/TL-16_action_combo.json</code></li><li><code>portfolios/testing/TP-01_combined_loss.json</code></li><li><code>portfolios/testing/TP-02_underlying_sl.json</code></li><li><code>portfolios/testing/TP-03_loss_and_range.json</code></li><li><code>portfolios/testing/TP-04_combined_profit.json</code></li><li><code>portfolios/testing/TP-05_underlying_tgt.json</code></li><li><code>portfolios/testing/TP-06_trailing_sl.json</code></li><li><code>portfolios/testing/TP-07_trailing_target.json</code></li><li><code>portfolios/testing/TP-08_movecost_portfolio.json</code></li><li><code>portfolios/testing/TP-09_portfolio_delay.json</code></li><li><code>portfolios/testing/TP-10_sqoff_filter_loss.json</code></li><li><code>portfolios/testing/TP-11_crossportfolio_A.json</code></li><li><code>portfolios/testing/TP-11_crossportfolio_B.json</code></li><li><code>portfolios/testing/TP-12_leg_breach.json</code></li><li><code>portfolios/testing/TX-01_format_A_bidask.json</code></li><li><code>portfolios/testing/TX-01_format_B_ohlcv.json</code></li><li><code>portfolios/testing/TX-01_format_C_ltp.json</code></li><li><code>portfolios/testing/TX-02_mis_cutoff.json</code></li><li><code>portfolios/testing/TX-03_nrml_carry.json</code></li><li><code>portfolios/testing/TX-04_tf_1d.json</code></li><li><code>portfolios/testing/TX-04_tf_1h.json</code></li><li><code>portfolios/testing/TX-04_tf_1m.json</code></li><li><code>portfolios/testing/TX-04_tf_5m.json</code></li><li><code>portfolios/testing/TX-05_tick_snap.json</code></li><li><code>portfolios/testing/TX-06_safety_seconds.json</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.claude/agent-memory/ntm3/MEMORY.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>.claude/agent-memory/ntm3/project_docs_library_empty.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>.claude/settings.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>.claude/settings.local.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/ATR-10.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/ATR-15.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/ATR-20.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/ATR-30.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/NONE.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/PCT-05.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/PCT-10.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/PTS-0005.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/portfolios/PTS-0010.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>5. Logics/sl_formula_tests/sl_formula_results.json</code></td><td>New: Persisted test results for 9 SL configurations (1 146 lines)</td></tr><tr><td><code>README_APP.md</code></td><td>Minor: removed references to catalog/feature sidecars and aggregator ATR/EMA/VWAP output</td></tr><tr><td><code>adapter_admin/adapters_config/coinbase_ms.json</code></td><td>Bug fix: venue corrected &#x27;COINBASE&#x27;→&#x27;COINBASE_MS&#x27;; session times added</td></tr><tr><td><code>adapter_admin/adapters_config/nifty_futures_ms.json</code></td><td>Added session_start_time/session_end_time fields</td></tr><tr><td><code>core/backtest_runner/simple_backtest_runner_readme.md</code></td><td>New: Developer documentation for modular backtest_runner layout</td></tr><tr><td><code>core/managed_strategy.py</code></td><td>Modified 24 lines (diff truncated; likely ATR SL rounding or session-time integration)</td></tr><tr><td><code>html_reports/LIMIT_ORDER_REPORT.html</code></td><td>New: Slippage comparison tearsheet (LIMIT vs. callback-MARKET)</td></tr><tr><td><code>html_reports/order_emulator_report.html</code></td><td>New: Order emulator behavior tearsheet</td></tr><tr><td><code>portfolios/testing/README.md</code></td><td>New: Documented catalog of all test portfolios</td></tr><tr><td><code>portfolios/testing/TC-01_samebar_precedence_A.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-01_samebar_precedence_B.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-02_trailstep_breach.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-03_movecost_gap.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-04_reexec_instant_restop.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-05_trail_vs_fixed.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-06_crosspf_race_A.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-06_crosspf_race_B.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TC-07_boundary_threshold.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-01_sl_pct.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-02_sl_points.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-03_sl_atr.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-04_tgt_pct.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-05_tgt_points.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-06_sl_wait.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-07_movecost_profitonly.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-08_movecost_all.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-09_movecost_ltpbuffer.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-10_trail_after_move.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-11_action_sqoff.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-12_action_reexecute.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-13_action_reentry.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-14_action_keeplegrunning.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-15_action_execute.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TL-16_action_combo.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-01_combined_loss.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-02_underlying_sl.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-03_loss_and_range.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-04_combined_profit.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-05_underlying_tgt.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-06_trailing_sl.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-07_trailing_target.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-08_movecost_portfolio.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-09_portfolio_delay.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-10_sqoff_filter_loss.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-11_crossportfolio_A.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-11_crossportfolio_B.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TP-12_leg_breach.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-01_format_A_bidask.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-01_format_B_ohlcv.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-01_format_C_ltp.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-02_mis_cutoff.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-03_nrml_carry.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-04_tf_1d.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-04_tf_1h.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-04_tf_1m.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-04_tf_5m.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-05_tick_snap.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing/TX-06_safety_seconds.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>scripts/aggregate_catalog.py</code></td><td>Modified 42 lines (diff truncated; likely removal of feature-sidecar computation)</td></tr><tr><td><code>tests/smoke_tests/verify_leg_sl_formulas_report.py</code></td><td>New: HTML report renderer for SL formula test results</td></tr><tr><td><code>verify_leg_sl_formulas.py</code></td><td>New: SL formula verification harness; drives live API, checks engine_sl vs. formula per trade</td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>ATR SL rounding bug is confirmed but not yet fixed — systematic ±1-tick error at multipliers ≥1.5× needs a fix in managed_strategy.py tick-snapping (likely round vs. floor/ceil choice after float multiplication)</li><li>PCT-10 also fails with the same 1-tick pattern (2/3 trades); shares likely root cause with ATR failures</li><li>core/managed_strategy.py and scripts/aggregate_catalog.py diffs are truncated — actual changes are unreviewed; risk is unknown</li><li>coinbase_ms.json venue name fix may invalidate any catalog data or saved results keyed under the old &#x27;COINBASE&#x27; venue string</li><li>Feature sidecar removal (RSI/ATR/EMA/VWAP) from the aggregator is implied by README_APP.md edits but the aggregate_catalog.py diff is not visible — downstream consumers of sidecar data (if any) could silently break</li><li>core/backtest_runner/simple_backtest_runner_readme.md is a documentation-only file inside a package directory; its description of sub-folders (profiling/, bar_types/, rbo/, etc.) should be verified against the actual directory contents to ensure it is not out of date</li><li>65+ new test portfolios reference EURUSD.FOREX_MS / NIFTY data — they will error at runtime on any machine whose catalog lacks that data; no CI guard enforces this</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat <span class='chip warn'>truncated</span></h2>
+    <pre>.claude/agent-memory/ntm3/MEMORY.md                |    2 +
+ .../ntm3/project_docs_library_empty.md             |   22 +
+ .claude/settings.json                              |    5 +-
+ .claude/settings.local.json                        |   16 +-
+ 5. Logics/sl_formula_tests/portfolios/ATR-10.json  |   36 +
+ 5. Logics/sl_formula_tests/portfolios/ATR-15.json  |   36 +
+ 5. Logics/sl_formula_tests/portfolios/ATR-20.json  |   36 +
+ 5. Logics/sl_formula_tests/portfolios/ATR-30.json  |   36 +
+ 5. Logics/sl_formula_tests/portfolios/NONE.json    |   36 +
+ 5. Logics/sl_formula_tests/portfolios/PCT-05.json  |   36 +
+ 5. Logics/sl_formula_tests/portfolios/PCT-10.json  |   36 +
+ .../sl_formula_tests/portfolios/PTS-0005.json      |   36 +
+ .../sl_formula_tests/portfolios/PTS-0010.json      |   36 +
+ 5. Logics/sl_formula_tests/sl_formula_results.json | 1146 ++++++++++++++++++++
+ README_APP.md                                      |    4 +-
+ adapter_admin/adapters_config/coinbase_ms.json     |    6 +-
+ .../adapters_config/nifty_futures_ms.json          |    4 +-
+ .../simple_backtest_runner_readme.md               |  389 +++++++
+ core/managed_strategy.py                           |   24 +-
+ html_reports/LIMIT_ORDER_REPORT.html               | 1054 ++++++++++++++++++
+ html_reports/order_emulator_report.html            |  723 ++++++++++++
+ portfolios/testing/README.md                       |  174 +++
+ portfolios/testing/TC-01_samebar_precedence_A.json |  240 ++++
+ portfolios/testing/TC-01_samebar_precedence_B.json |  140 +++
+ portfolios/testing/TC-02_trailstep_breach.json     |  240 ++++
+ portfolios/testing/TC-03_movecost_gap.json         |  190 ++++
+ .../testing/TC-04_reexec_instant_restop.json       |  140 +++
+ portfolios/testing/TC-05_trail_vs_fixed.json       |  240 ++++
+ portfolios/testing/TC-06_crosspf_race_A.json       |  240 ++++
+ portfolios/testing/TC-06_crosspf_race_B.json       |  140 +++
+ portfolios/testing/TC-07_boundary_threshold.json   |  240 ++++
+ portfolios/testing/TL-01_sl_pct.json               |  140 +++
+ portfolios/testing/TL-02_sl_points.json            |  140 +++
+ portfolios/testing/TL-03_sl_atr.json               |  140 +++
+ portfolios/testing/TL-04_tgt_pct.json              |  140 +++
+ portfolios/testing/TL-05_tgt_points.json           |  140 +++
+ portfolios/testing/TL-06_sl_wait.json              |  140 +++
+ portfolios/testing/TL-07_movecost_profitonly.json  |  190 ++++
+ portfolios/testing/TL-08_movecost_all.json         |  190 ++++
+ portfolios/testing/TL-09_movecost_ltpbuffer.json   |  240 ++++
+ portfolios/testing/TL-10_trail_after_move.json     |  190 ++++
+ portfolios/testing/TL-11_action_sqoff.json         |  140 +++
+ portfolios/testing/TL-12_action_reexecute.json     |  140 +++
+ portfolios/testing/TL-13_action_reentry.json       |  140 +++
+ .../testing/TL-14_action_keeplegrunning.json       |  190 ++++
+ portfolios/testing/TL-15_action_execute.json       |  190 ++++
+ portfolios/testing/TL-16_action_combo.json         |  140 +++
+ portfolios/testing/TP-01_combined_loss.json        |  240 ++++
+ portfolios/testing/TP-02_underlying_sl.json        |  240 ++++
+ portfolios/testing/TP-03_loss_and_range.json       |  240 ++++
+ portfolios/testing/TP-04_combined_profit.json      |  240 ++++
+ portfolios/testing/TP-05_underlying_tgt.json       |  240 ++++
+ portfolios/testing/TP-06_trailing_sl.json          |  240 ++++
+ portfolios/testing/TP-07_trailing_target.json      |  240 ++++
+ portfolios/testing/TP-08_movecost_portfolio.json   |  240 ++++
+ portfolios/testing/TP-09_portfolio_delay.json      |  240 ++++
+ portfolios/testing/TP-10_sqoff_filter_loss.json    |  240 ++++
+ portfolios/testing/TP-11_crossportfolio_A.json     |  240 ++++
+ portfolios/testing/TP-11_crossportfolio_B.json     |  140 +++
+ portfolios/testing/TP-12_leg_breach.json           |  240 ++++
+ portfolios/testing/TX-01_format_A_bidask.json      |  140 +++
+ portfolios/testing/TX-01_format_B_ohlcv.json       |  140 +++
+ portfolios/testing/TX-01_format_C_ltp.json         |  140 +++
+ portfolios/testing/TX-02_mis_cutoff.json           |  140 +++
+ portfolios/testing/TX-03_nrml_carry.json           |  140 +++
+ portfolios/testing/TX-04_tf_1d.json                |  140 +++
+ portfolios/testing/TX-04_tf_1h.json                |  140 +++
+ portfolios/testing/TX-04_tf_1m.json                |  140 +++
+ portfolios/testing/TX-04_tf_5m.json                |  140 +++
+ portfolios/testing/TX-05_tick_snap.json            |  140 +++
+ portfolios/testing/TX-06_safety_seconds.json       |  140 +++
+ scripts/aggregate_catalog.py                       |   42 +-
+ tests/smoke_tests/verify_leg_sl_formulas_report.py |  278 +++++
+ verify_leg_sl_formulas.py                          |  382 +++++++
+ 74 files changed, 13503 insertions(+), 52 deletions(-)</pre>
+  </section>
+
+  <footer>
+    Commit a9d32b15282d0141a17b1afd00ecda9624057320 on <strong>Path_A_LowAPI</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>
