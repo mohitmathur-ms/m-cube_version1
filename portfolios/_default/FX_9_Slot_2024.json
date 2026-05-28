@@ -3,7 +3,7 @@
   "description": "Benchmark portfolio: EMA/RSI/Bollinger x EURUSD/GBPUSD/USDJPY on 1-minute MID bars.",
   "portfolio_tag": null,
   "created_at": "2026-04-22T00:00:00+00:00",
-  "updated_at": "2026-05-25T04:23:05.066885+00:00",
+  "updated_at": "2026-05-28T09:44:46.767202+00:00",
   "starting_capital": 100000,
   "max_loss": null,
   "max_profit": null,
@@ -23,7 +23,7 @@
     "Fri"
   ],
   "entry_start_time": "09:30:00",
-  "entry_end_time": "15:29:00",
+  "entry_end_time": "11:30:00",
   "winter_time_adjust": false,
   "rbo_enabled": true,
   "range_monitoring_start": "09:30:00",
