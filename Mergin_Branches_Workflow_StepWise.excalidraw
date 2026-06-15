@@ -11,7 +11,7 @@
       "width": 338.4000244140625,
       "height": 120.79997253417969,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -25,8 +25,8 @@
         "type": 3
       },
       "seed": 1121693488,
-      "version": 59,
-      "versionNonce": 1896772560,
+      "version": 60,
+      "versionNonce": 1610460976,
       "isDeleted": false,
       "boundElements": [
         {
@@ -38,7 +38,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1781521371279,
+      "updated": 1781522350254,
       "link": null,
       "locked": false
     },
@@ -50,7 +50,7 @@
       "width": 162.49989318847656,
       "height": 25,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -62,11 +62,11 @@
       "index": "a1",
       "roundness": null,
       "seed": 701473072,
-      "version": 17,
-      "versionNonce": 246389552,
+      "version": 18,
+      "versionNonce": 1801198544,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1781521062208,
+      "updated": 1781522350254,
       "link": null,
       "locked": false,
       "text": "Path_A_LowAPI",
@@ -176,7 +176,7 @@
       "width": 246.4000244140625,
       "height": 109.59996032714844,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -190,8 +190,8 @@
         "type": 3
       },
       "seed": 1691662128,
-      "version": 48,
-      "versionNonce": 34094384,
+      "version": 49,
+      "versionNonce": 484460848,
       "isDeleted": false,
       "boundElements": [
         {
@@ -203,7 +203,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1781521376041,
+      "updated": 1781522350254,
       "link": null,
       "locked": false
     },
@@ -215,7 +215,7 @@
       "width": 168.9998779296875,
       "height": 25,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -227,11 +227,11 @@
       "index": "a4",
       "roundness": null,
       "seed": 1321411536,
-      "version": 23,
-      "versionNonce": 1954213328,
+      "version": 24,
+      "versionNonce": 1460150736,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1781521077569,
+      "updated": 1781522350254,
       "link": null,
       "locked": false,
       "text": "merger_path_a_b",
@@ -386,7 +386,7 @@
       "width": 391.20001220703125,
       "height": 148,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -400,8 +400,8 @@
         "type": 3
       },
       "seed": 748694320,
-      "version": 54,
-      "versionNonce": 784951088,
+      "version": 56,
+      "versionNonce": 608244528,
       "isDeleted": false,
       "boundElements": [
         {
@@ -421,7 +421,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1781521388328,
+      "updated": 1781522526130,
       "link": null,
       "locked": false
     },
@@ -433,7 +433,7 @@
       "width": 346.07977294921875,
       "height": 125,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -445,11 +445,11 @@
       "index": "a9",
       "roundness": null,
       "seed": 179780560,
-      "version": 92,
-      "versionNonce": 1434576,
+      "version": 94,
+      "versionNonce": 175175632,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1781521127471,
+      "updated": 1781522526130,
       "link": null,
       "locked": false,
       "text": "Merged Path_A_LowAPI ->\nmerger_path_a_b.\n\nNow merger_path_a_b contains the\nmerged code",
@@ -470,7 +470,7 @@
       "width": 228.800048828125,
       "height": 116.80001831054686,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -484,8 +484,8 @@
         "type": 3
       },
       "seed": 844517168,
-      "version": 129,
-      "versionNonce": 1067104208,
+      "version": 131,
+      "versionNonce": 1259810096,
       "isDeleted": false,
       "boundElements": [
         {
@@ -497,7 +497,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1781521392122,
+      "updated": 1781522526130,
       "link": null,
       "locked": false
     },
@@ -509,7 +509,7 @@
       "width": 69.15995788574219,
       "height": 25,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -521,11 +521,11 @@
       "index": "aB",
       "roundness": null,
       "seed": 419112912,
-      "version": 101,
-      "versionNonce": 886036784,
+      "version": 103,
+      "versionNonce": 1998683600,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1781521154892,
+      "updated": 1781522526130,
       "link": null,
       "locked": false,
       "text": "path_b",
