@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leg-Level SL — Test Scenarios</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --red:#cf222e; --red-bg:#ffebe9; --amber:#9a6700; --amber-bg:#fff8c5; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1180px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#1a7f37 100%); color:#fff; padding:34px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:26px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:20px; margin-top:34px; padding-bottom:7px; border-bottom:2px solid var(--border); }
+  h3 { font-size:16px; margin-top:22px; }
+  h4 { font-size:13px; margin-top:16px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13.5px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  td.center,th.center { text-align:center; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12.5px; background:#f6f8fa; padding:2px 6px; border-radius:3px; color:#d63384; }
+  pre { background:#f6f8fa; border:1px solid var(--border); border-radius:6px; padding:12px 16px; overflow-x:auto; font-size:13px; }
+  pre code { background:none; color:var(--text); padding:0; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:11px 15px; margin:13px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .callout.warn { background:var(--amber-bg); border-left-color:var(--amber); }
+  .callout.warn strong { color:var(--amber); }
+  .callout.bug { background:var(--red-bg); border-left-color:var(--red); }
+  .callout.bug strong { color:var(--red); }
+  ol.steps { padding-left:22px; font-size:14px; }
+  ol.steps li { margin:7px 0; }
+  nav.toc { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:14px 18px; margin:18px 0; }
+  nav.toc h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+  nav.toc ol { margin:0; padding-left:20px; columns:2; column-gap:32px; }
+  nav.toc li { margin:3px 0; }
+  nav.toc a { color:var(--accent); text-decoration:none; }
+  .res { color:var(--green); font-weight:600; }
+  .footnote { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Leg-Level SL — Test Scenarios</h1>
+  <p>Scope: leg-level stop-loss only — percentage · points · atr · trailing. Oracle = the implementation's own formulas and fields.</p>
+</header>
+
+<div class="callout">
+  Values below are <strong>tick-snapped</strong> (the engine snaps every SL to the instrument grid). Baseline for the formula fixtures: entry <code>100.00</code>, tick <code>0.01</code>. The asset/timeframe matrix (§5) re-runs them on real instruments. Config fields: <code>stop_loss_type</code>, <code>stop_loss_value</code>, <code>sl_atr_period</code>, <code>sl_atr_multiplier</code>, <code>trailing_sl_step</code>, <code>trailing_sl_offset</code>.
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#types">1. SL-type golden fixtures</a></li>
+    <li><a href="#sweep">2. ATR multiplier sweep</a></li>
+    <li><a href="#trail">3. Trailing (leg) — step-based</a></li>
+    <li><a href="#product">4. Product type — MIS vs NRML</a></li>
+    <li><a href="#matrix">5. Asset-class × timeframe matrix</a></li>
+    <li><a href="#mechanics">6. Common mechanics</a></li>
+    <li><a href="#harness">7. How to run as a test strategy</a></li>
+  </ol>
+</nav>
+
+<h2 id="types">1. SL-type golden fixtures (compute + trigger)</h2>
+<table>
+  <thead><tr><th>ID</th><th>Type</th><th>Dir</th><th>Config</th><th>Computed SL</th><th>Trigger test</th><th>Fires on bar</th></tr></thead>
+  <tbody>
+    <tr><td>LS-PCT-01</td><td>percentage</td><td>LONG</td><td>value = 2</td><td><code>100×(1−0.02) = 98.00</code></td><td><code>bar_low ≤ 98.00</code></td><td>low 97.96 → hit</td></tr>
+    <tr><td>LS-PCT-02</td><td>percentage</td><td>SHORT</td><td>value = 2</td><td><code>100×(1+0.02) = 102.00</code></td><td><code>bar_high ≥ 102.00</code></td><td>high 102.05 → hit</td></tr>
+    <tr><td>LS-PTS-01</td><td>points</td><td>LONG</td><td>value = 2.50</td><td><code>100 − 2.50 = 97.50</code></td><td><code>bar_low ≤ 97.50</code></td><td>low 97.40 → hit</td></tr>
+    <tr><td>LS-PTS-02</td><td>points</td><td>SHORT</td><td>value = 2.50</td><td><code>100 + 2.50 = 102.50</code></td><td><code>bar_high ≥ 102.50</code></td><td>high 102.60 → hit</td></tr>
+    <tr><td>LS-ATR-01</td><td>atr</td><td>LONG</td><td>period 14, mult 1.5, ATR=0.80</td><td><code>100 − (1.5×0.80) = 98.80</code></td><td><code>bar_low ≤ 98.80</code></td><td>low 98.75 → hit</td></tr>
+    <tr><td>LS-ATR-02</td><td>atr</td><td>SHORT</td><td>period 14, mult 1.5, ATR=0.80</td><td><code>100 + 1.20 = 101.20</code></td><td><code>bar_high ≥ 101.20</code></td><td>high 101.25 → hit</td></tr>
+    <tr><td>LS-ATR-03</td><td>atr</td><td>LONG</td><td>ATR not initialised (warm-up)</td><td><code>dist=0 → current_sl = 0</code></td><td><strong>no SL armed</strong></td><td>never fires</td></tr>
+    <tr><td>LS-NONE</td><td>none</td><td>—</td><td>—</td><td>no SL</td><td>—</td><td>leg never stopped</td></tr>
+  </tbody>
+</table>
+<p><strong>Assert for each:</strong> computed <code>current_sl</code> exactly equals the value shown (after tick snap), trigger uses the correct side (<code>low</code> long, <code>high</code> short), and <code>_handle_exit("sl")</code> fires on the first piercing bar — not on the close.</p>
+
+<h2 id="sweep">2. ATR multiplier sweep</h2>
+<p>ATR alone is just a volatility number — the <strong>multiplier</strong> sets the distance (<code>dist = mult × ATR</code>). LONG, entry 100:</p>
+<table>
+  <thead><tr><th>ATR at entry ↓ / multiplier →</th><th class="center">1.0</th><th class="center">1.5</th><th class="center">2.0</th><th class="center">3.0</th></tr></thead>
+  <tbody>
+    <tr><td>0.40 (calm)</td><td class="center">99.60</td><td class="center">99.40</td><td class="center">99.20</td><td class="center">98.80</td></tr>
+    <tr><td>0.80 (normal)</td><td class="center">99.20</td><td class="center">98.80</td><td class="center">98.40</td><td class="center">97.60</td></tr>
+    <tr><td>1.60 (volatile)</td><td class="center">98.40</td><td class="center">97.60</td><td class="center">96.80</td><td class="center">95.20</td></tr>
+  </tbody>
+</table>
+<p><strong>Assert:</strong> each cell = <code>100 − (ATR × mult)</code>, tick-snapped. Higher multiplier and/or ATR → wider stop. (SHORT mirrors: <code>100 + ATR×mult</code>.) Confirm <strong>mult = 0 or ATR = 0 ⇒ no SL armed</strong> (<code>current_sl = 0</code>).</p>
+
+<h2 id="trail">3. Trailing (leg) — step-based per the final spec</h2>
+<p>Leg-level trailing is <strong>Move SL to Cost + Trail After Move SL</strong> (PnL / step-based) — see <code>trailing_final_report</code> / <code>trailing_spec</code>. Concrete fixtures live in <strong>§5</strong>: <strong>MC-01…MC-03</strong> (Move SL to Cost, 3 variants) and <strong>TM-01</strong> (Trail After Move SL ratchet).</p>
+<div class="callout warn">The implementation's <strong>standalone <code>trailing</code> SL type</strong> (percentage step off entry, <code>trailing_sl_step</code> / <code>trailing_sl_offset</code>) is <strong>not in the spec → being removed</strong> (it's also the buggy one, see <code>trailing_sl_bug_report.md</code>). <strong>No standalone price-trailing ("Way 2") leg stop is adopted.</strong></div>
+
+<h2 id="product">4. Product type — MIS vs NRML (each SL type)</h2>
+<p>The SL <strong>computation and intrabar trigger are product-agnostic</strong> — identical under MIS and NRML. Only end-of-session handling differs.</p>
+<table>
+  <thead><tr><th>ID</th><th>Product</th><th>Scenario</th><th>Expected</th></tr></thead>
+  <tbody>
+    <tr><td>PR-MIS-01</td><td>MIS</td><td>SL <strong>not</strong> hit by intraday cutoff (e.g. 15:20 IST NSE; session close CME)</td><td>Leg <strong>force-closed at the cutoff</strong> at market, regardless of SL</td></tr>
+    <tr><td>PR-MIS-02</td><td>MIS</td><td>SL hit at 13:00 (before cutoff)</td><td>Normal SL exit at 13:00; cutoff never reached</td></tr>
+    <tr><td>PR-NRML-01</td><td>NRML</td><td>SL not hit</td><td><strong>No</strong> intraday forced close; carries to next session / expiry</td></tr>
+    <tr><td>PR-NRML-02</td><td>NRML</td><td>SL hit</td><td>Normal SL exit; identical fill to PR-MIS-02</td></tr>
+  </tbody>
+</table>
+<p><strong>Cross-check:</strong> run PR-MIS-02 and PR-NRML-02 with the same SL config and bars → trigger bar and fill must be <strong>identical</strong> (proves SL logic is product-independent). Run all four for each of percentage / points / atr / trailing.</p>
+<div class="callout warn"><strong>Dependency:</strong> product type (MIS/NRML auto-square-off cutoff) is not yet in the spec — tracked as <strong>TBD-7</strong>. PR-MIS-01 passes only once the engine has product-type + cutoff handling. NRML / SL-trigger parts are testable now.</div>
+
+<h2 id="matrix">5. Asset-class × timeframe matrix</h2>
+<p>Run LS-PCT / LS-PTS / LS-ATR in <strong>every cell</strong> = every asset × every timeframe. <strong>Timeframes: 1m · 3m · 5m · 2h · 1d · 1w · 1M</strong> (drop to tick/1-sec where exact intrabar ordering must be settled). The SL logic is the same; what changes per cell is tick snapping, lot multiplier, currency, and (for ATR) the lookback window.</p>
+<table>
+  <thead><tr><th>Asset</th><th>tick</th><th>lot/mult</th><th>ccy</th></tr></thead>
+  <tbody>
+    <tr><td>NIFTY-FUT</td><td>0.05</td><td>65</td><td>INR</td></tr>
+    <tr><td>BANKNIFTY-FUT</td><td>0.05</td><td>25</td><td>INR</td></tr>
+    <tr><td>US index futures (E-mini S&amp;P)</td><td>0.25</td><td>$50</td><td>USD</td></tr>
+    <tr><td>6E (EUR/USD)</td><td>0.00005</td><td>125,000</td><td>USD</td></tr>
+    <tr><td>GC (Gold)</td><td>0.10</td><td>100</td><td>USD</td></tr>
+    <tr><td>BTC</td><td>5</td><td>5</td><td>USD</td></tr>
+  </tbody>
+</table>
+<h4>Per-asset tick-snap checks (percentage 2%, LONG)</h4>
+<table>
+  <thead><tr><th>Asset</th><th>raw <code>entry×0.98</code></th><th>snapped SL</th></tr></thead>
+  <tbody>
+    <tr><td>NIFTY-FUT, entry 22001</td><td>21560.98</td><td class="res">21561.00</td></tr>
+    <tr><td>6E, entry 1.10003</td><td>1.0780294</td><td class="res">1.07805</td></tr>
+    <tr><td>GC, entry 1950.07</td><td>1911.0686</td><td class="res">1911.10</td></tr>
+    <tr><td>BTC, entry 60003</td><td>58802.94</td><td class="res">58805</td></tr>
+  </tbody>
+</table>
+<p><strong>Per-asset asserts:</strong> <code>PnL = (exit − entry) × lot_mult × n_lots</code> (NIFTY 65, BANKNIFTY 25, 6E 125,000, GC 100, BTC 5); currency INR for NSE futures, USD for the rest.</p>
+<p><strong>Per-timeframe asserts:</strong></p>
+<ul>
+  <li><strong>ATR is in <em>bars</em></strong> — <code>ATR(14)</code> spans 14 bars → 14 min on 1m, 70 min on 5m, 28 h on 2h, 14 days on 1d, 14 months on 1M. The same <code>(period, mult)</code> gives <strong>different SL distances per timeframe</strong> — verify the distance is recomputed from the active bar series, never assumed equal.</li>
+  <li><strong>SL-wait:</strong> <code>sl_wait_sec</code> is wall-clock (timeframe-independent); <code>sl_wait_bars</code> scales with bar size (2 bars = 2 min on 1m, 10 min on 5m, 2 days on 1d).</li>
+  <li><strong>Trigger granularity:</strong> finer timeframes pierce on smaller bars → trigger timestamp differs, SL price identical.</li>
+  <li><strong>Tick snap is timeframe-independent</strong> — depends only on the instrument.</li>
+</ul>
+
+<h2 id="mechanics">6. Common mechanics (all four types)</h2>
+<table>
+  <thead><tr><th>Check</th><th>Expected</th></tr></thead>
+  <tbody>
+    <tr><td>Tick snap</td><td>every computed SL = <code>round(price/tick) × tick</code>; off-grid raw values snap (e.g. 108.54 → 108.55 at tick 0.05)</td></tr>
+    <tr><td>Intrabar trigger</td><td>LONG fires on <code>bar_low ≤ SL</code>, SHORT on <code>bar_high ≥ SL</code> — the bar <strong>low/high</strong>, not the close</td></tr>
+    <tr><td>SL-wait gate</td><td>with <code>sl_wait_sec</code> (preferred) / <code>sl_wait_bars</code>, exit suppressed until the level holds that long; if price recovers first, no exit</td></tr>
+    <tr><td>No-SL guard</td><td><code>current_sl = 0</code> ⇒ leg never stopped (covers ATR warm-up / none)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="harness">7. How to run as a test strategy (EMA-cross harness)</h2>
+<p>Use a trivial EMA/MA crossover purely as the <strong>entry trigger</strong> so the strategy takes real trades; then check the SL against each realised fill. You no longer control the exact entry price, so verify <strong>relative to the fill</strong>:</p>
+<pre><code>expected_sl = formula(fill_price, sl_config)   then snap to instrument tick
+assert  engine.current_sl == expected_sl</code></pre>
+<p>Per type: percentage <code>fill × (1 ∓ v/100)</code> · points <code>fill ∓ v</code> · atr <code>fill ∓ (mult × ATR_at_entry)</code>.</p>
+<div class="callout"><strong>Example.</strong> EMA(9)/EMA(21) on NIFTY-FUT 1-min, long on bullish cross, <code>percentage</code> SL value 2. Trade fills at <code>22037.40</code> → expected SL <code>= 22037.40 × 0.98 = 21596.652</code> → snap 0.05 → <span class="res">21596.65</span>. Assert engine SL = 21596.65; the first bar with <code>low ≤ 21596.65</code> must exit at that level. Repeat the check on <strong>every</strong> trade.</div>
+
+<h3>A. Ask the developer team to — build + instrument the harness</h3>
+<ol class="steps">
+  <li><strong>Provide a minimal deterministic test strategy:</strong> EMA(fast)/EMA(slow) crossover — long on bullish cross, short on bearish — single leg, with the leg SL block (<code>stop_loss_type</code>, <code>stop_loss_value</code>, <code>sl_atr_period</code>, <code>sl_atr_multiplier</code>, <code>trailing_sl_step</code>, <code>trailing_sl_offset</code>) fully configurable.</li>
+  <li><strong>Parameterise it</strong> for instrument, bar timeframe, product type (MIS / NRML), and SL config — so one harness runs every cell of the matrix.</li>
+  <li><strong>Log per entry:</strong> fill price, timestamp, direction, and — for <code>atr</code> — the ATR value used at entry; for <code>trailing</code> — the per-bar <code>current_sl</code> updates.</li>
+  <li><strong>Log per exit:</strong> exit reason (<code>sl</code> / <code>target</code> / <code>eod</code> / <code>cutoff</code>), exit price, timestamp, and <code>current_sl</code> at exit.</li>
+  <li><strong>Emit a machine-readable orderbook</strong> (CSV / JSON), one row per fill/exit, so checks can be automated.</li>
+  <li><strong>State the tick</strong> used for snapping per instrument, and the <strong>lot multiplier + currency</strong> used for PnL.</li>
+  <li><strong>Confirm whether product type / MIS cutoff is implemented</strong> (TBD-7). If not, mark MIS scenarios blocked.</li>
+</ol>
+
+<h3>B. Then verify yourself — only the orderbook needed, no engine internals</h3>
+<ol class="steps">
+  <li><strong>One SL type at a time.</strong> Run the harness with <code>percentage</code>, value 2, one instrument, one timeframe.</li>
+  <li><strong>Recompute every SL.</strong> For each entry, apply the type formula to the logged fill, snap to tick → your expected SL. Compare to the engine's logged <code>current_sl</code>. Must match to the tick.</li>
+  <li><strong>Check the trigger</strong> on <code>sl</code> exits: the exit bar's low (long) / high (short) pierced the SL, and exit price = the SL level.</li>
+  <li><strong>Repeat for <code>points</code> and <code>atr</code>.</strong> For ATR, use the logged ATR-at-entry: expected = <code>fill ∓ (mult × ATR)</code>.</li>
+  <li><strong>Trailing — trace it bar by bar.</strong> <code>current_sl</code> should ratchet up and lock profit; if it freezes after the first step, you've reproduced the trailing bug.</li>
+  <li><strong>Sweep the matrix.</strong> Re-run across NIFTY-FUT / BANKNIFTY-FUT / US index fut / 6E / GC / BTC × 1m / 3m / 5m / 2h / 1d / 1w / 1M. Spot-check tick snap, <code>PnL = move × lot-mult × n_lots</code>, currency, and that ATR distance changes with timeframe.</li>
+  <li><strong>MIS vs NRML.</strong> Same config, both products: the SL trades must match exactly; under MIS, any position open at the cutoff must show a <code>cutoff</code> exit (pending TBD-7).</li>
+  <li><strong>Record results</strong> against the §1–§6 fixtures — green where expected SL = engine SL and triggers line up; red (with the offending trade) where they don't.</li>
+</ol>
+<div class="callout"><strong>The split:</strong> the dev team hands you a parameterised EMA harness + a logged orderbook; you verify purely from that orderbook — no need to read engine code.</div>
+
+<div class="callout warn">
+  <strong>Notes.</strong> Tick snapping here follows the <em>implementation</em> (it snaps) — this contradicts TBD-2 (keep raw); align before locking any snap-dependent expected value. All fixtures are leg-level — Move-SL-to-Cost, profit-lock, and portfolio/user levels are out of scope for this set.
+</div>
+
+</div>
+</body>
+</html>

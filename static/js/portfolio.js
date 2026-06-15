@@ -71,6 +71,7 @@ const Portfolio = {
                 try {
                     const d = await App.api(`/api/portfolios/load?name=${encodeURIComponent(name)}`);
                     if (d.portfolio) {
+                        this._fromWireTZ(d.portfolio);   // backend UTC → display IST
                         this._liftUniformSlotDates(d.portfolio);
                         loaded.push(d.portfolio);
                     }
@@ -123,6 +124,60 @@ const Portfolio = {
             opts.push(`<option value="${tz}" ${currentTz === tz ? "selected" : ""}>${tz}</option>`);
         }
         return `<select class="form-control" id="${id}">${opts.join("")}</select>`;
+    },
+
+    /* ── IST ⇄ UTC at the wire boundary ──────────────────────────────────────
+       The whole portfolio UI is entered and displayed in IST. The backend works
+       entirely in UTC (verified: entry window, RBO windows, run_on_days, leg
+       exits and the portfolio clip all compare against the bar's UTC ts; only
+       squareoff is tz-aware via squareoff_tz). So we translate ALL time-of-day
+       fields IST→UTC right before sending, and UTC→IST right after loading —
+       nothing in the render/save/validation logic changes, and the backend is
+       left untouched. Square-off times are converted too and their tz pinned to
+       "UTC" (the chosen "convert everything to UTC" approach). */
+    _NAIVE_TIME_FIELDS: ["entry_start_time", "entry_end_time", "range_monitoring_start",
+        "range_monitoring_end", "rbo_entry_start", "rbo_entry_end"],
+
+    /** IST → UTC. Mutates an already-cloned payload `c`. */
+    _toWireTZ(c) {
+        for (const f of this._NAIVE_TIME_FIELDS) if (c[f]) c[f] = App.istToUtcHHMM(c[f]);
+        if (c.squareoff_time) { c.squareoff_time = App.istToUtcHHMM(c.squareoff_time); c.squareoff_tz = "UTC"; }
+        if (c.mis_squareoff_time) { c.mis_squareoff_time = App.istToUtcHHMM(c.mis_squareoff_time); c.mis_squareoff_tz = "UTC"; }
+        for (const s of (c.slots || [])) {
+            if (s.squareoff_time) { s.squareoff_time = App.istToUtcHHMM(s.squareoff_time); s.squareoff_tz = "UTC"; }
+            const ec = s.exit_config;
+            if (ec && ec.squareoff_time) { ec.squareoff_time = App.istToUtcHHMM(ec.squareoff_time); ec.squareoff_tz = "UTC"; }
+        }
+        return c;
+    },
+
+    /** UTC → IST. Mutates the loaded portfolio `pf` in place. */
+    _fromWireTZ(pf) {
+        if (!pf) return pf;
+        for (const f of this._NAIVE_TIME_FIELDS) if (pf[f]) pf[f] = App.utcToIstHHMM(pf[f]);
+        if (pf.squareoff_time) { pf.squareoff_time = App.utcToIstHHMM(pf.squareoff_time); pf.squareoff_tz = "Asia/Kolkata"; }
+        if (pf.mis_squareoff_time) { pf.mis_squareoff_time = App.utcToIstHHMM(pf.mis_squareoff_time); pf.mis_squareoff_tz = "Asia/Kolkata"; }
+        for (const s of (pf.slots || [])) {
+            if (s.squareoff_time) { s.squareoff_time = App.utcToIstHHMM(s.squareoff_time); s.squareoff_tz = "Asia/Kolkata"; }
+            const ec = s.exit_config;
+            if (ec && ec.squareoff_time) { ec.squareoff_time = App.utcToIstHHMM(ec.squareoff_time); ec.squareoff_tz = "Asia/Kolkata"; }
+        }
+        return pf;
+    },
+
+    /** Deep-clone, strip UI-only fields, and translate IST→UTC. The single
+     *  source of truth for every save/run payload sent to the backend. */
+    _cleanForSave(pf) {
+        const c = JSON.parse(JSON.stringify(pf));
+        delete c._enabled;
+        delete c._ui;
+        delete c.on_leg_fail;
+        delete c.execution_mode;
+        delete c.strategy_tag;
+        delete c.max_legs;
+        delete c.tgt_sl_per_lot;
+        this._toWireTZ(c);
+        return c;
     },
 
     /* ═══════════════════════════════════════════════════════════════════════
@@ -196,6 +251,15 @@ const Portfolio = {
         const gEndVal = activePf?.end_date || "";
         const pfCount = this.portfolios.length;
 
+        // Preserve the live backtest-progress block across re-renders. renderApp()
+        // fires when the user selects/toggles another portfolio; without this the
+        // running run's progress bar + "Processed up to …" line would be wiped.
+        // The run loop re-queries its elements by id each event, so restoring the
+        // saved innerHTML (including slot-icon states via data-done) is enough.
+        const prevProgress = this._running
+            ? document.getElementById("pf-progress")?.innerHTML
+            : null;
+
         document.getElementById("portfolio-app").innerHTML = `
             <div class="pf-list-wrap">
                 <div style="overflow-x: auto;">
@@ -244,6 +308,12 @@ const Portfolio = {
             <div id="pf-progress"></div>
             <div id="pf-results">${resultsHTML}</div>
         `;
+
+        // Re-inject the in-flight progress block wiped by the rebuild above.
+        if (prevProgress != null) {
+            const pp = document.getElementById("pf-progress");
+            if (pp) pp.innerHTML = prevProgress;
+        }
     },
 
     /* ═══════════════════════════════════════════════════════════════════════
@@ -315,14 +385,7 @@ const Portfolio = {
         pf[key] = value || null;
 
         // Strip UI-only fields (matches _savePortfolioModal's clean step).
-        const cleanPf = JSON.parse(JSON.stringify(pf));
-        delete cleanPf._enabled;
-        delete cleanPf._ui;
-        delete cleanPf.on_leg_fail;
-        delete cleanPf.execution_mode;
-        delete cleanPf.strategy_tag;
-        delete cleanPf.max_legs;
-        delete cleanPf.tgt_sl_per_lot;
+        const cleanPf = this._cleanForSave(pf);
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
             .then(() => App.log(`Portfolio "${pf.name}" ${key} updated`, "SUCCESS", "Multileg", pf.name))
             .catch(() => { });
@@ -368,14 +431,7 @@ const Portfolio = {
         let saved = 0;
         for (const pf of this.portfolios) {
             try {
-                const clean = JSON.parse(JSON.stringify(pf));
-                delete clean._enabled;
-                delete clean._ui;
-                delete clean.on_leg_fail;
-                delete clean.execution_mode;
-                delete clean.strategy_tag;
-                delete clean.max_legs;
-                delete clean.tgt_sl_per_lot;
+                const clean = this._cleanForSave(pf);
                 await App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(clean) });
                 saved++;
             } catch { }
@@ -463,6 +519,10 @@ const Portfolio = {
         if (pf.product) pf._ui.product = pf.product;
         if (pf.mis_squareoff_time) pf._ui.mis_squareoff_time = pf.mis_squareoff_time;
         if (pf.mis_squareoff_tz) pf._ui.mis_squareoff_tz = pf.mis_squareoff_tz;
+        // Entry window (IST after _fromWireTZ) → scratchpad so the inputs show
+        // the saved values on re-edit instead of resetting to the defaults.
+        if (pf.entry_start_time) pf._ui.start_time = pf.entry_start_time;
+        if (pf.entry_end_time) pf._ui.end_time = pf.entry_end_time;
         if (pf.rbo_enabled !== undefined) pf._ui.rbo_enabled = pf.rbo_enabled;
         if (pf.range_monitoring_start) pf._ui.range_monitoring_start = pf.range_monitoring_start;
         if (pf.range_monitoring_end) pf._ui.range_monitoring_end = pf.range_monitoring_end;
@@ -482,6 +542,7 @@ const Portfolio = {
         if (pf.pf_tgt_enabled !== undefined) pf._ui.target_enabled = pf.pf_tgt_enabled;
         if (pf.pf_tgt_type) pf._ui.target_type = pf.pf_tgt_type;
         if (pf.pf_tgt_value !== undefined) pf._ui.target_value = pf.pf_tgt_value;
+        if (pf.pf_tgt_value_is_pct !== undefined) pf._ui.target_value_is_pct = pf.pf_tgt_value_is_pct;
         if (pf.pf_tgt_action) pf._ui.on_target = pf.pf_tgt_action;
         if (pf.pf_tgt_delay_sec !== undefined) pf._ui.target_delay = pf.pf_tgt_delay_sec;
         if (pf.pf_tgt_reexecute_count !== undefined) pf._ui.target_reexecute_count = pf.pf_tgt_reexecute_count;
@@ -495,6 +556,7 @@ const Portfolio = {
         if (pf.pf_sl_enabled !== undefined) pf._ui.sl_enabled = pf.pf_sl_enabled;
         if (pf.pf_sl_type) pf._ui.sl_type = pf.pf_sl_type;
         if (pf.pf_sl_value !== undefined) pf._ui.sl_value = pf.pf_sl_value;
+        if (pf.pf_sl_value_is_pct !== undefined) pf._ui.sl_value_is_pct = pf.pf_sl_value_is_pct;
         if (pf.pf_sl_underlying_below !== undefined) pf._ui.sl_underlying_below = pf.pf_sl_underlying_below;
         if (pf.pf_sl_underlying_above !== undefined) pf._ui.sl_underlying_above = pf.pf_sl_underlying_above;
         if (pf.pf_sl_action) pf._ui.on_sl_action = pf.pf_sl_action;
@@ -502,6 +564,8 @@ const Portfolio = {
         if (pf.pf_sl_reexecute_count !== undefined) pf._ui.sl_reexecute_count = pf.pf_sl_reexecute_count;
         if (pf.pf_sl_sqoff_only_loss_legs !== undefined) pf._ui.sqoff_loss_legs = pf.pf_sl_sqoff_only_loss_legs;
         if (pf.pf_sl_sqoff_only_profit_legs !== undefined) pf._ui.sqoff_profit_legs = pf.pf_sl_sqoff_only_profit_legs;
+        if (pf.pf_tgt_sqoff_only_loss_legs !== undefined) pf._ui.tgt_sqoff_loss_legs = pf.pf_tgt_sqoff_only_loss_legs;
+        if (pf.pf_tgt_sqoff_only_profit_legs !== undefined) pf._ui.tgt_sqoff_profit_legs = pf.pf_tgt_sqoff_only_profit_legs;
         if (pf.pf_sl_trail_enabled !== undefined) pf._ui.trail_sl_enabled = pf.pf_sl_trail_enabled;
         if (pf.pf_sl_trail_every !== undefined) pf._ui.trail_sl_every = pf.pf_sl_trail_every;
         if (pf.pf_sl_trail_by !== undefined) pf._ui.trail_sl_by = pf.pf_sl_trail_by;
@@ -635,13 +699,12 @@ const Portfolio = {
                         </div>
                         <div class="pf-field-row" id="pf-row-mis-sqoff"
                              style="display:${(ui.product || 'MIS') === 'MIS' ? 'flex' : 'none'};"
-                             title="Linked to the SqOff Time on the Timing tab — editing either keeps both in sync (same time + timezone). Forces intraday close at this local time and blocks re-entries until the next session.">
+                             title="Linked to the SqOff Time on the Timing tab — editing either keeps both in sync. All times are IST. Forces intraday close at this time and blocks re-entries until the next session.">
                             <span class="pf-field-label">MIS SqOff Time</span>
-                            <input type="time" class="form-control" id="pf-m-mis-sqoff" value="${ui.mis_squareoff_time || '15:15'}" step="60" style="flex:1;">
-                            <input type="text" class="form-control" id="pf-m-mis-sqofftz" value="${ui.mis_squareoff_tz || 'Asia/Kolkata'}" placeholder="IANA tz" style="flex:1; margin-left:4px;">
+                            <input type="time" class="form-control" id="pf-m-mis-sqoff" value="${ui.mis_squareoff_time || ''}" step="60" style="flex:1;">
                         </div>
                         <p id="pf-mis-sqoff-note" style="display:${(ui.product || 'MIS') === 'MIS' ? 'block' : 'none'}; font-size:0.7rem; color:var(--text-muted); margin:2px 0 6px; font-style:italic;">
-                            Time &amp; timezone are linked to the SqOff Time / Squareoff TZ on the Timing tab — changing either updates both.
+                            Linked to the SqOff Time on the Timing tab — changing either updates both. All times are IST.
                         </p>
                         <div class="pf-field-row pf-live-only">
                             <span class="pf-field-label">Strategy Tag</span>
@@ -722,9 +785,9 @@ const Portfolio = {
                                 <span class="pf-field-label">End Time</span>
                                 <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time || '16:15:00'}" step="1" style="flex:1;">
                             </div>
-                            <div class="pf-field-row pf-live-only" title="Live-only. Backtest uses the SqOff Time on the Timing tab (portfolio.squareoff_time).">
+                            <div class="pf-field-row pf-live-only" title="Live-only, read-only mirror of the SqOff Time on the Timing tab (portfolio.squareoff_time). Empty when no square-off is set.">
                                 <span class="pf-field-label">SqOff Time</span>
-                                <input type="time" class="form-control" id="pf-m-sqofftime-exec" value="${ui.sqoff_time_exec || '16:15:00'}" step="1" style="flex:1;">
+                                <input type="time" class="form-control" id="pf-m-sqofftime-exec" value="${pf.squareoff_time || ''}" step="1" style="flex:1;" readonly>
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
@@ -1044,9 +1107,13 @@ const Portfolio = {
         }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row" title="Combined Profit: PnL amount. Underlying Movement: the underlying price level the primary instrument must cross.">
+                        <div class="pf-field-row" title="Combined Profit: PnL amount (absolute) or, in % mode, a percent of starting capital. Underlying Movement: the underlying price level the primary instrument must cross.">
                             <span class="pf-field-label" id="pf-m-tgt-value-label">Target Value</span>
                             <input type="number" class="form-control" id="pf-m-tgt-value" value="${ui.target_value || 0}" step="0.01" min="0" style="width:110px;">
+                            <select class="form-control" id="pf-m-tgt-value-mode" style="width:130px;margin-left:6px;" title="Absolute currency, or % of starting capital (Combined Profit only).">
+                                <option value="abs" ${ui.target_value_is_pct ? '' : 'selected'}>Absolute</option>
+                                <option value="pct" ${ui.target_value_is_pct ? 'selected' : ''}>% of capital</option>
+                            </select>
                         </div>
                         <div class="pf-field-row" title="Only SqOff and ReExecute apply for FX/crypto. ReExecute is treated as clip+flag in v1 (no replay).">
                             <span class="pf-field-label">On Target</span>
@@ -1076,6 +1143,19 @@ const Portfolio = {
                         <div class="pf-field-row" title="Cross-portfolio action target. Name of another portfolio to act on when On Target is SqOff/Execute/Start Other Portfolio.">
                             <span class="pf-field-label">Target Portfolio</span>
                             <input type="text" class="form-control" id="pf-m-tgt-targetpf" value="${ui.target_target_portfolio || ''}" style="flex:1;" placeholder="(other portfolio name)">
+                        </div>
+                        <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light);">
+                            <div style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;" title="At clip-point, only close slots matching the filter; the others continue running. Trailing-Target hits always full-SqOff.">On Target Hit — Selective SqOff</div>
+                            <div class="pf-field-row">
+                                <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                    <input type="checkbox" id="pf-m-tgt-sqoff-loss" ${ui.tgt_sqoff_loss_legs ? 'checked' : ''}> SqOff Only Loss Making Legs
+                                </label>
+                            </div>
+                            <div class="pf-field-row">
+                                <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                    <input type="checkbox" id="pf-m-tgt-sqoff-profit" ${ui.tgt_sqoff_profit_legs ? 'checked' : ''}> SqOff Only Profit Making Legs
+                                </label>
+                            </div>
                         </div>
                     </fieldset>
                     <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
@@ -1127,9 +1207,13 @@ const Portfolio = {
         }).join("")}
                             </select>
                         </div>
-                        <div class="pf-field-row" title="For 'Combined Loss' this is the loss amount. For 'Underlying Movement' it is the underlying price level to fire at. For 'Loss and Underlying Range' it is the loss amount.">
+                        <div class="pf-field-row" title="For 'Combined Loss' this is the loss amount (absolute) or, in % mode, a percent of starting capital. For 'Underlying Movement' it is the underlying price level to fire at. For 'Loss and Underlying Range' it is the loss amount.">
                             <span class="pf-field-label">Value</span>
                             <input type="number" class="form-control" id="pf-m-sl-value" value="${ui.sl_value || 0}" step="0.01" min="0" style="width:110px;">
+                            <select class="form-control" id="pf-m-sl-value-mode" style="width:130px;margin-left:6px;" title="Absolute currency, or % of starting capital (Combined Loss only).">
+                                <option value="abs" ${ui.sl_value_is_pct ? '' : 'selected'}>Absolute</option>
+                                <option value="pct" ${ui.sl_value_is_pct ? 'selected' : ''}>% of capital</option>
+                            </select>
                         </div>
                         <div class="pf-field-row" id="pf-m-sl-urow" title="Underlying price bounds for 'Loss and Underlying Range' — the SL arms when price falls to/below 'Below' or rises to/above 'Above'. 0 disables that side." style="display:${(ui.sl_type === 'Underlying Movement' || ui.sl_type === 'Loss and Underlying Range') ? 'flex' : 'none'};">
                             <span class="pf-field-label">Underlying Below / Above</span>
@@ -1258,15 +1342,15 @@ const Portfolio = {
                                 <span class="pf-field-label">End Date</span>
                                 <input type="date" class="form-control" id="pf-m-end" value="${pf.end_date || ''}" style="flex:1;">
                             </div>
-                            <div class="pf-field-row" title="Linked to the MIS SqOff Time on the Execution Parameters tab — editing either keeps both in sync (same time + timezone). This is the value the backtest squares off at.">
+                            <div class="pf-field-row" title="Linked to the MIS SqOff Time on the Execution Parameters tab — editing either keeps both in sync. All times are IST. This is the value the backtest squares off at.">
                                 <span class="pf-field-label">SqOff Time</span>
                                 <input type="time" class="form-control" id="pf-m-sqoff" value="${pf.squareoff_time || ''}" style="flex:1;">
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px;">
                             <div class="pf-field-row">
-                                <span class="pf-field-label">Squareoff TZ</span>
-                                ${this._renderTzSelect(pf.squareoff_tz, "pf-m-sqofftz", "(UTC)")}
+                                <span class="pf-field-label">Timezone</span>
+                                <span style="flex:1; font-size:0.78rem; color:var(--text-muted); padding:4px 0;">IST (Asia/Kolkata) — all times are IST</span>
                             </div>
                             <div class="pf-field-row" title="Spec §9 Winter Time Adjustment. Shifts entry window, square-off and RBO times +1 hour at run time for US-listed instruments during DST. Leave off for NSE/India (no DST).">
                                 <label style="display:flex; align-items:center; gap:6px;">
@@ -1623,6 +1707,7 @@ const Portfolio = {
     /** Timeframes the user can pick. The `value` is the Nautilus
      *  "<step>-<aggregation>" tail of the bar_type_str. */
     TIMEFRAMES: [
+        { label: "1 sec", value: "1-SECOND" },
         { label: "1 min", value: "1-MINUTE" },
         { label: "5 min", value: "5-MINUTE" },
         { label: "15 min", value: "15-MINUTE" },
@@ -1684,6 +1769,7 @@ const Portfolio = {
     /** Minutes-of-day weight for each timeframe — used to keep strategy
      *  subscribe timeframes coarser-than-or-equal-to the base. */
     TF_MINUTES: {
+        "1-SECOND": 1 / 60,
         "1-MINUTE": 1, "5-MINUTE": 5, "15-MINUTE": 15, "30-MINUTE": 30,
         "1-HOUR": 60, "2-HOUR": 120, "1-DAY": 1440, "1-WEEK": 10080, "1-MONTH": 43200,
     },
@@ -1982,7 +2068,9 @@ const Portfolio = {
         pf.start_date = document.getElementById("pf-m-start")?.value || null;
         pf.end_date = document.getElementById("pf-m-end")?.value || null;
         pf.squareoff_time = document.getElementById("pf-m-sqoff")?.value || null;
-        pf.squareoff_tz = document.getElementById("pf-m-sqofftz")?.value || null;
+        // Timezone selectors removed: the UI is always IST. Wire conversion
+        // (_toWireTZ) pins the tz to UTC after converting the time IST→UTC.
+        pf.squareoff_tz = pf.squareoff_time ? "Asia/Kolkata" : null;
         // Winter Time Adjustment (spec §9) — applied at run time by the backend.
         pf.winter_time_adjust = document.getElementById("pf-m-winter")?.checked || false;
         // Portfolio Tag (spec §11) — assigns this portfolio to a shared risk tier.
@@ -1998,7 +2086,7 @@ const Portfolio = {
         // Execution Settings
         pf._ui.product = document.getElementById("pf-m-product")?.value || "MIS";
         pf._ui.mis_squareoff_time = document.getElementById("pf-m-mis-sqoff")?.value || null;
-        pf._ui.mis_squareoff_tz = (document.getElementById("pf-m-mis-sqofftz")?.value || "").trim() || null;
+        pf._ui.mis_squareoff_tz = pf._ui.mis_squareoff_time ? "Asia/Kolkata" : null;
         // Persisted copies for the backend (match PortfolioConfig field names).
         // MIS supplies a default squareoff_time when product==MIS and no
         // explicit Timing-tab SqOff Time is set. NRML is a no-op.
@@ -2031,7 +2119,7 @@ const Portfolio = {
         }
         pf._ui.start_time = document.getElementById("pf-m-starttime")?.value || "09:30:00";
         pf._ui.end_time = document.getElementById("pf-m-endtime")?.value || "16:15:00";
-        pf._ui.sqoff_time_exec = document.getElementById("pf-m-sqofftime-exec")?.value || "16:15:00";
+        pf._ui.sqoff_time_exec = document.getElementById("pf-m-sqofftime-exec")?.value || null;
         // Wire UI dropdown -> backend `pf.entry_start_time` / `pf.entry_end_time`.
         // Backend treats null/empty as "unbounded" on that side. Empty string ->
         // null so an explicitly cleared field doesn't act as 00:00 / 23:59.
@@ -2077,6 +2165,7 @@ const Portfolio = {
         pf._ui.target_enabled = document.getElementById("pf-m-tgt-enabled")?.checked || false;
         pf._ui.target_type = document.getElementById("pf-m-tgt-type")?.value || "Combined Profit";
         pf._ui.target_value = parseFloat(document.getElementById("pf-m-tgt-value")?.value) || 0;
+        pf._ui.target_value_is_pct = (document.getElementById("pf-m-tgt-value-mode")?.value === "pct");
         pf._ui.on_target = document.getElementById("pf-m-tgt-action")?.value || "SqOff";
         pf._ui.target_delay = parseInt(document.getElementById("pf-m-tgt-delay")?.value) || 0;
         pf._ui.target_reexecute_count = parseInt(document.getElementById("pf-m-tgt-reexcount")?.value) || 0;
@@ -2090,6 +2179,7 @@ const Portfolio = {
         pf._ui.sl_enabled = document.getElementById("pf-m-sl-enabled")?.checked || false;
         pf._ui.sl_type = document.getElementById("pf-m-sl-type")?.value || "Combined Loss";
         pf._ui.sl_value = parseFloat(document.getElementById("pf-m-sl-value")?.value) || 0;
+        pf._ui.sl_value_is_pct = (document.getElementById("pf-m-sl-value-mode")?.value === "pct");
         pf._ui.sl_underlying_below = parseFloat(document.getElementById("pf-m-sl-ubelow")?.value) || 0;
         pf._ui.sl_underlying_above = parseFloat(document.getElementById("pf-m-sl-uabove")?.value) || 0;
         pf._ui.on_sl_action = document.getElementById("pf-m-sl-action")?.value || "SqOff";
@@ -2111,12 +2201,15 @@ const Portfolio = {
         pf._ui.move_sl_agg_pnl_direction = document.getElementById("pf-m-sl-agg-direction")?.value || "loss";
         pf._ui.sqoff_loss_legs = document.getElementById("pf-m-sl-sqoff-loss")?.checked || false;
         pf._ui.sqoff_profit_legs = document.getElementById("pf-m-sl-sqoff-profit")?.checked || false;
+        pf._ui.tgt_sqoff_loss_legs = document.getElementById("pf-m-tgt-sqoff-loss")?.checked || false;
+        pf._ui.tgt_sqoff_profit_legs = document.getElementById("pf-m-tgt-sqoff-profit")?.checked || false;
         // Persisted copies for the backend (Target tab + Stoploss tab).
         // Field names on pf match PortfolioConfig in models.py. Spec:
         // 5. Logics/portfolio_sl_tgt.html.
         pf.pf_tgt_enabled = pf._ui.target_enabled;
         pf.pf_tgt_type = pf._ui.target_type;
         pf.pf_tgt_value = pf._ui.target_value;
+        pf.pf_tgt_value_is_pct = pf._ui.target_value_is_pct;
         pf.pf_tgt_action = pf._ui.on_target;
         pf.pf_tgt_delay_sec = pf._ui.target_delay;
         pf.pf_tgt_reexecute_count = pf._ui.target_reexecute_count;
@@ -2130,6 +2223,7 @@ const Portfolio = {
         pf.pf_sl_enabled = pf._ui.sl_enabled;
         pf.pf_sl_type = pf._ui.sl_type;
         pf.pf_sl_value = pf._ui.sl_value;
+        pf.pf_sl_value_is_pct = pf._ui.sl_value_is_pct;
         pf.pf_sl_underlying_below = pf._ui.sl_underlying_below;
         pf.pf_sl_underlying_above = pf._ui.sl_underlying_above;
         pf.pf_sl_action = pf._ui.on_sl_action;
@@ -2137,6 +2231,8 @@ const Portfolio = {
         pf.pf_sl_reexecute_count = pf._ui.sl_reexecute_count;
         pf.pf_sl_sqoff_only_loss_legs = pf._ui.sqoff_loss_legs;
         pf.pf_sl_sqoff_only_profit_legs = pf._ui.sqoff_profit_legs;
+        pf.pf_tgt_sqoff_only_loss_legs = pf._ui.tgt_sqoff_loss_legs;
+        pf.pf_tgt_sqoff_only_profit_legs = pf._ui.tgt_sqoff_profit_legs;
         pf.pf_sl_trail_enabled = pf._ui.trail_sl_enabled;
         pf.pf_sl_trail_every = pf._ui.trail_sl_every;
         pf.pf_sl_trail_by = pf._ui.trail_sl_by;
@@ -2215,14 +2311,7 @@ const Portfolio = {
         }
 
         // Strip UI-only fields before sending to server
-        const cleanPf = JSON.parse(JSON.stringify(pf));
-        delete cleanPf._enabled;
-        delete cleanPf._ui;
-        delete cleanPf.on_leg_fail;
-        delete cleanPf.execution_mode;
-        delete cleanPf.strategy_tag;
-        delete cleanPf.max_legs;
-        delete cleanPf.tgt_sl_per_lot;
+        const cleanPf = this._cleanForSave(pf);
         App.api("/api/portfolios/save", { method: "POST", body: JSON.stringify(cleanPf) })
             .then(() => {
                 App.log(`Portfolio "${pf.name}" saved`, "SUCCESS", "Multileg", pf.name);
@@ -2512,12 +2601,8 @@ const Portfolio = {
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Slot SqOff</label>
                         <input type="time" class="form-control" id="leg-m-sqoff" value="${slot.squareoff_time || ''}"></div>
-                    <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Slot SqOff TZ</label>
-                        ${this._renderTzSelect(slot.squareoff_tz, "leg-m-sqofftz", "(inherit)")}</div>
                     <div class="form-group" style="flex:1; min-width:100px;"><label class="form-label">Leg SqOff</label>
                         <input type="time" class="form-control" id="leg-m-legsqoff" value="${ec.squareoff_time || ''}"></div>
-                    <div class="form-group" style="flex:1; min-width:130px;"><label class="form-label">Leg SqOff TZ</label>
-                        ${this._renderTzSelect(ec.squareoff_tz, "leg-m-legsqofftz", "(inherit)")}</div>
                 </div>
             </div>
 
@@ -2646,9 +2731,9 @@ const Portfolio = {
         ec.tgt_trail_by = parseFloat(document.getElementById("leg-m-tgttrail-by")?.value) || 0;
         ec.on_target_action = document.getElementById("leg-m-tpaction").value;
         ec.squareoff_time = document.getElementById("leg-m-legsqoff").value || null;
-        ec.squareoff_tz = document.getElementById("leg-m-legsqofftz").value || null;
+        ec.squareoff_tz = ec.squareoff_time ? "Asia/Kolkata" : null;
         slot.squareoff_time = document.getElementById("leg-m-sqoff").value || null;
-        slot.squareoff_tz = document.getElementById("leg-m-sqofftz").value || null;
+        slot.squareoff_tz = slot.squareoff_time ? "Asia/Kolkata" : null;
 
         // Go back to portfolio modal
         this._closeModal();
@@ -2730,14 +2815,7 @@ const Portfolio = {
         }
 
         // Strip UI-only fields before sending to server
-        const cleanPf = JSON.parse(JSON.stringify(pf));
-        delete cleanPf._enabled;
-        delete cleanPf._ui;
-        delete cleanPf.on_leg_fail;
-        delete cleanPf.execution_mode;
-        delete cleanPf.strategy_tag;
-        delete cleanPf.max_legs;
-        delete cleanPf.tgt_sl_per_lot;
+        const cleanPf = this._cleanForSave(pf);
 
         App.log(`Backtest started: "${pf.name}" with ${enabledSlots.length} slot(s)`, "MESSAGE", "Multileg", pf.name);
         const progressDiv = document.getElementById("pf-progress");
@@ -2747,6 +2825,11 @@ const Portfolio = {
             <div id="pf-progress-details" style="margin-top:8px; font-size:0.85rem; color:var(--text-secondary);"></div>
             <div id="pf-progress-slots" style="margin-top:12px;"></div>
         </div>`;
+
+        // While a run streams, renderApp() (triggered by selecting/toggling another
+        // portfolio) must NOT wipe the live progress block — this flag tells it to
+        // preserve #pf-progress across re-renders.
+        this._running = true;
 
         try {
             const response = await fetch("/api/portfolios/backtest", {
@@ -2779,7 +2862,15 @@ const Portfolio = {
                         if (evt.phase === "engine") {
                             for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el && !el.dataset.done) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9881;"; el.style.color = "var(--accent)"; } }
                             if (evt.completed_slot_id) { const el = document.getElementById(`pf-slot-${evt.completed_slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; el.dataset.done = "1"; } }
-                            if (details) details.textContent = `${evt.slots_completed || 0}/${slotInfo.length} strategies completed`;
+                            if (details) {
+                                const slotsLine = `${evt.slots_completed || 0}/${slotInfo.length} strategies completed`;
+                                // Day-wise data progress: show how far through the
+                                // date range the engine has streamed, alongside the
+                                // slot-completion count.
+                                details.textContent = evt.data_ts_day
+                                    ? `Processed up to ${evt.data_ts_day}  ·  ${slotsLine}`
+                                    : slotsLine;
+                            }
                         } else if (evt.phase === "reports") { for (const s of slotInfo) { const el = document.getElementById(`pf-slot-${s.slot_id}`); if (el) { const ic = el.querySelector(".slot-icon"); if (ic) ic.innerHTML = "&#9989;"; el.style.color = "var(--text-primary)"; } } if (details) details.textContent = evt.message; }
                     } else if (evt.event === "complete") {
                         if (bar) bar.style.width = "100%";
@@ -2800,6 +2891,8 @@ const Portfolio = {
         } catch (e) {
             document.getElementById("pf-progress").innerHTML = `<div class="alert alert-danger">Backtest failed: ${e.message}</div>`;
             App.log(`Backtest failed: ${e.message}`, "ERROR", "Multileg", pf.name);
+        } finally {
+            this._running = false;
         }
     },
 
@@ -2883,6 +2976,7 @@ const Portfolio = {
                 ${App.metricHTML("Max Drawdown", r.max_drawdown.toFixed(2) + "%")}
             </div>
             ${perStratRows ? `<div class="table-container" style="margin-top:12px;"><table><thead><tr><th>Strategy</th><th>P&L</th><th>Trades</th><th>Win Rate (Trades)</th><th title="Wins / (Wins + Losses)">Decisive Win Rate</th><th>Win% (Days)</th><th>Wins</th><th>Losses</th><th title="P&L rounded to zero">Flat</th></tr></thead><tbody>${perStratRows}</tbody></table></div>` : ""}
+            ${(r.account_report && r.account_report.length) ? `<div style="margin-top:14px;">${App.accordionHTML("pf-account-report", `Account Report (${r.account_report.length} account states · times in IST)`, App.tableHTML(r.account_report))}</div>` : ""}
         </div>`;
     },
 };

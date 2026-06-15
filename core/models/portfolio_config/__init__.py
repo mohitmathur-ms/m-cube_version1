@@ -72,6 +72,15 @@ class PortfolioConfig:
     # catalog doesn't carry. Applied once at run start in
     # ``backtest_runner._apply_winter_time``. Default off → no shift.
     winter_time_adjust: bool = False
+    # Auto US-DST detection (opt-in). When True, the engine derives the winter
+    # shift from the portfolio's primary US venue (CME/NYMEX/COMEX/CBOT/NYSE/
+    # NASDAQ/ARCA → America/Chicago|New_York) and the run START date via
+    # ``zoneinfo``: if that date is in US STANDARD time (winter), the +1h shift
+    # is applied automatically — no manual toggle. No-op for non-US venues
+    # (FX/crypto/NSE never observe US DST). CAVEAT: this is a whole-run
+    # determination keyed on start_date; a run spanning a DST boundary should
+    # be split. The explicit ``winter_time_adjust`` flag still forces the shift.
+    winter_time_auto: bool = False
 
     # Range Breakout (RBO). When rbo_enabled, the entry timing for all enabled
     # slots is gated by a per-day state machine: range is built during
@@ -144,6 +153,12 @@ class PortfolioConfig:
     # to the portfolio's primary slot instrument (D5 "underlying = self").
     pf_sl_type: str = "Combined Loss"
     pf_sl_value: float = 0.0
+    # Stoploss Value input mode (spec §2.1 — "accepts absolute or % input").
+    # When True and the SL type is PnL-based (Combined Loss), pf_sl_value is a
+    # PERCENT of starting_capital, converted to a currency amount at resolve
+    # time. Ignored for underlying-price types (where the value is a price
+    # level). Default False = absolute currency (unchanged behavior).
+    pf_sl_value_is_pct: bool = False
     # Underlying price bounds for the "Underlying Movement" / "Loss and
     # Underlying Range" SL types. The SL fires when the primary instrument's
     # price crosses out of [below, above]. 0.0 on a bound disables that side.
@@ -190,9 +205,18 @@ class PortfolioConfig:
     pf_tgt_enabled: bool = False
     pf_tgt_type: str = "Combined Profit"  # only universal value for FX/crypto
     pf_tgt_value: float = 0.0
+    # Target Value input mode (spec §2.4). When True and the type is PnL-based
+    # (Combined Profit), pf_tgt_value is a PERCENT of starting_capital. Ignored
+    # for underlying-price types. Default False = absolute (unchanged).
+    pf_tgt_value_is_pct: bool = False
     pf_tgt_action: str = "SqOff"
     pf_tgt_delay_sec: int = 0
     pf_tgt_reexecute_count: int = 0  # 0 = unlimited
+    # Selective partial-close on a portfolio Target hit (sl_features.html §2.4 —
+    # Target table lists both as supported). Mirror of the SL pair (§1.9/§1.10),
+    # mutually exclusive. Default False = full SqOff (unchanged behavior).
+    pf_tgt_sqoff_only_loss_legs: bool = False
+    pf_tgt_sqoff_only_profit_legs: bool = False
 
     # ── Trailing Target Settings (spec §5) ──
     pf_tgt_trail_enabled: bool = False
@@ -202,18 +226,22 @@ class PortfolioConfig:
     pf_tgt_trail_by: float = 0.0
 
     # ── ReExecute Tab (spec: 5. Logics/ReExecute_Logics.html) ──
-    # P1 (no_reexec_sl_cost): WIRED for FX/crypto. When True, suppresses
-    #   re_execute action when the slot's SL was previously raised to entry
-    #   via Move SL to Cost (current_position._move_sl_fired_this_position).
-    # P2 (no_wait_trade_reexec): no-op for FX/crypto — we have no per-leg
-    #   "Wait & Trade" pre-entry delay concept. Stored for round-trip only.
+    # P1 (no_reexec_sl_cost): WIRED for FX/crypto. When True, suppresses the
+    #   re_execute action when the slot's SL was raised to entry via Move SL to
+    #   Cost (per-position or per-trading-day; ManagedExitStrategy gate).
+    # P2 (no_wait_trade_reexec): WIRED — skips the slot re-execution delay
+    #   (delay_between_legs_sec) on re-executions. Effect only when that delay
+    #   is > 0 (default 0), so it is inert for the common FX case. The literal
+    #   options "Wait & Trade" pre-entry concept does not exist on FX; this is
+    #   the FX adaptation (the delay it gates is our nearest analogue).
     # P3 (no_strike_change_reexec): options-only — strikes (ATM, ATM±N)
     #   don't exist for FX/crypto. Stored, marked gray in UI.
-    # P4 (no_reentry_after_end): effectively always-on in our system —
-    #   entry_end_time pre-filters bars; re-executions can't fire past it.
-    #   Stored for round-trip; tooltip explains.
-    # P5 (no_reentry_sl_cost): no-op — we don't have a separate ReEntry
-    #   action that waits for price recovery (P1 covers our use case).
+    # P4 (no_reentry_after_end): WIRED — blocks ReExecute / ReEntry past the
+    #   intraday entry_end_time (post-window bars are kept and gated inside the
+    #   strategy, NOT pre-filtered). Effect only when an intraday entry window
+    #   is configured; inert for 24/5 FX portfolios with no entry window.
+    # P5 (no_reentry_sl_cost): WIRED — blocks the re_entry action when SL was
+    #   moved to cost. Default ON (spec).
     no_reexec_sl_cost: bool = False
     no_wait_trade_reexec: bool = False
     no_strike_change_reexec: bool = False
@@ -224,8 +252,12 @@ class PortfolioConfig:
     # exit_order_type: only "MARKET" is implemented (spec confirms even for
     #   options). "Limit" / "SL_Limit" are not implemented; spec blocks them
     #   at portfolio save in the original engine.
-    # exit_sell_first: options-only multi-leg ordering (close SELL legs
-    #   before BUY legs to reduce delta). FX/crypto slots are independent.
+    # exit_sell_first: spec §8.2 — within a batch exit (Squareoff / Portfolio
+    #   SqOff), log SELL-leg closes before BUY-leg closes. Read by the orderbook
+    #   builder (report_generator._build_orderbook). Log order ONLY — the engine
+    #   has no intra-bar leg-exit delay, so fills/PnL are unchanged; a no-op for
+    #   independent (different-entry-time) FX/crypto legs, visible for multi-leg
+    #   same-entry groups (options-style straddles).
     # on_portfolio_complete: only "None" is wired. The 3 cross-portfolio
     #   actions need cross-portfolio infrastructure that doesn't exist.
     exit_order_type: str = "MARKET"
@@ -237,11 +269,18 @@ class PortfolioConfig:
     # BUY exits = min(vwap, hit), where vwap is the opposite-quote-side per-bar
     # typical price and hit is the trigger-side bar extreme (see
     # backtest_runner._apply_vwap_fill). Requires paired ASK/BID bars in the
-    # catalog (FX/synth-MID slots); a no-op on LAST-only/crypto slots. Default
-    # off preserves the plain Nautilus matching-engine fill so existing saved
-    # backtests are unchanged unless the user opts in. Also force-enabled by the
+    # catalog (Format A); on a single-series slot (Format B) it uses that
+    # series' own VWAP + high/low; a no-op only where no usable series exists.
+    # Default ON so leg SL/Target fills follow spec §4.2 out of the box; a
+    # portfolio JSON may set it false to opt out. Also force-enabled by the
     # _USE_VWAP_FILL env flag (dev/parity tooling).
-    vwap_exit_fill: bool = False
+    vwap_exit_fill: bool = True
+    # Directional-close exit fill (spec execution_logic.html §8.1). Base price
+    # for the non-SL/Target exits (squareoff/EOD): SELL→ask_close, BUY→bid_close,
+    # modelling the half-spread paid on exit. Composes with vwap_exit_fill (VWAP
+    # owns the §4.2 leg SL/Target exits; this owns the rest). Default ON; a
+    # portfolio JSON may set it false. Also force-enabled by _USE_DIRECTIONAL_FILL.
+    directional_close_fill: bool = True
 
     # ── Monitoring Tab (no spec doc found in 5. Logics/) ──
     # All 6 fields are evaluation-frequency settings (Realtime / MinuteClose

@@ -11,6 +11,7 @@ from core.fx_rates import parse_money_string
 
 from core.backtest_runner.equity_curves import (
     _build_equity_curve_from_account,
+    _build_mtm_equity_curve,
     _ensure_final_equity_point,
 )
 from core.backtest_runner.exit_fill import (
@@ -29,6 +30,7 @@ def _extract_results(
     fx_resolver: FxRateResolver | None = None,
     vwap_lookup: dict | None = None,
     close_lookup: dict | None = None,
+    bar_closes: list | None = None,
 ) -> dict:
     """Extract backtest results from the engine, converting per-position PnL
     into the account base currency via the supplied FX resolver.
@@ -235,6 +237,23 @@ def _extract_results(
     equity_curve_ts = _build_equity_curve_from_account(accounts, starting_capital)
     _ensure_final_equity_point(equity_curve_ts, starting_capital + total_pnl)
 
+    # Per-bar mark-to-market curve for the portfolio SL/Target. Lets the clip
+    # monitor the LIVE combined P&L every bar (incl. open positions' unrealized),
+    # instead of only realized P&L at position closes. Empty when no bars were
+    # supplied — the clip then falls back to the realized equity_curve_ts.
+    equity_curve_mtm: list = []
+    if bar_closes and positions_report is not None and not positions_report.empty:
+        _mp = _pick_col(positions_report, ["realized_pnl", "RealizedPnl", "pnl"])
+        _ct = _pick_col(positions_report, ["ts_closed", "ts_last", "ts_init"])
+        if _mp:
+            # Build P&L-based (capital 0) so the portfolio merge can sum slots
+            # without double/missing-counting each slot's capital — the merge
+            # adds the portfolio capital back once.
+            equity_curve_mtm = _build_mtm_equity_curve(
+                positions_report, 0.0, bar_closes,
+                lambda row, _mp=_mp, _ct=_ct: _row_pnl_to_base(row, _mp, _ct, fx_resolver),
+            )
+
     return {
         "starting_capital": starting_capital,
         "final_balance": starting_capital + total_pnl,
@@ -254,6 +273,7 @@ def _extract_results(
         "loss_pct_days": _loss_pct_days,
         "daily_pnl": _daily_pnl,
         "equity_curve_ts": equity_curve_ts,
+        "equity_curve_mtm": equity_curve_mtm,
         "fills_report": fills_report,
         "positions_report": positions_report_with_base(positions_report, fx_resolver),
         "account_report": account_report,

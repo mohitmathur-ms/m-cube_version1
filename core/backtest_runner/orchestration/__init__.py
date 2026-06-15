@@ -8,6 +8,7 @@ from core.models import PortfolioConfig
 from core.models import effective_portfolio_squareoff
 
 from core.backtest_runner.bar_types import _group_slots
+from core.backtest_runner.unified import _run_portfolio_unified, _unified_active
 from core.backtest_runner.cross_portfolio import (
     _is_entry_price_reexec,
     _is_reexec_action,
@@ -17,6 +18,7 @@ from core.backtest_runner.other_settings import _resolve_other_settings
 from core.backtest_runner.portfolio_clip import (
     _compute_agg_coordination,
     _entry_at_clip,
+    _opened_in_window,
     _ts_iso_to_ns,
 )
 from core.backtest_runner.portfolio_exit_config import (
@@ -27,6 +29,7 @@ from core.backtest_runner.portfolio_exit_config import (
     _resolve_pf_target,
 )
 from core.backtest_runner.portfolio_results import (
+    _leg_key_of,
     _merge_portfolio_results,
     _splice_merged_results,
 )
@@ -232,7 +235,8 @@ def run_portfolio_backtest(
         sorted_slots = sorted(enabled_slots, key=_duration_estimate, reverse=True)
 
     def _run_all_slots(active_move_sl, fire_callbacks: bool, replay_cutoff_ns: int = 0,
-                       reexec_entry_prices: dict | None = None):
+                       reexec_entry_prices: dict | None = None,
+                       reexec_market_mode: bool = False):
         """Submit every slot/group to a fresh ProcessPoolExecutor and collect
         results into ``{slot_id: result}``.
 
@@ -250,6 +254,104 @@ def run_portfolio_backtest(
         # type can supply a default when no explicit squareoff_time is set.
         # Slot/leg overrides still win at resolve-time inside the slot worker.
         _pf_sq_time, _pf_sq_tz = effective_portfolio_squareoff(portfolio)
+
+        # ── Phase 1: unified single-engine path (flag _USE_UNIFIED_ENGINE) ──
+        # Runs ALL legs in ONE engine. Restricted (for now) to the plain
+        # single-pass case: no ReExecute replay, no aggregate/cross-leg Move-SL
+        # two-pass, and no entry-window bar-filter (Phase 2). Portfolio SL/Target
+        # still applies via the existing post-run clip on these results.
+        _ms = active_move_sl
+        _agg_active = bool(_ms and (getattr(_ms, "agg_pnl_enabled", False)
+                                    or getattr(_ms, "hit_on_leg_sl", False)
+                                    or getattr(_ms, "hit_on_leg_target", False)))
+        # Phase 2: entry-window + run_on_days are now handled in the unified path
+        # (start-side pre-filter + strategy gate, matching the per-slot MANAGED
+        # behaviour). For a windowed portfolio only take the unified path when
+        # every leg is managed (RAW end-side bar-filtering isn't replicated yet).
+        _has_window = bool(portfolio.entry_start_time or portfolio.entry_end_time)
+        _all_managed = all(
+            (s.exit_config.has_exit_management()
+             or s.exit_config.squareoff_time or s.squareoff_time
+             or _pf_sq_time or rbo_settings is not None)
+            for s in enabled_slots
+        )
+        # Portfolio SL/Target (SqOff / Target / trailing / selective / day-scoped)
+        # run on the unified path — the clip sites are keyed by the per-leg
+        # (trader_id|strategy_id) combo, correct in one shared engine. ReExecute
+        # (both market AND "at Entry Price") ALSO runs live one-pass now (Phase 3
+        # done): the monitor fires the breach and each leg either re-enters at
+        # market or arms a genuine resting LIMIT at the captured entry price and
+        # re-enters when price returns (managed_strategy `_reexec_limit_px`), capped
+        # at reexecute_count. The old per-slot + post-run replay (portfolio_clip)
+        # is now ONLY the _USE_POST_RUN_PF escape hatch.
+        _sl_reexec = bool(portfolio.pf_sl_enabled and _is_reexec_action(portfolio.pf_sl_action))
+        _tgt_reexec = bool(portfolio.pf_tgt_enabled and _is_reexec_action(portfolio.pf_tgt_action))
+        _reexec_cfg = _sl_reexec or _tgt_reexec
+        # Live portfolio enforcement is the DEFAULT (one-pass live engine): the
+        # monitor signals legs to close (SqOff) / re-arm re-entry (ReExecute) /
+        # move SL (aggregate + Hit-On-Leg) live on base bars — NO post-run clip,
+        # NO two-pass replay/discovery. Reverted only by _USE_POST_RUN_PF=1.
+        # pf_sl AND pf_tgt ReExecute both run live now.
+        _enforce_active = (os.environ.get("_USE_POST_RUN_PF", "0") != "1"
+                           and os.environ.get("_USE_PF_ENFORCE", "1") == "1")
+        _live_reexec_ok = _enforce_active  # both SL- and Target-side ReExecute are live
+        # Aggregate-P&L + Hit-On-Leg Move-SL also run one-pass when enforcing.
+        _live_move_sl_ok = _enforce_active and _agg_active
+        if (_unified_active() and replay_cutoff_ns == 0 and not reexec_entry_prices
+                and (not _agg_active or _live_move_sl_ok)
+                and (not _reexec_cfg or _live_reexec_ok)
+                and (not _has_window or _all_managed)):
+            print("[UNIFIED] single-engine path active — running all legs in one engine")
+            pairs = [(slot, capitals[slot.slot_id]) for slot in enabled_slots]
+            _sl_set_u, _ = _resolve_pf_stoploss(portfolio)
+            _tgt_set_u, _ = _resolve_pf_target(portfolio)
+
+            def _pf_action_triple(_settings):
+                _a = getattr(_settings, "action", "") or ""
+                if _is_reexec_action(_a):
+                    return ("reexecute", not _is_entry_price_reexec(_a),
+                            int(getattr(_settings, "reexecute_count", 0) or 0))
+                return ("sqoff", False, 0)
+
+            _pf_action_u, _pf_market_u, _pf_cap_u = _pf_action_triple(_sl_set_u)
+            _tgt_action_u, _tgt_market_u, _tgt_cap_u = _pf_action_triple(_tgt_set_u)
+            return _run_portfolio_unified(
+                catalog_path=catalog_path,
+                slot_capital_pairs=pairs,
+                custom_strategies_dir=custom_strategies_dir,
+                default_start_date=portfolio.start_date,
+                default_end_date=portfolio.end_date,
+                default_squareoff_time=_pf_sq_time,
+                default_squareoff_tz=_pf_sq_tz,
+                default_run_on_days=portfolio.run_on_days,
+                default_entry_start_time=portfolio.entry_start_time,
+                default_entry_end_time=portfolio.entry_end_time,
+                default_rbo_settings=rbo_settings,
+                default_other_settings=other_settings,
+                default_move_sl_settings=active_move_sl,
+                user_id=user_id,
+                portfolio_name=getattr(portfolio, "name", ""),
+                default_vwap_fill=vwap_fill_enabled,
+                default_directional_fill=directional_fill_enabled,
+                default_capture_underlying=_capture_underlying,
+                default_pf_sl_enabled=bool(getattr(_sl_set_u, "enabled", False)),
+                default_pf_sl_value=float(getattr(_sl_set_u, "value", 0.0) or 0.0),
+                default_day_tz=(_pf_sq_tz or "UTC"),
+                default_pf_sl_action=_pf_action_u,
+                default_pf_sl_reexec_cap=_pf_cap_u,
+                default_pf_sl_market_mode=_pf_market_u,
+                default_pf_tgt_enabled=bool(getattr(_tgt_set_u, "enabled", False)),
+                default_pf_tgt_value=float(getattr(_tgt_set_u, "value", 0.0) or 0.0),
+                default_pf_tgt_action=_tgt_action_u,
+                default_pf_tgt_reexec_cap=_tgt_cap_u,
+                default_pf_tgt_market_mode=_tgt_market_u,
+                # Underlying-price SL (spec §2.1/§5.1) — live in the monitor.
+                default_pf_sl_type=str(getattr(_sl_set_u, "sl_type", "Combined Loss") or "Combined Loss"),
+                default_pf_sl_underlying_below=float(getattr(_sl_set_u, "underlying_below", 0.0) or 0.0),
+                default_pf_sl_underlying_above=float(getattr(_sl_set_u, "underlying_above", 0.0) or 0.0),
+                default_pf_sl_delay_sec=int(getattr(_sl_set_u, "delay_sec", 0) or 0),
+                default_pf_tgt_delay_sec=int(getattr(_tgt_set_u, "delay_sec", 0) or 0),
+            )
         with ProcessPoolExecutor(
             max_workers=max_workers,
             initializer=_worker_init_ignore_sigint,
@@ -288,6 +390,7 @@ def run_portfolio_backtest(
                                 slot.slot_id, (0.0, True))[0],
                             default_reexec_entry_was_long=(reexec_entry_prices or {}).get(
                                 slot.slot_id, (0.0, True))[1],
+                            default_reexec_market_mode=reexec_market_mode,
                         )
                         futures[future] = ("single", [slot])
                     else:
@@ -313,6 +416,8 @@ def run_portfolio_backtest(
                             default_vwap_fill=vwap_fill_enabled,
                             default_directional_fill=directional_fill_enabled,
                             default_reexec_entry_prices=reexec_entry_prices,
+                            default_reexec_market_mode=reexec_market_mode,
+                            default_capture_underlying=_capture_underlying,
                         )
                         futures[future] = ("group", [slot for slot, _cap in group])
             else:
@@ -343,6 +448,7 @@ def run_portfolio_backtest(
                             slot.slot_id, (0.0, True))[0],
                         default_reexec_entry_was_long=(reexec_entry_prices or {}).get(
                             slot.slot_id, (0.0, True))[1],
+                        default_reexec_market_mode=reexec_market_mode,
                     )
                     futures[future] = ("single", [slot])
 
@@ -413,7 +519,17 @@ def run_portfolio_backtest(
         or move_sl_settings.hit_on_leg_target
         or os.environ.get("_USE_PF_AGG_MOVE_SL", "0") == "1"
     )
-    if not agg_active:
+    # Phase 4: when the live monitor enforces (unified path), aggregate-P&L +
+    # Hit-On-Leg Move-SL run ONE-PASS in the engine — skip the two-pass discovery.
+    _live_move_sl_active = (
+        os.environ.get("_USE_POST_RUN_PF", "0") != "1"
+        and os.environ.get("_USE_PF_ENFORCE", "1") == "1"
+        and _unified_active()
+        and (move_sl_settings.agg_pnl_enabled
+             or move_sl_settings.hit_on_leg_sl
+             or move_sl_settings.hit_on_leg_target)
+    )
+    if not agg_active or _live_move_sl_active:
         slot_results, errors = _run_all_slots(move_sl_settings, fire_callbacks=True)
     else:
         print("[PF_AGG_MOVE_SL] two-pass active — running discovery pass 1")
@@ -468,6 +584,11 @@ def run_portfolio_backtest(
         (_sl_set.enabled and _is_reexec_action(_sl_set.action))
         or (_tgt_set.enabled and _is_reexec_action(_tgt_set.action))
     )
+    # When the unified live monitor already re-executed in-engine (one-pass), the
+    # result carries pf_monitor_enforced=True → skip the two-pass replay entirely
+    # (it would double-count on top of the live re-entries).
+    if result.get("pf_monitor_enforced"):
+        return result
     if _reexec_configured or os.environ.get("_USE_PF_REEXEC_REPLAY", "0") == "1":
         _cap = max(int(getattr(_sl_set, "reexecute_count", 0) or 0),
                    int(getattr(_tgt_set, "reexecute_count", 0) or 0))
@@ -475,6 +596,12 @@ def run_portfolio_backtest(
         _replays = 0
         _last_clip_ns = 0
         _pass_slots = slot_results  # per-slot results of the pass that produced the clip
+        # Pending "ReExecute at Entry Price" arms ({slot_id: (entry_px, was_long)})
+        # carried across replays. A leg armed to wait for its entry price E may
+        # still be waiting (flat) when a LATER breach fires from another leg;
+        # without this it would be dropped (no open position at the new clip) and
+        # revert to normal signals. Carrying it forward keeps it waiting for E.
+        _pending_eps: dict = {}
         while _replays < _cap:
             _events = result.get("pf_clip_events") or []
             _first = next((e for e in _events if _is_reexec_action(e[2])), None)
@@ -483,23 +610,61 @@ def run_portfolio_backtest(
             _clip_ns = _ts_iso_to_ns(_first[0])
             if _clip_ns <= 0 or _clip_ns <= _last_clip_ns:
                 break  # no forward progress — guard against a degenerate loop
-            # "ReExecute at Entry Price" / "Same Contract" (spec §5.2): capture
-            # each slot's pre-clip entry price so the replay pins the first
-            # re-entry to it (price-wait). Plain ReExecute leaves this None →
-            # market re-entry on the next signal.
+            # ReExecute-family re-entry mode (spec §5.2 / portfolio_sl_tgt.html).
+            # Both variants capture each slot's pre-clip (entry_price, side):
+            #   • "at Entry Price"/"Same Contract" → resting LIMIT at the entry
+            #     price ("waits to re-enter each leg at its original entry price").
+            #   • plain "ReExecute" → immediate MARKET re-entry on the original
+            #     side on the next bar ("immediately re-opens them"); the price
+            #     is carried only as a "re-entry pending" flag.
             _reexec_eps = None
-            if _is_entry_price_reexec(_first[2]):
+            _reexec_market = False
+            if _is_reexec_action(_first[2]):
+                _reexec_market = not _is_entry_price_reexec(_first[2])
                 _reexec_eps = {}
                 for _sid, _sr in (_pass_slots or {}).items():
                     _ep = _entry_at_clip(_sr.get("positions_report"), _clip_ns)
                     if _ep is not None:
+                        # Leg held an open position at this breach → (re-)arm at it.
                         _reexec_eps[_sid] = _ep
-                print(f"[PF_REEXEC] entry-price pin: {len(_reexec_eps)} slot(s) "
-                      f"will wait for their pre-clip entry price")
+                    elif (not _reexec_market) and _sid in _pending_eps:
+                        # Entry-price re-exec only: leg was armed in a prior replay
+                        # and opened NO position between the prior clip and this one
+                        # → it is still waiting for E (price never returned). A
+                        # breach from another leg must not wipe that — carry the
+                        # original (entry_px, side) forward so it keeps waiting
+                        # instead of resuming signals. (The windowed check matters:
+                        # _pass_slots is the prior FULL segment, which also holds
+                        # this leg's later trades — so a plain "empty" test fails.)
+                        _pr = _sr.get("positions_report") if _sr else None
+                        if not _opened_in_window(_pr, _last_clip_ns, _clip_ns):
+                            _reexec_eps[_sid] = _pending_eps[_sid]
+                _pending_eps = dict(_reexec_eps)  # remember for the next replay
+                _mode = "market re-entry (next bar)" if _reexec_market else "entry-price limit"
+                print(f"[PF_REEXEC] {_mode}: {len(_reexec_eps)} slot(s) re-enter")
+            # Head-truncation (close-at-breach, spec "Closes all legs"): per-trader
+            # equity curve from the pre-clip pass, so the splice closes each slot's
+            # open-at-breach position AT clip_ns instead of at its natural exit.
+            _trader_curves = {}
+            for _sid, _sr in (_pass_slots or {}).items():
+                if not _sr:
+                    continue
+                _pr = _sr.get("positions_report")
+                # Prefer the per-bar mark-to-market curve so an INTRADAY portfolio
+                # clip closes the open leg at its live (unrealized) P&L at the
+                # breach bar; fall back to the realized curve when MtM is absent.
+                _curve = _sr.get("equity_curve_mtm") or _sr.get("equity_curve_ts")
+                if (_pr is not None and not getattr(_pr, "empty", True)
+                        and ("trader_id" in _pr.columns or "strategy_id" in _pr.columns)
+                        and _curve):
+                    try:
+                        _trader_curves[_leg_key_of(_pr)] = _curve
+                    except Exception:  # noqa: BLE001 — best effort
+                        pass
             print(f"[PF_REEXEC] replay #{_replays + 1}: re-running slots flat from {_first[0]}")
             _seg_results, _seg_errors = _run_all_slots(
                 move_sl_settings, fire_callbacks=False, replay_cutoff_ns=_clip_ns,
-                reexec_entry_prices=_reexec_eps,
+                reexec_entry_prices=_reexec_eps, reexec_market_mode=_reexec_market,
             )
             if not _seg_results:
                 break
@@ -507,8 +672,18 @@ def run_portfolio_backtest(
             _seg_merged = _merge_portfolio_results(
                 portfolio, _seg_results, capitals, _seg_errors, user_id=user_id,
             )
+            # Orderbook reason for the legs the portfolio SL/Target closed at the
+            # breach — uses the ACTUAL configured threshold (resolved), not a
+            # constant, and reflects this clip's reason + action.
+            _is_tgt = "TARGET" in _first[1]
+            _clip_val = (_tgt_set.value if _is_tgt else _sl_set.value)
+            _clip_reason_tag = (
+                f"Portfolio {'Target' if _is_tgt else 'Stoploss'}: "
+                f"combined {_clip_val:g} hit -> {_first[2]}"
+            )
             result = _splice_merged_results(
                 result, _seg_merged, _clip_ns, portfolio.starting_capital,
+                trader_curves=_trader_curves, clip_reason_tag=_clip_reason_tag,
             )
             result["pf_reexec_replays"] = _replays + 1
             _last_clip_ns = _clip_ns

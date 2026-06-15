@@ -14,6 +14,16 @@ const ViewData = {
     lastMeta: {},  // raw_count / downsampled / bucket_size from last fetch
     MAX_TABLE_ROWS: 500,
     FETCH_LIMIT: 5000,
+    // Sub-minute (1-SECOND) data packs ~22.5k bars into a single NSE session, so
+    // the default 5000 cap would bucket every ~5 seconds into one candle. Use a
+    // higher cap for second data so a full day renders at true 1-second resolution
+    // (zoom in to inspect individual seconds). Server hard-caps at 100k.
+    SECOND_FETCH_LIMIT: 30000,
+
+    /** Per-bar-type fetch/downsample cap. */
+    _fetchLimit(barType) {
+        return (barType || "").includes("-SECOND") ? this.SECOND_FETCH_LIMIT : this.FETCH_LIMIT;
+    },
 
     async render(container) {
         container.innerHTML = `
@@ -55,14 +65,7 @@ const ViewData = {
 
     async loadBarTypes() {
         try {
-            // Fetch bar types and the venue-name map in parallel. The map lets
-            // us show the adapter config's friendly "name" (e.g. COINBASE_MS)
-            // for the raw venue token (e.g. COINBASE) parsed from bar types.
-            const [data, adData] = await Promise.all([
-                App.api("/api/data/bar_types"),
-                App.api("/api/configured-adapters").catch(() => ({})),
-            ]);
-            this.venueNames = (adData && adData.venue_names) || {};
+            const data = await App.api("/api/data/bar_types");
             const select = document.getElementById("view-bar-type");
             const venueSelect = document.getElementById("view-venue");
 
@@ -77,7 +80,8 @@ const ViewData = {
             this.allBarTypes = data.bar_types;
             this.barTypeDetails = data.bar_type_details || {};
 
-            // Populate the venue dropdown from the unique venue tokens in catalog.
+            // Populate the venue dropdown from the unique venue tokens in catalog
+            // (the token IS the venue name, e.g. BINANCE_MS / COINBASE_MS).
             const venues = new Set();
             for (const bt of this.allBarTypes) {
                 const v = this.venueOf(bt);
@@ -92,7 +96,7 @@ const ViewData = {
             venueSelect.innerHTML =
                 `<option value="" ${!this.selectedVenue ? "selected" : ""}>All Venues</option>`
                 + sortedVenues.map(v =>
-                    `<option value="${v}" ${this.selectedVenue === v ? "selected" : ""}>${this.venueNames[v] || v}</option>`
+                    `<option value="${v}" ${this.selectedVenue === v ? "selected" : ""}>${v}</option>`
                 ).join("");
 
             this.renderBarTypeOptions();
@@ -151,10 +155,11 @@ const ViewData = {
         const start = d.start_date;
         const end = d.end_date;
         if (!start || !end) return { from: "", to: "" };
-        const bpd = barType.includes("1-MINUTE") ? 1440
+        const bpd = barType.includes("-SECOND")  ? 86400   // seconds-per-day
+                  : barType.includes("1-MINUTE") ? 1440
                   : barType.includes("1-HOUR")   ? 24
                   :                                 1;  // default daily
-        const daysNeeded = Math.max(1, Math.ceil(this.FETCH_LIMIT / bpd));
+        const daysNeeded = Math.max(1, Math.ceil(this._fetchLimit(barType) / bpd));
         const endD = new Date(end + "T00:00:00Z");
         const fromD = new Date(endD);
         fromD.setUTCDate(fromD.getUTCDate() - daysNeeded + 1);
@@ -195,12 +200,22 @@ const ViewData = {
             bar_type: barType,
             start: from || "",
             end: to || "",
-            limit: String(this.FETCH_LIMIT),
+            limit: String(this._fetchLimit(barType)),
+            // The page shows times in IST, so From/To are IST days. Tell the
+            // backend to shift the UTC day-boundary filter by +5:30 so the
+            // fetched range matches the IST day (else early-IST bars are cut off).
+            tz_offset: "330",
         });
         const t0 = performance.now();
+        // Race guard: only the most recent fetch may render. Changing "From"
+        // alone can fire a slow wide-range request (millions of bars) that
+        // returns AFTER a later narrow request and would otherwise overwrite it
+        // with stale, full-dataset data — which looks like "filtering broke".
+        const _seq = (this._fetchSeq = (this._fetchSeq || 0) + 1);
 
         try {
             const data = await App.api(`/api/data/bars?${qs.toString()}`);
+            if (_seq !== this._fetchSeq) return;  // a newer fetch superseded this one
             const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
             this.barData = data.data || [];
             this.lastMeta = {
@@ -235,6 +250,7 @@ const ViewData = {
             this.renderTable();
             this.renderAnalysis();
         } catch (e) {
+            if (_seq !== this._fetchSeq) return;  // stale failed fetch — ignore
             content.innerHTML = `<div class="alert alert-danger">Failed to load bars: ${e.message || e}</div>`;
         }
     },
@@ -288,7 +304,8 @@ const ViewData = {
         const vol = new Array(data.length);
         for (let i = 0; i < data.length; i++) {
             const d = data[i];
-            x[i] = d.timestamp;
+            // Catalog timestamps are UTC; display the chart axis in IST (+5:30).
+            x[i] = App.formatIST(d.timestamp, true);
             open[i] = d.open; high[i] = d.high; low[i] = d.low; close[i] = d.close;
             vol[i] = d.volume;
         }
@@ -303,7 +320,7 @@ const ViewData = {
             title: barType,
             yaxis:  { title: "Price", side: "left" },
             yaxis2: { title: "Volume", side: "right", overlaying: "y", showgrid: false },
-            xaxis:  { title: "Date", rangeslider: { visible: false } },
+            xaxis:  { title: "Date (IST)", rangeslider: { visible: false } },
             template: "plotly_dark",
             paper_bgcolor: "#ffffff",
             plot_bgcolor: "#ffffff",
@@ -318,7 +335,7 @@ const ViewData = {
         const max = this.MAX_TABLE_ROWS;
         const slice = this.barData.slice(0, max);
         const rows = slice.map(d => ({
-            Timestamp: d.timestamp.replace("T", " ").slice(0, 19),
+            "Timestamp (IST)": App.formatIST(d.timestamp),
             Open: App.currency(d.open),
             High: App.currency(d.high),
             Low: App.currency(d.low),
@@ -343,7 +360,7 @@ const ViewData = {
                 returns.push(r * 100);
                 cumProd *= (1 + r);
                 cumReturns.push((cumProd - 1) * 100);
-                cumDates.push(data[i].timestamp);
+                cumDates.push(App.formatIST(data[i].timestamp, true));
             }
         }
 
@@ -380,7 +397,7 @@ const ViewData = {
         }], {
             ...darkLayout,
             title: "Cumulative Return (%)",
-            xaxis: { title: "Date" }, yaxis: { title: "Return (%)" },
+            xaxis: { title: "Date (IST)" }, yaxis: { title: "Return (%)" },
         });
     },
 };

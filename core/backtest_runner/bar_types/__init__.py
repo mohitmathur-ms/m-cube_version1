@@ -71,3 +71,38 @@ def _pair_bid_ask_bar_type(bt_str: str) -> list[str]:
             bt_str.replace("-MID-", "-BID-", 1),
         ]
     return []
+
+
+def _same_ts_sort_key(bar):
+    """Project-wide same-timestamp ordering: **quotes before MID** (ASK, then BID,
+    then MID) at each ``ts_init``. Deterministic by contract (spec §4.1/§4.2 — an
+    exit's conservative fill should see the current minute's bid/ask before the MID
+    trigger), replacing the old incidental load-order. Non-FX (LAST) single-stream
+    bars get a neutral rank (no same-ts pairing). Use as ``bars.sort(key=...)`` in
+    every path that feeds the engine so all engines agree on the order."""
+    s = str(bar.bar_type)
+    rank = 3
+    if "-ASK-" in s:
+        rank = 0
+    elif "-BID-" in s:
+        rank = 1
+    elif "-MID-" in s:
+        rank = 2
+    return (bar.ts_init, rank)
+
+
+def _normalize_primary_to_mid(bt_str: str) -> str:
+    """Force an FX bid/ask primary to its MID variant.
+
+    The signal / SL-TP-trigger decision should run on the unbiased **midpoint**,
+    not a single quote side (ASK-only / BID-only bakes a half-spread skew into the
+    indicators even though trades go both ways). Fills stay direction-correct
+    regardless (BUY→ASK, SELL→BID) via the matching engine + the §4.2 logic, so the
+    primary only carries the *decision* price. ``-ASK-`` / ``-BID-`` → ``-MID-``;
+    ``-MID-`` and crypto ``-LAST-`` (no midpoint) are returned unchanged.
+    """
+    if "-ASK-" in bt_str:
+        return bt_str.replace("-ASK-", "-MID-", 1)
+    if "-BID-" in bt_str:
+        return bt_str.replace("-BID-", "-MID-", 1)
+    return bt_str

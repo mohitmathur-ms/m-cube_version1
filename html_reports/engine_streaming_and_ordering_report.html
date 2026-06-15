@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtest Engine Evolution — Two-Pass → Unified → Streaming &amp; Ordering</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --ink:#e6e9ef; --muted:#9aa4b2;
+    --acc:#4f9cff; --good:#3fb950; --bad:#f85149; --warn:#d29922; --line:#2a2f3a; --code:#0b0d11;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:38px 40px 26px;background:linear-gradient(135deg,#141925,#0f1115);border-bottom:1px solid var(--line)}
+  header h1{margin:0 0 6px;font-size:26px;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:15px}
+  header .meta{margin-top:14px;color:var(--muted);font-size:13px}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 40px 80px}
+  .timeline{display:flex;gap:0;flex-wrap:wrap;margin:26px 0 6px}
+  .timeline .t{flex:1;min-width:170px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin:4px}
+  .timeline .t b{display:block;color:#cfe3ff;font-size:13px;margin-bottom:3px}
+  .timeline .t span{color:var(--muted);font-size:12.5px}
+  .timeline .t.cur{border-color:var(--acc)}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:22px 0}
+  nav.toc h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  nav.toc ol{margin:0;padding-left:22px;columns:2;column-gap:34px}
+  nav.toc li{margin:4px 0}
+  nav.toc a{color:var(--acc);text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  h2{margin:44px 0 12px;font-size:21px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{margin:24px 0 8px;font-size:16px;color:#cdd6e3}
+  p{margin:10px 0}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;
+    font-family:"SF Mono",Consolas,"Roboto Mono",monospace;color:#cfe3ff}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:9px;padding:14px 16px;overflow:auto;
+    font-family:"SF Mono",Consolas,"Roboto Mono",monospace;font-size:12.5px;line-height:1.55;color:#d6deea}
+  pre .c{color:#6b7686}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#cdd6e3;font-weight:600}
+  tr:nth-child(even) td{background:#14171e}
+  .box{border-radius:9px;padding:14px 18px;margin:16px 0;border:1px solid var(--line)}
+  .prob{background:rgba(248,81,73,.08);border-color:rgba(248,81,73,.4)}
+  .sol{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.4)}
+  .note{background:rgba(79,156,255,.08);border-color:rgba(79,156,255,.4)}
+  .key{background:rgba(210,153,34,.10);border-color:rgba(210,153,34,.45)}
+  .box .lbl{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px}
+  .prob .lbl{color:#ff7b72}.sol .lbl{color:#56d364}.note .lbl{color:#79c0ff}.key .lbl{color:#e3b341}
+  .pill{display:inline-block;padding:1px 9px;border-radius:20px;font-size:11.5px;font-weight:700;letter-spacing:.4px}
+  .p-good{background:rgba(63,185,80,.16);color:#56d364}
+  .p-bad{background:rgba(248,81,73,.16);color:#ff7b72}
+  .ok{color:var(--good);font-weight:700}.no{color:var(--bad);font-weight:700}
+  .muted{color:var(--muted)}
+  hr{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .small{font-size:12.5px;color:var(--muted)}
+  .flow{display:flex;gap:0;align-items:stretch;flex-wrap:wrap;margin:16px 0}
+  .flow .step{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin:4px;text-align:center;font-size:13px}
+  .flow .step b{display:block;color:#cfe3ff;margin-bottom:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Backtest Engine Evolution</h1>
+  <div class="sub">Two-pass / post-run → unified single-pass live engine → BacktestNode streaming &amp; the ASK/BID/MID ordering problem.</div>
+  <div class="meta">m-cube · NautilusTrader 1.224.0 · branch <code>Path_A_LowAPI</code> · design &amp; decision record</div>
+</header>
+
+<div class="wrap">
+
+<div class="timeline">
+  <div class="t"><b>① Post-run</b><span>single run; merge results &amp; clip post-breach trades — but open positions NOT closed.</span></div>
+  <div class="t"><b>② Two-pass</b><span>added a replay pass so ReExecute (&amp; aggregate discovery) could work.</span></div>
+  <div class="t"><b>③ Unified single-pass</b><span>all legs + monitor in ONE engine; portfolio logic enforced LIVE, one pass.</span></div>
+  <div class="t cur"><b>④ Streaming &amp; ordering</b><span>BacktestNode for bounded memory; fixing the same-ts (ASK/BID/MID) order.</span></div>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#postrun">The earliest design — post-run clip</a></li>
+    <li><a href="#twopass">The two-pass approach</a></li>
+    <li><a href="#unified">Migration to the unified single-pass live engine</a></li>
+    <li><a href="#eager">The unified engine's eager data loading</a></li>
+    <li><a href="#goal">The goal — multi-user, concurrent backtests</a></li>
+    <li><a href="#node">Shifting toward BacktestNode</a></li>
+    <li><a href="#derisk">De-risking the node path</a></li>
+    <li><a href="#order">The problem — same-timestamp ordering</a></li>
+    <li><a href="#proof">Proving the order matters</a></li>
+    <li><a href="#root">Root cause — a same-bar re-entry race</a></li>
+    <li><a href="#fills">Confirming the fills are correct</a></li>
+    <li><a href="#fixes">The fixes</a></li>
+    <li><a href="#final">Final architecture</a></li>
+    <li><a href="#verify">Verification</a></li>
+    <li><a href="#files">Key code locations</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<h2 id="postrun">1. The earliest design — post-run clip</h2>
+<p>The earliest approach ran each enabled slot in its <b>own <code>BacktestEngine</code> in its own worker process</b> (a <code>ProcessPoolExecutor</code>). A single run, pure per-leg — <b>no leg could see the combined portfolio P&amp;L during the run</b> (separate processes, no shared state).</p>
+<p>So portfolio SL/Target was applied <b>purely as post-processing</b>: after the per-slot runs, <b>merge</b> the per-slot equity curves into a combined P&amp;L curve, find the breach point, and <b>CLIP</b> — drop the trades opened after the breach (e.g. after the square-off time).</p>
+<div class="prob"><span class="lbl">The limitation (confirmed in the code)</span>
+The clip <b>dropped post-breach trades but did NOT close the positions already open at the breach</b> — a position opened <em>before</em> the breach but closed <em>after</em> it was kept whole and <b>ran to its natural exit</b>. So the "square-off" truncated the trade list without actually squaring off open positions. Documented in <code>_truncate_open_positions_at_clip</code>'s docstring:
+<br><span class="small">“the splice head keeps positions by <code>ts_opened &lt; clip_ns</code>, so a position opened before the breach but closed after it is kept whole — <b>running past the breach to its natural exit</b>.”</span>
+<br>That helper (which rewrites the open-at-breach position to close <em>at</em> the breach, mark-to-market) was a <b>later refinement</b>; it explicitly <em>“degrades to the prior ‘natural exit’ behaviour”</em> when data is missing — i.e. natural-exit was the original behaviour.</div>
+<p><b>No ReExecute</b> in this phase — pure post-processing on a finished run can't re-enter the market.</p>
+
+<!-- 2 -->
+<h2 id="twopass">2. The two-pass approach</h2>
+<p>To support <b>ReExecute</b> (and aggregate Move-SL discovery) — which the single post-run pass couldn't do — a <b>second pass / replay</b> was added:</p>
+<table>
+<tr><th>Portfolio feature</th><th>How it was done (multi-pass)</th></tr>
+<tr><td><b>ReExecute</b></td><td><b>Replay</b>: pass 1 discovers the breach + each leg's entry price; pass 2 re-runs the slots starting flat from the clip, with resting-limit re-entries.</td></tr>
+<tr><td><b>Aggregate Move-SL / Hit-On-Leg</b></td><td><b>Discovery pass</b> (find the trigger timestamp) + an <b>apply pass</b> (move SL).</td></tr>
+<tr><td><b>Open-at-breach positions</b></td><td>Refined to <b>close at the breach</b> (mark-to-market) via <code>_truncate_open_positions_at_clip</code>, instead of running to natural exit.</td></tr>
+</table>
+<div class="prob"><span class="lbl">Limitations of two-pass</span>
+Portfolio decisions were still <b>reconstructed after the run</b>, not enforced <em>during</em> it; cross-leg coordination was impossible in one pass (separate processes); it needed 2–3 passes (slower); and the reconstruction was approximate at the edges.</div>
+
+<!-- 3 -->
+<h2 id="unified">3. Migration to the unified single-pass live engine</h2>
+<p>The fix was to put <b>all legs plus a position-less <code>PortfolioMonitorStrategy</code> in ONE engine, running ONE pass</b>, in the same process. Now the monitor can see the combined P&amp;L <em>live</em>, every bar, and <b>enforce</b> portfolio logic during the run:</p>
+<div class="flow">
+  <div class="step"><b>Monitor</b>sees combined P&amp;L live each bar</div>
+  <div class="step"><b>Breach</b>publishes to an in-process bus (keyed by portfolio)</div>
+  <div class="step"><b>Each leg</b>reads the bus → closes / re-arms its own position live</div>
+</div>
+
+<h3>How the monitor tracks combined P&amp;L</h3>
+<p>The enabler: the monitor is a <b>position-less <code>Strategy</code> living in the same engine as the legs</b>, so it can read the shared <code>Portfolio</code> directly — impossible in the per-slot design where legs were in separate processes. Every bar it computes the live combined P&amp;L:</p>
+<pre>combined_pnl = Σ portfolio.total_pnl(instrument_id)   <span class="c"># over EVERY leg's instrument</span>
+             + cons_bus[0]                            <span class="c"># live conservative-fill delta</span>
+   <span class="c"># total_pnl = realized + UNREALIZED (mark-to-market), so the curve reflects</span>
+   <span class="c"># open positions on every bar — not just realized P&L at closes.</span></pre>
+<ul>
+  <li><b>Combined &amp; live:</b> <code>portfolio.total_pnl(iid)</code> gives realized + unrealized P&amp;L per instrument; summed across all legs it's the portfolio's mark-to-market P&amp;L at that bar (multi-currency safe via the venue's base currency).</li>
+  <li><b>Performance (skip-when-flat):</b> <code>total_pnl</code> dominates runtime, so the monitor only re-values instruments that currently hold an <b>open</b> position (a flat instrument's P&amp;L is its constant realized total between trades), with a one-shot recompute on each open→flat transition to catch the realized jump. When <b>no</b> position is open at all it reuses the last value — no new breach is possible while fully flat.</li>
+  <li><b>Conservative consistency:</b> legs publish their live §4.2 conservative-vs-engine fill delta on a shared bus (<code>cons_bus</code>); the monitor adds it, so its SqOff/Target/ReExecute decisions use the same conservative P&amp;L the final report shows.</li>
+  <li><b>References &amp; baselines:</b> a <b>day baseline</b> (resets each calendar day → day-scoped SqOff), a <b>trailing-reset baseline</b> (→ ReExecute, capped at the configured count), and the <b>§5.3 confirmation-delay</b> window (a breach must hold N seconds before it fires; clears if it recovers first).</li>
+  <li><b>Underlying SL:</b> for the underlying-price types it tracks the <b>primary slot's bar close</b> live and evaluates the cross / loss+band condition each bar — same primary series the post-run path used, now read in-engine.</li>
+</ul>
+<p>On a breach it calls <code>_fire(...)</code>, appending an <b>action-aware</b> entry <code>{ts, action, market, reason}</code> to the in-process fire bus (keyed by <code>portfolio_id</code>); each leg reads it on the same bar and closes / re-arms its own position. The <code>reason</code> string becomes the orderbook exit tag. <span class="small">Implementation: <code>core/portfolio_monitor.py</code> — <code>_combined_pnl()</code>, <code>on_bar()</code>, <code>_eval_side()</code>, <code>_fire()</code>.</span></p>
+
+<table>
+<tr><th></th><th>Two-pass / post-run</th><th>Unified single-pass</th></tr>
+<tr><td>Engines</td><td>one per slot, separate processes</td><td>ONE engine, all legs + monitor</td></tr>
+<tr><td>Portfolio SL/Target/ReExecute</td><td>post-run clip / replay</td><td><b>live</b>, enforced in-pass via the monitor + bus</td></tr>
+<tr><td>Conservative fills</td><td>post-run reprice</td><td><b>live</b> via a custom <code>ConservativeFillModel</code> (synthetic order book)</td></tr>
+<tr><td>Passes</td><td>2–3</td><td><b>1</b></td></tr>
+</table>
+<p>This was rolled out in phases (all legs in one engine → live SqOff → live ReExecute → live aggregate/Hit-On-Leg → streaming) and made the <b>default</b>. The old behaviour remains reachable via the escape hatch <code>_USE_POST_RUN_PF=1</code>.</p>
+<p class="small">Other features moved to live one-pass in the same effort: §8.1 directional close + portfolio-SqOff VWAP enhancement, underlying-price SL (Underlying Movement / Loss &amp; Underlying Range — which also fixed a latent misfire), the §5.3 confirmation Delay, and the §8.2 exit-sell-first log ordering.</p>
+
+<!-- 3 -->
+<h2 id="eager">4. The unified engine's eager data loading</h2>
+<p>The unified engine is a low-level <code>BacktestEngine</code> with <b>eager</b> data handling — every bar for the whole range is read into an in-memory list, sorted, then run in one shot:</p>
+<pre>all_bars = []                                  <span class="c"># load EVERY bar for the range</span>
+for slot: all_bars += catalog.bars(slot.bar_types, start, end)
+all_bars.sort(key=lambda b: b.ts_init)
+engine.add_data(all_bars); engine.run()        <span class="c"># one shot</span></pre>
+<div class="note"><span class="lbl">Why this matters next</span>
+Peak memory scales with the <b>whole date range</b> (the FX catalog is ~24M bars). Fine for one run — but the next goal made it the binding constraint.</div>
+
+<!-- 4 -->
+<h2 id="goal">5. The goal — multi-user, concurrent backtests</h2>
+<p>The driver: <b>many users running many backtests simultaneously</b>. Two clarifications shaped the rest:</p>
+<table>
+<tr><th>Realization</th><th>Consequence</th></tr>
+<tr><td>Concurrency comes from <b>process isolation</b>, not the engine API (Nautilus engines aren't thread-safe).</td><td>Runs must be in separate processes regardless of engine.</td></tr>
+<tr><td>The lever the engine choice affects is <b>per-run memory</b>.</td><td>So: stream the data instead of loading it all.</td></tr>
+</table>
+
+<!-- 5 -->
+<h2 id="node">6. Shifting toward BacktestNode</h2>
+<p>NautilusTrader's high-level <b>BacktestNode</b> takes a <code>chunk_size</code> and streams the catalog in row-batches via an internal <code>DataBackendSession</code> — peak memory ≈ one chunk, independent of the range. That's the memory profile we wanted.</p>
+<div class="flow">
+  <div class="step"><b>BacktestRunConfig</b>venues + data + chunk_size</div>
+  <div class="step"><b>node.build()</b>builds engine, loads instruments</div>
+  <div class="step"><b>get_engine()</b>attach strategies imperatively</div>
+  <div class="step"><b>node.run()</b>streams chunks → engine</div>
+</div>
+
+<!-- 6 -->
+<h2 id="derisk">7. De-risking the node path</h2>
+<table>
+<tr><th>Risk</th><th>Resolution</th><th></th></tr>
+<tr><td>The custom <code>ConservativeFillModel</code> is attached imperatively; a node builds fill models declaratively.</td><td>Added <code>ConservativeFillModelConfig(portfolio_id)</code> + dual-construct <code>__init__(portfolio_id=None, config=None)</code>; verified the <code>FillModelFactory.create(ImportableFillModelConfig(...))</code> route binds the same bus.</td><td><span class="pill p-good">cleared</span></td></tr>
+<tr><td>Strategies must serialize through the node.</td><td><code>ManagedExitConfig</code> &amp; <code>PortfolioMonitorConfig</code> round-trip via NautilusConfig (<code>eq=True</code>).</td><td><span class="pill p-good">cleared</span></td></tr>
+<tr><td>Reaching the engine to attach legs/monitor.</td><td>path_b attaches strategies <b>imperatively after <code>node.build()</code></b> → reuse the unified runner's strategy-build + extraction; only the engine plumbing changes.</td><td><span class="pill p-good">cleared</span></td></tr>
+</table>
+<p>Integrated behind <code>_USE_BACKTEST_NODE=1</code> (parity-gated, not default).</p>
+
+<!-- 7 -->
+<h2 id="order">8. The problem — same-timestamp ordering (ASK/BID/MID)</h2>
+<p>For an FX leg a single minute is <b>three</b> bars at the same timestamp: <code>MID</code>, <code>BID</code>, <code>ASK</code> (MID is synthesized from BID/ASK). Something must decide the order <em>within</em> that minute.</p>
+<table>
+<tr><th></th><th>Unified BacktestEngine</th><th>BacktestNode</th></tr>
+<tr><td>Data delivery</td><td>one in-memory list, sorted by <code>ts_init</code></td><td><code>DataBackendSession</code> merges files by ts, streamed in chunks</td></tr>
+<tr><td>Same-ts order</td><td><b>controllable</b> (we own the sort)</td><td><b>internal / not controllable</b> — MID may land first, middle, or last</td></tr>
+</table>
+<div class="prob"><span class="lbl">The problem</span>
+The unified order was <b>incidental</b> (load order + stable sort → MID,ASK,BID), and BacktestNode uses a <b>different internal order</b>. If results depend on that order, the engines can't agree — and the node's order can't be forced.</div>
+
+<!-- 8 -->
+<h2 id="proof">9. Proving the order matters</h2>
+<p>Change <em>only</em> the same-ts tiebreak on <code>BXT_11</code> (FX, EMA-Cross, SL/TP):</p>
+<table>
+<tr><th>Same-ts order</th><th>Total P&amp;L</th><th>Trades</th></tr>
+<tr><td>MID, ASK, BID (incidental default)</td><td>−4650.63</td><td>367</td></tr>
+<tr><td>ASK, BID, MID (reordered)</td><td class="no">−5241.58</td><td class="no">422</td></tr>
+<tr><td>BacktestNode (its internal order)</td><td>−4647.12</td><td>371</td></tr>
+</table>
+<div class="key"><span class="lbl">Result</span>
+Reordering the same three bars swung the result by <b>$591 / 55 trades</b>. The output is <b>materially sensitive</b> to same-timestamp order — and the node (−4647) is close to but not identical to the unified (−4650), so it can't be byte-identical.</div>
+
+<!-- 9 -->
+<h2 id="root">10. Root cause — a same-bar re-entry race</h2>
+<p>The first divergence is one minute, <b>04:35</b> — a long's stop fires <em>and</em> the EMA flips to sell on the same bar:</p>
+<pre><span class="c"># UNIFIED (MID,ASK,BID) — fills at 04:35</span>
+04:35:00  EXIT  SELL  px=1.22452  tag=[Stop Loss: 1.22439 &lt;= SL 1.22444]
+          <span class="c"># ...that's it. Long closed. New short DEFERRED.</span>
+
+<span class="c"># REORDERED (ASK,BID,MID) — fills at 04:35</span>
+04:35:00  EXIT   SELL  px=1.22454  tag=[Stop Loss: 1.22439 &lt;= SL 1.22444]
+04:35:00  ENTRY  SELL  px=1.22454  tag=[EMA Cross SELL: fast(9) &lt; slow(21)]
+          <span class="c"># Long closed AND a new short OPENED on the same bar.</span></pre>
+<div class="prob"><span class="lbl">Root cause</span>
+At 04:35 the stop closes the long <b>and</b> the EMA simultaneously signals a short. Whether the leg takes that short <b>on the same minute</b> depends on whether it's already flat (the close has settled) when the entry is evaluated — which depends on which of MID/BID/ASK is processed last. The same-ts order flips a <b>"re-enter on the exit bar?"</b> decision, and that one trade cascades (367 vs 422 trades).</div>
+<p class="small">The new short is the strategy's own <b>EMA-cross signal</b> (tag <code>EMA Cross SELL</code>) — <b>not</b> a re-execute or reverse (<code>BXT_11</code>: <code>on_sl_action="close"</code>, <code>max_re_executions=0</code>).</p>
+
+<!-- 10 -->
+<h2 id="fills">11. Confirming the fills are correct</h2>
+<p>We checked the scarier possibility — that the order corrupts <em>fill prices</em> — and it's <b>false</b>:</p>
+<table>
+<tr><th>Position</th><th>Exit fill</th><th>Matches</th></tr>
+<tr><td>LONG exit (sell to close)</td><td>1.22453</td><td class="ok">BID close ✓</td></tr>
+<tr><td>SHORT exit (buy to close)</td><td>1.23021</td><td class="ok">ASK close ✓</td></tr>
+</table>
+<div class="sol"><span class="lbl">Conclusion</span>
+LONG exits fill at the BID, SHORT exits at the ASK — exact to the 5th decimal, 10/10 positions. So this is a <b>determinism / re-entry-policy</b> issue, not a fill bug. Both engines price every fill correctly; they only sequence a few same-bar re-entries differently.</div>
+
+<!-- 11 -->
+<h2 id="fixes">12. The fixes</h2>
+<h3>11.1 MID-primary normalization</h3>
+<p>The signal should run on the unbiased <b>midpoint</b> (ASK-only/BID-only skews indicators by half the spread). So whatever the UI selects, the <b>signal primary is forced to MID</b> for FX; fills stay BUY→ASK, SELL→BID. Verified: ASK-primary and BID-primary portfolios now produce the identical result to MID-primary.</p>
+<h3>11.2 Explicit same-ts order — ASK, BID, MID (quotes-before-MID)</h3>
+<p>The incidental order became an <b>explicit, deterministic contract</b> (spec §4.1/§4.2: an exit's conservative fill should see the current minute's bid/ask before the MID trigger), applied <b>project-wide, no flag</b>:</p>
+<pre>def _same_ts_sort_key(bar):
+    rank = {ASK:0, BID:1, MID:2}.get(price_type(bar), 3)
+    return (bar.ts_init, rank)</pre>
+<div class="sol"><span class="lbl">Bonus</span>Making the order explicit brought the <b>unified and per-slot paths into agreement</b> (both −5241.58 / 422 on BXT_11).</div>
+<h3>11.3 "Stream it yourself" — controlled order <em>and</em> bounded memory</h3>
+<p><code>node.run()</code> can't control the same-ts order, so we <b>stream the data ourselves</b>: read the catalog in date windows, sort each window with our key, feed it, advance, drop it.</p>
+<pre>for window in date_windows(start, end, days=7):
+    chunk = catalog.bars(all_bar_types, window.start, window.end)
+    chunk.sort(key=_same_ts_sort_key)            <span class="c"># OUR order: ASK,BID,MID</span>
+    engine.add_data(chunk, sort=True); engine.run(streaming=True); engine.clear_data()</pre>
+<div class="note"><span class="lbl">Why this is the answer</span>Controlled order (we sort each chunk) <b>and</b> bounded memory (≈ one window). Date-aligned windows never split a timestamp, so per-window sort + ascending windows reconstruct the same global order as an eager sort → byte-identical. The only thing dropped is <code>node.run()</code> — exactly the part whose order we couldn't control.</div>
+
+<!-- 12 -->
+<h2 id="final">13. Final architecture — chunk in the node, not in the engine</h2>
+<table>
+<tr><th></th><th>Unified BacktestEngine <span class="small">(default)</span></th><th>BacktestNode <span class="small">(<code>_USE_BACKTEST_NODE=1</code>)</span></th></tr>
+<tr><td>Engine built by</td><td>direct <code>BacktestEngine(...)</code></td><td><code>node.build()</code> (venue + FillModel-as-config + instruments)</td></tr>
+<tr><td>Chunking</td><td><span class="no">none — eager load + run</span></td><td><span class="ok">manual windowed chunking (we self-stream)</span></td></tr>
+<tr><td>Same-ts order</td><td><b>ASK, BID, MID</b></td><td><b>ASK, BID, MID</b></td></tr>
+<tr><td>Memory</td><td>full range (trusted reference)</td><td>bounded ≈ one window</td></tr>
+<tr><td><code>node.run()</code> used?</td><td>n/a</td><td><b>no</b> — we stream ourselves (controlled order)</td></tr>
+</table>
+<div class="key"><span class="lbl">The contract</span>Chunk in BacktestNode (manual windowed), do NOT chunk in the unified engine (eager), keep ASK→BID→MID order in both — and they produce identical results.</div>
+
+<!-- 13 -->
+<h2 id="verify">14. Verification</h2>
+<table>
+<tr><th>Portfolio</th><th>Unified (eager, no chunk)</th><th>BacktestNode (chunked)</th><th></th></tr>
+<tr><td>BXT_11 (FX, non-pf)</td><td>−5241.58017 / 422</td><td>−5241.58017 / 422</td><td class="ok">MATCH</td></tr>
+<tr><td>pf_sl (live monitor)</td><td>−4057.94 / 322</td><td>−4057.94 / 322</td><td class="ok">MATCH</td></tr>
+</table>
+<p><b>254/254 pytest pass</b> throughout. The node path no longer depends on <code>DataBackendSession</code>'s internal order (it doesn't use <code>node.run()</code> in the common case), so it is deterministic and byte-identical to the unified reference.</p>
+
+<!-- 14 -->
+<h2 id="files">15. Key code locations</h2>
+<table>
+<tr><th>What</th><th>Where</th></tr>
+<tr><td>Same-ts sort key (ASK,BID,MID)</td><td><code>backtest_runner/bar_types/__init__.py</code> · <code>_same_ts_sort_key</code></td></tr>
+<tr><td>MID-primary normalization</td><td><code>bar_types/__init__.py</code> · <code>_normalize_primary_to_mid</code></td></tr>
+<tr><td>Unified eager sort (order applied)</td><td><code>unified/__init__.py</code> · <code>all_bars.sort(key=_same_ts_sort_key)</code></td></tr>
+<tr><td>Node windowed self-streaming + per-chunk sort</td><td><code>unified/__init__.py</code> · <code>_lazy_ok</code> branch (gated on <code>_node_path</code>)</td></tr>
+<tr><td>FillModel as config</td><td><code>core/conservative_fill_model.py</code> · <code>ConservativeFillModelConfig</code></td></tr>
+<tr><td>Node run-config builder</td><td><code>unified/__init__.py</code> · <code>_build_node_run_config</code></td></tr>
+<tr><td>Live portfolio monitor (replaced 2-pass)</td><td><code>core/portfolio_monitor.py</code></td></tr>
+<tr><td>Post-run / two-pass (escape hatch)</td><td><code>backtest_runner/portfolio_clip/</code>, gated by <code>_USE_POST_RUN_PF=1</code></td></tr>
+</table>
+<h3>Flags</h3>
+<table>
+<tr><th>Flag</th><th>Default</th><th>Effect</th></tr>
+<tr><td><code>_USE_POST_RUN_PF</code></td><td>off</td><td>Revert to the original two-pass / post-run portfolio reconstruction.</td></tr>
+<tr><td><code>_USE_BACKTEST_NODE</code></td><td>off</td><td>Build the engine via BacktestNode + manual windowed chunking (bounded memory).</td></tr>
+<tr><td><code>_USE_LAZY_STREAM</code></td><td>on</td><td>Escape hatch — <code>0</code> forces eager feed even on the node path.</td></tr>
+</table>
+
+<hr>
+<p class="small">This record documents the full evolution: from the earliest <b>post-run clip</b> (single run + truncate, open positions not closed), to the <b>two-pass replay</b> (adding ReExecute), to the <b>unified single-pass live</b> engine, to the <b>streaming &amp; ordering</b> work — where same-timestamp (MID/BID/ASK) ordering was found to materially affect results via a same-bar close→re-enter race (not a fill bug), and resolved with an explicit ASK,BID,MID order everywhere, self-managed windowed chunking in the BacktestNode path, an eager no-chunk unified reference, and verified byte-identical results between the two.</p>
+
+</div>
+</body>
+</html>

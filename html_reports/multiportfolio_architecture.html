@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m-cube — Multi-Portfolio Architecture (Complete Design)</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --gray-bg: #eaeef2; --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.58; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1180px; margin: 0 auto; padding: 32px 40px 90px; }
+  header.cover { background: linear-gradient(135deg, #8250df 0%, #0969da 100%); color: white; padding: 40px; margin: -32px -40px 32px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 27px; }
+  header.cover .subtitle { margin: 0; font-size: 15px; opacity: 0.93; }
+  header.cover .meta { margin-top: 12px; font-size: 12px; opacity: 0.82; }
+  h2 { font-size: 21px; margin-top: 42px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16.5px; margin-top: 26px; }
+  h4 { font-size: 14px; margin-top: 18px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f9fafb; }
+  td.center, th.center { text-align: center; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px; background: #f1f3f5; padding: 1px 5px; border-radius: 3px; color: #b3406b; }
+  pre { background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 14px 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+  pre code { background: none; color: inherit; padding: 0; font-size: 12.5px; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 11.5px; font-weight: 700; border-radius: 4px; }
+  .b-new { background: var(--purple-bg); color: var(--purple); border: 1px solid var(--purple); }
+  .b-reuse { background: var(--green-bg); color: var(--green); }
+  .b-fix { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .b-live { background: var(--green-bg); color: var(--green); }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; font-size: 13.5px; }
+  .callout strong { color: var(--accent); }
+  .callout.warn { background: var(--amber-bg); border-left-color: var(--amber); }
+  .callout.warn strong { color: var(--amber); }
+  .callout.ok { background: var(--green-bg); border-left-color: var(--green); }
+  .callout.ok strong { color: var(--green); }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 36px; }
+  nav.toc li { margin: 3px 0; } nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .ascii { background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 16px 18px; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.45; white-space: pre; overflow-x: auto; }
+  .foot { font-size: 12px; color: var(--muted); margin-top: 40px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .lbl { font-size: 11px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>m-cube — Multi-Portfolio Architecture</h1>
+  <p class="subtitle">One session engine · a live monitor tier (leg → portfolio → tag → user) · same-bar cross-portfolio actions. Turns every parked SL/Target setting CORRECT and Live, without regressing the single-portfolio engine.</p>
+  <p class="meta">Design spec · builds on the live <code>PortfolioMonitorStrategy</code> + <code>ConservativeFillModel</code> + unified/BacktestNode engine · cites <code>file:line</code> into the current code</p>
+</header>
+
+<div class="callout ok">
+  <strong>One-sentence summary.</strong> Put <em>every</em> portfolio's legs plus a <strong>tier of position-less monitors</strong> (portfolio → tag → user) into <strong>one session engine, one pass, one process</strong>; each monitor sums the combined P&amp;L over <em>its own scope of legs</em> live every bar and publishes to an in-process bus; legs (and other portfolios) read the buses and act <strong>the same bar</strong> — which makes cross-portfolio actions, user/tag limits, %-of-allocation and hierarchy validation all work live, exactly as the spec requires.
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#goals">1. Goals &amp; what it unlocks</a></li>
+    <li><a href="#principles">2. Design principles</a></li>
+    <li><a href="#model">3. The session model (schema)</a></li>
+    <li><a href="#engine">4. One session engine</a></li>
+    <li><a href="#scope">5. Scope &amp; combined P&amp;L</a></li>
+    <li><a href="#tier">6. The monitor tier &amp; order</a></li>
+    <li><a href="#bus">7. The bus fabric</a></li>
+    <li><a href="#crosspf">8. Cross-portfolio actions (detail)</a></li>
+    <li><a href="#usertag">9. User &amp; Tag limits</a></li>
+    <li><a href="#alloc">10. % of allocation</a></li>
+    <li><a href="#valid">11. Hierarchy validation</a></li>
+    <li><a href="#fixes">12. Shared-resource fixes</a></li>
+    <li><a href="#correct">13. Correctness &amp; parity gate</a></li>
+    <li><a href="#approaches">14. Unified + BacktestNode</a></li>
+    <li><a href="#rollout">15. Rollout phases</a></li>
+    <li><a href="#mapping">16. Feature → mechanism map</a></li>
+    <li><a href="#risks">17. Risks &amp; edge cases</a></li>
+  </ol>
+</nav>
+
+<h2 id="goals">1. Goals &amp; what it unlocks</h2>
+<p>Every feature currently marked <strong>ON HOLD — multi-PF</strong> in the compliance report becomes <strong>CORRECT &amp; Live</strong>:</p>
+<table>
+  <thead><tr><th>Group</th><th>Settings</th><th>Spec</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Cross-portfolio actions</strong> (priority)</td><td>SqOff Other Portfolio · Execute Other Portfolio · Start Other Portfolio · Target Portfolio (cross-pf name) · Delay (sec) · ReExecute Count — on both the SL and Target sides</td><td><code>sl_features §2.1, §2.4</code> · <code>execution_logic §5.2</code></td></tr>
+    <tr><td><strong>User level</strong></td><td>Max Loss · Max Profit · Trailing SL · Trailing Target / Profit-Lock</td><td><code>sl_features §3</code> · <code>execution_logic §6</code></td></tr>
+    <tr><td><strong>Strategy Tags</strong></td><td>Tag risk tier · Tag Combined Loss + Trailing SL · Tag Combined Profit + Profit-Lock</td><td><code>execution_logic §11</code></td></tr>
+    <tr><td><strong>Threshold mode</strong></td><td>User/Tag "% of allocation" (engine-defined constant)</td><td><code>sl_features Level 3, TBD-6</code></td></tr>
+    <tr><td><strong>Validation</strong></td><td>Σ leg SL ≤ portfolio ≤ Σ ≤ tag ≤ Σ ≤ user (and Target mirror)</td><td><code>execution_logic §11</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="principles">2. Design principles</h2>
+<table>
+  <thead><tr><th>Principle</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Live per spec</strong></td><td>The spec evaluates the hierarchy <em>every bar</em> (User → Tag → Portfolio → Leg) and a higher level force-squares everything below <em>in the same bar</em>. Every decision and every cross-pf effect happens in-engine on the triggering bar — never a post-run pass.</td></tr>
+    <tr><td><strong>No regression</strong></td><td>Each portfolio's monitor + legs + buses stay byte-identical to a standalone run (they are already <code>portfolio_id</code>-keyed). Multi-portfolio is a strict <em>superset</em>: new monitors/buses are added <em>on top</em>; nothing existing is rewired. A parity gate proves it per build.</td></tr>
+    <tr><td><strong>Reuse the monitor pattern</strong></td><td>The tag and user monitors ARE the existing position-less <code>PortfolioMonitorStrategy</code>, just scoped to a different set of legs. ~90% reuse.</td></tr>
+    <tr><td><strong>Both approaches free</strong></td><td>Everything is wired in the shared post-branch attach code, so the Unified engine and the BacktestNode path both get multi-portfolio automatically.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="model">3. The session model (schema)</h2>
+<p>A request now carries a user's whole tree (<span class="badge b-new">NEW</span> <code>SessionConfig</code>), not a single <code>PortfolioConfig</code>:</p>
+<pre><code>SessionConfig
+  user_id
+  allocation_base : float          # engine constant, fixed at session start (for "% of allocation")
+  reporting_ccy   : str            # currency to aggregate cross-currency PnL into
+  user            : { max_loss, max_profit, trailing_sl{every,by}, trailing_tgt{reach,lock,every,by} }
+  tags     : [ { tag_id, portfolio_ids[], sl{...}, tgt{...}, trailing_sl{...}, profit_lock{...} } ]
+  portfolios : [ PortfolioConfig + {
+                   portfolio_id,           # unique
+                   tag_id | null,
+                   manual : bool,          # NEW: idle until a cross-pf Start/Execute fires it
+                   pf_sl_action / pf_tgt_action may include:
+                       target_portfolio, verb(sqoff|execute|start), delay_sec, reexecute_count
+                 } ]
+  # each leg inherits (portfolio_id, tag_id, user_id) + a GLOBALLY-UNIQUE strategy tag  P{p}-U{i}</code></pre>
+<p class="callout">The whole tree in one request is also what makes <strong>Σ-of-siblings validation</strong> possible (§11) — today the server only ever sees one portfolio, so it can't sum siblings.</p>
+
+<h2 id="engine">4. One session engine</h2>
+<p>Generalize <code>_run_portfolio_unified</code> to accept a <code>SessionConfig</code> and add <strong>every leg of every portfolio</strong> to the one engine, plus the monitor tier. The node-vs-direct build branch is untouched; the new monitors are attached in the shared post-branch code (<code>unified/__init__.py:489-562</code>), so Unified + BacktestNode both inherit it.</p>
+<div class="ascii">            ONE session engine · ONE pass · ONE process
+   +----------------------------------------------------------------+
+   |  UserMonitor          scope = ALL the user's legs              |  <- ceiling
+   |    |- TagMonitor "A"   scope = legs of P1 + P2                 |
+   |    |    |- PfMonitor P1   scope = P1's legs --> legs x N       |
+   |    |    +- PfMonitor P2   scope = P2's legs --> legs x N       |
+   |    +- TagMonitor "B"   scope = legs of P3 ...                  |
+   |                                                                |
+   |  ConservativeFillModel  (per venue, session-scoped, per-leg pin)|
+   +----------------------------------------------------------------+
+   evaluation order each bar:  User -> Tag -> Portfolio -> Leg
+   a higher scope fires first and force-squares everything below, same bar</div>
+
+<h2 id="scope">5. Scope &amp; combined P&amp;L</h2>
+<p><strong>The one critical change to the monitor:</strong> aggregate P&amp;L by the scope's set of <strong>leg <code>strategy_id</code>s</strong>, not by instrument. Today <code>_combined_pnl</code> sums <code>Portfolio.total_pnl(instrument)</code> (<code>portfolio_monitor.py:155-176</code>), which is <strong>engine-wide per instrument</strong> — correct only when an instrument belongs to one portfolio. If two portfolios share an instrument it cross-contaminates.</p>
+<pre><code># scope = the set of leg strategy_ids in this monitor's tier
+def scope_pnl(scope):
+    total = 0.0
+    for pos in cache.positions():
+        if pos.strategy_id in scope.strategy_ids:
+            pnl = pos.realized_pnl + pos.unrealized_pnl(last_price)
+            total += fx_convert(pnl, pos.quote_ccy -> reporting_ccy)   # cross-currency aggregation
+    return total + scope.cons_fill_delta            # conservative-fill consistency (existing cons bus)</code></pre>
+<p>This is a <strong>no-op</strong> for disjoint-instrument portfolios (same number as today) and <strong>required</strong> for shared ones. Higher tiers (tag, user) just use a larger <code>strategy_ids</code> set = the union of their children. Cross-currency conversion uses the existing <code>FxRateResolver</code> at each leg before summing at tag/user scope (ties into TBD-3; a no-op when everything is one currency).</p>
+
+<h2 id="tier">6. The monitor tier &amp; per-bar order</h2>
+<p>Use a single <span class="badge b-new">NEW</span> <code>HierarchyMonitorStrategy</code> that owns all scopes and walks them <strong>top-down each bar</strong> (or keep per-scope monitors registered User→Tag→Portfolio). Top-down + a per-bar <em>squared</em> guard gives the spec's "higher force-squares lower, same bar":</p>
+<pre><code>on_bar(bar):
+    squared = set()                                  # scopes closed this bar
+
+    # 1) USER ceiling
+    if user.enabled and breach(scope_pnl(user)) and held(user.delay):
+        fire(user_bus); squared |= user.legs; return # everything below is moot this bar
+
+    # 2) TAG tier
+    for tag in tags:
+        if tag.legs & squared: continue
+        if breach(scope_pnl(tag)) and held(tag.delay):
+            fire(tag_bus[tag]); squared |= tag.legs
+
+    # 3) PORTFOLIO tier  (this is today's PortfolioMonitor, unchanged per portfolio)
+    for pf in portfolios:
+        if pf.legs & squared: continue
+        evaluate_portfolio(pf)        # Combined Loss/Profit, trailing, underlying, agg Move-SL,
+                                      # Hit-On-Leg, SqOff/ReExecute, AND cross-pf actions (sec.8)
+
+    # 4) LEG level runs in each leg's own on_bar (after the monitor) — unchanged</code></pre>
+<p><strong>Registration order</strong> guarantees same-bar delivery: the monitor(s) are added to the engine <em>before</em> the legs, so the engine calls monitor <code>on_bar</code> first (publish) then each leg <code>on_bar</code> (consume) — the exact pattern the single-portfolio engine already relies on.</p>
+
+<h2 id="bus">7. The bus fabric</h2>
+<p>All buses are in-process module dicts keyed by a scope id — the existing pattern (<code>get_pf_sl_bus(portfolio_id)</code>, etc., <code>managed_strategy.py:54-131</code>), extended one tier up and one tier sideways:</p>
+<table>
+  <thead><tr><th>Bus</th><th>Key</th><th>Producer → Consumer</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td><code>pf_sl_bus</code> / <code>pf_agg_bus</code> / <code>cons_bus</code></td><td><code>portfolio_id</code></td><td>PfMonitor → that portfolio's legs</td><td><span class="badge b-reuse">REUSE</span></td></tr>
+    <tr><td><code>cross_slot_bus</code> (Hit-On-Leg, Execute-other-leg)</td><td><code>portfolio_id</code> + <code>slot_id</code></td><td>leg → sibling leg (same portfolio only)</td><td><span class="badge b-reuse">REUSE</span></td></tr>
+    <tr><td><code>tag_bus</code></td><td><code>tag_id</code></td><td>TagMonitor → all the tag's legs</td><td><span class="badge b-new">NEW</span></td></tr>
+    <tr><td><code>user_bus</code></td><td><code>user_id</code></td><td>UserMonitor → all the user's legs</td><td><span class="badge b-new">NEW</span></td></tr>
+    <tr><td><code>cross_pf_bus</code></td><td><strong>target</strong> <code>portfolio_id</code></td><td>PfMonitor A → portfolio B's legs (cross-pf actions)</td><td><span class="badge b-fix">EXISTS, drain same-bar</span></td></tr>
+    <tr><td><code>fill_px_bus</code> (ConservativeFillModel pin)</td><td><strong>session</strong> + leg <code>strategy_id</code></td><td>leg → its own exit fill</td><td><span class="badge b-fix">RE-KEY (see §12)</span></td></tr>
+  </tbody>
+</table>
+<p>Each leg subscribes to its <strong>three</strong> scope buses (<code>pf_bus</code>, <code>tag_bus</code>, <code>user_bus</code>) plus any <code>cross_pf_bus</code> targeting its portfolio — all checked in the same <code>on_bar:1000-1038</code> block it already uses for <code>pf_sl_bus</code> (one extra loop, not new machinery).</p>
+
+<h2 id="crosspf">8. Cross-portfolio actions — the detail</h2>
+<p>When portfolio <strong>A</strong>'s monitor breaches with a cross-pf action targeting <strong>B</strong>, the effect must land on B <strong>the same bar</strong>. Because all portfolios live in one engine, this is just a same-bar bus drain:</p>
+<pre><code># PfMonitor A, on breach (after §5.3 Delay hold, capped by ReExecute Count):
+for action in A.sl_actions + A.tgt_actions:
+    if action.is_local:           # "SqOff" / "ReExecute" on A itself
+        fire(pf_bus[A], action)                    # A's own legs (today's behaviour)
+    if action.target_portfolio:   # cross-pf
+        cross_pf_bus[action.target].append(
+            {verb: action.verb, ts: bar.ts, source: A, idem: (A, action.verb, bar.ts)})
+
+# Legs of B, same bar (their on_bar runs after the monitors):
+for evt in cross_pf_bus[B]:
+    if evt.ts != this_bar or evt.idem in B.seen: continue   # idempotent, once per (source,verb,bar)
+    if B.legs & squared_this_bar: continue                  # a higher tier already closed B -> skip
+    B.seen.add(evt.idem)
+    if   evt.verb == "sqoff":   leg._force_portfolio_sl_close()        # close B now
+    elif evt.verb == "execute": leg._armed_for_entry = True           # B takes its entry signal now
+    elif evt.verb == "start":   leg._started = True; leg._triggered_manual = True  # start manual B</code></pre>
+
+<h4>Verb semantics (spec §5.2)</h4>
+<table>
+  <thead><tr><th>Verb</th><th>Live effect on target B</th><th>Reuses</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SqOff Other Portfolio</strong></td><td>Force-close all of B's legs at this bar (same as a portfolio SqOff)</td><td><code>_force_portfolio_sl_close</code></td></tr>
+    <tr><td><strong>Execute Other Portfolio</strong></td><td>Arm B's legs so they take their entry signal now (re-enter)</td><td><code>_armed_for_entry</code> (<code>:2127-2133</code>)</td></tr>
+    <tr><td><strong>Start Other Portfolio</strong></td><td>Start a <em>manual</em> B (idle until triggered); B begins running and <strong>bypasses End-Time</strong> for that trigger cycle</td><td><code>_triggered_manual</code> + blocked flags</td></tr>
+    <tr><td>ReExecute Same Contract</td><td>Options / multi-contract — <strong>out of scope</strong> (degenerates to "at Entry Price" for single-instrument)</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h4>Delay, Count, manual lifecycle, ordering</h4>
+<ul>
+  <li><strong>Delay (sec)</strong> — the §5.3 confirmation hold before the cross-pf event is published (reuse <code>_delay_ok</code>): A's breach must persist <code>delay_sec</code>, cleared if it reverses.</li>
+  <li><strong>ReExecute Count</strong> — caps how many times A's action re-fires (reuse the monitor's trailing-reset fire counter / <code>reexec_cap</code>).</li>
+  <li><strong>Manual portfolio lifecycle</strong> — <code>manual=True</code> portfolios are added to the engine but their legs start entry-blocked (<code>_started=False</code>); only a <code>start</code>/<code>execute</code> event activates them, setting <code>_triggered_manual</code> so they bypass <code>end_blocked</code> for that cycle (verbatim spec).</li>
+  <li><strong>Precedence</strong> — the per-bar <code>squared</code> set means a User/Tag fire that already closed B suppresses a redundant cross-pf SqOff of B; the User/Tag ceiling always outranks a cross-pf <em>start</em>.</li>
+  <li><strong>Loop guard</strong> — cross-pf events carry <code>source</code> + an <code>idem</code> key, processed once per <code>(source, verb, bar)</code>; a global per-bar hop cap stops an A→B→A cascade from looping within a bar.</li>
+</ul>
+<div class="callout"><strong>Why this is live per spec:</strong> A breaches → (Delay hold) → publish → B closes/arms/starts in the same <code>on_bar</code>. Nothing is deferred to a post-run pass or a later request — the exact gap the compliance report flagged on today's "drained next-request" bus.</div>
+
+<h2 id="usertag">9. User &amp; Tag limits</h2>
+<p>The UserMonitor and each TagMonitor are the same position-less monitor, scoped to their legs (§5). They reuse the existing SL/Target logic verbatim:</p>
+<table>
+  <thead><tr><th>Limit</th><th>Mechanism</th><th>Reuses</th></tr></thead>
+  <tbody>
+    <tr><td>Max Loss / Max Profit</td><td>Combined scope P&amp;L ≤ −maxLoss / ≥ maxProfit → fire scope bus → all scope legs close</td><td>monitor Combined-Loss/Profit path</td></tr>
+    <tr><td>Trailing SL</td><td>Tighten-only ratchet on the scope loss-limit as scope profit grows</td><td>the portfolio Trailing-SL ratchet</td></tr>
+    <tr><td>Trailing Target / Profit-Lock</td><td>Activate at <code>reach</code>, lock <code>lock</code>, ratchet by <code>by</code> per <code>every</code></td><td><code>advance_trailing_target</code></td></tr>
+  </tbody>
+</table>
+<p>Because P&amp;L is read live from the engine cache, the obsolete module-global <code>users.py</code>/<code>tags.py</code> accumulators (the "never reset in production" bug) are <strong>deleted</strong>, not extended.</p>
+
+<h2 id="alloc">10. % of allocation</h2>
+<p>User/Tag thresholds entered as "<code>% of allocation</code>" resolve against <code>SessionConfig.allocation_base</code> — an <strong>engine constant fixed at session start</strong>, not affected by intraday PnL, fund add/withdraw, or exchange margin (spec Level-3 rule). Resolved once at session build:</p>
+<pre><code>user_max_loss_currency = allocation_base * (pct/100)   if pct-mode else absolute</code></pre>
+<p>Leg/portfolio raw-% stays as-is (still open per TBD-6); only the user/tag tiers get the fixed-base % per the resolved spec decision.</p>
+
+<h2 id="valid">11. Hierarchy validation (Σ-of-siblings)</h2>
+<p>With the whole tree in one <code>SessionConfig</code>, the save/run validator can finally sum siblings (today it can't — it sees one portfolio):</p>
+<pre><code>assert Σ(leg SL within a portfolio)   ≤ portfolio SL        # per portfolio
+assert Σ(portfolio SL within a tag)   ≤ tag SL              # per tag
+assert Σ(tag SL)                      ≤ user SL             # session
+# same chain mirrored for Target.  Block save (or warn+clip) on violation (spec §11).</code></pre>
+<p>(Leg SL is a price-distance trigger, not a currency budget — so the leg→portfolio rung stays a documented exception unless leg SLs are first converted to a worst-case currency loss; the portfolio→tag→user rungs are exact.)</p>
+
+<h2 id="fixes">12. Shared-resource fixes (mandatory, or single-portfolio regresses)</h2>
+<div class="callout warn"><strong>These are the two places where naive co-location of portfolios would silently break today's behaviour.</strong> Both must land in Phase 0.</div>
+<h4>12.1 <code>ConservativeFillModel</code> — re-key the pin per leg <span class="badge b-fix">FIX</span></h4>
+<p>Today the model is <strong>one per venue</strong>, bound to a single <code>portfolio_id</code>, and the pin is keyed by <strong>instrument</strong> (<code>conservative_fill_model.py:61-65</code>; pins at <code>managed_strategy.py:1506,1925</code>). Breakages with multiple portfolios:</p>
+<ul>
+  <li>Two portfolios sharing a <strong>venue</strong> → the single model reads only one portfolio's bus → the other's conservative/directional fills are silently lost.</li>
+  <li>Two legs on the <strong>same instrument</strong> firing the same bar → pin collision (a latent issue even today).</li>
+</ul>
+<p><strong>Fix:</strong> a <strong>session-scoped</strong> fill bus, with the pin keyed by the leg's <code>order_tag</code>/<code>strategy_id</code>. The model already receives the <code>order</code> in <code>get_orderbook_for_fill_simulation</code>, so it resolves the leg identity from the order's tag/strategy. This also <em>hardens single-portfolio</em>.</p>
+<h4>12.2 Monitor P&amp;L — scope by <code>strategy_id</code> <span class="badge b-fix">FIX</span></h4>
+<p>Replace <code>Σ Portfolio.total_pnl(instrument)</code> with <code>Σ</code> over positions whose <code>strategy_id ∈ scope</code> (§5). No-op for disjoint instruments, required for shared.</p>
+<h4>12.3 Namespacing + per-monitor context <span class="badge b-fix">FIX</span></h4>
+<ul>
+  <li><code>order_id_tag</code> must be globally unique across all portfolios (<code>P{p}-U{i}</code>), or NETTING position keys collide.</li>
+  <li>Each PfMonitor gets <em>its own</em> <code>underlying_bar_type</code> (its primary slot), <code>day_tz</code>, and scope — automatic if each portfolio keeps its own monitor instance.</li>
+</ul>
+
+<h2 id="correct">13. Correctness &amp; the parity gate</h2>
+<p><strong>Invariant checklist</strong> (Phase 0 must hold all):</p>
+<ol>
+  <li>Per-portfolio monitor scope = exactly that portfolio's legs.</li>
+  <li>Buses stay <code>portfolio_id</code>-keyed (already true) → P2 can't touch P1.</li>
+  <li>Fill pin keyed per-leg; fill bus session-scoped (§12.1).</li>
+  <li>Monitor P&amp;L scoped by <code>strategy_id</code> (§12.2).</li>
+  <li>Globally-unique <code>order_id_tag</code>.</li>
+  <li>Cross-pf events idempotent + loop-guarded; <code>squared</code> guard enforces top-down precedence.</li>
+</ol>
+<div class="callout ok"><strong>The proof mechanism — a parity gate.</strong> For every build: run each portfolio <em>standalone</em> and again <em>inside the multi-portfolio session</em> (with no user/tag/cross-pf limits configured); assert the orderbook + per-portfolio P&amp;L are <strong>byte-identical</strong>. This is how we guarantee leg- and portfolio-level SL/Target/Move-SL/trailing/actions are untouched. Model it on <code>enforce_parity_test.py</code>.</div>
+
+<h2 id="approaches">14. Unified engine + BacktestNode</h2>
+<p>All new pieces (tier monitors, <code>tag_bus</code>/<code>user_bus</code>, cross-pf drain, re-keyed fill pin) are attached in the <strong>shared post-branch code</strong> (<code>unified/__init__.py:489-562</code>) — the same place today's monitor + legs are attached. So the BacktestNode path inherits multi-portfolio with zero extra work, preserving the verified Unified≡Node equivalence. The session fill model still rides through <code>ImportableFillModelConfig</code> (now carrying a session id + per-leg keying).</p>
+
+<h2 id="rollout">15. Rollout phases (flagged, parity-gated)</h2>
+<table>
+  <thead><tr><th>Phase</th><th>Delivers</th><th>Flips to CORRECT/Live</th><th>Gate</th></tr></thead>
+  <tbody>
+    <tr><td><strong>0</strong> <code>_USE_MULTI_PORTFOLIO</code></td><td>SessionConfig; N portfolios in one engine; §12 fixes. NO new limits.</td><td>(nothing new — proves no regression)</td><td>standalone == in-session, byte-identical</td></tr>
+    <tr><td><strong>1</strong> (priority)</td><td>Cross-portfolio actions live (same-bar <code>cross_pf_bus</code> drain; manual portfolios; Delay; Count)</td><td>SqOff/Execute/Start Other Portfolio · Target Portfolio (SL + Target sides)</td><td>2-pf fixture: A's SqOff closes B same-bar</td></tr>
+    <tr><td><strong>2</strong></td><td>Tag + User monitors (scope P&amp;L, scope buses)</td><td>User Max Loss/Profit + Trailing · Tag Combined Loss/Profit + Profit-Lock</td><td>scope-PnL vs hand-summed legs</td></tr>
+    <tr><td><strong>3</strong></td><td>% of allocation; Σ-of-siblings validation</td><td>%-mode user/tag; hierarchy save checks</td><td>validation unit tests</td></tr>
+  </tbody>
+</table>
+
+<h2 id="mapping">16. Feature → mechanism map</h2>
+<table>
+  <thead><tr><th>Parked feature</th><th>Mechanism</th><th>New / Reuse</th><th>Live?</th></tr></thead>
+  <tbody>
+    <tr><td>SqOff Other Portfolio</td><td><code>cross_pf_bus[B]</code> same-bar → <code>_force_portfolio_sl_close</code></td><td><span class="badge b-fix">drain</span> + <span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Execute Other Portfolio</td><td><code>cross_pf_bus[B]</code> → <code>_armed_for_entry</code></td><td><span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Start Other Portfolio</td><td><code>cross_pf_bus[B]</code> → <code>_started</code> + <code>_triggered_manual</code> (manual pf)</td><td><span class="badge b-new">manual flag</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Target Portfolio (cross-pf name)</td><td>the <code>target_portfolio</code> field routing the above</td><td><span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Delay (sec) on cross-pf</td><td><code>_delay_ok</code> hold before publish (§5.3)</td><td><span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>ReExecute Count on cross-pf</td><td>monitor trailing-reset fire counter cap</td><td><span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>User Max Loss / Max Profit</td><td>UserMonitor scope P&amp;L → <code>user_bus</code></td><td><span class="badge b-new">user scope</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>User Trailing SL / Target</td><td>scope ratchet / <code>advance_trailing_target</code></td><td><span class="badge b-reuse">reuse</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Tag SL / Target + Profit-Lock</td><td>TagMonitor scope P&amp;L → <code>tag_bus</code></td><td><span class="badge b-new">tag scope</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>% of allocation (user/tag)</td><td>resolve vs <code>allocation_base</code> at session start</td><td><span class="badge b-new">const</span></td><td><span class="badge b-live">Live</span></td></tr>
+    <tr><td>Σ-of-siblings validation</td><td>whole-tree sum at save</td><td><span class="badge b-new">validator</span></td><td>Pre-run</td></tr>
+  </tbody>
+</table>
+
+<h2 id="risks">17. Risks &amp; edge cases</h2>
+<table>
+  <thead><tr><th>Risk</th><th>Handling</th></tr></thead>
+  <tbody>
+    <tr><td>Cross-pf cascade A→B→A looping in a bar</td><td><code>idem</code> key per <code>(source,verb,bar)</code> + a per-bar hop cap; <code>squared</code> guard makes repeated SqOff a no-op</td></tr>
+    <tr><td>Cross-currency user/tag aggregation</td><td>convert each leg P&amp;L to <code>reporting_ccy</code> via <code>FxRateResolver</code> before summing (no-op single-ccy; ties to TBD-3)</td></tr>
+    <tr><td>Same instrument across portfolios</td><td>scope P&amp;L by <code>strategy_id</code> (§12.2); fill pin keyed per-leg (§12.1); NETTING already keys positions by <code>(instrument, strategy_id)</code></td></tr>
+    <tr><td>Same-bar precedence (User must beat Tag/Portfolio)</td><td>top-down walk + <code>squared</code> set; legs read user_bus/tag_bus/pf_bus and the highest fire wins</td></tr>
+    <tr><td>Engine scale (many instruments/legs)</td><td>the existing windowed streaming bounds memory; monitor only re-values open-position instruments</td></tr>
+    <tr><td>Manual portfolio never started</td><td>stays flat all run (no entries) — correct; counts as zero P&amp;L in its scopes</td></tr>
+    <tr><td>Regression risk</td><td>the Phase-0 parity gate (§13) is mandatory and blocks merge on any byte difference</td></tr>
+  </tbody>
+</table>
+
+<p class="foot">
+  This design reuses the live <code>PortfolioMonitorStrategy</code> + shared-bus + <code>ConservativeFillModel</code> pattern (see the "How the live portfolio monitor works" section of the compliance report) and the unified/BacktestNode engine. The only genuinely new code is the <code>SessionConfig</code>/tree model, the tag/user scopes, the <code>tag_bus</code>/<code>user_bus</code>, the same-bar cross-pf drain, and the two §12 shared-resource fixes — everything else is a scoping of machinery that already runs live today. Next: Phase 0 (parity harness + §12 fixes) lands the safety net before any multi-portfolio limit is switched on.
+</p>
+
+</div>
+</body>
+</html>

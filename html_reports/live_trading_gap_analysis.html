@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>m-cube — Live Trading Gap Analysis &amp; Roadmap</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2330; --border:#2b3340;
+    --text:#e6edf3; --muted:#9aa7b4; --accent:#4c8dff; --accent2:#7c5cff;
+    --good:#3fb950; --warn:#d29922; --bad:#f85149; --chip:#21262d;
+    --code:#0b0f14;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; font-size:15px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  header.hero{
+    background:linear-gradient(135deg,#161b22 0%,#1b2333 60%,#241a3a 100%);
+    border:1px solid var(--border); border-radius:16px; padding:34px 36px; margin-bottom:28px;
+  }
+  header.hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.4px}
+  header.hero .sub{color:var(--muted);font-size:16px}
+  .pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:var(--chip);border:1px solid var(--border);border-radius:999px;
+    padding:5px 13px;font-size:12.5px;color:var(--muted)}
+  .pill b{color:var(--text)}
+  h2{font-size:22px;margin:38px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
+     letter-spacing:-.3px}
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+  h3{font-size:17px;margin:24px 0 8px;color:#cdd9e5}
+  p{margin:10px 0}
+  .muted{color:var(--muted)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;margin:14px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:6px;
+    vertical-align:middle;letter-spacing:.3px}
+  .t-done{background:rgba(63,185,80,.15);color:var(--good);border:1px solid rgba(63,185,80,.35)}
+  .t-partial{background:rgba(210,153,34,.15);color:var(--warn);border:1px solid rgba(210,153,34,.35)}
+  .t-missing{background:rgba(248,81,73,.15);color:var(--bad);border:1px solid rgba(248,81,73,.35)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  td code,p code,li code{background:var(--code);border:1px solid var(--border);border-radius:5px;
+    padding:1px 6px;font-family:"SF Mono",Consolas,Menlo,monospace;font-size:12.5px;color:#a9c7ff}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;padding:16px 18px;
+    overflow:auto;font-family:"SF Mono",Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55}
+  pre .c{color:#6b7785}      /* comment */
+  pre .k{color:#ff7b72}      /* keyword */
+  pre .s{color:#7ee787}      /* string */
+  pre .f{color:#d2a8ff}      /* func/class */
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  .callout{border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 10px 10px 0;
+    padding:14px 18px;margin:16px 0}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout.bad{border-left-color:var(--bad)}
+  .callout.good{border-left-color:var(--good)}
+  .callout .h{font-weight:700;margin-bottom:4px}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0}
+  .flow .box{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;
+    font-size:13px;text-align:center;min-width:120px}
+  .flow .arr{color:var(--accent);font-size:20px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:8px 0 0}
+  .road{position:relative;margin:18px 0;padding-left:28px}
+  .road:before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--border)}
+  .phase{position:relative;margin:0 0 18px}
+  .phase:before{content:"";position:absolute;left:-24px;top:4px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:3px solid var(--bg)}
+  .phase.s2:before{background:var(--accent2)}
+  .phase.s3:before{background:var(--warn)}
+  .phase.s4:before{background:var(--bad)}
+  .phase .ttl{font-weight:700;font-size:15.5px}
+  .phase .meta{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .kpill{font-size:11px;background:var(--chip);border:1px solid var(--border);border-radius:6px;
+    padding:2px 8px;color:var(--muted);margin-left:6px}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .toc{columns:2;column-gap:28px;font-size:13.5px}
+  @media(max-width:760px){.toc{columns:1}}
+  .toc a{display:block;padding:3px 0;color:#cdd9e5}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Live Trading — Gap Analysis &amp; Implementation Roadmap</h1>
+  <div class="sub">Taking <b>m-cube</b> from a backtest-only research platform to backtest <i>+</i> live/paper trading, managed from the Adapter Admin panel.</div>
+  <div class="pills">
+    <span class="pill">Stack: <b>NautilusTrader 1.224.0</b> · Flask · vanilla-JS SPA</span>
+    <span class="pill">Backtest: <b>working</b></span>
+    <span class="pill">Live execution layer (L4): <b>not built</b></span>
+    <span class="pill">Prepared: 2026-06-01</span>
+  </div>
+</header>
+
+<div class="card">
+  <b>Contents</b>
+  <nav class="toc">
+    <a href="#tldr">0 · Bottom line up front</a>
+    <a href="#today">1 · What works today</a>
+    <a href="#promise">2 · The Nautilus promise: what transfers free</a>
+    <a href="#arch">3 · Backtest engine vs. live TradingNode</a>
+    <a href="#coupling">4 · The one real refactor: order submission</a>
+    <a href="#gaps">5 · Component gap table</a>
+    <a href="#admin">6 · Adapter Admin: ready vs. missing</a>
+    <a href="#fields">7 · UI fields that "wake up" in live</a>
+    <a href="#skeleton">8 · Verified TradingNode skeleton</a>
+    <a href="#ops">9 · Operational concerns (the hard part)</a>
+    <a href="#roadmap">10 · Phased roadmap</a>
+    <a href="#risks">11 · Risks &amp; open questions</a>
+  </nav>
+</div>
+
+<!-- ===================== TL;DR ===================== -->
+<h2 id="tldr"><span class="n">0</span>Bottom line up front</h2>
+<div class="callout good">
+  <div class="h">Good news — your most valuable code already runs in live, unchanged.</div>
+  NautilusTrader is designed so the <b>same Strategy class</b> runs in both backtest and live. That means your
+  entry strategies (<code>strategies/</code>, L1) and your entire exit engine — SL/TP/trailing/square-off/RBO in
+  <code>core/managed_strategy.py</code> (L2) — port to live <b>without rewriting the trading logic</b>.
+</div>
+<div class="callout bad">
+  <div class="h">The work — a new execution subsystem (L4), not a tweak.</div>
+  Backtesting runs many short-lived <code>BacktestEngine</code> processes via a <code>ProcessPoolExecutor</code>.
+  Live trading is a <b>single, long-lived async process</b> (<code>TradingNode</code>) holding open websocket +
+  broker connections. None of <code>core/backtest_runner.py</code>'s per-slot / grouping / Path-B orchestration
+  applies to live. This is a new module, not an edit to an existing one.
+</div>
+<div class="grid3">
+  <div class="card"><div class="tag t-done">REUSABLE</div><p>Signals, exit state machine, RBO, portfolio SL/TP logic, models, venue/instrument config, the Admin panel's credential storage &amp; masking.</p></div>
+  <div class="card"><div class="tag t-partial">REFACTOR</div><p>One coupling point: <code>ManagedExitStrategy._submit_order()</code> calls Nautilus order APIs directly — fine, but the surrounding orchestration must change.</p></div>
+  <div class="card"><div class="tag t-missing">BUILD NEW</div><p>The L4 live runner (<code>TradingNode</code> launcher), real-time process lifecycle, reconciliation/persistence, and live monitoring UI + endpoints.</p></div>
+</div>
+<div class="callout">
+  <div class="h">Recommended first milestone: <b>SANDBOX (paper) trading</b>.</div>
+  Nautilus ships a <code>SANDBOX</code> execution client that takes <b>real live market data</b> but fills orders on
+  its <b>own simulated matching engine</b> — the same fill model your backtests already use. This de-risks the entire
+  effort: you prove the live data feed, the node lifecycle, and the strategy wiring <i>before</i> a single real order
+  or real API secret touches an exchange.
+</div>
+
+<!-- ===================== TODAY ===================== -->
+<h2 id="today"><span class="n">1</span>What works today (and what it tells us)</h2>
+<p>The platform is a Flask backend + vanilla-JS SPA over NautilusTrader. The backtest path is mature and layered:</p>
+<table>
+  <tr><th>Layer</th><th>Module</th><th>Responsibility</th><th>Live-portable?</th></tr>
+  <tr><td><b>L1</b> Signals</td><td><code>strategies/*.py</code></td><td>Pure entry logic (EMA cross, RSI, Bollinger, 4-MA, Range Breakout)</td><td><span class="tag t-done">YES</span></td></tr>
+  <tr><td><b>L2</b> Exit engine</td><td><code>core/managed_strategy.py</code></td><td>SL / TP / trailing / target-lock / square-off / RBO state machine</td><td><span class="tag t-done">YES</span></td></tr>
+  <tr><td><b>L3</b> Orchestration</td><td><code>core/backtest_runner/</code></td><td>Multi-slot portfolios, capital split, Path A/B, grouping, portfolio SL/TP</td><td><span class="tag t-missing">NO — backtest-specific</span></td></tr>
+  <tr><td><b>L0</b> Data</td><td><code>core/csv_loader</code>, <code>nautilus_loader</code></td><td>CSV → ParquetDataCatalog ingest</td><td><span class="tag t-partial">Partial — live uses streams, not catalog</span></td></tr>
+  <tr><td><b>L4</b> Execution</td><td><i>does not exist</i></td><td>Real-time order routing to a broker/exchange</td><td><span class="tag t-missing">TO BUILD</span></td></tr>
+</table>
+<p>Your own <code>CLAUDE.md</code> already names this honestly: <i>"L4 = Execution layer — does not exist yet (intentionally; live-trading-only fields are marked <code>pf-live-only</code> in the UI)."</i> So the architecture was designed with this seam in mind — we are filling a planned gap, not reversing a decision.</p>
+
+<!-- ===================== PROMISE ===================== -->
+<h2 id="promise"><span class="n">2</span>The Nautilus promise: what transfers for free</h2>
+<p>Nautilus's headline guarantee is <b>backtest/live parity</b>: a <code>Strategy</code> subclass that submits orders via
+<code>self.order_factory.market(...)</code> / <code>self.submit_order(...)</code> behaves identically whether an engine is
+feeding it historical bars or a live client is feeding it real ticks. Your exit engine already uses exactly these
+native APIs:</p>
+<pre><span class="c"># core/managed_strategy.py — _submit_order() (already live-compatible)</span>
+order = self.order_factory.<span class="f">market</span>(
+    instrument_id=self.config.instrument_id,
+    order_side=side,
+    quantity=self.instrument.<span class="f">make_qty</span>(self.config.trade_size),
+    time_in_force=TimeInForce.GTC,
+)
+self.<span class="f">submit_order</span>(order)   <span class="c"># identical call path in backtest AND live</span></pre>
+<div class="callout good">
+  <div class="h">What this means concretely</div>
+  Your SL/TP/trailing logic, the RBO range-breakout machine, target-lock, and per-leg/slot/portfolio square-off
+  precedence all evaluate on <code>on_bar</code> the same way live. You do <b>not</b> reimplement trading logic for live —
+  you give it a live data feed and a live execution client, and host it inside a <code>TradingNode</code> instead of a
+  <code>BacktestEngine</code>.
+</div>
+<p class="muted">Caveat worth stating to stakeholders: parity is on <i>logic</i>, not <i>outcomes</i>. Backtest fills are deterministic from OHLCV; live fills bring real slippage, partial fills, rejections, latency and queue position. The code is the same; the market is not.</p>
+
+<!-- ===================== ARCH ===================== -->
+<h2 id="arch"><span class="n">3</span>Backtest engine vs. live TradingNode</h2>
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">Today — Backtest</h3>
+    <ul>
+      <li><b>Many short processes.</b> One <code>BacktestEngine</code> per slot in a <code>ProcessPoolExecutor</code>.</li>
+      <li><b>Synchronous.</b> Bars replayed start→end, then the process exits.</li>
+      <li><b>Test clock.</b> Time is driven by the data.</li>
+      <li><b>Data = catalog.</b> Parquet bars loaded up front.</li>
+      <li><b>No credentials.</b> No network, no auth, no fills from a real venue.</li>
+      <li><b>State is disposable.</b> Results extracted, process torn down.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Target — Live / Sandbox</h3>
+    <ul>
+      <li><b>One long-lived process.</b> A single <code>TradingNode</code> running an asyncio event loop.</li>
+      <li><b>Asynchronous.</b> Reacts to streamed ticks/bars + broker events indefinitely.</li>
+      <li><b>Real-time clock.</b> Time is wall-clock.</li>
+      <li><b>Data = live client.</b> Websocket subscriptions (e.g. Binance, IB).</li>
+      <li><b>Credentials required.</b> API key/secret or IB Gateway connection per venue.</li>
+      <li><b>State must persist &amp; reconcile.</b> Cache (optionally Redis), order/position reconciliation on startup.</li>
+    </ul>
+  </div>
+</div>
+<div class="flow">
+  <div class="box"><b>Live data client</b><br><span class="muted">ticks / bars</span></div>
+  <div class="arr">→</div>
+  <div class="box"><b>TradingNode</b><br><span class="muted">MessageBus + Cache</span></div>
+  <div class="arr">→</div>
+  <div class="box"><b>Your Strategy</b><br><span class="muted">unchanged L1+L2</span></div>
+  <div class="arr">→</div>
+  <div class="box"><b>Exec client</b><br><span class="muted">SANDBOX → live broker</span></div>
+</div>
+
+<!-- ===================== COUPLING ===================== -->
+<h2 id="coupling"><span class="n">4</span>The one real refactor: order submission</h2>
+<p>The exit state machine is logically pure, but it is physically coupled to Nautilus's in-strategy order APIs
+(<code>self.order_factory</code>, <code>self.submit_order</code>). For a live node that coupling is actually <b>fine</b> —
+those same APIs exist on a live strategy. So strictly, <b>no rewrite is required</b> to run the strategy live.</p>
+<p>The decision point is whether you also want a thin <b>submitter abstraction</b> so the same state machine can be
+unit-tested and driven outside an engine. If yes, inject an interface:</p>
+<pre><span class="c"># Optional hardening — not required for parity, but improves testability</span>
+<span class="k">class</span> <span class="f">OrderSubmitter</span>(Protocol):
+    <span class="k">def</span> <span class="f">submit</span>(self, side, qty, *, tags): ...
+
+<span class="c"># ManagedExitStrategy keeps using self.submit_order in live;</span>
+<span class="c"># the abstraction only matters if you want to drive the FSM in isolation.</span></pre>
+<div class="callout warn">
+  <div class="h">Scope guard</div>
+  Do <b>not</b> treat "decouple the strategy" as a prerequisite for live. It is a nice-to-have. The critical-path
+  work is the <b>L4 node launcher + lifecycle + reconciliation</b>, not refactoring proven exit logic.
+</div>
+
+<!-- ===================== GAPS ===================== -->
+<h2 id="gaps"><span class="n">5</span>Component gap table</h2>
+<table>
+  <tr><th>Component</th><th>Status</th><th>Notes / where it lives</th></tr>
+  <tr><td>Strategy signals (L1)</td><td><span class="tag t-done">READY</span></td><td>Run unchanged on live node</td></tr>
+  <tr><td>Exit engine / RBO (L2)</td><td><span class="tag t-done">READY</span></td><td>Uses native order APIs — live-compatible</td></tr>
+  <tr><td>Models / schema</td><td><span class="tag t-done">READY</span></td><td><code>core/models/</code> — exit configs are framework-neutral</td></tr>
+  <tr><td>Adapter config storage</td><td><span class="tag t-done">READY</span></td><td><code>adapter_admin/adapters_config/*.json</code> already hold <code>api_key</code>, <code>exec_config</code>, <code>testnet</code></td></tr>
+  <tr><td>Credential masking / reveal</td><td><span class="tag t-done">READY</span></td><td><code>adapter_registry.py</code> masks <code>****last4</code></td></tr>
+  <tr><td>Connectivity test</td><td><span class="tag t-partial">PARTIAL</span></td><td><code>/api/adapters/&lt;id&gt;/test</code> works for Binance &amp; Bybit only; others unsupported</td></tr>
+  <tr><td>L4 live runner (TradingNode launcher)</td><td><span class="tag t-missing">MISSING</span></td><td>New <code>core/live_trader.py</code></td></tr>
+  <tr><td>Live data streaming</td><td><span class="tag t-missing">MISSING</span></td><td>No websocket subscriptions</td></tr>
+  <tr><td>Order routing / fills / positions (live)</td><td><span class="tag t-missing">MISSING</span></td><td>No exec client wired</td></tr>
+  <tr><td>Account / balance / margin polling</td><td><span class="tag t-missing">MISSING</span></td><td>No live account sync</td></tr>
+  <tr><td>State persistence + reconciliation</td><td><span class="tag t-missing">MISSING</span></td><td>Redis cache + <code>LiveExecEngineConfig</code></td></tr>
+  <tr><td>Live control endpoints + monitoring UI</td><td><span class="tag t-missing">MISSING</span></td><td>Start/stop/status; live blotter page</td></tr>
+  <tr><td>Risk controls (kill-switch, limits)</td><td><span class="tag t-missing">MISSING</span></td><td><code>LiveRiskEngineConfig</code></td></tr>
+</table>
+
+<!-- ===================== ADMIN ===================== -->
+<h2 id="admin"><span class="n">6</span>Adapter Admin: ready vs. missing</h2>
+<p>The Admin panel (<code>adapter_admin/admin_server.py</code>, port 5001) is already <b>most of the way to a live control plane</b>.
+It discovers Nautilus adapters at runtime (<code>adapter_discovery.py</code> introspects <code>LiveDataClientConfig</code> /
+<code>LiveExecClientConfig</code> fields via <code>msgspec</code>), stores per-venue configs, masks secrets, and even runs a
+live credential test. The config files <b>already carry the live fields</b> — they are simply never read by the backtest path:</p>
+<pre><span class="c">// adapter_admin/adapters_config/binance_ms.json (abridged)</span>
+{
+  <span class="s">"venue"</span>: <span class="s">"BINANCE_MS"</span>, <span class="s">"exchange_type"</span>: <span class="s">"Binance"</span>,
+  <span class="s">"testnet"</span>: <span class="k">false</span>,
+  <span class="s">"data_config"</span>: { <span class="s">"api_key"</span>:<span class="s">""</span>, <span class="s">"api_secret"</span>:<span class="s">""</span>, <span class="s">"environment"</span>:<span class="s">"LIVE"</span>, <span class="s">"account_type"</span>:<span class="s">"SPOT"</span>, ... },
+  <span class="s">"exec_config"</span>: { <span class="s">"api_key"</span>:<span class="s">""</span>, <span class="s">"api_secret"</span>:<span class="s">""</span>, ... }   <span class="c">// ← never read in backtest</span>
+}</pre>
+<div class="grid2">
+  <div class="card"><div class="tag t-done">ALREADY THERE</div>
+    <ul><li>Venue config CRUD + per-venue JSON</li><li><code>data_config</code> / <code>exec_config</code> blocks shaped to Nautilus client configs</li><li><code>testnet</code> / <code>environment</code> toggles</li><li>Secret masking &amp; reveal</li><li>Binance/Bybit credential test</li><li>Custom-adapter upload + validation</li></ul>
+  </div>
+  <div class="card"><div class="tag t-missing">STILL NEEDED</div>
+    <ul><li>"Go live" action that <i>consumes</i> these configs to build a node</li><li>Run/stop/status lifecycle per venue or per portfolio</li><li>Live blotter: open orders, positions, fills, balance, PnL</li><li>Reconciliation + persistence wiring</li><li>Test coverage for IB &amp; other adapters</li><li>Secrets at rest hardening (see §11)</li></ul>
+  </div>
+</div>
+
+<!-- ===================== FIELDS ===================== -->
+<h2 id="fields"><span class="n">7</span>UI fields that "wake up" in live</h2>
+<p>The portfolio editor (<code>static/js/portfolio.js</code>) already marks fields that are stored but inert in backtest.
+<code>pf-live-only</code> (gray) fields are precisely the controls that become meaningful once L4 exists. They are
+documented in <code>LOGICS_BACKEND_STATUS.md</code>. Highlights:</p>
+<table>
+  <tr><th>Field / tab</th><th>Meaning in live</th><th>Why inert in backtest</th></tr>
+  <tr><td><code>strategy_tag</code></td><td>Broker-side order grouping / risk tier</td><td>Backtest never routes to a broker</td></tr>
+  <tr><td><code>on_leg_fail</code></td><td>What to do when a broker rejects a leg (keep / cancel placed legs)</td><td>Backtest orders never get rejected</td></tr>
+  <tr><td>Monitoring tab: <code>leg/combined *_monitoring</code></td><td>Real-time vs minute-close vs interval evaluation cadence</td><td>Backtest evaluates every bar deterministically</td></tr>
+  <tr><td><code>exit_order_type</code> = LIMIT / SL_LIMIT</td><td>Real limit/stop-limit exit orders</td><td>Only MARKET is wired today</td></tr>
+  <tr><td><code>product</code> = MIS / NRML, <code>mis_squareoff_*</code></td><td>Intraday auto-square-off vs overnight at the broker</td><td>Backtest treats MIS as a default squareoff only</td></tr>
+  <tr><td><code>on_portfolio_complete</code> / cross-portfolio targets</td><td>Square-off / start another live portfolio</td><td>Only "None" wired; needs a live orchestrator</td></tr>
+</table>
+<div class="callout">
+  Many of these are <b>options-trading semantics</b> (strike rounding, <code>based_on</code>, combined-premium mode) inherited
+  from the BTSoftware design target — for FX/crypto live they remain no-ops. Don't scope them into the first live release;
+  the "wake-up" set that actually matters for FX/crypto is: order rejection handling, monitoring cadence, limit exit
+  orders, and MIS/NRML square-off.
+</div>
+
+<!-- ===================== SKELETON ===================== -->
+<h2 id="skeleton"><span class="n">8</span>Verified TradingNode skeleton</h2>
+<p class="muted">Class &amp; method names below were confirmed against the installed <code>nautilus_trader==1.224.0</code> package
+(<code>nautilus_trader/live/node.py</code>, <code>live/config.py</code>, <code>adapters/sandbox/</code>, <code>adapters/binance/</code>).
+Treat this as the shape of the new <code>core/live_trader.py</code>, not copy-paste-final.</p>
+<pre><span class="k">from</span> nautilus_trader.live.node <span class="k">import</span> TradingNode
+<span class="k">from</span> nautilus_trader.live.config <span class="k">import</span> TradingNodeConfig, LiveExecEngineConfig
+<span class="k">from</span> nautilus_trader.config <span class="k">import</span> InstrumentProviderConfig, LoggingConfig, CacheConfig
+<span class="k">from</span> nautilus_trader.adapters.binance.factories <span class="k">import</span> (
+    BinanceLiveDataClientFactory, BinanceLiveExecClientFactory)
+<span class="k">from</span> nautilus_trader.adapters.binance.config <span class="k">import</span> BinanceDataClientConfig, BinanceExecClientConfig
+<span class="c"># Paper trading: real data in, simulated fills</span>
+<span class="k">from</span> nautilus_trader.adapters.sandbox.config <span class="k">import</span> SandboxExecutionClientConfig
+<span class="k">from</span> nautilus_trader.adapters.sandbox.factory <span class="k">import</span> SandboxLiveExecClientFactory
+
+config = <span class="f">TradingNodeConfig</span>(
+    trader_id=<span class="s">"MCUBE-001"</span>,
+    logging=<span class="f">LoggingConfig</span>(log_level=<span class="s">"INFO"</span>),
+    <span class="c"># Redis-backed cache for state persistence (optional but recommended live):</span>
+    cache=<span class="f">CacheConfig</span>(<span class="c">#[ database=DatabaseConfig(...) ]</span>),
+    <span class="c"># Reconciliation: on startup, rebuild state from the venue. Node refuses</span>
+    <span class="c"># to start if reconciliation fails — this is a safety feature, keep it on.</span>
+    exec_engine=<span class="f">LiveExecEngineConfig</span>(reconciliation=<span class="k">True</span>),
+    data_clients={
+        <span class="s">"BINANCE"</span>: <span class="f">BinanceDataClientConfig</span>(
+            api_key=..., api_secret=..., testnet=<span class="k">True</span>,
+            instrument_provider=<span class="f">InstrumentProviderConfig</span>(load_all=<span class="k">True</span>),
+        ),
+    },
+    exec_clients={
+        <span class="c"># PHASE 1 (paper): SANDBOX fills on its own matching engine</span>
+        <span class="s">"BINANCE"</span>: <span class="f">SandboxExecutionClientConfig</span>(
+            venue=<span class="s">"BINANCE"</span>, starting_balances=[<span class="s">"10_000 USDT"</span>],
+            instrument_provider=<span class="f">InstrumentProviderConfig</span>(load_all=<span class="k">True</span>),
+        ),
+        <span class="c"># PHASE 3 (real): swap to BinanceExecClientConfig(api_key=..., ...)</span>
+    },
+)
+
+node = <span class="f">TradingNode</span>(config=config)
+node.<span class="f">add_data_client_factory</span>(<span class="s">"BINANCE"</span>, BinanceLiveDataClientFactory)
+node.<span class="f">add_exec_client_factory</span>(<span class="s">"BINANCE"</span>, SandboxLiveExecClientFactory)   <span class="c"># or Binance factory for real</span>
+node.trader.<span class="f">add_strategy</span>(my_managed_strategy)   <span class="c"># ← your existing L2 strategy, unchanged</span>
+node.<span class="f">build</span>()
+<span class="k">try</span>:
+    node.<span class="f">run</span>()          <span class="c"># blocks: runs the asyncio event loop indefinitely</span>
+<span class="k">finally</span>:
+    node.<span class="f">dispose</span>()      <span class="c"># graceful shutdown / connection teardown</span></pre>
+<div class="callout good">
+  <div class="h">The single most important line</div>
+  <code>node.trader.add_strategy(my_managed_strategy)</code> — the strategy object is the <b>same class</b> you backtest with.
+  Phase 1 → Phase 3 is one swap: <code>SandboxLiveExecClientFactory</code> → <code>BinanceLiveExecClientFactory</code> and the
+  matching exec-client config. Everything above the exec client is identical.
+</div>
+
+<!-- ===================== OPS ===================== -->
+<h2 id="ops"><span class="n">9</span>Operational concerns — the part that's actually hard</h2>
+<p>The strategy port is easy; running a live node <i>safely</i> is where the real engineering is. Budget for these:</p>
+<div class="grid2">
+  <div class="card"><h3 style="margin-top:0">Reconciliation</h3><p>On startup the node queries the venue for open orders/positions and rebuilds internal state. If it can't reconcile, it <b>won't start</b> — by design. You must handle cold starts, externally-placed orders (<code>EXTERNAL</code> / external order claims), and mid-session restarts.</p></div>
+  <div class="card"><h3 style="margin-top:0">State persistence</h3><p>Backtest state is disposable; live state is not. A crash mid-position must be recoverable. Plan a <b>Redis-backed cache</b> (<code>CacheConfig</code> + <code>DatabaseConfig</code>) and a <code>MessageBusConfig</code> so positions/orders survive a restart.</p></div>
+  <div class="card"><h3 style="margin-top:0">Async lifecycle &amp; the Flask seam</h3><p><code>node.run()</code> blocks on an event loop. It cannot live inside a Flask request thread. The node runs as a <b>separate supervised process/service</b>; Flask sends start/stop/status commands to it (subprocess, queue, or a small control socket).</p></div>
+  <div class="card"><h3 style="margin-top:0">Disconnects &amp; risk</h3><p>Websocket drops, partial fills, rate limits, rejections are normal live. Configure <code>LiveExecEngineConfig</code> retries and a <code>LiveRiskEngineConfig</code> (max order rate, position limits) plus an explicit <b>kill-switch</b>.</p></div>
+  <div class="card"><h3 style="margin-top:0">Real-time clock</h3><p>Square-off times, MIS auto-close, entry windows and RBO day boundaries now fire against wall-clock in a specific timezone. Verify TZ handling end-to-end — a backtest TZ bug is a wrong number; a live TZ bug is a missed square-off.</p></div>
+  <div class="card"><h3 style="margin-top:0">Secrets at rest</h3><p>Configs currently store <code>api_key</code>/<code>api_secret</code> in <b>plaintext JSON</b>, masked only in transit. Before real money: move to env vars / a secrets store, add access control, and an audit trail. The Admin panel has no auth (<code>X-User-Id</code> is spoofable).</p></div>
+</div>
+
+<!-- ===================== ROADMAP ===================== -->
+<h2 id="roadmap"><span class="n">10</span>Phased roadmap</h2>
+<div class="legend">
+  <span>● <b>Phase 1</b> Paper/Sandbox</span>
+  <span>● <b>Phase 2</b> Control plane &amp; UI</span>
+  <span>● <b>Phase 3</b> Real money (one venue)</span>
+  <span>● <b>Phase 4</b> Harden &amp; scale</span>
+</div>
+<div class="road">
+  <div class="phase s1">
+    <div class="ttl">Phase 1 · Sandbox / paper trading on live data <span class="kpill">prove the loop</span></div>
+    <div class="meta">Lowest risk. No real orders, no real secrets needed beyond read-only data keys.</div>
+    <ul>
+      <li>New <code>core/live_trader.py</code> that builds a <code>TradingNode</code> with a <b>live data client + SANDBOX exec client</b>.</li>
+      <li>Feed <b>one</b> existing strategy slot live (e.g. Binance testnet data → EMA-cross + SL/TP).</li>
+      <li>Confirm bars stream, signals fire, sandbox fills occur, square-off triggers on wall-clock.</li>
+      <li>Run the node as a standalone script first — no Flask integration yet.</li>
+    </ul>
+  </div>
+  <div class="phase s2">
+    <div class="ttl">Phase 2 · Control plane &amp; live monitoring <span class="kpill">make it operable</span></div>
+    <div class="meta">Wrap the node in start/stop/status; surface state in the Admin panel.</div>
+    <ul>
+      <li>Run the node as a supervised <b>subprocess/service</b>; add <code>POST /api/trading/start</code>, <code>/stop</code>, <code>GET /api/trading/status</code>.</li>
+      <li>Live blotter page: open orders, positions, fills, balance, running PnL (poll the node's cache).</li>
+      <li>Map a saved <b>portfolio</b> → a set of live strategies on the node (reuse <code>core/models</code>).</li>
+      <li>Wire the genuinely-needed <code>pf-live-only</code> fields: <code>on_leg_fail</code>, monitoring cadence, MIS/NRML square-off.</li>
+    </ul>
+  </div>
+  <div class="phase s3">
+    <div class="ttl">Phase 3 · Real money, single venue <span class="kpill">go live, small</span></div>
+    <div class="meta">Swap SANDBOX → real exec client for ONE venue. Tiny size. Hands on the kill-switch.</div>
+    <ul>
+      <li>Swap to <code>BinanceLiveExecClientFactory</code> (or IB) + real <code>exec_config</code> credentials.</li>
+      <li>Turn on <b>reconciliation</b>, Redis persistence, and <code>LiveRiskEngineConfig</code> limits.</li>
+      <li>Implement the <b>kill-switch</b> and disconnect/reconnect handling; alerting on rejects/errors.</li>
+      <li>Harden secrets at rest + Admin-panel auth before this phase ships.</li>
+    </ul>
+  </div>
+  <div class="phase s4">
+    <div class="ttl">Phase 4 · Harden &amp; scale <span class="kpill">multi-venue, robust</span></div>
+    <div class="meta">Generalize beyond one venue; production reliability.</div>
+    <ul>
+      <li>Add remaining adapters (IB FX/commodities, Bybit, custom) + connectivity tests for each.</li>
+      <li>Multi-venue / multi-portfolio nodes; per-user isolation.</li>
+      <li>Crash-recovery drills, reconciliation edge cases, partial-fill correctness, latency/slippage reporting.</li>
+      <li>Cross-portfolio actions &amp; remaining monitoring semantics if business needs them.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===================== RISKS ===================== -->
+<h2 id="risks"><span class="n">11</span>Risks &amp; open questions to resolve before building</h2>
+<table>
+  <tr><th>Topic</th><th>Question to answer</th><th>Why it matters</th></tr>
+  <tr><td>First venue</td><td>Which broker/exchange goes live first — Binance (crypto) or Interactive Brokers (FX)?</td><td>IB requires a running Gateway + different config (<code>ibg_host/port</code>, <code>account_id</code>); Binance is API-key only. Pick the simpler one for Phase 1/3.</td></tr>
+  <tr><td>Process model</td><td>One node per user? Per portfolio? Per venue? Always-on or on-demand?</td><td>Drives the control-plane design and resource footprint.</td></tr>
+  <tr><td>Persistence</td><td>Stand up Redis, or accept in-memory cache for paper only?</td><td>No persistence = no crash recovery. Acceptable in Phase 1, not Phase 3.</td></tr>
+  <tr><td>Secrets</td><td>Where do real API secrets live, and who can read them?</td><td>Plaintext JSON + spoofable <code>X-User-Id</code> is unacceptable for real funds.</td></tr>
+  <tr><td>Order types</td><td>Is MARKET-only acceptable for live, or are LIMIT/SL_LIMIT exits required day one?</td><td>Only MARKET is wired in L2 today; limit exits are extra L2 work.</td></tr>
+  <tr><td>Docs gap</td><td>Node-launch + SANDBOX APIs are <b>not</b> in the bundled concept docs.</td><td>This skeleton was verified against package <i>source</i> — re-verify class signatures against the pinned 1.224.0 build during implementation.</td></tr>
+  <tr><td>Compliance</td><td>Regulatory/permission to run automated live orders for the target accounts?</td><td>Out of scope here, but a hard gate before Phase 3.</td></tr>
+</table>
+
+<div class="callout good">
+  <div class="h">One-paragraph summary for stakeholders</div>
+  Backtesting is done. Live trading reuses ~80% of what exists — every strategy and the entire exit engine run
+  unchanged on a NautilusTrader <code>TradingNode</code>, and the Admin panel already stores broker credentials and
+  configs. The new work is a single live-execution module plus the operational scaffolding around it: real-time
+  process lifecycle, state persistence/reconciliation, monitoring UI, and secrets hardening. The safe path is to ship
+  <b>paper trading on live data (SANDBOX) first</b>, then flip a single exec-client factory to go real on one venue with
+  tiny size and a kill-switch.
+</div>
+
+<footer>
+  m-cube · Live Trading Gap Analysis · prepared 2026-06-01 · NautilusTrader 1.224.0.<br>
+  Sources: codebase exploration of <code>adapter_admin/</code>, <code>core/backtest_runner/</code>,
+  <code>core/managed_strategy.py</code>, <code>static/js/portfolio.js</code>, <code>LOGICS_BACKEND_STATUS.md</code>;
+  live API verified against installed package <code>nautilus_trader/live/node.py</code> &amp;
+  <code>adapters/{sandbox,binance}/</code>. Code skeleton is illustrative — re-verify signatures at implementation time.
+</footer>
+
+</div>
+</body>
+</html>

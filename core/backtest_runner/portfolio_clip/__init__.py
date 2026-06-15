@@ -5,6 +5,7 @@ aggregate-Move-SL pass-1->pass-2 coordination payload."""
 from __future__ import annotations
 
 import dataclasses
+from zoneinfo import ZoneInfo
 import pandas as pd
 from core.managed_strategy import advance_trailing_target
 
@@ -64,6 +65,31 @@ def _entry_at_clip(positions_report, clip_ns: int):
         return (px, bool(was_long))
     except Exception:
         return None
+
+
+def _opened_in_window(positions_report, lo_ns: int, hi_ns: int) -> bool:
+    """True if any position in ``positions_report`` opened within ``[lo_ns, hi_ns)``.
+
+    Used by the ReExecute-at-Entry-Price replay to tell whether a leg actually
+    re-entered during a replay segment (opened a position before the next clip)
+    or stayed flat the whole time (still waiting for its entry price E). A leg
+    that opened nothing in the window is still waiting, so its pending re-entry
+    must be carried forward across the next breach instead of being dropped
+    (which would let it revert to normal signals). Defensive: never raises.
+    """
+    try:
+        if positions_report is None or positions_report.empty:
+            return False
+        open_col = _pick_col(positions_report, ["ts_opened", "ts_init"])
+        if not open_col:
+            return False
+        for idx in positions_report.index:
+            o_ns = _vwap_ts_to_ns(positions_report.at[idx, open_col])
+            if o_ns and lo_ns <= o_ns < hi_ns:
+                return True
+        return False
+    except Exception:
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -186,6 +212,48 @@ def _ts_iso_to_ns(ts_iso: str | None) -> int:
         return pd.Timestamp(ts_iso).value
     except Exception:
         return 0
+
+
+def _daily_sqoff_clips(mtm_curve, starting_capital: float, threshold: float,
+                       tz_key: str = "UTC") -> list[tuple[int, int]]:
+    """Per-DAY portfolio SqOff breach points (spec: SqOff is day-scoped — each
+    trading day is an independent cycle).
+
+    Walks the merged per-bar mark-to-market curve. The combined-loss reference
+    RESETS at each new calendar day (in ``tz_key``), so a prior day's SL hit
+    never carries over. For each day, the FIRST bar whose day-P&L ≤ ``-threshold``
+    is a SqOff point. Returns a list of ``(clip_ns, day_end_ns)`` — the caller
+    closes open legs at ``clip_ns`` and drops entries opened in
+    ``(clip_ns, day_end_ns]`` (rest of that day). Empty when nothing breaches.
+    """
+    if not mtm_curve or not threshold or threshold <= 0:
+        return []
+    try:
+        tz = ZoneInfo(tz_key)
+    except Exception:
+        tz = ZoneInfo("UTC")
+    clips: list[tuple[int, int]] = []
+    cur_day = None
+    day_start_bal = float(starting_capital)
+    clipped_today = False
+    for p in mtm_curve:
+        ts = p.get("timestamp")
+        if ts is None:
+            continue
+        ns = _ts_iso_to_ns(ts)
+        if ns <= 0:
+            continue
+        bal = float(p.get("balance", starting_capital) or starting_capital)
+        day = pd.Timestamp(ns, unit="ns", tz="UTC").tz_convert(tz).date()
+        if day != cur_day:
+            cur_day = day
+            day_start_bal = bal
+            clipped_today = False
+        if not clipped_today and (bal - day_start_bal) <= -threshold:
+            day_end = pd.Timestamp(day, tz=tz) + pd.Timedelta(days=1)
+            clips.append((ns, int(day_end.tz_convert("UTC").value)))
+            clipped_today = True
+    return clips
 
 
 def _apply_portfolio_clip(
@@ -421,10 +489,17 @@ def _build_clip_result(
         action = pf_sl.action
         sqoff_loss = pf_sl.sqoff_only_loss_legs
         sqoff_profit = pf_sl.sqoff_only_profit_legs
-    else:
-        action = "SqOff" if reason == "TARGET_TRAIL" else pf_tgt.action
-        sqoff_loss = False  # selective filters are SL-only per spec §1.9-§1.10
+    elif reason == "TARGET_TRAIL":
+        # Trailing-Target hit always full-SqOffs per spec §5 — no selective filter.
+        action = "SqOff"
+        sqoff_loss = False
         sqoff_profit = False
+    else:
+        # Normal portfolio Target hit. Selective partial-close IS supported on
+        # the Target side (sl_features.html §2.4), mirroring the SL pair.
+        action = pf_tgt.action
+        sqoff_loss = getattr(pf_tgt, "sqoff_only_loss_legs", False)
+        sqoff_profit = getattr(pf_tgt, "sqoff_only_profit_legs", False)
 
     # Prefer per-slot PnL evaluated at the clip timestamp when slot curves are
     # available; fall back to the end-of-run proxy in slot_pnl_at_clip.
@@ -483,18 +558,15 @@ def _build_clip_result(
     )
 
 
-def _build_underlying_curve(engine, bar_type) -> list[dict]:
-    """Extract the (timestamp, close) price series the engine processed.
+def _underlying_curve_from_bars(bars) -> list[dict]:
+    """Convert a list of ``Bar`` objects to the (timestamp, close) curve used by
+    the underlying-price SL/Target types (spec §2.1).
 
-    Used by the portfolio-level "Underlying Movement" / "Loss and Underlying
-    Range" SL types (spec §2.1). The underlying defaults to the slot's own
-    instrument (D5 "underlying = self"). Returns ``[]`` when bars can't be
-    read — the caller degrades to "underlying SL not enforced" with a warning.
+    Shared by both capture routes: the engine-cache read (``_build_underlying_curve``,
+    Path A per-slot) and the catalog read (grouped / Path-B runs, where the
+    engine may already be disposed at extraction time). Returns ``[]`` when no
+    usable bars are given. Output is sorted ascending by timestamp.
     """
-    try:
-        bars = engine.cache.bars(bar_type)
-    except Exception:
-        return []
     if not bars:
         return []
     out: list[dict] = []
@@ -509,6 +581,21 @@ def _build_underlying_curve(engine, bar_type) -> list[dict]:
     # cache.bars() returns most-recent-first; sort ascending by ts.
     out.sort(key=lambda p: p["timestamp"])
     return out
+
+
+def _build_underlying_curve(engine, bar_type) -> list[dict]:
+    """Extract the (timestamp, close) price series the engine processed.
+
+    Used by the portfolio-level "Underlying Movement" / "Loss and Underlying
+    Range" SL types (spec §2.1). The underlying defaults to the slot's own
+    instrument (D5 "underlying = self"). Returns ``[]`` when bars can't be
+    read — the caller degrades to "underlying SL not enforced" with a warning.
+    """
+    try:
+        bars = engine.cache.bars(bar_type)
+    except Exception:
+        return []
+    return _underlying_curve_from_bars(bars)
 
 
 def _underlying_sl_clip(
@@ -527,15 +614,20 @@ def _underlying_sl_clip(
     • "Loss and Underlying Range" → fire when combined PnL ≤ −value AND the
       underlying price is outside [underlying_below, underlying_above].
 
-    ``Delay (sec)`` shifts the clip timestamp forward by that many seconds
-    (a confirmed-after-N-seconds approximation). Returns a ``_ClipResult``;
+    ``Delay (sec)`` is a confirmation window (spec §5.3), matching the
+    Combined-Loss walk: a hit arms a PENDING clip and the condition must keep
+    holding for ``delay_sec`` or the pending clip is cancelled (oscillation
+    guard). For a Movement cross, "still holds" = the price remains on the side
+    it crossed to. ``delay_sec == 0`` fires immediately at the hit bar (the clip
+    timestamp is the trigger bar, as before). Returns a ``_ClipResult``;
     ``clip_ts is None`` means the SL never fired.
     """
     logs: list[str] = []
     if not underlying_curve:
         logs.append(
             "UNDERLYING_SL_SKIPPED | no underlying price series available "
-            "(grouped / Path-B run, or missing data) — underlying SL not enforced"
+            "(primary bar series unreadable / no bars in range) — underlying SL "
+            "not enforced"
         )
         return _ClipResult(logs=tuple(logs))
 
@@ -567,17 +659,63 @@ def _underlying_sl_clip(
     prev_close: float | None = None
     eq_idx = 0
     cur_pnl = 0.0
+    # Confirmation-delay state (spec §5.3) — an underlying hit arms a PENDING
+    # clip; it only fires once the condition has held for delay_sec, and is
+    # cancelled if the condition recovers first. pending_dir tracks the Movement
+    # cross direction so "still holds" means the price stayed on the far side.
+    pending_at_ns = 0
+    pending_clip_ts: str | None = None
+    pending_dir = 0  # +1 crossed up (holds while close>=level), -1 crossed down
+
+    def _underlying_holds(close_px: float, pnl: float) -> bool:
+        if is_movement:
+            if pending_dir > 0:
+                return close_px >= level
+            if pending_dir < 0:
+                return close_px <= level
+            return False
+        range_breached = (below > 0 and close_px <= below) or (above > 0 and close_px >= above)
+        return pnl <= -level and range_breached
+
     for ts_ns, close in u:
         while eq_idx < len(eq) and eq[eq_idx][0] <= ts_ns:
             cur_pnl = eq[eq_idx][1]
             eq_idx += 1
 
+        # Re-confirm an armed pending clip before scanning for a fresh hit.
+        if pending_clip_ts is not None:
+            if not _underlying_holds(close, cur_pnl):
+                logs.append(
+                    f"UNDERLYING_DELAY_CLEARED | type={pf_sl.sl_type!r} | "
+                    f"condition recovered before {pf_sl.delay_sec}s"
+                )
+                pending_clip_ts = None
+                pending_at_ns = 0
+                pending_dir = 0
+                # fall through — a fresh hit may re-arm on this same bar
+            elif (ts_ns - pending_at_ns) >= delay_ns:
+                logs.append(
+                    f"UNDERLYING_SL_HIT | type={pf_sl.sl_type!r} | underlying={close:.5f} "
+                    f"| pnl={cur_pnl:.2f} | clip_ts={pending_clip_ts}"
+                )
+                return _build_clip_result(
+                    clip_ts=pending_clip_ts, reason="STOPLOSS",
+                    pf_sl=pf_sl, pf_tgt=pf_tgt,
+                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                    slot_curves=slot_curves,
+                )
+            else:
+                prev_close = close
+                continue  # holding within the delay window — keep waiting
+
         hit = False
+        hit_dir = 0
         if is_movement:
-            if prev_close is not None and (
-                (prev_close <= level <= close) or (prev_close >= level >= close)
-            ):
-                hit = True
+            if prev_close is not None:
+                if prev_close <= level <= close:
+                    hit, hit_dir = True, 1
+                elif prev_close >= level >= close:
+                    hit, hit_dir = True, -1
         else:  # Loss and Underlying Range
             range_breached = (below > 0 and close <= below) or (above > 0 and close >= above)
             if cur_pnl <= -level and range_breached:
@@ -585,17 +723,23 @@ def _underlying_sl_clip(
         prev_close = close
 
         if hit:
-            clip_ns = ts_ns + delay_ns
-            clip_iso = pd.Timestamp(clip_ns, unit="ns", tz="UTC").isoformat()
+            clip_iso = pd.Timestamp(ts_ns, unit="ns", tz="UTC").isoformat()
+            if delay_ns <= 0:
+                logs.append(
+                    f"UNDERLYING_SL_HIT | type={pf_sl.sl_type!r} | underlying={close:.5f} "
+                    f"| pnl={cur_pnl:.2f} | clip_ts={clip_iso}"
+                )
+                return _build_clip_result(
+                    clip_ts=clip_iso, reason="STOPLOSS",
+                    pf_sl=pf_sl, pf_tgt=pf_tgt,
+                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                    slot_curves=slot_curves,
+                )
+            pending_at_ns = ts_ns
+            pending_clip_ts = clip_iso
+            pending_dir = hit_dir
             logs.append(
-                f"UNDERLYING_SL_HIT | type={pf_sl.sl_type!r} | underlying={close:.5f} "
-                f"| pnl={cur_pnl:.2f} | clip_ts={clip_iso}"
-            )
-            return _build_clip_result(
-                clip_ts=clip_iso, reason="STOPLOSS",
-                pf_sl=pf_sl, pf_tgt=pf_tgt,
-                slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
-                slot_curves=slot_curves,
+                f"UNDERLYING_DELAY_PENDING | type={pf_sl.sl_type!r} | delay={pf_sl.delay_sec}s"
             )
 
     return _ClipResult(logs=tuple(logs))
@@ -666,14 +810,17 @@ def _underlying_tgt_clip(
 
     Mirror of the ``is_movement`` branch of ``_underlying_sl_clip`` on the
     profit side: fires the first time the primary instrument's price crosses
-    ``pf_tgt.value``. ``Delay (sec)`` shifts the clip timestamp forward.
+    ``pf_tgt.value``. ``Delay (sec)`` is a confirmation window (spec §5.3): the
+    price must stay on the side it crossed to for ``delay_sec`` or the pending
+    clip is cancelled. ``delay_sec == 0`` fires at the crossing bar (as before).
     Returns a ``_ClipResult``; ``clip_ts is None`` means the Target never fired.
     """
     logs: list[str] = []
     if not underlying_curve:
         logs.append(
             "UNDERLYING_TGT_SKIPPED | no underlying price series available "
-            "(grouped / Path-B run, or missing data) — underlying Target not enforced"
+            "(primary bar series unreadable / no bars in range) — underlying "
+            "Target not enforced"
         )
         return _ClipResult(logs=tuple(logs))
 
@@ -689,25 +836,63 @@ def _underlying_tgt_clip(
     level = pf_tgt.value
     delay_ns = int(pf_tgt.delay_sec) * 1_000_000_000
     prev_close: float | None = None
+    # Confirmation-delay state (spec §5.3): a cross arms a PENDING clip; the
+    # price must stay on the crossed-to side for delay_sec or it is cancelled.
+    pending_at_ns = 0
+    pending_clip_ts: str | None = None
+    pending_dir = 0  # +1 crossed up (holds while close>=level), -1 crossed down
     for ts_ns, close in u:
-        hit = (
-            prev_close is not None
-            and ((prev_close <= level <= close) or (prev_close >= level >= close))
-        )
+        # Re-confirm an armed pending clip before scanning for a fresh cross.
+        if pending_clip_ts is not None:
+            holds = (close >= level) if pending_dir > 0 else (close <= level)
+            if not holds:
+                logs.append(
+                    f"UNDERLYING_TGT_DELAY_CLEARED | price recovered before {pf_tgt.delay_sec}s"
+                )
+                pending_clip_ts = None
+                pending_at_ns = 0
+                pending_dir = 0
+            elif (ts_ns - pending_at_ns) >= delay_ns:
+                logs.append(
+                    f"UNDERLYING_TGT_HIT | underlying={close:.5f} | level={level:.5f} "
+                    f"| clip_ts={pending_clip_ts}"
+                )
+                return _build_clip_result(
+                    clip_ts=pending_clip_ts, reason="TARGET",
+                    pf_sl=pf_sl, pf_tgt=pf_tgt,
+                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                    slot_curves=slot_curves,
+                )
+            else:
+                prev_close = close
+                continue  # holding within the delay window — keep waiting
+
+        hit = False
+        hit_dir = 0
+        if prev_close is not None:
+            if prev_close <= level <= close:
+                hit, hit_dir = True, 1
+            elif prev_close >= level >= close:
+                hit, hit_dir = True, -1
         prev_close = close
+
         if hit:
-            clip_ns = ts_ns + delay_ns
-            clip_iso = pd.Timestamp(clip_ns, unit="ns", tz="UTC").isoformat()
-            logs.append(
-                f"UNDERLYING_TGT_HIT | underlying={close:.5f} | level={level:.5f} "
-                f"| clip_ts={clip_iso}"
-            )
-            return _build_clip_result(
-                clip_ts=clip_iso, reason="TARGET",
-                pf_sl=pf_sl, pf_tgt=pf_tgt,
-                slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
-                slot_curves=slot_curves,
-            )
+            clip_iso = pd.Timestamp(ts_ns, unit="ns", tz="UTC").isoformat()
+            if delay_ns <= 0:
+                logs.append(
+                    f"UNDERLYING_TGT_HIT | underlying={close:.5f} | level={level:.5f} "
+                    f"| clip_ts={clip_iso}"
+                )
+                return _build_clip_result(
+                    clip_ts=clip_iso, reason="TARGET",
+                    pf_sl=pf_sl, pf_tgt=pf_tgt,
+                    slot_pnl_at_clip=slot_pnl_at_clip, logs=logs,
+                    slot_curves=slot_curves,
+                )
+            pending_at_ns = ts_ns
+            pending_clip_ts = clip_iso
+            pending_dir = hit_dir
+            logs.append(f"UNDERLYING_TGT_DELAY_PENDING | delay={pf_tgt.delay_sec}s")
 
     return _ClipResult(logs=tuple(logs))
 
@@ -780,8 +965,23 @@ def _user_tgt_clip(
     return _ClipResult()
 
 
+def _clip_tier_rank(reason: str | None) -> int:
+    """Tier priority for same-timestamp tie-breaks (spec §8 evaluation order
+    User → Portfolio → Leg): when two tiers breach on the SAME bar the higher
+    tier wins. User (0) beats Tag (1) beats Portfolio (2). Derived from the
+    clip_reason prefix (``USER_*`` / ``TAG_*`` / portfolio ``STOPLOSS``/``TARGET``).
+    """
+    r = (reason or "").upper()
+    if r.startswith("USER"):
+        return 0
+    if r.startswith("TAG"):
+        return 1
+    return 2  # portfolio-level
+
+
 def _earliest_clip(*results: _ClipResult) -> _ClipResult:
-    """Return the _ClipResult with the earliest non-None clip_ts.
+    """Return the winning _ClipResult: earliest non-None clip_ts, and on a
+    same-timestamp tie the higher tier wins (User > Tag > Portfolio, spec §8).
 
     Logs from every result are merged onto the winner so nothing is lost.
     When no result fired, returns the first with merged logs.
@@ -792,5 +992,10 @@ def _earliest_clip(*results: _ClipResult) -> _ClipResult:
     fired = [r for r in results if r.clip_ts is not None]
     if not fired:
         return _ClipResult(logs=merged_logs)
-    winner = min(fired, key=lambda r: _ts_iso_to_ns(r.clip_ts))
+    # Primary key = clip time (earliest wins); secondary = tier rank (higher tier
+    # wins on equal timestamps). Non-tie behavior is unchanged.
+    winner = min(
+        fired,
+        key=lambda r: (_ts_iso_to_ns(r.clip_ts), _clip_tier_rank(r.clip_reason)),
+    )
     return dataclasses.replace(winner, logs=merged_logs)

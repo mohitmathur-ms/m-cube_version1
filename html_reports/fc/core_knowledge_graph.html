@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>core/ Knowledge Graph — m-cube</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-card: #141a30;
+    --bg-card-2: #1a2240;
+    --fg: #e4e9f7;
+    --fg-dim: #9aa3c0;
+    --fg-mute: #6c7497;
+    --border: #262e4d;
+
+    --c-l0: #06b6d4;
+    --c-l1: #10b981;
+    --c-l2: #8b5cf6;
+    --c-l3: #f97316;
+    --c-l4: #f59e0b;
+
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(139,92,246,.18), transparent 70%),
+      radial-gradient(900px 500px at 100% 0%, rgba(6,182,212,.15), transparent 70%),
+      radial-gradient(800px 400px at 50% 100%, rgba(249,115,22,.12), transparent 70%),
+      var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1300px; margin: 0 auto; padding: 48px 28px 96px; }
+
+  header.hero {
+    padding: 40px 36px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1a2244 0%, #2a1f4a 50%, #1a2940 100%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  header.hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(400px 200px at 0% 0%, rgba(6,182,212,.18), transparent 70%),
+      radial-gradient(400px 200px at 100% 100%, rgba(249,115,22,.18), transparent 70%);
+    pointer-events: none;
+  }
+  header.hero h1 {
+    margin: 0 0 8px;
+    font-size: 34px;
+    background: linear-gradient(90deg, #06b6d4, #8b5cf6, #f97316);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header.hero .sub { color: var(--fg-dim); font-size: 15px; max-width: 900px; }
+  header.hero .meta {
+    margin-top: 14px;
+    display: flex; gap: 12px; flex-wrap: wrap;
+    font-size: 13px; color: var(--fg-mute);
+  }
+  header.hero .meta span {
+    padding: 4px 10px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  header.hero a { color: var(--c-l0); text-decoration: none; }
+
+  /* Legend */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .legend .lg {
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    position: relative;
+    overflow: hidden;
+  }
+  .legend .lg::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--accent, var(--fg-dim));
+  }
+  .legend .lg.l0 { --accent: var(--c-l0); }
+  .legend .lg.l1 { --accent: var(--c-l1); }
+  .legend .lg.l2 { --accent: var(--c-l2); }
+  .legend .lg.l3 { --accent: var(--c-l3); }
+  .legend .lg.l4 { --accent: var(--c-l4); }
+  .legend .lg .name { font-weight: 700; color: var(--fg); font-size: 13px; }
+  .legend .lg .desc { font-size: 12px; color: var(--fg-dim); margin-top: 4px; }
+
+  /* Graph container */
+  .graph-card {
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-2) 100%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin-bottom: 36px;
+    overflow: auto;
+  }
+  .graph-card h2 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  .mermaid {
+    background: transparent !important;
+    min-height: 600px;
+  }
+
+  /* Edge / matrix tables */
+  .tablecard {
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .tablecard h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  table.edges {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.edges th, table.edges td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.edges th {
+    background: rgba(255,255,255,.03);
+    color: var(--fg-dim);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  table.edges tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+  table.edges td.file {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: #fcd34d;
+    width: 22%;
+    white-space: nowrap;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 2px 3px 2px 0;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    border: 1px solid;
+    background: rgba(255,255,255,.02);
+  }
+  .pill.imp { color: #34d399; border-color: rgba(52,211,153,.5); }
+  .pill.by  { color: #60a5fa; border-color: rgba(96,165,250,.5); }
+  .pill.none { color: var(--fg-mute); border-color: var(--border); font-style: italic; }
+  .pill.l0 { background: color-mix(in srgb, var(--c-l0) 14%, transparent); color: var(--c-l0); border-color: color-mix(in srgb, var(--c-l0) 50%, transparent); }
+  .pill.l1 { background: color-mix(in srgb, var(--c-l1) 14%, transparent); color: var(--c-l1); border-color: color-mix(in srgb, var(--c-l1) 50%, transparent); }
+  .pill.l2 { background: color-mix(in srgb, var(--c-l2) 14%, transparent); color: var(--c-l2); border-color: color-mix(in srgb, var(--c-l2) 50%, transparent); }
+  .pill.l3 { background: color-mix(in srgb, var(--c-l3) 14%, transparent); color: var(--c-l3); border-color: color-mix(in srgb, var(--c-l3) 50%, transparent); }
+  .pill.l4 { background: color-mix(in srgb, var(--c-l4) 14%, transparent); color: var(--c-l4); border-color: color-mix(in srgb, var(--c-l4) 50%, transparent); }
+
+  footer.foot {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--fg-mute);
+    font-size: 12px;
+    text-align: center;
+  }
+  footer.foot a { color: var(--c-l0); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>core/ Knowledge Graph</h1>
+  <div class="sub">
+    Visualises the import dependencies between the 19 files in
+    <code>d:\m-cube_version1\core\</code>. Nodes are colour-coded by layer
+    (L0 ingest → L4 reporting); arrows point from <em>imported module</em>
+    → <em>importer</em>, so the runner (downstream) sits on the right of
+    everything that feeds it. Companion per-file write-up:
+    <a href="core_module_report.html">core_module_report.html</a>.
+  </div>
+  <div class="meta">
+    <span>19 nodes</span>
+    <span>19 edges (top-level + lazy)</span>
+    <span>5 architectural layers</span>
+    <span>Rendered with Mermaid.js</span>
+  </div>
+</header>
+
+<div class="legend">
+  <div class="lg l0"><div class="name">L0 — Data ingest</div><div class="desc">CSV / catalog / venue / FX</div></div>
+  <div class="lg l1"><div class="name">L1 — Signals &amp; strategies</div><div class="desc">Entry registry, custom loader, templates</div></div>
+  <div class="lg l2"><div class="name">L2 — Exit management</div><div class="desc">The SL/TP/trailing/RBO state machine</div></div>
+  <div class="lg l3"><div class="name">L3 — Orchestration</div><div class="desc">Portfolio runner + schema</div></div>
+  <div class="lg l4"><div class="name">L4 — Users &amp; reporting</div><div class="desc">Identity, history, reports, utilities</div></div>
+</div>
+
+<div class="graph-card">
+  <h2>Dependency graph</h2>
+  <div class="mermaid">
+flowchart LR
+    classDef l0 fill:#0b3b46,stroke:#06b6d4,stroke-width:2px,color:#cffafe;
+    classDef l1 fill:#0c3b2e,stroke:#10b981,stroke-width:2px,color:#d1fae5;
+    classDef l2 fill:#2a1d4a,stroke:#8b5cf6,stroke-width:2px,color:#ede9fe;
+    classDef l3 fill:#3b1e0a,stroke:#f97316,stroke-width:2px,color:#ffedd5;
+    classDef l4 fill:#3b2a07,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+
+    subgraph L0 ["L0 · Data ingest"]
+      csv_loader["csv_loader.py"]
+      nautilus_loader["nautilus_loader.py"]
+      instrument_factory["instrument_factory.py"]
+      venue_config["venue_config.py"]
+      fx_rates["fx_rates.py"]
+      aggregator["aggregator.py"]
+    end
+
+    subgraph L1 ["L1 · Signals &amp; strategies"]
+      signals["signals.py"]
+      strategies["strategies.py"]
+      custom_loader["custom_strategy_loader.py"]
+      templates["templates.py"]
+    end
+
+    subgraph L2 ["L2 · Exit mgmt"]
+      managed_strategy["managed_strategy.py"]
+    end
+
+    subgraph L3 ["L3 · Orchestration"]
+      models["models.py"]
+      backtest_runner["backtest_runner.py"]
+    end
+
+    subgraph L4 ["L4 · Users &amp; reporting"]
+      users["users.py"]
+      migrate_users["migrate_users.py"]
+      runtime_history["runtime_history.py"]
+      report_generator["report_generator.py"]
+      pandas_utils["_pandas_utils.py"]
+      init_py["__init__.py"]
+    end
+
+    csv_loader --> nautilus_loader
+    csv_loader --> aggregator
+    instrument_factory --> nautilus_loader
+    venue_config --> instrument_factory
+    venue_config --> backtest_runner
+    venue_config -. lazy .-> models
+
+    signals --> managed_strategy
+    models --> managed_strategy
+    models --> templates
+    models --> backtest_runner
+    managed_strategy --> backtest_runner
+    strategies --> backtest_runner
+    strategies --> custom_loader
+    custom_loader -. lazy .-> backtest_runner
+    fx_rates --> backtest_runner
+
+    users -. lazy .-> backtest_runner
+    users -. lazy .-> models
+    users -. lazy .-> report_generator
+    pandas_utils --> backtest_runner
+    pandas_utils --> report_generator
+
+    class csv_loader,nautilus_loader,instrument_factory,venue_config,fx_rates,aggregator l0;
+    class signals,strategies,custom_loader,templates l1;
+    class managed_strategy l2;
+    class models,backtest_runner l3;
+    class users,migrate_users,runtime_history,report_generator,pandas_utils,init_py l4;
+  </div>
+</div>
+
+<div class="tablecard">
+  <h2>Dependency matrix</h2>
+  <table class="edges">
+    <thead>
+      <tr>
+        <th style="width:22%">File</th>
+        <th style="width:8%">Layer</th>
+        <th style="width:35%">Imports from core</th>
+        <th style="width:35%">Imported by core</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="file">__init__.py</td><td><span class="pill l4">L4</span></td><td><span class="pill none">none</span></td><td><span class="pill none">none</span></td></tr>
+      <tr><td class="file">_pandas_utils.py</td><td><span class="pill l4">L4</span></td><td><span class="pill none">none</span></td><td><span class="pill by">backtest_runner</span><span class="pill by">report_generator</span></td></tr>
+      <tr><td class="file">csv_loader.py</td><td><span class="pill l0">L0</span></td><td><span class="pill none">none</span></td><td><span class="pill by">nautilus_loader</span><span class="pill by">aggregator</span></td></tr>
+      <tr><td class="file">nautilus_loader.py</td><td><span class="pill l0">L0</span></td><td><span class="pill imp">csv_loader</span><span class="pill imp">instrument_factory</span></td><td><span class="pill none">none (server.py)</span></td></tr>
+      <tr><td class="file">instrument_factory.py</td><td><span class="pill l0">L0</span></td><td><span class="pill imp">venue_config</span></td><td><span class="pill by">nautilus_loader</span></td></tr>
+      <tr><td class="file">aggregator.py</td><td><span class="pill l0">L0</span></td><td><span class="pill imp">csv_loader</span></td><td><span class="pill none">none (scripts)</span></td></tr>
+      <tr><td class="file">venue_config.py</td><td><span class="pill l0">L0</span></td><td><span class="pill none">none</span></td><td><span class="pill by">instrument_factory</span><span class="pill by">backtest_runner</span><span class="pill by">models (lazy)</span></td></tr>
+      <tr><td class="file">fx_rates.py</td><td><span class="pill l0">L0</span></td><td><span class="pill none">none</span></td><td><span class="pill by">backtest_runner</span></td></tr>
+      <tr><td class="file">signals.py</td><td><span class="pill l1">L1</span></td><td><span class="pill none">none</span></td><td><span class="pill by">managed_strategy</span></td></tr>
+      <tr><td class="file">strategies.py</td><td><span class="pill l1">L1</span></td><td><span class="pill none">none (sibling pkg)</span></td><td><span class="pill by">custom_strategy_loader</span><span class="pill by">backtest_runner</span></td></tr>
+      <tr><td class="file">custom_strategy_loader.py</td><td><span class="pill l1">L1</span></td><td><span class="pill imp">strategies</span></td><td><span class="pill by">backtest_runner (lazy)</span></td></tr>
+      <tr><td class="file">templates.py</td><td><span class="pill l1">L1</span></td><td><span class="pill imp">models</span></td><td><span class="pill none">none (server.py)</span></td></tr>
+      <tr><td class="file">models.py</td><td><span class="pill l3">L3</span></td><td><span class="pill imp">venue_config (lazy)</span><span class="pill imp">users (lazy)</span></td><td><span class="pill by">managed_strategy</span><span class="pill by">backtest_runner</span><span class="pill by">templates</span></td></tr>
+      <tr><td class="file">managed_strategy.py</td><td><span class="pill l2">L2</span></td><td><span class="pill imp">models</span><span class="pill imp">signals</span></td><td><span class="pill by">backtest_runner</span></td></tr>
+      <tr><td class="file">backtest_runner.py</td><td><span class="pill l3">L3</span></td><td><span class="pill imp">strategies</span><span class="pill imp">models</span><span class="pill imp">managed_strategy</span><span class="pill imp">fx_rates</span><span class="pill imp">venue_config</span><span class="pill imp">users (lazy)</span><span class="pill imp">custom_strategy_loader (lazy)</span></td><td><span class="pill none">none (entry point)</span></td></tr>
+      <tr><td class="file">users.py</td><td><span class="pill l4">L4</span></td><td><span class="pill none">none</span></td><td><span class="pill by">backtest_runner (lazy)</span><span class="pill by">models (lazy)</span><span class="pill by">report_generator (lazy)</span></td></tr>
+      <tr><td class="file">migrate_users.py</td><td><span class="pill l4">L4</span></td><td><span class="pill none">none</span></td><td><span class="pill none">none (server startup)</span></td></tr>
+      <tr><td class="file">runtime_history.py</td><td><span class="pill l4">L4</span></td><td><span class="pill none">none</span></td><td><span class="pill none">none (scheduler)</span></td></tr>
+      <tr><td class="file">report_generator.py</td><td><span class="pill l4">L4</span></td><td><span class="pill imp">_pandas_utils</span><span class="pill imp">users (lazy)</span></td><td><span class="pill none">none (server.py)</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="tablecard">
+  <h2>How to read the graph</h2>
+  <ul style="margin: 0; padding-left: 20px; color: var(--fg-dim); font-size: 14px;">
+    <li><strong>Solid arrows</strong> are top-level <code>from core.X import …</code> imports — they resolve at module load time and define the hard dependency.</li>
+    <li><strong>Dashed arrows labelled "lazy"</strong> are imports inside function bodies. They exist to break cycles (e.g. <code>models</code> ↔ <code>users</code> would cycle if eager) or to keep package import cheap.</li>
+    <li>Three nodes — <code>__init__.py</code>, <code>migrate_users.py</code>, <code>runtime_history.py</code> — have no inbound or outbound edges within <code>core/</code>. They're used by <code>server.py</code> or offline scripts, not by other modules in this package.</li>
+    <li><code>backtest_runner.py</code> is the rightmost sink: everything below L4 ultimately funnels into it. It is the only file that imports <em>every</em> other layer.</li>
+  </ul>
+</div>
+
+<footer class="foot">
+  Companion to <a href="core_module_report.html">core_module_report.html</a> · 19 files · 5 layers · graph rendered client-side by Mermaid.js
+</footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: {
+      curve: 'basis',
+      padding: 18,
+      nodeSpacing: 50,
+      rankSpacing: 70
+    },
+    themeVariables: {
+      darkMode: true,
+      background: '#0b1020',
+      primaryColor: '#1a2240',
+      primaryTextColor: '#e4e9f7',
+      primaryBorderColor: '#8b5cf6',
+      lineColor: '#9aa3c0',
+      secondaryColor: '#141a30',
+      tertiaryColor: '#0b1020',
+      clusterBkg: 'rgba(255,255,255,0.02)',
+      clusterBorder: '#262e4d',
+      labelBackground: '#1a2240'
+    }
+  });
+</script>
+</body>
+</html>

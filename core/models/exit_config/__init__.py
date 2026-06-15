@@ -31,6 +31,16 @@ class ExitConfig:
     # Stop Loss
     stop_loss_type: str = "none"  # "none", "percentage", "points", "trailing", "atr"
     stop_loss_value: float = 0.0
+    # Spec execution_logic.html §4.4: "Premium" is ONE type whose value is read
+    # as EITHER a percentage OR an absolute distance, chosen by this input-mode
+    # flag (independent of the type name):
+    #   True  → Premium absolute:  sl = entry ∓ value
+    #   False → Premium with %:    sl = entry × (1 ∓ value/100)
+    #   None  → infer from the type name (percentage/Premium → %, points/
+    #           AbsolutePremium → absolute) — backward-compatible default.
+    # Honoured in config_from_exit (overrides the percentage/points canonical
+    # type); does not apply to ATR/none/trailing.
+    sl_value_is_absolute: Optional[bool] = None
     trailing_sl_step: float = 0.0
     trailing_sl_offset: float = 0.0
 
@@ -46,6 +56,9 @@ class ExitConfig:
     # Target / Take Profit
     target_type: str = "none"  # "none", "percentage", "points", "atr"
     target_value: float = 0.0
+    # Target twin of sl_value_is_absolute (spec §4.4 target). True → absolute
+    # (tp = entry ± value); False → percentage; None → infer from type name.
+    target_value_is_absolute: Optional[bool] = None
 
     # ATR-based Target (spec sl_features.html §1.1 footnote 4). When
     # target_type == "atr", the leg TP is sized from the bar series' Average

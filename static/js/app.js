@@ -656,6 +656,43 @@ const App = {
         return Number(value).toLocaleString("en-US");
     },
 
+    /** Convert a UTC ISO timestamp (e.g. "2026-03-02T03:45:00+00:00") to the IST
+     *  (Asia/Kolkata, UTC+5:30) wall-clock for DISPLAY only — the catalog stays
+     *  in UTC. IST has no DST, so a fixed +5:30 shift is exact. Returns
+     *  "YYYY-MM-DD HH:MM:SS", or "YYYY-MM-DDTHH:MM:SS" when iso=true (for Plotly
+     *  axes, which render the literal value without re-applying a timezone). */
+    formatIST(isoUtc, iso = false) {
+        if (!isoUtc) return "";
+        const t = Date.parse(isoUtc);
+        if (isNaN(t)) return isoUtc;
+        const d = new Date(t + 5.5 * 3600 * 1000);  // shift to the IST wall-clock
+        const p = n => String(n).padStart(2, "0");
+        const date = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+        const time = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+        return iso ? `${date}T${time}` : `${date} ${time}`;
+    },
+
+    /** Shift a "HH:MM" / "HH:MM:SS" time-of-day string by ±5:30 (IST↔UTC),
+     *  wrapping within 24h. IST has no DST so the offset is exact. The portfolio
+     *  UI works entirely in IST; these translate to/from the UTC the backend uses
+     *  at the wire boundary only. Returns the same field granularity it received. */
+    _shiftHHMM(t, sign) {
+        if (!t) return t;
+        const parts = String(t).split(":");
+        const hasSec = parts.length >= 3;
+        let s = (parseInt(parts[0], 10) || 0) * 3600
+              + (parseInt(parts[1], 10) || 0) * 60
+              + (parseInt(parts[2], 10) || 0);
+        s = (((s + sign * (5 * 3600 + 30 * 60)) % 86400) + 86400) % 86400;  // wrap 24h
+        const p = n => String(n).padStart(2, "0");
+        const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+        return hasSec ? `${p(hh)}:${p(mm)}:${p(ss)}` : `${p(hh)}:${p(mm)}`;
+    },
+    /** IST clock string → UTC clock string (subtract 5:30). */
+    istToUtcHHMM(t) { return this._shiftHHMM(t, -1); },
+    /** UTC clock string → IST clock string (add 5:30). */
+    utcToIstHHMM(t) { return this._shiftHHMM(t, +1); },
+
     /** Create a metric card HTML */
     metricHTML(label, value, delta = null) {
         let deltaHTML = "";

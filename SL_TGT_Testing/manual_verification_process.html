@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Verification Process — Time · Logic · Price</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1080px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#1a7f37 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:23px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:19px; margin-top:30px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  h3 { font-size:15px; margin-top:18px; }
+  h3 .tag { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:4px; margin-right:6px; vertical-align:middle; }
+  .tagT { background:var(--blue-bg); color:var(--accent); } .tagL { background:#fbefff; color:#8250df; } .tagP { background:var(--green-bg); color:var(--green); }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12px; background:#f6f8fa; padding:1px 5px; border-radius:3px; color:#d63384; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .callout.warn { background:var(--amber-bg); border-left-color:var(--amber); } .callout.warn strong { color:var(--amber); }
+  ol.steps { padding-left:22px; font-size:14px; } ol.steps li { margin:7px 0; }
+  .green { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Manual Verification Process — Time · Logic · Price</h1>
+  <p>Confirm every SL/Target feature fired at the right time, with the correct logic, at the correct price — by checking the order book against numbers you recompute yourself.</p>
+</header>
+
+<div class="callout"><strong>Principle:</strong> re-derive the expected time/logic/price from the order book's <strong>own logged inputs</strong> (fill, bar data, config, PnL) — never from what the engine <em>claims</em>. The claim and your recomputation must agree.</div>
+
+<h2>1. The order book — what the engine must emit</h2>
+<p>One row per <strong>event</strong> (not just per fill), with these columns:</p>
+<table>
+  <thead><tr><th>Column</th><th>Why it's needed</th></tr></thead>
+  <tbody>
+    <tr><td><code>seq</code>, <code>timestamp</code>, <code>bar_index</code></td><td>the <strong>time</strong> axis — when did it happen</td></tr>
+    <tr><td><code>level</code> (leg/portfolio/user) · <code>leg_id</code> · <code>portfolio_id</code> · <code>user_id</code></td><td>which entity acted</td></tr>
+    <tr><td><code>instrument</code> · <code>direction</code> · <code>product_mode</code></td><td>context for price + lifecycle</td></tr>
+    <tr><td><code>event</code></td><td>ENTRY · SL_TRIGGER · DELAY_START · DELAY_CLEARED · MOVE_TO_COST · TRAIL_UPDATE · SL_EXIT · TARGET_EXIT · PORTFOLIO_SQOFF · USER_SQOFF · MIS_CUTOFF · REEXEC · REENTRY …</td></tr>
+    <tr><td><code>reason</code></td><td>SL · TARGET · TRAIL_SL · TARGET_TRAIL · MOVE_TO_COST · PORTFOLIO_LOSS · USER_MAX_LOSS · MIS_CUTOFF …</td></tr>
+    <tr><td><code>entry_price</code> · <code>fill_price</code> · <code>level_price</code></td><td>the <strong>price</strong> axis</td></tr>
+    <tr><td><code>current_sl</code> · <code>current_target</code> · <code>move_sl_trail_anchor</code> · <code>anchor_pnl</code></td><td>live state to verify trailing / move-to-cost</td></tr>
+    <tr><td><code>leg_pnl</code> · <code>combined_pnl</code> · <code>underlying</code></td><td>thresholds for PnL / underlying triggers</td></tr>
+    <tr><td><code>bar_o/h/l/c</code> (or <code>bid_*</code>/<code>ask_*</code>/<code>ltp</code>)</td><td>the bar that caused it — to verify trigger + price</td></tr>
+    <tr><td><code>config</code> (sl_type, value, every/by, wait, safety, reach/lock…)</td><td>to recompute expected levels/times</td></tr>
+  </tbody>
+</table>
+<div class="callout warn">Without the <strong>per-bar state</strong> (<code>current_sl</code>, anchors, pnl) and the <strong>bar data</strong>, you can only check entries/exits — not <em>when</em> and <em>why</em> the dynamic features moved. Insist on these columns.</div>
+
+<h2>2. The 3-axis check (run on every event row)</h2>
+
+<h3><span class="tag tagT">A · TIME</span> did it fire at the right moment?</h3>
+<ol class="steps">
+  <li>Identify the <strong>trigger condition</strong> for the event (from <code>reason</code>).</li>
+  <li>From the logged <strong>bar data</strong>, find the <strong>first bar</strong> where that condition became true.</li>
+  <li>The event's <code>bar_index</code> must equal that bar — <strong>not earlier</strong> (look-ahead), <strong>not later</strong> (lag) — unless a delay applies: SL/Target Wait → exit bar = trigger bar <strong>+ wait</strong>; Safety Seconds → effect at trigger time <strong>+ safety_seconds</strong>.</li>
+  <li>If multiple levels fired the <strong>same bar</strong>, confirm precedence <strong>User → Portfolio → Leg</strong>.</li>
+</ol>
+
+<h3><span class="tag tagL">B · LOGIC</span> did the right thing fire, for the right reason?</h3>
+<ol class="steps">
+  <li><code>reason</code> matches the condition <strong>actually true</strong> at that bar (e.g. <code>SL</code> only if price reached the SL; <code>TARGET_TRAIL</code> only if the locked floor was breached).</li>
+  <li>The correct <strong>action</strong> dispatched (SqOff / ReExecute / ReEntry / KeepLegRunning / cross-portfolio).</li>
+  <li><strong>Exactly one</strong> outcome where only one is valid (not both SL and Target same leg/bar; fixed Target suppressed while Trailing Target active).</li>
+  <li><strong>State transition</strong> valid (ACTIVE → CLOSED / IDLE / REENTRY_WAITING per the action).</li>
+  <li><strong>Guards/limits</strong> respected (Re-Execute count; trailing only-tightens; lock only-rises).</li>
+</ol>
+
+<h3><span class="tag tagP">C · PRICE</span> right level, right fill?</h3>
+<ol class="steps">
+  <li><strong>Recompute the level</strong> from <code>entry_price</code> + <code>config</code>, tick-snapped: SL % <code>entry × (1 ∓ v/100)</code> · points <code>entry ∓ v</code> · ATR <code>entry ∓ mult×ATR</code> · trailing/move-to-cost = the <strong>ratcheted</strong> value. The logged <code>current_sl</code> must equal it.</li>
+  <li><strong>Fill price</strong> matches the fill model (limit level, or VWAP-conservative — <em>pending the parked fill-price question</em>).</li>
+  <li><strong>PnL</strong> = <code>(exit − entry) × lot_mult × n_lots</code> matches <code>leg_pnl</code>; roll-ups add up.</li>
+</ol>
+
+<h2>3. Per-feature timing — what "right time" means</h2>
+<table>
+  <thead><tr><th>Feature</th><th>"Right time"</th><th>How to check from the order book</th></tr></thead>
+  <tbody>
+    <tr><td>Leg SL / Target trigger</td><td>first bar level reached</td><td>event <code>bar_index</code> == first bar where <code>low ≤ SL</code> / <code>high ≥ Tgt</code></td></tr>
+    <tr><td>SL / Target <strong>Wait</strong></td><td>trigger + wait</td><td>exit bar == trigger bar + <code>wait</code> (bars) or exit time == trigger + <code>wait</code> (sec)</td></tr>
+    <tr><td><strong>Safety Seconds</strong> (Move-to-Cost)</td><td>trigger-event + safety</td><td>MOVE_TO_COST applied <code>safety_seconds</code> after the triggering event's timestamp</td></tr>
+    <tr><td><strong>Trail update</strong></td><td>bar PnL crosses next step</td><td><code>current_sl</code> changes on <strong>that</strong> bar; no change between steps</td></tr>
+    <tr><td>Move-to-Cost trigger</td><td>bar a sibling leg hit SL/Target</td><td>MOVE_TO_COST same <code>bar_index</code> as the sibling exit</td></tr>
+    <tr><td>Portfolio SL / Target</td><td>bar combined PnL / underlying crosses</td><td>PORTFOLIO_SQOFF on that bar</td></tr>
+    <tr><td>User Max Loss / Profit</td><td>bar combined user PnL crosses</td><td>USER_SQOFF — <strong>all</strong> portfolios same bar</td></tr>
+    <tr><td>MIS cutoff</td><td>the cutoff bar (e.g. 15:20)</td><td>MIS_CUTOFF at the cutoff bar; nothing forced before it</td></tr>
+    <tr><td>Evaluation order</td><td>within one bar</td><td>User row → Portfolio row → Leg row in <code>seq</code> order</td></tr>
+  </tbody>
+</table>
+
+<h2>4. The verification loop (step by step)</h2>
+<ol class="steps">
+  <li><strong>Run</strong> the test portfolio → <strong>export the order book</strong> (schema §1).</li>
+  <li><strong>Sort</strong> by <code>timestamp</code> / <code>seq</code>.</li>
+  <li>For <strong>each event row</strong>, run the <strong>A-Time / B-Logic / C-Price</strong> checks.</li>
+  <li><strong>Recompute</strong> expected values from the row's <em>own</em> inputs — independent of the engine's claim.</li>
+  <li>Mark <strong>green</strong> (engine == recomputation) or <strong>red</strong> (mismatch: column, expected, actual).</li>
+  <li>For <strong>dynamic features</strong> (trail, move-to-cost, profit-lock, user cascade), walk the rows <strong>in sequence</strong> — the state must evolve exactly as your manual trace says, bar by bar.</li>
+</ol>
+
+<h2>5. Worked example — leg SL with Wait = 2 bars</h2>
+<p>Config: NIFTY-FUT, long, <code>percentage 2%</code>, <code>SL Wait = 2 bars</code>, MIS.</p>
+<table>
+  <thead><tr><th>seq</th><th>bar</th><th>event</th><th>reason</th><th>bar low</th><th>current_sl</th><th>fill</th><th>leg_pnl</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>5</td><td>ENTRY</td><td>—</td><td>—</td><td>21560</td><td>22000</td><td>0</td></tr>
+    <tr><td>2</td><td>100</td><td>SL_TRIGGER</td><td>SL</td><td>21558</td><td>21560</td><td>—</td><td>—</td></tr>
+    <tr><td>3</td><td>101</td><td>(hold)</td><td>SL_WAIT</td><td>21557</td><td>21560</td><td>—</td><td>—</td></tr>
+    <tr><td>4</td><td>102</td><td>SL_EXIT</td><td>SL</td><td>21556</td><td>21560</td><td>21560</td><td>−440 / unit</td></tr>
+  </tbody>
+</table>
+<p><span class="green">A-Time:</span> trigger at bar 100 (first <code>low ≤ 21560</code> ✓); exit at bar <strong>102 = 100 + 2</strong> (the wait) ✓ — not 100, not 101.<br>
+<span class="green">B-Logic:</span> <code>reason = SL</code> correct (level reached, held through wait, not cleared); single exit; ACTIVE→CLOSED.<br>
+<span class="green">C-Price:</span> SL level = <code>22000 × 0.98 = 21560</code> (tick 0.05 → 21560) ✓; fill = 21560; PnL = <code>(21560 − 22000) = −440 / unit</code> ✓.</p>
+
+<h2>6. Timing &amp; logic pitfalls to watch</h2>
+<table>
+  <thead><tr><th>Pitfall</th><th>What to look for</th></tr></thead>
+  <tbody>
+    <tr><td>Off-by-one bar</td><td>exit fires one bar early/late vs trigger + wait</td></tr>
+    <tr><td>Look-ahead</td><td>a decision uses a price it couldn't know yet (bar <strong>close</strong> to justify an intrabar exit, or a future bar)</td></tr>
+    <tr><td>Intrabar ordering</td><td>a bar that both makes a new high <em>and</em> breaches a stop — which the engine assumed happened first</td></tr>
+    <tr><td>Same-bar precedence</td><td>user + portfolio + leg all trigger together — did they fire User→Portfolio→Leg</td></tr>
+    <tr><td>Wait units</td><td><code>wait</code> applied in <strong>bars</strong> when it should be <strong>seconds</strong> (or vice-versa)</td></tr>
+    <tr><td>Snapped vs raw</td><td><code>current_sl</code> compared at the raw value when the engine correctly snapped to tick</td></tr>
+    <tr><td>Stale level after move</td><td>after Move-to-Cost / a trail step, later bars still checked against the <strong>old</strong> level</td></tr>
+  </tbody>
+</table>
+
+<h2>7. For the dev team — self-verify before handoff (the same lens)</h2>
+<p>Verification isn't only the tester's job. Before you hand a build off, run the <strong>same Time / Logic / Price lens</strong> on a small sample so the obvious breaks are caught at source.</p>
+<p><strong>Before handoff, for at least one trade per feature you touched:</strong></p>
+<ol class="steps">
+  <li><strong>Emit, then read your own order book.</strong> Every event row must carry the §1 columns — especially per-bar <code>current_sl</code>, anchors, <code>leg_pnl</code>/<code>combined_pnl</code>, and the <code>bar_o/h/l/c</code> that caused the row. If a row can't be re-derived from its own columns, it isn't verifiable — fix the emit first.</li>
+  <li><strong>TIME.</strong> For each exit, find the first bar the condition is true in your own bar data; the event must land on <em>that</em> bar (+wait/+safety), not where you happened to evaluate it. Watch off-by-one, look-ahead (using the close to justify an intrabar exit), and wait-units (bars vs seconds).</li>
+  <li><strong>LOGIC.</strong> The <code>reason</code> must be the condition actually true — not a default. Assert the guards <em>in code</em>: trailing only-tightens, profit-lock floor only-rises, re-exec count caps, fixed Target suppressed while Trailing Target active.</li>
+  <li><strong>PRICE.</strong> Recompute the level from <code>entry_price</code> + config, tick-snap it; logged <code>current_sl</code> must equal it. <code>PnL = (exit − entry) × lot_mult × n_lots</code> must tie to <code>leg_pnl</code> and roll up.</li>
+  <li><strong>State machine.</strong> Every position ends in a terminal state (CLOSED / IDLE / REENTRY_WAITING) consistent with the action; no orphaned ACTIVE legs after a force-sqoff.</li>
+</ol>
+<p><strong>Invariants to assert in the engine itself</strong> (cheap, catch whole classes of bugs):</p>
+<ul>
+  <li><code>current_sl</code> for a long never decreases after a trail/move step; for a short never increases.</li>
+  <li>After <code>MOVE_TO_COST</code>, later bars are checked against the <strong>new</strong> level (no stale level).</li>
+  <li>A user/portfolio force-sqoff flattens <strong>every</strong> child position on the <strong>same bar</strong>; nothing re-enters after a sticky user hit.</li>
+  <li>Same-bar precedence is always <strong>User → Portfolio → Leg</strong>.</li>
+</ul>
+<div class="callout"><strong>What "done" means:</strong> the build emits the §1 order book, your sample passes all three axes, and the engine-level invariants hold. Hand off the order book + logs so the tester can re-run the full <strong>§4 loop</strong> independently — recomputing from your logged inputs, not from your claims.</div>
+
+</div>
+</body>
+</html>

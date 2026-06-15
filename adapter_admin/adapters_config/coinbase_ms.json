@@ -24,11 +24,7 @@
   "account_base_currency": "USD",
   "fx_conversion": {},
   "created_at": "2026-05-20T11:20:13.375714",
-<<<<<<< Updated upstream
-  "updated_at": "2026-05-28T10:53:18.931283",
-=======
   "updated_at": "2026-05-28T15:13:22.185288",
->>>>>>> Stashed changes
   "session_start_time": "00:00:00",
   "session_end_time": "23:59:00"
 }

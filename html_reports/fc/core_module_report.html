@@ -1,0 +1,2494 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>core/ Module Report — m-cube</title>
+  <style>
+    :root {
+      Create Adapter Config for Commodities Data and Convert the Commodities data into proper format (date + time=timestamp) (19-05-2026).Create Adapter Config for Commodities Data and Convert the Commodities data into proper format (date + time=timestamp) (19-05-2026). --bg: #0b1020;
+      --bg-card: #141a30;
+      --bg-card-2: #1a2240;
+      --fg: #e4e9f7;
+      Create Adapter Config for Commodities Data and Convert the Commodities data into proper format (date + time=timestamp) (19-05-2026).Create Adapter Config for Commodities Data and Convert the Commodities data into proper format (date + time=timestamp) (19-05-2026).Create Adapter Config for Commodities Data and Convert the Commodities data into proper format (date + time=timestamp) (19-05-2026). --fg-dim: #9aa3c0;
+      --fg-mute: #6c7497;
+      --border: #262e4d;
+
+      --c-l0: #06b6d4;
+      /* L0 data ingest — teal */
+      --c-l1: #10b981;
+      /* L1 signals/strategies — green */
+      --c-l2: #8b5cf6;
+      /* L2 exit mgmt — purple */
+      --c-l3: #f97316;
+      /* L3 orchestration — red-orange */
+      --c-l4: #f59e0b;
+      /* L4 users/reporting — amber */
+
+      --c-pill-imp: #34d399;
+      /* "imports from" pill — green */
+      --c-pill-by: #60a5fa;
+      /* "imported by" pill — blue */
+      --c-pill-ext: #a78bfa;
+      /* "external" pill — violet */
+
+      --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(139, 92, 246, .18), transparent 70%),
+        radial-gradient(900px 500px at 100% 0%, rgba(6, 182, 212, .15), transparent 70%),
+        radial-gradient(800px 400px at 50% 100%, rgba(249, 115, 22, .12), transparent 70%),
+        var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 48px 28px 96px;
+    }
+
+    /* Header */
+    header.hero {
+      padding: 40px 36px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #1a2244 0%, #2a1f4a 50%, #1a2940 100%);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 36px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header.hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(400px 200px at 0% 0%, rgba(6, 182, 212, .18), transparent 70%),
+        radial-gradient(400px 200px at 100% 100%, rgba(249, 115, 22, .18), transparent 70%);
+      pointer-events: none;
+    }
+
+    header.hero h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      background: linear-gradient(90deg, #06b6d4, #8b5cf6, #f97316);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    header.hero .sub {
+      color: var(--fg-dim);
+      font-size: 15px;
+      max-width: 850px;
+    }
+
+    header.hero .meta {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--fg-mute);
+    }
+
+    header.hero .meta span {
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+
+    /* Legend */
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .legend .lg {
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .legend .lg::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--accent, var(--fg-dim));
+    }
+
+    .legend .lg .name {
+      font-weight: 700;
+      color: var(--fg);
+    }
+
+    .legend .lg .desc {
+      font-size: 12px;
+      color: var(--fg-dim);
+      margin-top: 4px;
+    }
+
+    .legend .lg.l0 {
+      --accent: var(--c-l0);
+    }
+
+    .legend .lg.l1 {
+      --accent: var(--c-l1);
+    }
+
+    .legend .lg.l2 {
+      --accent: var(--c-l2);
+    }
+
+    .legend .lg.l3 {
+      --accent: var(--c-l3);
+    }
+
+    .legend .lg.l4 {
+      --accent: var(--c-l4);
+    }
+
+    /* Table of contents */
+    .toc {
+      padding: 22px 26px;
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      margin-bottom: 48px;
+      box-shadow: var(--shadow);
+    }
+
+    .toc h2 {
+      margin: 0 0 14px;
+      font-size: 17px;
+      color: var(--fg-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .toc ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 8px 16px;
+      counter-reset: ti;
+    }
+
+    .toc li {
+      counter-increment: ti;
+      padding: 8px 12px;
+      border-left: 3px solid var(--accent, var(--fg-mute));
+      background: rgba(255, 255, 255, .02);
+      border-radius: 4px;
+      transition: background .15s;
+    }
+
+    .toc li:hover {
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .toc li::before {
+      content: counter(ti, decimal-leading-zero) ". ";
+      color: var(--fg-mute);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .toc a {
+      color: var(--fg);
+      text-decoration: none;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .toc a:hover {
+      color: var(--accent, var(--c-l0));
+    }
+
+    .toc li.l0 {
+      --accent: var(--c-l0);
+    }
+
+    .toc li.l1 {
+      --accent: var(--c-l1);
+    }
+
+    .toc li.l2 {
+      --accent: var(--c-l2);
+    }
+
+    .toc li.l3 {
+      --accent: var(--c-l3);
+    }
+
+    .toc li.l4 {
+      --accent: var(--c-l4);
+    }
+
+    /* File section card */
+    section.file {
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-2) 100%);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--accent, var(--c-l0));
+      padding: 28px 30px;
+      box-shadow: var(--shadow);
+      margin-bottom: 0;
+      scroll-margin-top: 20px;
+    }
+
+    section.file.l0 {
+      --accent: var(--c-l0);
+    }
+
+    section.file.l1 {
+      --accent: var(--c-l1);
+    }
+
+    section.file.l2 {
+      --accent: var(--c-l2);
+    }
+
+    section.file.l3 {
+      --accent: var(--c-l3);
+    }
+
+    section.file.l4 {
+      --accent: var(--c-l4);
+    }
+
+    section.file h3.fname {
+      margin: 0 0 4px;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    section.file h3.fname .fp {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #fff));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    section.file .badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      text-transform: uppercase;
+    }
+
+    section.file .one-liner {
+      color: var(--fg-dim);
+      font-size: 14px;
+      margin: 0 0 22px;
+    }
+
+    /* Sub-section */
+    .sub {
+      margin: 22px 0 8px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent, var(--fg-mute));
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sub::before {
+      content: "";
+      width: 18px;
+      height: 2px;
+      background: var(--accent, var(--fg-mute));
+      border-radius: 2px;
+    }
+
+    ul.logic {
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    ul.logic li {
+      margin-bottom: 6px;
+    }
+
+    ul.logic li::marker {
+      color: var(--accent);
+    }
+
+    p.purpose {
+      margin: 0 0 4px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .9em;
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .06);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: #fde68a;
+    }
+
+    code.kw {
+      color: #93c5fd;
+    }
+
+    code.fn {
+      color: #fcd34d;
+    }
+
+    code.cls {
+      color: #c4b5fd;
+    }
+
+    /* Data flow card (3-column grid) */
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      align-items: stretch;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .flow .step {
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+
+    .flow .step .lbl {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .flow .step .body {
+      font-size: 13px;
+      color: var(--fg);
+    }
+
+    .flow .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    @media (max-width: 760px) {
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .flow .arrow {
+        transform: rotate(90deg);
+      }
+    }
+
+    /* Pills */
+    .pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      border: 1px solid;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .pill.imp {
+      color: var(--c-pill-imp);
+      border-color: color-mix(in srgb, var(--c-pill-imp) 50%, transparent);
+    }
+
+    .pill.by {
+      color: var(--c-pill-by);
+      border-color: color-mix(in srgb, var(--c-pill-by) 50%, transparent);
+    }
+
+    .pill.ext {
+      color: var(--c-pill-ext);
+      border-color: color-mix(in srgb, var(--c-pill-ext) 50%, transparent);
+    }
+
+    .pill.none {
+      color: var(--fg-mute);
+      border-color: var(--border);
+      font-style: italic;
+    }
+
+    .pills-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 4px 0;
+      flex-wrap: wrap;
+    }
+
+    .pills-row .tag {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--fg-mute);
+      min-width: 100px;
+    }
+
+    /* Constants table */
+    table.consts {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 4px;
+      font-size: 13px;
+    }
+
+    table.consts th,
+    table.consts td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.consts th {
+      background: rgba(255, 255, 255, .03);
+      color: var(--fg-dim);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    table.consts tr:nth-child(even) td {
+      background: rgba(255, 255, 255, .015);
+    }
+
+    table.consts td:first-child {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: #fcd34d;
+      width: 38%;
+      vertical-align: top;
+    }
+
+    /* HR separator between files — colorful gradient bar */
+    hr.file-sep {
+      border: 0;
+      height: 6px;
+      margin: 36px 0;
+      background: linear-gradient(90deg,
+          var(--prev, var(--c-l0)) 0%,
+          var(--next, var(--c-l4)) 100%);
+      border-radius: 6px;
+      box-shadow: 0 0 18px color-mix(in srgb, var(--prev, var(--c-l0)) 50%, transparent);
+      opacity: .85;
+    }
+
+    /* Footer */
+    footer.foot {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--fg-mute);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    footer.foot a {
+      color: var(--c-l0);
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header class="hero">
+      <h1>core/ Module Report</h1>
+      <div class="sub">
+        A per-file walkthrough of every Python module under
+        <code>d:\m-cube_version1\core\</code> — purpose, key logic, data flow, and
+        cross-file connections. Each file is colour-coded by the architectural
+        layer it belongs to (L0 ingest → L4 reporting). Companion knowledge graph:
+        <a style="color:var(--c-l0)" href="core_knowledge_graph.html">core_knowledge_graph.html</a>.
+      </div>
+      <div class="meta">
+        <span>Project: <strong>m-cube</strong></span>
+        <span>Branch: <strong>Path_A_LowAPI</strong></span>
+        <span>Files covered: <strong>19</strong></span>
+        <span>Format: self-contained HTML, no external assets</span>
+      </div>
+    </header>
+
+    <div class="legend">
+      <div class="lg l0">
+        <div class="name">L0 — Data ingest</div>
+        <div class="desc">CSV → DataFrame → Nautilus Bars → catalog. Currency / venue / FX rate resolution.</div>
+      </div>
+      <div class="lg l1">
+        <div class="name">L1 — Signals &amp; strategies</div>
+        <div class="desc">Pluggable entry logic, strategy registry, custom-strategy loading, template portfolios.</div>
+      </div>
+      <div class="lg l2">
+        <div class="name">L2 — Exit management</div>
+        <div class="desc">The SL/TP/trailing/RBO state machine that wraps any entry signal.</div>
+      </div>
+      <div class="lg l3">
+        <div class="name">L3 — Orchestration</div>
+        <div class="desc">Portfolio + slot dataclasses; the multi-slot backtest runner (Path A / Path B / grouping).
+        </div>
+      </div>
+      <div class="lg l4">
+        <div class="name">L4 — Users &amp; reporting</div>
+        <div class="desc">Multi-user identity, runtime history, report generation, shared utilities.</div>
+      </div>
+    </div>
+
+    <div class="toc">
+      <h2>Table of contents</h2>
+      <ol>
+        <li class="l4"><a href="#f-init">core/__init__.py</a></li>
+        <li class="l4"><a href="#f-pandas-utils">core/_pandas_utils.py</a></li>
+        <li class="l0"><a href="#f-csv-loader">core/csv_loader.py</a></li>
+        <li class="l0"><a href="#f-nautilus-loader">core/nautilus_loader.py</a></li>
+        <li class="l0"><a href="#f-instrument-factory">core/instrument_factory.py</a></li>
+        <li class="l0"><a href="#f-aggregator">core/aggregator.py</a></li>
+        <li class="l0"><a href="#f-venue-config">core/venue_config.py</a></li>
+        <li class="l0"><a href="#f-fx-rates">core/fx_rates.py</a></li>
+        <li class="l1"><a href="#f-signals">core/signals.py</a></li>
+        <li class="l1"><a href="#f-strategies">core/strategies.py</a></li>
+        <li class="l1"><a href="#f-custom-strategy-loader">core/custom_strategy_loader.py</a></li>
+        <li class="l1"><a href="#f-templates">core/templates.py</a></li>
+        <li class="l3"><a href="#f-models">core/models.py</a></li>
+        <li class="l2"><a href="#f-managed-strategy">core/managed_strategy.py</a></li>
+        <li class="l3"><a href="#f-backtest-runner">core/backtest_runner.py</a></li>
+        <li class="l4"><a href="#f-users">core/users.py</a></li>
+        <li class="l4"><a href="#f-migrate-users">core/migrate_users.py</a></li>
+        <li class="l4"><a href="#f-runtime-history">core/runtime_history.py</a></li>
+        <li class="l4"><a href="#f-report-generator">core/report_generator.py</a></li>
+      </ol>
+    </div>
+
+    <!-- ===================== FILE 1: __init__.py ===================== -->
+    <section class="file l4" id="f-init">
+      <h3 class="fname">
+        <span class="badge">L4 · package</span>
+        <span class="fp">core/__init__.py</span>
+      </h3>
+      <p class="one-liner">Package marker for the <code>core</code> namespace; empty.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Marks <code>core/</code> as a Python package so that
+        <code class="kw">from core import …</code> statements resolve. No re-exports,
+        no side effects.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li>Empty file — no module-level code.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">(none)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">(none)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Enables <code>import core</code></div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none</span></div>
+
+      <div class="sub">Constants &amp; State</div>
+      <p style="color:var(--fg-mute);font-style:italic;margin:0;">None.</p>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l4); --next: var(--c-l4);">
+
+    <!-- ===================== FILE 2: _pandas_utils.py ===================== -->
+    <section class="file l4" id="f-pandas-utils">
+      <h3 class="fname">
+        <span class="badge">L4 · utility</span>
+        <span class="fp">core/_pandas_utils.py</span>
+      </h3>
+      <p class="one-liner">Column-major row iterator that replaces <code>DataFrame.iterrows()</code> in hot paths.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Provide a fast row iterator for the few places that genuinely
+        need to walk a DataFrame row-by-row (report building, per-trade post-processing).
+        ~5× faster than <code>iterrows</code> by materializing each column with
+        <code class="fn">.tolist()</code> once and then zipping the lists.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">iter_columns(df, *names)</code> — for each requested
+          name, either yields the column's <code>.tolist()</code> or falls back to a
+          list of <code>None</code> when the column is missing, then <code>zip</code>s
+          them and yields one tuple per row.</li>
+        <li>Missing-column fallback matches the optional-column pattern downstream
+          so callers don't need to pre-check <code>col in df.columns</code>.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">pandas <code>DataFrame</code> + list of column names</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Materialise each column to a Python list, <code>zip</code> in lockstep</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Iterator of tuples (one tuple per row)</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">backtest_runner</span>
+        <span class="pill by">report_generator</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span><span class="pill ext">pandas</span></div>
+
+      <div class="sub">Constants &amp; State</div>
+      <p style="color:var(--fg-mute);font-style:italic;margin:0;">None.</p>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l4); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 3: csv_loader.py ===================== -->
+    <section class="file l0" id="f-csv-loader">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/csv_loader.py</span>
+      </h3>
+      <p class="one-liner">Scan folders of OHLCV CSVs across crypto / FX / commodity / index layouts and load them into
+        clean DataFrames.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">First stage of the ingest pipeline. Detects which on-disk
+        layout the user has (flat <code>{id}_{SYMBOL}_{Name}.csv</code>, consolidated
+        per-pair files, FX daily-file tree, commodity daily-file tree, or single-stream
+        index files), exposes them as selectable entries to the UI, then loads the
+        bytes into pandas with PyArrow-backed parsers tuned for the FX timestamp
+        format. Synthesises MID bars from ASK + BID at load time.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">scan_csv_folder(folder)</code> — fall-through detection:
+          consolidated FX → flat crypto → FX daily → commodity daily → index daily.
+          Returns a list of dicts <code>{path, filename, id, symbol, name, …}</code>.</li>
+        <li><code class="fn">_scan_fx_daily_layout</code> /
+          <code class="fn">_scan_commodity_daily_layout</code> aggregate thousands of
+          <code>YYYY/MM/DD/*.csv</code> files into <strong>three entries per symbol</strong>
+          — ASK, BID, MID — so the UI exposes each side as its own selectable
+          instrument. Each entry carries the full <code>ask_files</code> /
+          <code>bid_files</code> lists; MID is synthesised at load.
+        </li>
+        <li><code class="fn">_scan_index_daily_layout</code> emits a single entry
+          per root (no ASK/BID split, single stream), with a synthetic display
+          filename shaped like the consolidated FX naming so the UI's asset-class
+          filter still matches.</li>
+        <li>Module-level mtime-keyed caches (<code>_FX_SCAN_CACHE</code>,
+          <code>_COMMODITY_SCAN_CACHE</code>, <code>_INDEX_SCAN_CACHE</code>) skip
+          re-walking the tree on every UI refresh. Stale entries fall back to a
+          TTL safety-net of 600s.
+        </li>
+        <li><code class="fn">load_csv()</code> — PyArrow CSV reader (~35× faster
+          than pandas on 4M-row files). FX timestamps
+          (<code>DD.MM.YYYY HH:MM:SS GMT±HHMM</code>) are reshaped to ISO-8601 in
+          vectorised <code>pyarrow.compute</code> string ops then cast to
+          <code>timestamp[ns,UTC]</code> — measured ~22× faster than
+          <code>pd.to_datetime(format=…)</code>.
+        </li>
+        <li><code class="fn">concat_side(files)</code> — parallel daily-file load
+          via <code>ThreadPoolExecutor</code> (default 16 workers). pandas releases
+          the GIL inside the C parser so I/O overlaps cleanly.</li>
+        <li><code class="fn">_merge_ask_bid_to_mid(ask, bid)</code> — inner-join on
+          timestamp, OHLC = average, volume = sum, capped at <code>QUANTITY_MAX</code>;
+          per-side extras (e.g. <code>ask_vwap</code> / <code>bid_vwap</code>) are
+          carried through unchanged.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Folder path of CSVs; optional column-name overrides</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Layout detect → cache lookup / rescan → PyArrow parse → vectorised timestamp cast → drop NaN
+            OHLCV → MID synth (if requested)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">List of entry dicts (scan); UTC-indexed OHLCV <code>DataFrame</code> (load)</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">nautilus_loader</span>
+        <span class="pill by">aggregator</span> <span class="pill by" style="opacity:.7">(QUANTITY_MAX only)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">pandas</span>
+        <span class="pill ext">pyarrow</span>
+        <span class="pill ext">pyarrow.csv</span>
+        <span class="pill ext">pyarrow.compute</span>
+        <span class="pill ext">concurrent.futures</span>
+        <span class="pill ext">re</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>DEFAULT_CSV_FOLDER</td>
+            <td>Default scan root (<code>D:\Data_all\Fx</code>).</td>
+          </tr>
+          <tr>
+            <td>QUANTITY_MAX</td>
+            <td>16e9 safety cap below Nautilus's <code>QUANTITY_RAW_MAX</code>.</td>
+          </tr>
+          <tr>
+            <td>_CONCAT_SIDE_MAX_WORKERS</td>
+            <td>Thread-pool size for parallel daily loads (16).</td>
+          </tr>
+          <tr>
+            <td>_FX_SCAN_CACHE, _COMMODITY_SCAN_CACHE, _INDEX_SCAN_CACHE</td>
+            <td>Per-layout mtime-keyed scan caches (TTL 600s).</td>
+          </tr>
+          <tr>
+            <td>_SYMBOL_NORMALIZE</td>
+            <td>Common-misspelling map (<code>EUROUSD→EURUSD</code>, <code>GPBUSD→GBPUSD</code>).</td>
+          </tr>
+          <tr>
+            <td>_DAILY_FX_PATTERN, _DAILY_COMMODITY_PATTERN, _DAILY_INDEX_PATTERN, _FLAT_FX_FILE_PATTERN</td>
+            <td>Compiled regexes for each on-disk layout.</td>
+          </tr>
+          <tr>
+            <td>_OHLCV_LOWER</td>
+            <td>Canonical OHLCV column order.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 4: nautilus_loader.py ===================== -->
+    <section class="file l0" id="f-nautilus-loader">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/nautilus_loader.py</span>
+      </h3>
+      <p class="one-liner">Bridge from raw CSV DataFrame to a populated NautilusTrader <code>ParquetDataCatalog</code>.
+      </p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Second stage of ingest. Takes the entry dicts produced by
+        <code class="fn">scan_csv_folder</code>, loads the underlying CSV(s), builds
+        a Nautilus instrument via <code class="fn">create_instrument</code>, wrangles
+        the OHLCV rows into <code class="cls">Bar</code> objects, and writes both the
+        instrument and the bars to a <code class="cls">ParquetDataCatalog</code> on
+        disk. Also owns the cache of opened catalog handles.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">load_csv_and_store(csv_entry, catalog_path, venue, data_format)</code>
+          — main entry point. Dispatches on entry shape:
+          <code>files</code> list (single-stream index) → <code class="fn">concat_side</code>;
+          <code>ask_files</code> + <code>bid_files</code> + <code>side=MID</code> →
+          <code class="fn">load_pair_mid</code>; <code>ask_files</code>/<code>bid_files</code> +
+          <code>side=ASK|BID</code> → <code class="fn">concat_side</code> on the chosen
+          side; otherwise → single-file <code class="fn">load_csv</code>.
+        </li>
+        <li><code class="fn">wrangle_bars()</code> — wraps Nautilus's
+          <code class="cls">BarDataWrangler</code> to turn the OHLCV DataFrame into
+          a list of <code class="cls">Bar</code> objects.
+        </li>
+        <li><code class="fn">save_to_catalog()</code> — writes instrument + bars
+          to <code>catalog/</code>; skips the instrument write when already present
+          so re-ingest is cheap.</li>
+        <li><code class="fn">load_catalog(path)</code> — per-path
+          <code class="cls">ParquetDataCatalog</code> cache (<code>_CATALOG_CACHE</code>
+          guarded by <code>_CATALOG_LOCK</code>) so the 50–300ms manifest read isn't
+          paid on every API call.
+        </li>
+        <li>Doji sanity check — samples up to 1000 wrangled bars and logs a warning
+          if &gt;30% have <code>open == close</code> (a clear sign of insufficient
+          price precision).</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">CSV entry dict + catalog path + venue + data-format config</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Load DataFrame → build instrument → wrangle to Bars → doji check → write Parquet</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Result dict; bars + instrument persisted under <code>catalog/data/</code></div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">csv_loader</span>
+        <span class="pill imp">instrument_factory</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (called by
+          server.py)</span></div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">nautilus_trader</span>
+        <span class="pill ext">pandas</span>
+        <span class="pill ext">threading</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_CATALOG_CACHE / _CATALOG_LOCK</td>
+            <td>Per-path catalog instance cache + lock.</td>
+          </tr>
+          <tr>
+            <td>DEFAULT_CATALOG_PATH</td>
+            <td><code>./catalog</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 5: instrument_factory.py ===================== -->
+    <section class="file l0" id="f-instrument-factory">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/instrument_factory.py</span>
+      </h3>
+      <p class="one-liner">Construct fully-specified Nautilus <code>CurrencyPair</code> instruments with precision &amp;
+        lot-size from the admin config.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Centralises all "what does this instrument look like?"
+        decisions: per-quote-currency price precision, per-base crypto precision,
+        fiat <code>Currency</code> object overrides, lot size, trade-size cap, fees,
+        margins, price/quantity bounds. The rest of the system never instantiates
+        <code class="cls">CurrencyPair</code> directly.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">create_instrument(base, quote, venue, price_precision, size_precision)</code>
+          — composes the instrument:
+          price precision falls back through explicit override →
+          <code>BASE_PRICE_PRECISION</code> (BTC/ETH/etc.) →
+          <code>PRICE_PRECISION</code> (by quote ccy) → default 2.
+        </li>
+        <li>Size precision defaults to 0 (safety against volume overflow).</li>
+        <li><code class="fn">_get_currency()</code> overrides fiat (USD/EUR/GBP/JPY)
+          precision to <code>CURRENCY_PRECISION</code>, otherwise uses an 8-decimal
+          crypto default.</li>
+        <li>Lot size &amp; trade-size cap pulled from the venue's admin config via
+          <code class="fn">load_instrument_config</code> — so the same crypto
+          instrument can have venue-specific minimums.
+        </li>
+        <li>Standard fees (maker / taker 0.1%) and margins (init 1.0, maint 0.35)
+          baked in.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">base, quote, venue, optional precision overrides</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Resolve precisions → build <code>Currency</code> objects → load lot/trade-size from admin →
+            assemble <code>CurrencyPair</code></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Nautilus <code class="cls">CurrencyPair</code> instrument</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">venue_config</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">nautilus_loader</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">nautilus_trader</span>
+        <span class="pill ext">decimal</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PRICE_PRECISION</td>
+            <td>USD/EUR/GBP→5, JPY→3, USDT→2.</td>
+          </tr>
+          <tr>
+            <td>BASE_PRICE_PRECISION</td>
+            <td>BTC/ETH→2; SOL/XRP/ADA/AVAX/LINK/DOT→4; DOGE/MATIC→6.</td>
+          </tr>
+          <tr>
+            <td>CURRENCY_PRECISION</td>
+            <td>Fiat Money-object precisions.</td>
+          </tr>
+          <tr>
+            <td>_ISO4217</td>
+            <td>Fiat-currency override map.</td>
+          </tr>
+          <tr>
+            <td>VENUE</td>
+            <td>Module-level default <code>Venue("BINANCE")</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 6: aggregator.py ===================== -->
+    <section class="file l0" id="f-aggregator">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/aggregator.py</span>
+      </h3>
+      <p class="one-liner">Pure-pandas OHLCV resampling + derived-feature computation; mirrors Nautilus's
+        <code>TimeBarAggregator</code> semantics.
+      </p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Convert a 1-minute OHLCV DataFrame into a coarser-timeframe
+        DataFrame and optionally append 14 derived features (EMAs, RSI, ATR, VWAP,
+        true range, log/pct returns, body / wick geometry). Driven offline by
+        <code>scripts/aggregate_catalog.py</code> — not invoked inside the live
+        backtest engine.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">aggregate_ohlcv(df, timeframe, …)</code> — pandas
+          <code class="fn">resample(rule, closed='right', label='right')</code>
+          so the window <code>(T-N, T]</code> is stamped at <code>T</code>, matching
+          Nautilus's <code class="cls">TimeBarAggregator</code> convention exactly.
+        </li>
+        <li><code class="fn">_drop_trailing_partial()</code> removes an in-progress
+          final window when no source bar lands exactly on the right boundary, so
+          aggregated output never contains a partially-filled bar.</li>
+        <li><code class="fn">compute_features(df, …)</code> — emits 14 columns:
+          geometry (<code>range, body, upper_wick, lower_wick</code>),
+          returns (<code>log_return, pct_return</code>),
+          price (<code>typical_price, vwap</code>; per-session resettable),
+          volatility (<code>tr, atr_14</code>; 14-bar Wilder smoothing via
+          <code>ewm(alpha=1/period, adjust=False)</code>),
+          momentum (<code>ema_9, ema_21, rsi_14</code>).
+        </li>
+        <li><code class="fn">aggregate_with_features()</code> — convenience wrapper:
+          resample + feature compute in one call.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">UTC-indexed 1-min OHLCV <code>DataFrame</code>, timeframe string, feature params</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Right-closed resample → drop trailing partial → 14 feature columns</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Resampled / feature-enriched <code>DataFrame</code></div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">csv_loader</span> <span class="pill imp" style="opacity:.7">(QUANTITY_MAX)</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (offline script
+          consumer)</span></div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">pandas</span>
+        <span class="pill ext">numpy</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OHLCV_AGG</td>
+            <td>Standard resample aggregators (first / max / min / last / sum).</td>
+          </tr>
+          <tr>
+            <td>TIMEFRAME_TO_RULE</td>
+            <td>Nautilus timeframe → pandas resample rule.</td>
+          </tr>
+          <tr>
+            <td>FEATURE_COLUMNS</td>
+            <td>The 14 feature names emitted by <code>compute_features</code>.</td>
+          </tr>
+          <tr>
+            <td>_MONTH_ABBR</td>
+            <td>Three-letter month abbreviations (shared shape with csv_loader).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 7: venue_config.py ===================== -->
+    <section class="file l0" id="f-venue-config">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/venue_config.py</span>
+      </h3>
+      <p class="one-liner">Parse the venue from a bar-type string and look up the matching adapter config JSON.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Single source of truth for the bar-type-string format
+        <code>SYMBOL.VENUE-N-TIMEFRAME-PRICE-EXTERNAL</code> and the JSON adapter
+        configs under <code>adapter_admin/adapters_config/*.json</code>. Used by the
+        instrument factory (lot size / trade-size cap) and the backtest runner
+        (account base currency, FX conversion rules).
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">venue_from_bar_type(s)</code> — split on
+          <code>.</code> + <code>-</code> to extract the venue (<code>"FOREX_MS"</code>
+          from <code>"USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL"</code>).
+        </li>
+        <li><code class="fn">symbol_from_bar_type(s)</code> — sibling that returns
+          just the symbol (<code>"USDJPY"</code>).</li>
+        <li><code class="fn">load_adapter_config_for_venue(venue)</code> —
+          case-insensitive match against each <code>*.json</code> file's
+          <code>"venue"</code> field.
+        </li>
+        <li><code class="fn">load_instrument_config(symbol, venue)</code> —
+          look up <code>config["instruments"][symbol]</code> (case-insensitive); the
+          expected shape is <code>{"lot_size": n, "trade_size": cap}</code>.</li>
+        <li>Convenience wrappers <code class="fn">load_adapter_config_for_bar_type</code>
+          and <code class="fn">load_instrument_config_for_bar_type</code> combine
+          parse + load in one call.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Bar-type string or (venue, symbol) pair</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Parse bar type → glob <code>adapter_admin/adapters_config/*.json</code> → case-insensitive
+            match</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Config dict (or <code>None</code> if not found)</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">instrument_factory</span>
+        <span class="pill by">backtest_runner</span>
+        <span class="pill by">models</span> <span class="pill by" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">json</span>
+        <span class="pill ext">pathlib</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_PROJECT_ROOT</td>
+            <td>Path resolved from <code>__file__</code>.</td>
+          </tr>
+          <tr>
+            <td>_ADAPTERS_CONFIG_DIR</td>
+            <td><code>&lt;root&gt;/adapter_admin/adapters_config</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l0);">
+
+    <!-- ===================== FILE 8: fx_rates.py ===================== -->
+    <section class="file l0" id="f-fx-rates">
+      <h3 class="fname">
+        <span class="badge">L0 · ingest</span>
+        <span class="fp">core/fx_rates.py</span>
+      </h3>
+      <p class="one-liner">Timestamp-aware FX rate resolver that converts cross-currency PnL to the venue's account base
+        currency.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">A USDJPY trade settles in JPY; without conversion the JPY
+        PnL would be silently dropped from the USD account. This module loads the
+        venue's <code>fx_conversion</code> rules from its adapter config and converts
+        every per-trade amount at the FX rate <em>nearest and not after</em> the trade
+        timestamp. Supports both static rates and catalog-sourced pairs (daily-MID
+        preferred, with graceful fallback to LAST or a configured constant).</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li>Dataclasses: <code class="cls">_RuleStatic</code> (fixed scalar) and
+          <code class="cls">_RuleCatalog</code> (catalog pair + <code>is_inverse</code>
+          flag + fallback rate).
+        </li>
+        <li><code class="cls">FxRateResolver</code>:
+          <ul>
+            <li><code class="fn">from_adapter_config(adapter_cfg, catalog_path)</code>
+              — factory that parses the venue's <code>account_base_currency</code>
+              and <code>fx_conversion</code> rules.</li>
+            <li><code class="fn">convert(amount, from_ccy, at_timestamp)</code> —
+              same-currency pass-through; missing rule → identity; catalog miss →
+              configured fallback or identity.</li>
+            <li><code class="fn">_get_series(pair)</code> — lazy load FX series
+              from <code>ParquetDataCatalog</code>, preferring
+              <code>1-DAY-MID</code> → <code>1-DAY-LAST</code> → <code>MID</code> →
+              <code>LAST</code>; cached on the instance.
+            </li>
+            <li><code class="fn">_lookup_price(series, at)</code> — asof lookup on
+              a sorted UTC-indexed series; forward-fills weekends and falls back to
+              the latest if the timestamp precedes the series start.</li>
+          </ul>
+        </li>
+        <li><code class="fn">_decode_nautilus_price_column(col)</code> — zero-copy
+          decode of Nautilus fixed-precision int64 prices (1e9 scale) from PyArrow
+          arrays, <code>FixedSizeBinary(8)</code> blobs, or pandas Series. Handles
+          float64, int64 / uint64, and binary formats interchangeably.</li>
+        <li><code class="fn">parse_money_string(s)</code> — split Nautilus
+          <code>Money</code> strings (e.g. <code>"-1234.56 JPY"</code>) into
+          <code>(amount, ccy)</code>.
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Adapter config + catalog path; per-trade <code>(amount, ccy, timestamp)</code></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Pick rule → lazy-load FX series from catalog → asof lookup → multiply</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Converted amount in the account base currency</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">backtest_runner</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">pandas</span>
+        <span class="pill ext">pyarrow</span>
+        <span class="pill ext">pyarrow.parquet</span>
+        <span class="pill ext">numpy</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>FxRateResolver._series_cache</td>
+            <td>Lazy per-pair series cache.</td>
+          </tr>
+          <tr>
+            <td>FxRateResolver._rules</td>
+            <td>From-ccy → rule map.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l0); --next: var(--c-l1);">
+
+    <!-- ===================== FILE 9: signals.py ===================== -->
+    <section class="file l1" id="f-signals">
+      <h3 class="fname">
+        <span class="badge">L1 · signal</span>
+        <span class="fp">core/signals.py</span>
+      </h3>
+      <p class="one-liner">Registry of pure entry-signal functions and their indicator dependencies.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">For a strategy to be wrapped by
+        <code class="cls">ManagedExitStrategy</code> it needs a stateless
+        signal function. This module is the registry of those functions plus a
+        declarative description of the Nautilus indicators each one needs. The exit
+        engine looks up the entry by name and feeds it pre-computed indicator
+        values + position-state booleans on every bar.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">ema_cross_signal(fast, slow, …)</code> — BUY when
+          <code>fast ≥ slow</code>, SELL when <code>fast &lt; slow</code> (crosses
+          only — keeps the state machine in <code class="cls">ManagedExitStrategy</code>).
+        </li>
+        <li><code class="fn">rsi_signal(rsi, overbought, oversold, …)</code> —
+          BUY at / below oversold, SELL at / above overbought.</li>
+        <li><code class="fn">bollinger_signal(close, lower, upper, …)</code> —
+          BUY at the lower band, SELL at the upper band.</li>
+        <li><code class="fn">four_ma_signal(v1..v4, …)</code> — BUY when
+          <code>v1 &gt; v2 &gt; v3 &gt; v4</code> (alignment), SELL on the inverse.
+        </li>
+        <li><code>SIGNAL_REGISTRY[name]</code> = <code>{signal_fn, indicators, extract_args}</code>
+          — <code>extract_args</code> is a small lambda that assembles the named
+          arguments for <code>signal_fn</code> from the indicators dict + slot
+          params dict so the runner stays decoupled from each signal's signature.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Indicator values per bar + slot params + position-state flags</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body"><code>extract_args</code> → <code>signal_fn</code></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body"><code>(OrderSide | None, reason_str | None)</code></div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">managed_strategy</span>
+        <span class="pill by">backtest_runner</span> <span class="pill by" style="opacity:.7">(via re-export)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">nautilus_trader (indicators)</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SIGNAL_REGISTRY</td>
+            <td>Name → {signal_fn, indicators, extract_args} map.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l1); --next: var(--c-l1);">
+
+    <!-- ===================== FILE 10: strategies.py ===================== -->
+    <section class="file l1" id="f-strategies">
+      <h3 class="fname">
+        <span class="badge">L1 · strategy</span>
+        <span class="fp">core/strategies.py</span>
+      </h3>
+      <p class="one-liner">Backward-compat re-export of <code>STRATEGY_REGISTRY</code> from the <code>strategies/</code>
+        package.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Historic location for the strategy registry; now a thin
+        shim. Callers that still <code class="kw">from core.strategies import …</code>
+        get the merged registry plus the individual strategy / config classes.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li>Imports <code>STRATEGY_REGISTRY</code> from the top-level
+          <code>strategies</code> package (auto-discovered at import time by
+          <code>strategies/__init__.py</code>'s <code>_build_registry</code>).
+        </li>
+        <li>Re-exports the concrete classes:
+          <code class="cls">EMACrossStrategy</code>,
+          <code class="cls">RSIMeanReversionStrategy</code>,
+          <code class="cls">BollingerBandsStrategy</code>,
+          <code class="cls">FourMAStrategy</code> + their <code>Config</code> twins.
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">(import-time only) — pulls from the <code>strategies</code> package</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Re-export</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body"><code>STRATEGY_REGISTRY</code> + per-strategy class names</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">custom_strategy_loader</span>
+        <span class="pill by">backtest_runner</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">strategies (sibling package)</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>STRATEGY_REGISTRY</td>
+            <td>Re-exported merged registry.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l1); --next: var(--c-l1);">
+
+    <!-- ===================== FILE 11: custom_strategy_loader.py ===================== -->
+    <section class="file l1" id="f-custom-strategy-loader">
+      <h3 class="fname">
+        <span class="badge">L1 · strategy</span>
+        <span class="fp">core/custom_strategy_loader.py</span>
+      </h3>
+      <p class="one-liner">Discover, validate and merge user-uploaded strategy <code>.py</code> files with the built-in
+        registry.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Lets users drop a <code>.py</code> file under
+        <code>custom_strategies/&lt;user_id&gt;/</code> and have it show up alongside
+        the built-in strategies in the UI. Performs a strict 6-phase validation
+        before exposing anything so a broken upload never poisons the registry.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">validate_and_load_strategy(file_path)</code> — six
+          phases:
+          <em>(1)</em> file checks (exists, non-empty);
+          <em>(2)</em> module load via <code>importlib.util</code> (catches and
+          reformats syntax errors);
+          <em>(3)</em> required exports present
+          (<code>STRATEGY_NAME / STRATEGY_CLASS / CONFIG_CLASS / DESCRIPTION / PARAMS</code>);
+          <em>(4)</em> type checks (str / class inheritance / dict);
+          <em>(5)</em> config &amp; strategy method validation
+          (<code>instrument_id / bar_type / trade_size</code> on the config;
+          <code>on_start / on_bar / on_stop</code> on the strategy);
+          <em>(6)</em> PARAMS dict cross-referenced against the config fields
+          (numeric params must have <code>min/max</code> and a default in range).
+        </li>
+        <li><code class="fn">load_all_custom_strategies(dir)</code> — glob
+          <code>*.py</code>, skip dunder files, validate each, de-duplicate by
+          strategy name, returning <code>(strategies_dict, warnings)</code>.
+        </li>
+        <li><code class="fn">get_merged_registry(custom_dir)</code> — thread-safe
+          (lock + double-check on a per-dir mtime signature) merge of built-ins
+          plus customs; collisions get a <code>"(Custom) "</code> prefix to keep
+          the built-ins as the canonical name.</li>
+        <li><code class="fn">get_strategy_template()</code> — returns a
+          well-commented template <code>.py</code> file for the UI's "new strategy"
+          flow.</li>
+        <li><code class="fn">get_strategy_guidelines()</code> — markdown docs of
+          the contract (required exports, indicators list, common patterns).</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Custom-strategies directory path</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Glob <code>.py</code> → <code>importlib</code> load → 6-phase validate → merge with
+            built-ins (lock-guarded cache)</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Merged registry dict + warnings list</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">strategies</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">backtest_runner</span> <span class="pill by" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">importlib.util</span>
+        <span class="pill ext">inspect</span>
+        <span class="pill ext">threading</span>
+        <span class="pill ext">nautilus_trader</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>REQUIRED_EXPORTS</td>
+            <td>5 module-level names every custom strategy must export.</td>
+          </tr>
+          <tr>
+            <td>REQUIRED_CONFIG_FIELDS</td>
+            <td><code>{"instrument_id", "bar_type", "trade_size"}</code>.</td>
+          </tr>
+          <tr>
+            <td>REQUIRED_STRATEGY_METHODS</td>
+            <td><code>{"on_start", "on_bar", "on_stop"}</code>.</td>
+          </tr>
+          <tr>
+            <td>MAX_STRATEGY_NAME_LENGTH</td>
+            <td>100 chars.</td>
+          </tr>
+          <tr>
+            <td>_REGISTRY_CACHE / _REGISTRY_CACHE_LOCK</td>
+            <td>Per-dir cache invalidated by mtime signature.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l1); --next: var(--c-l1);">
+
+    <!-- ===================== FILE 12: templates.py ===================== -->
+    <section class="file l1" id="f-templates">
+      <h3 class="fname">
+        <span class="badge">L1 · template</span>
+        <span class="fp">core/templates.py</span>
+      </h3>
+      <p class="one-liner">Pre-built portfolio templates the Dashboard exposes as one-click starters.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Hardcoded sample portfolios that demonstrate the supported
+        strategies + reasonable defaults. Each template knows how to build itself
+        given a list of bar types so the same template can be instantiated for any
+        loaded instrument set.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">get_templates()</code> — returns four named templates:
+          <strong>Trend Following</strong> (EMA Cross + trailing SL),
+          <strong>Mean Reversion</strong> (RSI + Bollinger, tight 3% SL / 5% TP),
+          <strong>Diversified</strong> (one of each at 5% SL / 10% TP), and
+          <strong>Conservative</strong> (single EMA, wide 8%/12% with target locking).
+        </li>
+        <li><code class="fn">build_template(name, bar_types)</code> — fetches the
+          matching builder and returns a populated
+          <code class="cls">PortfolioConfig</code>.
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Template name + list of bar types</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Build slots / exit configs / portfolio defaults</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">A <code class="cls">PortfolioConfig</code> ready to save or run</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">models</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (server.py uses
+          it)</span></div>
+
+      <div class="sub">Constants &amp; State</div>
+      <p style="color:var(--fg-mute);font-style:italic;margin:0;">None — templates are pure functions.</p>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l1); --next: var(--c-l3);">
+
+    <!-- ===================== FILE 13: models.py ===================== -->
+    <section class="file l3" id="f-models">
+      <h3 class="fname">
+        <span class="badge">L3 · schema</span>
+        <span class="fp">core/models.py</span>
+      </h3>
+      <p class="one-liner">Portfolio / slot / exit dataclasses, JSON persistence, legacy-field migration, leg-action
+        validation.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">The schema of everything the user can configure. Three
+        nested dataclasses describe a portfolio; helper functions load and save them
+        as JSON under <code>portfolios/&lt;user_id&gt;/</code>; one helper migrates
+        the legacy <code>trade_size</code> field into the new lots × lot-size model
+        so old saved portfolios keep loading.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="cls">ExitConfig</code> — every per-leg exit knob: SL type
+          (none / percentage / points / trailing / ATR), SL value, trailing offsets,
+          SL/Target wait (sec or bars), target lock (snap SL to a floor once
+          profit ≥ trigger), per-leg trailing target, action combos
+          (<code>close / re_execute / reverse / execute / re_entry / keep_leg_running</code>;
+          up to 3 comma-separated), cross-leg fields, squareoff override.</li>
+        <li><code class="cls">StrategySlotConfig</code> — slot identity
+          (8-char UUID), strategy name + params, bar type, lots, allocation %,
+          enabled flag, start/end date, slot-level squareoff override, embedded
+          <code class="cls">ExitConfig</code>.
+        </li>
+        <li><code class="cls">PortfolioConfig</code> — capital, max loss/profit,
+          allocation mode (equal / percentage), date filters, weekday filter
+          (<code>run_on_days</code>), entry-window filter
+          (<code>entry_start_time / entry_end_time</code>), portfolio-level
+          squareoff, RBO knobs, "Other Settings" knobs, portfolio SL / trailing SL,
+          Move SL to Cost (portfolio-aggregate flavour), portfolio target /
+          trailing target, ReExecute-tab suppressors, monitoring flags
+          (live-only), <code>slots: list[StrategySlotConfig]</code>.</li>
+        <li><code class="fn">resolve_squareoff(portfolio, slot)</code> — 3-level
+          priority chain: leg &gt; slot &gt; portfolio.</li>
+        <li><code class="fn">parse_leg_actions(s)</code> /
+          <code class="fn">validate_leg_actions(s, has_execute_target)</code> —
+          split CSV, deduplicate, enforce spec rules (at most 3,
+          <code>keep_leg_running</code> solo, <code>re_execute</code> and
+          <code>re_entry</code> exclusive, <code>execute</code> requires a target leg).
+        </li>
+        <li><code class="fn">portfolio_from_dict()</code> rebuilds a config from
+          dict; calls <code class="fn">_migrate_legacy_trade_size</code> on each
+          slot — that translates the old <code>trade_size</code> field into
+          <code>lots = trade_size / lot_size</code> by looking up the venue config.
+        </li>
+        <li><code class="fn">effective_slot_qty(slot, user_id)</code> →
+          <code>min(lot_size × lots × user_multiplier, trade_size_cap)</code>.
+        </li>
+        <li>Persistence: <code class="fn">save_portfolio</code>,
+          <code class="fn">load_portfolio</code>,
+          <code class="fn">list_portfolios</code>,
+          <code class="fn">delete_portfolio</code> — all under
+          <code>portfolios/&lt;user_id&gt;/&lt;name&gt;.json</code>.
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">User-built config (UI) or JSON file on disk</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body"><code>portfolio_from_dict</code> → legacy migration → dataclass construction → leg-action
+            validation</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Typed <code class="cls">PortfolioConfig</code> for the runner; JSON file for persistence
+          </div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">venue_config</span> <span class="pill imp" style="opacity:.7">(lazy)</span>
+        <span class="pill imp">users</span> <span class="pill imp" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">managed_strategy</span>
+        <span class="pill by">backtest_runner</span>
+        <span class="pill by">templates</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">dataclasses</span>
+        <span class="pill ext">uuid</span>
+        <span class="pill ext">json</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>VALID_LEG_ACTIONS</td>
+            <td>Tuple of the six legal leg-action names.</td>
+          </tr>
+          <tr>
+            <td>_filter_known_fields()</td>
+            <td>Defensive schema-drift filter applied by <code>portfolio_from_dict</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l3); --next: var(--c-l2);">
+
+    <!-- ===================== FILE 14: managed_strategy.py ===================== -->
+    <section class="file l2" id="f-managed-strategy">
+      <h3 class="fname">
+        <span class="badge">L2 · exit engine</span>
+        <span class="fp">core/managed_strategy.py</span>
+      </h3>
+      <p class="one-liner">The SL/TP/trailing/target-lock/RBO state machine that wraps any entry signal.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Heart of the portfolio system. Wraps a stateless signal
+        from <code>SIGNAL_REGISTRY</code> with a complete exit-management lifecycle:
+        intra-bar SL / TP, sec/bar waits, Move SL to Cost, trailing SL, target locks,
+        per-leg trailing target, multi-action exit dispatch
+        (<code>close / re_execute / reverse / execute / re_entry / keep_leg_running</code>),
+        intra-day entry windows, range-breakout (RBO) entry gating, squareoff, and
+        cross-slot Hit-On-Leg signalling via a shared in-memory event bus.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><strong>on_bar state machine</strong> (resolved each tick):
+          <ol style="padding-left:18px;margin:6px 0;">
+            <li><em>Format routing</em>: Format A buffers a BID/ASK/PRIMARY trio in
+              <code>_fa_pending</code> until all three arrive; B/C dispatch directly.
+            </li>
+            <li><em>RBO phase</em>: IDLE → MONITORING → ENTRY → DONE; daily reset.</li>
+            <li><em>Squareoff check</em>: compare local-time vs
+              <code>squareoff_time</code> in <code>squareoff_tz</code>; force-close
+              and block re-entry until next session.
+            </li>
+            <li><em>Exit checks</em> (when in position): Move SL to Cost variants
+              (incl. "for All Legs Despite Loss/Profit", LTP+buffer slide, Hit-On-Leg
+              cross-slot trigger, portfolio-aggregate trigger), trailing SL
+              (basic ratchet or post-move dedicated trail), target lock, per-leg
+              trailing target via <code class="fn">advance_trailing_target</code>,
+              SL hit (long: low ≤ SL; short: high ≥ SL) with sec/bar wait gating,
+              TP hit (mirror) with target-wait gating.</li>
+            <li><em>Entry checks</em> (when flat): Execute-arm consumption from the
+              sibling bus, ReEntry price gate (must cross back through entry level),
+              Re-execution delay (<code>delay_between_legs_sec</code>), Intra-day
+              entry-window block, RBO ENTRY-phase gating, signal lookup &amp;
+              side resolution, <code>_submit_order</code> + <code>_set_exit_levels</code>.</li>
+          </ol>
+        </li>
+        <li><code class="fn">_handle_exit(kind, is_long, close)</code> — publish
+          hit timestamp to the cross-slot bus, parse up to 3 actions, apply
+          <code>on_sl_action_on</code> / <code>on_target_action_on</code> filters
+          (suppress on trailed vs fixed), respect ReExecute suppressors
+          (<code>no_reexec_sl_cost</code>, <code>no_reentry_sl_cost</code>), close
+          with a structured reason tag (<code>_expecting_close_fill=True</code> so
+          <code>on_order_filled</code> doesn't misclassify the close as a new entry),
+          then dispatch each action.
+        </li>
+        <li><code class="fn">on_order_filled()</code> — on entry, compute SL/TP
+          from type+value (percentage / points / ATR / none); snap to the
+          instrument tick; reset per-position counters.</li>
+        <li><strong>RBO state machine</strong>
+          (<code class="fn">_rbo_step</code>): IDLE → MONITORING (accumulate
+          high/low) → ENTRY (detect breakouts on the configured side(s)) → DONE;
+          <code>rbo_cancel_other_side</code> defers DONE to next bar so this bar's
+          breakout still fires; range buffer + entry end mark the close of the
+          window.
+        </li>
+        <li><code class="fn">advance_trailing_target(active, stop, anchor, …)</code>
+          — pure function ratcheting profit-lock: activation at
+          <code>tgt_trail_when_profit_reach</code>, floor at
+          <code>tgt_trail_lock_min_profit</code>, ratchet by <code>tgt_trail_by</code>
+          every <code>tgt_trail_every</code> percent profit.
+        </li>
+        <li><code class="fn">resolve_trigger_hl(...)</code> — three-format trigger
+          resolver: Format A picks BID for long-SL / ASK for short-SL, Format B
+          uses OHLC, Format C uses close-only.</li>
+        <li>Cross-slot bus:
+          <code>_CROSS_SLOT_EVENT_BUSES[portfolio_id][slot_id]</code> stores
+          <code>sl_ns</code>, <code>tgt_ns</code>, <code>arm_ns</code> timestamps so
+          siblings can react to each other (Hit-On-Leg, Execute arm).
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body">Bar stream + position state + cross-slot bus events</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Exit-side evaluation (Move SL → trailing → target lock → leg-trail → SL hit → TP hit)
+            <em>OR</em> entry-side evaluation (gates → signal)
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Order submissions, position closes (tagged with structured reasons), cross-slot bus updates
+          </div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">models</span>
+        <span class="pill imp">signals</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">backtest_runner</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">nautilus_trader</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_CROSS_SLOT_EVENT_BUSES</td>
+            <td>Process-global dict[portfolio_id][slot_id] → {sl_ns, tgt_ns, arm_ns}.</td>
+          </tr>
+          <tr>
+            <td>_SL_TYPE_CANON / _TGT_TYPE_CANON</td>
+            <td>Alias canonicalisation maps for the SL/Target type strings.</td>
+          </tr>
+          <tr>
+            <td>_NANOS_PER_DAY</td>
+            <td>RBO daily-reset constant.</td>
+          </tr>
+          <tr>
+            <td>ManagedExitConfig</td>
+            <td>Frozen dataclass the strategy's <code>config_from_exit</code> builds from <code>ExitConfig</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l2); --next: var(--c-l3);">
+
+    <!-- ===================== FILE 15: backtest_runner.py ===================== -->
+    <section class="file l3" id="f-backtest-runner">
+      <h3 class="fname">
+        <span class="badge">L3 · orchestration</span>
+        <span class="fp">core/backtest_runner.py</span>
+      </h3>
+      <p class="one-liner">The portfolio runner. Loads bars, dispatches per-slot or per-group engines (Path A / Path B),
+        merges results, applies portfolio-level clipping.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Top-level driver invoked from <code>server.py</code>. Owns
+        the choice between single-strategy mode and multi-slot portfolio mode, the
+        three execution paths (per-slot Path A, grouped Path A, Path B
+        <code>BacktestNode</code>), worker-pool dispatch, day/time filters, FX-rate
+        conversion of cross-currency PnL, two-pass portfolio-aggregate Move SL
+        detection, and the final clip pass that enforces portfolio + user SL / TP /
+        trailing levels on the merged equity curve.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">run_backtest(catalog_path, bar_type, strategy_name, params, …)</code>
+          — single-strategy entry point; routes to
+          <code class="fn">run_backtest_node</code> when Path B is active.
+        </li>
+        <li><code class="fn">run_portfolio_backtest(portfolio, catalog_path, …)</code>
+          — multi-slot entry; for each enabled slot either spawns its own engine
+          (<code class="fn">_run_single_slot</code>) or, when
+          <code>_USE_GROUPING=1</code> and slots share
+          <code>(bar_type, start_date, end_date, custom_strategies_dir)</code>, batches
+          them into a shared <code class="cls">BacktestEngine</code> via
+          <code class="fn">_run_slot_group</code>.
+        </li>
+        <li><code class="fn">_extract_slot_from_group_reports</code> — after a shared
+          engine run, walks <code>engine.trader.strategies()</code> (Nautilus
+          reassigns IDs internally — never trust the pre-run ID), filters positions
+          by <code>strategy_id</code>, synthesises a per-slot equity curve from the
+          shared reports.</li>
+        <li><code class="fn">_run_single_backtest_task</code> — worker entry; calls
+          <code class="fn">get_merged_registry</code> via
+          <code class="fn">importlib</code> reload so custom strategies are available
+          inside child processes.
+        </li>
+        <li>Portfolio clipping pipeline:
+          <code class="fn">_merge_portfolio_results</code> calls
+          <code class="fn">_apply_portfolio_clip</code> which walks the merged equity
+          curve and runs
+          <code class="fn">_pf_sl_clip</code> (portfolio SL: combined-loss /
+          underlying-movement / loss-and-range),
+          <code class="fn">_pf_tgt_clip</code> (portfolio target),
+          <code class="fn">_user_sl_clip</code> + <code class="fn">_user_tgt_clip</code>
+          (user-level cumulative SL/TP across portfolios). All three respect Delay
+          (sec) and re-execute counters.
+        </li>
+        <li>Day / time filters: weekday list and intraday entry-window applied as
+          bar-list pre-filtering in Path A;
+          <code class="fn">_chunk_data_configs_for_path_b</code> emits one
+          <code class="cls">BacktestDataConfig</code> per allowed day for Path B.
+          Path B auto-falls-back to Path A when filters are active.
+        </li>
+        <li>Per-worker bar cache: <code>_cached_catalog_bars</code> is an
+          <code>lru_cache(maxsize=4)</code> so repeated runs on the same
+          <code>(bar_type, start, end)</code> reuse the in-memory bar list.
+        </li>
+        <li>FX conversion: <code class="cls">FxRateResolver</code> converts each
+          trade's PnL to the venue's account base currency before merging into the
+          portfolio equity curve.</li>
+        <li>RBO wrapper: when <code>rbo_enabled</code> the runner wraps the raw
+          signal with <code class="fn">config_from_exit</code> →
+          <code class="cls">ManagedExitStrategy</code>.
+        </li>
+        <li>Phase profiling: <code class="fn">_phase("label", phase_bag)</code>
+          context manager is zero-cost when <code>phase_bag is None</code>; populated
+          only under <code>_PROFILE_PHASES=1</code>.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body"><code class="cls">PortfolioConfig</code> + catalog path + user_id</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Group/split slots → load bars (cached) → filter → spawn worker engines → FX-convert PnL →
+            merge equity → apply portfolio + user clip</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Per-portfolio result dict: combined equity, trade list, metrics, provenance tags
+            (<code>path_b</code>, <code>bars_filtered_by_*</code>, <code>warning</code>)</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">strategies</span>
+        <span class="pill imp">models</span>
+        <span class="pill imp">managed_strategy</span>
+        <span class="pill imp">fx_rates</span>
+        <span class="pill imp">venue_config</span>
+        <span class="pill imp">users</span> <span class="pill imp" style="opacity:.7">(lazy)</span>
+        <span class="pill imp">custom_strategy_loader</span> <span class="pill imp" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (entry point)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">nautilus_trader</span>
+        <span class="pill ext">pandas</span>
+        <span class="pill ext">concurrent.futures (ProcessPool)</span>
+        <span class="pill ext">functools.lru_cache</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_USE_GROUPING</td>
+            <td>Env-gate for shared-engine grouping.</td>
+          </tr>
+          <tr>
+            <td>_USE_BACKTEST_NODE / _PATH_B_ACTIVE</td>
+            <td>Env-gate for Path B (<code>BacktestNode</code>); auto-fallback to Path A under filters.</td>
+          </tr>
+          <tr>
+            <td>_PROFILE_PHASES</td>
+            <td>Per-phase wall-time profiling switch.</td>
+          </tr>
+          <tr>
+            <td>_USE_VWAP_FILL</td>
+            <td>VWAP proxy-fill model toggle (spec §4.2).</td>
+          </tr>
+          <tr>
+            <td>_USE_PF_AGG_MOVE_SL</td>
+            <td>Two-pass portfolio-aggregate Move SL trigger toggle.</td>
+          </tr>
+          <tr>
+            <td>_cached_catalog_bars</td>
+            <td>Per-worker LRU bar cache (maxsize 4).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l3); --next: var(--c-l4);">
+
+    <!-- ===================== FILE 16: users.py ===================== -->
+    <section class="file l4" id="f-users">
+      <h3 class="fname">
+        <span class="badge">L4 · identity</span>
+        <span class="fp">core/users.py</span>
+      </h3>
+      <p class="one-liner">Identity-only multi-user layer: validates <code>X-User-Id</code> headers and exposes per-user
+        scalars (multiplier, caps, trailing rules, instrument allowlist).</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">There is no authentication — the server only checks that
+        the <code>X-User-Id</code> header is on file in <code>config/users.json</code>.
+        This module reads / writes that registry and exposes per-user knobs the
+        runner consults at backtest time: trade-size multiplier, absolute loss / profit
+        caps, trailing-SL and trailing-target rules, an optional instrument
+        allowlist, plus an in-memory cumulative-PnL aggregator for the level-3
+        user-cross-portfolio clip.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li>Startup: <code class="fn">_seed_if_missing()</code> guarantees
+          <code>config/users.json</code> exists with at least a <code>_default</code>
+          user.
+        </li>
+        <li><code class="fn">validate_user_id(s)</code> — slug regex
+          <code>^[a-z0-9_-]{1,32}$</code>.
+        </li>
+        <li><code class="fn">load_users()</code> / <code class="fn">save_users()</code>
+          — disk I/O with graceful fallback to a minimal default if the JSON is
+          corrupt or missing.</li>
+        <li><code class="fn">list_users()</code> returns a public-safe slice
+          (<code>user_id</code> + <code>alias</code> only); <code class="fn">get_user(uid)</code>
+          returns the full record.</li>
+        <li>Per-user lookups: <code class="fn">get_multiplier</code>,
+          <code class="fn">get_user_max_loss</code>,
+          <code class="fn">get_user_max_profit</code>,
+          <code class="fn">get_user_trailing_sl</code> (returns
+          <code>{"every", "by"}</code>),
+          <code class="fn">get_user_trailing_target</code> (returns
+          <code>{"when_reach", "lock", "every", "by"}</code>),
+          <code class="fn">get_allowed_instruments</code> /
+          <code class="fn">is_instrument_allowed</code>.
+        </li>
+        <li>Cumulative PnL: <code>_USER_PNL_AGGREGATOR</code> (in-memory dict) +
+          <code class="fn">get_user_cumulative_pnl</code> /
+          <code class="fn">add_user_pnl</code> (EMA-smoothed) /
+          <code class="fn">reset_user_pnl</code>.
+        </li>
+        <li>Pre-save validation: <code class="fn">validate_registry_payload(payload)</code>
+          rejects dupe user IDs, non-positive multipliers, malformed lists.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body"><code>X-User-Id</code> from the API or <code>config/users.json</code></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Slug-validate → load registry (with fallback) → per-field type coercion → allowlist filter
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">User record dict; aggregator updates in-memory; <code>config/users.json</code> written back
+            on save</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span>
+        <span class="pill by">backtest_runner</span> <span class="pill by" style="opacity:.7">(lazy)</span>
+        <span class="pill by">models</span> <span class="pill by" style="opacity:.7">(lazy)</span>
+        <span class="pill by">report_generator</span> <span class="pill by" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">json</span>
+        <span class="pill ext">pathlib</span>
+        <span class="pill ext">re</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_USERS_FILE</td>
+            <td><code>&lt;root&gt;/config/users.json</code>.</td>
+          </tr>
+          <tr>
+            <td>_USER_ID_RE</td>
+            <td>Slug validation regex.</td>
+          </tr>
+          <tr>
+            <td>_FALLBACK_DEFAULT_USER</td>
+            <td>Fallback record when the registry is missing or corrupt.</td>
+          </tr>
+          <tr>
+            <td>_USER_PNL_AGGREGATOR</td>
+            <td>In-memory cumulative-PnL dict (per user, EMA-smoothed).</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l4); --next: var(--c-l4);">
+
+    <!-- ===================== FILE 17: migrate_users.py ===================== -->
+    <section class="file l4" id="f-migrate-users">
+      <h3 class="fname">
+        <span class="badge">L4 · migration</span>
+        <span class="fp">core/migrate_users.py</span>
+      </h3>
+      <p class="one-liner">Idempotent startup migration that moves legacy <code>portfolios/*.json</code> into
+        <code>portfolios/_default/</code>.
+      </p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Before the multi-user model, all portfolios lived flat
+        under <code>portfolios/</code>. This script — invoked once at server startup
+        — partitions them into a <code>_default</code> subdirectory so the rest of
+        the system can treat portfolios as user-scoped without breaking any old
+        installations.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">migrate_portfolios(dir)</code> — for every top-level
+          <code>*.json</code> under <code>dir</code>, move it into
+          <code>dir/_default/</code>.
+        </li>
+        <li>No-ops if the directory doesn't exist, or if it already contains only
+          subdirectories (already partitioned).</li>
+        <li>Collision handling: when <code>_default/&lt;name&gt;.json</code> already
+          exists, the legacy file is renamed to <code>&lt;name&gt;.json.legacy</code>
+          so neither side is overwritten.</li>
+        <li>Returns <code>{"moved": int, "already_partitioned": bool}</code> and
+          logs the move count via <code>logging.info()</code>.</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body"><code>portfolios/</code> directory path</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Discover top-level <code>*.json</code> → collision-rename or <code>shutil.move</code></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Files relocated on disk; report dict returned</div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (called from server
+          startup)</span></div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">pathlib</span>
+        <span class="pill ext">shutil</span>
+        <span class="pill ext">logging</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>DEFAULT_USER_ID</td>
+            <td><code>"_default"</code>.</td>
+          </tr>
+          <tr>
+            <td>_LOG</td>
+            <td>Module logger.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l4); --next: var(--c-l4);">
+
+    <!-- ===================== FILE 18: runtime_history.py ===================== -->
+    <section class="file l4" id="f-runtime-history">
+      <h3 class="fname">
+        <span class="badge">L4 · scheduler</span>
+        <span class="fp">core/runtime_history.py</span>
+      </h3>
+      <p class="one-liner">Persistent EMA of wall-time-per-day for each (bar_type, strategy) pair to inform LPT
+        scheduling.</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">When the scheduler decides which slots to dispatch first
+        (Longest-Processing-Time-first), it would otherwise have to use a span-only
+        heuristic. This module remembers how long previous runs took per
+        <code>(bar_type, strategy)</code> and feeds back a smoothed estimate.
+      </p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">load()</code> / <code class="fn">save(data)</code> —
+          read / write <code>&lt;root&gt;/.runtime_history.json</code>, thread-safe
+          on the write side.</li>
+        <li><code class="fn">record(data, bar_type, strategy, elapsed, span_days)</code>
+          — per-day rate = <code>elapsed / span_days</code>; EMA blend
+          <code>0.3 × new + 0.7 × prev</code>; circular sample buffer capped at 20;
+          timestamp recorded.
+        </li>
+        <li><code class="fn">estimate(data, bar_type, strategy, span_days)</code>
+          → <code>per_day × max(1, span_days)</code> or <code>None</code> if no
+          history is recorded yet (caller falls back to span-only).</li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body"><code>bar_type</code>, <code>strategy</code>, <code>elapsed</code>, <code>span_days</code>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">EMA smoothing on per-day rate; sample-buffer pruning</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Estimated wall-time (seconds), persisted to <code>.runtime_history.json</code></div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span><span class="pill none">none</span></div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (called by scheduler
+          in server.py)</span></div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">json</span>
+        <span class="pill ext">threading</span>
+        <span class="pill ext">pathlib</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <table class="consts">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_PATH</td>
+            <td><code>&lt;root&gt;/.runtime_history.json</code>.</td>
+          </tr>
+          <tr>
+            <td>_LOCK</td>
+            <td>Write lock.</td>
+          </tr>
+          <tr>
+            <td>_MAX_SAMPLES</td>
+            <td>Circular buffer size (20).</td>
+          </tr>
+          <tr>
+            <td>_EMA_ALPHA</td>
+            <td>0.3 — weight on the most recent sample.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="file-sep" style="--prev: var(--c-l4); --next: var(--c-l4);">
+
+    <!-- ===================== FILE 19: report_generator.py ===================== -->
+    <section class="file l4" id="f-report-generator">
+      <h3 class="fname">
+        <span class="badge">L4 · report</span>
+        <span class="fp">core/report_generator.py</span>
+      </h3>
+      <p class="one-liner">Turn raw Nautilus backtest results into the self-contained HTML tearsheet
+        (<code>docs/report_template.html</code>).</p>
+
+      <div class="sub">Purpose</div>
+      <p class="purpose">Reads the positions / fills DataFrames Nautilus emits at
+        the end of a run, normalises the column names and Money/Quantity strings,
+        derives a per-trade ORDERBOOK + LOGS + SUMMARY data structures, and embeds
+        them as JSON inside the HTML report template. The result is a single
+        shareable <code>.html</code> file with everything inline.</p>
+
+      <div class="sub">Key Logic</div>
+      <ul class="logic">
+        <li><code class="fn">_parse_nautilus_value(s)</code> /
+          <code class="fn">parse_money_string</code> equivalents — strip the
+          <code>"NUMBER CCY"</code> suffix.
+        </li>
+        <li><code class="fn">_format_timestamp</code> /
+          <code class="fn">_format_timestamp_series</code> — vectorised
+          <code>DD-MM-YYYY HH:MM:SS</code> format with per-cell fallback for
+          unparseable rows.
+        </li>
+        <li><code class="fn">_resolve_column(df, candidates)</code> — alias
+          resolver for Nautilus's evolving column names.</li>
+        <li><code class="fn">_determine_reason(order_type, is_reduce, …)</code>
+          — priority order: tags &gt; order_type/contingency &gt; fallback. Returns
+          human-readable strings like <code>"Stop Loss"</code>, <code>"Take Profit"</code>,
+          <code>"OCO Exit"</code>, <code>"Strategy Signal"</code>.
+        </li>
+        <li><code class="fn">_build_fills_lookup(fills_report)</code> — builds
+          <strong>three</strong> lookups: by venue order id (legacy), by
+          <code>(trader_id, strategy_id, instrument_id, ts_seconds)</code>, and
+          role-split open/close variants so a reverse-on-SL fill can be told apart
+          from the entry fill on the same bar.
+        </li>
+        <li><code class="fn">_build_orderbook(all_results, user_id)</code> — turns
+          each closed position into a single dict (USERID, SYMBOL, EXCHANGE, …,
+          ENTRY/EXIT TIME, ENTRY/EXIT PRICE, ENTRY/EXIT REASON, PNL); scales LOTS /
+          MULTIPLIER via <code class="fn">core.users.get_multiplier</code> when a
+          <code>user_id</code> is given (lazy import).
+        </li>
+        <li><code class="fn">build_logs_dataframe(all_results, …)</code> — emits
+          "ENTRY | reason | side qty symbol @ price | OrderID / PositionID" lines
+          per fill.</li>
+        <li><code class="fn">_build_summary(orderbook)</code> — group trades by
+          <code>DD-MM-YYYY</code> date, compute cumulative PnL per day, capture
+          max/min peaks + the timestamps they occurred at.
+        </li>
+        <li><code class="fn">generate_report(all_results, …)</code> — load the
+          template, substitute <code>{{ORDERBOOK_JSON}}</code>,
+          <code>{{SUMMARY_JSON}}</code>, <code>{{LOGS_JSON}}</code>,
+          <code>{{DATE_RANGE_JSON}}</code>, <code>{{BACKTEST_NAME}}</code>; return
+          the rendered HTML string (caller writes to disk).
+        </li>
+      </ul>
+
+      <div class="sub">Data Flow</div>
+      <div class="flow">
+        <div class="step">
+          <div class="lbl">Input</div>
+          <div class="body"><code>all_results</code> dict (positions / fills DataFrames per strategy) + optional
+            <code>user_id</code>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Transform</div>
+          <div class="body">Column resolution → Money/timestamp normalisation → 3-way fills lookup → orderbook / logs /
+            summary construction → template substitution</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <div class="lbl">Output</div>
+          <div class="body">Self-contained HTML string (caller saves to <code>html_reports/&lt;run&gt;.html</code>)
+          </div>
+        </div>
+      </div>
+
+      <div class="sub">Connections</div>
+      <div class="pills-row"><span class="tag">Imports from core</span>
+        <span class="pill imp">_pandas_utils</span>
+        <span class="pill imp">users</span> <span class="pill imp" style="opacity:.7">(lazy)</span>
+      </div>
+      <div class="pills-row"><span class="tag">Imported by core</span><span class="pill none">none (server.py calls
+          it)</span></div>
+      <div class="pills-row"><span class="tag">External</span>
+        <span class="pill ext">pandas</span>
+      </div>
+
+      <div class="sub">Constants &amp; State</div>
+      <p style="color:var(--fg-mute);font-style:italic;margin:0;">None — all functions are stateless; dependencies
+        passed in by callers.</p>
+    </section>
+
+    <footer class="foot">
+      19 files · per-file purpose / logic / data flow / connections · companion
+      <a href="core_knowledge_graph.html">core_knowledge_graph.html</a>
+    </footer>
+
+  </div>
+</body>
+
+</html>

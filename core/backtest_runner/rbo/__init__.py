@@ -71,6 +71,48 @@ def add_one_hour(t: str | None) -> str | None:
     return f"{h:02d}:{m:02d}"
 
 
+# US venues that observe US DST → their IANA timezone. FX (FOREX_MS), crypto,
+# and NSE/India venues are intentionally absent — they never take the US shift.
+_US_VENUE_TZ = {
+    "CME": "America/Chicago", "CBOT": "America/Chicago", "GLOBEX": "America/Chicago",
+    "NYMEX": "America/New_York", "COMEX": "America/New_York",
+    "NYSE": "America/New_York", "NASDAQ": "America/New_York", "ARCA": "America/New_York",
+    "BATS": "America/New_York", "AMEX": "America/New_York", "CBOE": "America/Chicago",
+}
+
+
+def _us_winter_in_effect(portfolio) -> bool:
+    """Auto US-DST detection (opt-in ``winter_time_auto``).
+
+    Returns True when the portfolio's primary venue is a US DST-observing venue
+    AND the run START date falls in US STANDARD time (winter). Uses ``zoneinfo``
+    so no external metadata is needed beyond the venue→tz map. No-op (False) for
+    FX/crypto/NSE venues or when the date can't be resolved. Whole-run
+    determination keyed on start_date — runs spanning a DST boundary should be
+    split (documented on the config field).
+    """
+    try:
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        slots = getattr(portfolio, "slots", None) or []
+        if not slots:
+            return False
+        bt = str(getattr(slots[0], "bar_type_str", "") or "")
+        # venue = token after "." up to the first "-": e.g. "ES.CME-1-MINUTE-..."
+        venue = bt.split(".", 1)[1].split("-", 1)[0].upper() if "." in bt else ""
+        tzname = _US_VENUE_TZ.get(venue)
+        if not tzname:
+            return False  # non-US venue → US DST never applies
+        sd = getattr(portfolio, "start_date", None)
+        if not sd:
+            return False
+        d = datetime.fromisoformat(str(sd)[:10]).replace(tzinfo=ZoneInfo(tzname))
+        # Standard time (winter) ⇔ DST offset is zero on that date.
+        return d.dst() == timedelta(0)
+    except Exception:
+        return False
+
+
 def _apply_winter_time(portfolio) -> bool:
     """Apply the Winter Time Adjustment to all configured local times in place.
 
@@ -80,10 +122,15 @@ def _apply_winter_time(portfolio) -> bool:
     intraday time fields — entry window, portfolio/MIS square-off, RBO windows,
     and every slot/leg square-off override — so all downstream paths (Path A
     per-slot, grouped, Path B) see the shifted values uniformly. Dates are not
-    touched. Returns True when a shift was applied (for logging). No-op unless
-    ``portfolio.winter_time_adjust`` is set.
+    touched. Returns True when a shift was applied (for logging).
+
+    Applied when the explicit ``winter_time_adjust`` flag is set OR when
+    ``winter_time_auto`` is on and ``_us_winter_in_effect`` resolves True
+    (US venue + run-start date in standard time).
     """
-    if not getattr(portfolio, "winter_time_adjust", False):
+    if not (getattr(portfolio, "winter_time_adjust", False)
+            or (getattr(portfolio, "winter_time_auto", False)
+                and _us_winter_in_effect(portfolio))):
         return False
     portfolio.entry_start_time = add_one_hour(portfolio.entry_start_time)
     portfolio.entry_end_time = add_one_hour(portfolio.entry_end_time)

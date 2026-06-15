@@ -174,7 +174,7 @@ def reset_data_format(asset_class):
         },
         "instrument": {
             "type": None, "quote_currency": None, "price_precision": None,
-            "size_precision": None, "currency_type": None, "timeframe": None
+            "size_precision": None, "currency_type": None
         },
         "trading": {
             "maker_fee": None, "taker_fee": None,

@@ -162,12 +162,16 @@ def _build_run_config(
         bit-exact parity with Path A. Pass an int (e.g. 100_000) once you've
         verified parity to opt into row-chunked streaming.
     """
+    # Account base currency from the venue's adapter config (account_base_currency),
+    # default USD — INR for NIFTY, USD for FX/crypto, matching Path A.
+    from core.venue_config import account_currency_code_for_venue
+    _acct_code = account_currency_code_for_venue(str(venue))
     venue_cfg = BacktestVenueConfig(
         name=str(venue),
         oms_type=oms_type,
         account_type="MARGIN",
-        starting_balances=[f"{starting_capital} USD"],
-        base_currency="USD",
+        starting_balances=[f"{starting_capital} {_acct_code}"],
+        base_currency=_acct_code,
         default_leverage=1.0,
     )
 

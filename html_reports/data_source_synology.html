@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Source &mdash; Synology NAS</title>
+<style>
+  :root{
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;
+    --text-muted:#8b949e;--accent:#58a6ff;--accent2:#3fb950;--accent3:#d2a8ff;
+    --accent4:#f0883e;--code-bg:#1c2128;--table-alt:#1c2128;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;font-size:16px;}
+  .header{background:linear-gradient(135deg,#1e2433 0%,#0d1117 50%,#111a22 100%);
+    border-bottom:1px solid var(--border);padding:2.6rem 2rem;text-align:center;}
+  .header .badge{display:inline-block;font-size:.8rem;color:var(--accent4);
+    border:1px solid var(--accent4);border-radius:20px;padding:.15rem .8rem;margin-bottom:.8rem;}
+  .header h1{font-size:2rem;font-weight:700;
+    background:linear-gradient(90deg,var(--accent4),var(--accent));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.4rem;}
+  .header p{color:var(--text-muted);font-size:1.05rem;max-width:720px;margin:0 auto;}
+  .container{max-width:900px;margin:0 auto;padding:2rem;}
+  section{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1.6rem 2rem;margin-bottom:1.4rem;}
+  h2{font-size:1.4rem;color:var(--accent4);margin-bottom:1rem;padding-bottom:.4rem;
+    border-bottom:1px solid var(--border);}
+  h3{font-size:1.1rem;color:var(--accent);margin:1.2rem 0 .5rem;}
+  p{margin:.5rem 0;}
+  ul,ol{padding-left:1.4rem;margin:.5rem 0;}
+  li{margin:.35rem 0;}
+  code{background:var(--code-bg);border:1px solid var(--border);border-radius:4px;
+    padding:.1rem .4rem;font-family:'SFMono-Regular',Consolas,monospace;font-size:.88em;color:var(--accent3);}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+    padding:1rem;overflow-x:auto;margin:.7rem 0;}
+  pre code{background:none;border:none;padding:0;color:var(--text);}
+  table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.95rem;}
+  th,td{border:1px solid var(--border);padding:.55rem .7rem;text-align:left;vertical-align:top;}
+  th{background:var(--code-bg);color:var(--accent);}
+  tr:nth-child(even){background:var(--table-alt);}
+  .note{border-left:3px solid var(--accent4);background:rgba(240,136,62,.08);
+    padding:.7rem 1rem;border-radius:0 6px 6px 0;margin:.8rem 0;}
+  .ok{color:var(--accent2);}.muted{color:var(--text-muted);}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.8rem 0;}
+  .flow span{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+    padding:.4rem .7rem;font-size:.85rem;}
+  .flow .arrow{border:none;background:none;color:var(--accent4);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge">Data Source Option 3 of 3</div>
+  <h1>Synology NAS</h1>
+  <p>What it takes to load CSV market data from a Synology NAS instead of a local path.</p>
+</div>
+<div class="container">
+
+  <section>
+    <h2>1. How it fits the current flow</h2>
+    <p>A Synology NAS is the <strong>friendliest</strong> of the three options, because it can
+       be exposed as a <strong>real filesystem path</strong>. If we mount the NAS share on the
+       server, the existing <code>scan_csv_folder(folder)</code> works <em>as-is</em> &mdash;
+       the mount point simply looks like any other folder.</p>
+    <div class="flow">
+      <span>Synology share</span><span class="arrow">&rarr;</span>
+      <span>mount as drive / UNC path</span><span class="arrow">&rarr;</span>
+      <span>scan_csv_folder()</span><span class="arrow">&rarr;</span>
+      <span>catalog</span>
+    </div>
+    <p class="muted">Two access styles: <strong>(A)</strong> network mount (SMB/NFS) &mdash;
+       zero code change; or <strong>(B)</strong> Synology FileStation API &mdash; download-then-scan,
+       like the cloud options, when mounting isn't allowed.</p>
+  </section>
+
+  <section>
+    <h2>2. Requirements</h2>
+    <table>
+      <tr><th>Item</th><th>Detail</th></tr>
+      <tr><td>NAS reachability</td><td>Server can reach the NAS IP/hostname on the LAN/VPN.</td></tr>
+      <tr><td>Shared folder</td><td>A DSM shared folder holding the CSVs in our usual layout.</td></tr>
+      <tr><td>Account</td><td>A DSM user with <strong>read access</strong> to that share.</td></tr>
+      <tr><td>Protocol (Option A)</td><td>SMB (Windows) or NFS enabled in DSM &rarr; Control Panel &rarr; File Services.</td></tr>
+      <tr><td>API (Option B)</td><td>FileStation API enabled; HTTPS reachable (default port 5001).</td></tr>
+      <tr><td>Python lib (Option B only)</td><td><code>requests</code> (already available) or <code>synology-api</code>.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Process &mdash; Option A: mount (recommended)</h2>
+    <ol>
+      <li><strong>Enable SMB</strong> on the NAS (DSM &rarr; Control Panel &rarr; File Services &rarr; SMB).</li>
+      <li><strong>Mount the share</strong> on the Windows server:
+        <pre><code>net use Z: \\192.168.1.50\market_data /user:mcube ******</code></pre>
+        (or map a persistent drive / use the UNC path directly).</li>
+      <li><strong>Point the app</strong> at the mounted path &mdash; nothing else changes:
+        <pre><code>entries = scan_csv_folder(r"Z:\fx")        # or \\192.168.1.50\market_data\fx</code></pre></li>
+      <li><strong>Load</strong> normally into the catalog.</li>
+    </ol>
+    <div class="note">This is effectively the <strong>existing "system path" option</strong> &mdash;
+      a mounted NAS share <em>is</em> a system path. Minimal work, maximum reuse.</div>
+  </section>
+
+  <section>
+    <h2>4. Process &mdash; Option B: FileStation API (no mount)</h2>
+    <ol>
+      <li><strong>Authenticate</strong> to get a session ID:
+        <pre><code>GET /webapi/auth.cgi?api=SYNO.API.Auth&method=login
+    &account=mcube&passwd=***&session=FileStation&format=sid</code></pre></li>
+      <li><strong>List</strong> the share recursively (<code>SYNO.FileStation.List</code>).</li>
+      <li><strong>Download</strong> each CSV (<code>SYNO.FileStation.Download</code>) into a local staging tree.</li>
+      <li><strong>Scan + load</strong> the staging folder via <code>scan_csv_folder</code>.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>5. Where it touches our code</h2>
+    <ul>
+      <li><strong>Option A:</strong> <span class="ok">no code change</span> &mdash; UI just accepts the mounted/UNC path.</li>
+      <li><strong>Option B:</strong> a FileStation downloader feeding a staging folder, like the cloud options.</li>
+      <li><strong>Scanners:</strong> <span class="ok">no change</span> in either case.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. Gotchas</h2>
+    <ul>
+      <li>SMB credentials must survive server reboots &mdash; use a stored credential or persistent mount.</li>
+      <li>UNC paths can be slow over WAN; for remote NAS prefer caching/staging locally.</li>
+      <li>FileStation sessions expire &mdash; re-login and handle <code>error.code</code> responses.</li>
+      <li>Confirm DSM user is <strong>read-only</strong> on the share to avoid accidental writes.</li>
+    </ul>
+  </section>
+
+  <p class="muted" style="text-align:center;margin-top:1.5rem;">m-cube &bull; data-loading source options &bull; 3/3</p>
+</div>
+</body>
+</html>

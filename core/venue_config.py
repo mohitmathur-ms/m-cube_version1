@@ -73,6 +73,33 @@ def load_adapter_config_for_bar_type(
     return load_adapter_config_for_venue(venue_from_bar_type(bar_type_str), configs_dir)
 
 
+def account_currency_code_for_venue(
+    venue: str | None,
+    configs_dir: Path | str | None = None,
+) -> str:
+    """Account base-currency CODE (e.g. "INR", "USD") for ``venue``, read from the
+    adapter config's ``account_base_currency``.
+
+    Defaults to "USD" when no adapter or currency is configured — preserving the
+    historical USD-account behaviour for venues that don't declare one (FX/crypto),
+    while INR-quoted venues (e.g. NIFTY_FUTURES_MS, which declares
+    ``account_base_currency: "INR"``) now get an INR account so their account
+    report reflects real INR balances instead of a frozen USD one.
+    """
+    cfg = load_adapter_config_for_venue(venue, configs_dir)
+    code = (cfg or {}).get("account_base_currency") or "USD"
+    return str(code).strip().upper() or "USD"
+
+
+def account_currency_code_for_bar_type(
+    bar_type_str: str,
+    configs_dir: Path | str | None = None,
+) -> str:
+    """Same as :func:`account_currency_code_for_venue`, parsing the venue from a
+    bar type string."""
+    return account_currency_code_for_venue(venue_from_bar_type(bar_type_str), configs_dir)
+
+
 def symbol_from_bar_type(bar_type_str: str) -> str | None:
     """Extract the bare symbol from a bar type string.
 

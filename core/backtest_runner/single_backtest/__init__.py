@@ -19,7 +19,7 @@ from core.strategies import STRATEGY_REGISTRY
 from core.fx_rates import FxRateResolver
 from core.venue_config import load_adapter_config_for_bar_type
 
-from core.backtest_runner.bar_types import _pair_bid_ask_bar_type
+from core.backtest_runner.bar_types import _pair_bid_ask_bar_type, _same_ts_sort_key
 from core.backtest_runner.data_cache import _cached_catalog_bars
 from core.backtest_runner.path_b import (
     _build_run_config,
@@ -244,20 +244,28 @@ def run_backtest(
     )
     engine = BacktestEngine(config=engine_config)
 
-    # Add venue
+    # Add venue. Account base currency comes from the venue's adapter config
+    # (account_base_currency), defaulting to USD — so INR-quoted venues (NIFTY)
+    # run an INR account and FX/crypto venues stay on USD exactly as before.
+    from core.venue_config import account_currency_code_for_bar_type
+    from nautilus_trader.model.objects import Currency
+    _acct_ccy = Currency.from_str(account_currency_code_for_bar_type(bar_type_str))
     venue = instrument_id.venue
     engine.add_venue(
         venue=venue,
         oms_type=OmsType.NETTING,
         account_type=AccountType.MARGIN,
-        starting_balances=[Money(starting_capital, USD)],
-        base_currency=USD,
+        starting_balances=[Money(starting_capital, _acct_ccy)],
+        base_currency=_acct_ccy,
         default_leverage=Decimal(1),
     )
 
     # Add instrument and data. Drop the local bar list after add_data so we
     # don't hold a second copy alongside the engine's internal buffer.
     engine.add_instrument(instrument)
+    # Project-wide same-ts order: quotes (ASK,BID) before MID — deterministic by
+    # contract, identical rule as the portfolio paths (no flag).
+    bars.sort(key=_same_ts_sort_key)
     engine.add_data(bars)
     del bars
 

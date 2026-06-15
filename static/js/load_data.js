@@ -12,6 +12,23 @@ const LoadData = {
     assetVenues: {},  // populated from API
     dataFormats: {},  // per-asset-class data format configs
 
+    /** Timeframes the user can load into the catalog. The `value` is the
+     *  Nautilus "<step>-<aggregation>" tail of the bar_type_str. Mirrors the
+     *  base-timeframe list on the Portfolio page (static/js/portfolio.js).
+     *  The catalog can hold multiple timeframes for the same instrument/venue. */
+    TIMEFRAMES: [
+        { label: "1 sec", value: "1-SECOND" },
+        { label: "1 min", value: "1-MINUTE" },
+        { label: "5 min", value: "5-MINUTE" },
+        { label: "15 min", value: "15-MINUTE" },
+        { label: "30 min", value: "30-MINUTE" },
+        { label: "1 hour", value: "1-HOUR" },
+        { label: "2 hours", value: "2-HOUR" },
+        { label: "1 day", value: "1-DAY" },
+        { label: "1 week", value: "1-WEEK" },
+        { label: "1 month", value: "1-MONTH" },
+    ],
+
     async render(container) {
         // Fetch asset classes, configured adapters, and data formats
         try {
@@ -40,6 +57,11 @@ const LoadData = {
             `<option value="${v}">${v}</option>`
         ).join("");
 
+        // Default to 1-MINUTE to match the historical per-asset-class default.
+        const timeframeOptions = this.TIMEFRAMES.map(tf =>
+            `<option value="${tf.value}" ${tf.value === "1-MINUTE" ? "selected" : ""}>${tf.label}</option>`
+        ).join("");
+
         container.innerHTML = `
             <h1 class="page-title">&#128194; Load Market Data</h1>
             <p class="page-subtitle">Load daily OHLCV data from your local CSV files into the NautilusTrader catalog.</p>
@@ -61,6 +83,13 @@ const LoadData = {
                         No adapters configured for this asset class. Create one in the Adapter Admin Panel.
                     </div>
                     <p class="section-caption" id="instrument-preview">${defaultVenues.length > 0 ? `Instrument ID preview: BTCUSDT.${defaultVenues[0]}` : ''}</p>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Timeframe</label>
+                    <select id="timeframe-select" class="form-control">
+                        ${timeframeOptions}
+                    </select>
+                    <p class="section-caption">Bar size stored in the catalog for the selected CSVs.</p>
                 </div>
             </div>
 
@@ -342,9 +371,10 @@ const LoadData = {
             const venueSelect = document.getElementById("venue-select");
             const venue = venueSelect ? venueSelect.value : "BINANCE";
             const assetClass = document.getElementById("asset-class-select")?.value || "";
+            const timeframe = document.getElementById("timeframe-select")?.value || "1-MINUTE";
             const data = await App.api("/api/csv/load", {
                 method: "POST",
-                body: JSON.stringify({ entries, venue, asset_class: assetClass }),
+                body: JSON.stringify({ entries, venue, asset_class: assetClass, timeframe }),
                 // FX 1-minute ingest of multi-year ASK/BID merges can take many
                 // minutes; the default 60s client timeout was aborting the
                 // fetch ("signal is aborted without reason") before the server

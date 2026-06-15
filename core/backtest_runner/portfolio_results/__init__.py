@@ -10,6 +10,7 @@ from nautilus_trader.backtest.engine import BacktestEngine
 from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.identifiers import Venue
 from core.models import PortfolioConfig
+from core.models import effective_portfolio_squareoff
 
 from core.backtest_runner.equity_curves import (
     _build_equity_curve_from_account,
@@ -18,6 +19,7 @@ from core.backtest_runner.equity_curves import (
 from core.backtest_runner.portfolio_clip import (
     _ClipResult,
     _apply_portfolio_clip,
+    _daily_sqoff_clips,
     _earliest_clip,
     _ts_iso_to_ns,
     _underlying_sl_clip,
@@ -87,8 +89,165 @@ def _per_strategy_breakdown(positions, slot_to_strategy_id: dict | None) -> dict
     return out
 
 
+def _slot_balance_pnl_at_ns(curve, clip_ns: int):
+    """Slot PnL at ``clip_ns`` from its ``equity_curve_ts`` (balance at the last
+    point at-or-before the clip, minus seed). Returns ``None`` when the curve has
+    no point at/before the clip (slot hadn't started) so the caller can skip."""
+    if not curve:
+        return None
+    seed = float(curve[0].get("balance", 0.0) or 0.0)
+    last = seed
+    seen = False
+    for pt in curve:
+        ts = pt.get("timestamp")
+        if ts is None:
+            continue
+        if _ts_iso_to_ns(ts) <= clip_ns:
+            last = float(pt.get("balance", last) or last)
+            seen = True
+        else:
+            break
+    return (last - seed) if seen else None
+
+
+def _leg_key_series(df):
+    """Vectorised per-leg identity ``trader_id|strategy_id`` for a reports frame.
+
+    The portfolio clip must attribute positions to legs identically under BOTH
+    execution paths. Per-slot engines give each leg a unique ``trader_id`` but a
+    shared ``strategy_id``; the unified engine shares one ``trader_id`` across all
+    legs but a unique ``strategy_id``. Combining both is unique-per-leg in either.
+    """
+    has_t = "trader_id" in df.columns
+    has_s = "strategy_id" in df.columns
+    if has_t and has_s:
+        return df["trader_id"].astype(str) + "|" + df["strategy_id"].astype(str)
+    if has_t:
+        return df["trader_id"].astype(str)
+    return df["strategy_id"].astype(str)
+
+
+def _leg_key_of(df):
+    """Scalar leg-key from a per-slot reports frame's first row (or None)."""
+    if df is None or getattr(df, "empty", True):
+        return None
+    s = _leg_key_series(df)
+    return str(s.iloc[0]) if len(s) else None
+
+
+def _truncate_open_positions_at_clip(hp, trader_curves, clip_ns: int,
+                                     clip_reason_tag: str | None = None):
+    """Close each slot's position still open at ``clip_ns`` AT ``clip_ns``.
+
+    ``clip_reason_tag`` (when given) is stamped onto each truncated position's
+    ``exit_reason_tag`` column so the orderbook can show *why* the leg closed
+    (the portfolio SL/Target hit) instead of the generic "Market Exit" — the
+    portfolio-SL close is a post-run truncation, not a tagged engine fill.
+
+    Spec (portfolio_sl_tgt.html): a portfolio SqOff / ReExecute *"Closes all
+    legs"* at the breach. The splice head keeps positions by ``ts_opened <
+    clip_ns``, so a position opened *before* the breach but closed *after* it is
+    kept whole — running past the breach to its natural exit. This rewrites that
+    open-at-breach position so the slot's total head PnL equals its equity-curve
+    value at ``clip_ns`` (mark-to-market at the breach): ``ts_closed = clip_ns``
+    and ``realized_pnl = slot_pnl_at_clip − (realized of trades already closed
+    before the breach)``.
+
+    Heavily guarded — returns ``hp`` unchanged if the needed columns/curves are
+    missing, so it degrades to the prior "natural exit" behaviour rather than
+    corrupting PnL. NETTING gives one open position per slot; if several open
+    rows exist the residual lands on the last and the others are zeroed.
+    """
+    if hp is None or getattr(hp, "empty", True) or not trader_curves:
+        return hp
+    if ("trader_id" not in hp.columns and "strategy_id" not in hp.columns) \
+            or "ts_opened" not in hp.columns:
+        return hp
+    close_col = "ts_closed" if "ts_closed" in hp.columns else (
+        "ts_last" if "ts_last" in hp.columns else None)
+    if close_col is None:
+        return hp
+    base_col = next(
+        (c for c in hp.columns if c.startswith("realized_pnl_") and c != "realized_pnl_"),
+        None,
+    )
+    money_col = "realized_pnl" if "realized_pnl" in hp.columns else None
+    if base_col is None and money_col is None:
+        return hp
+    open_px_col = next((c for c in ("avg_px_open", "AvgPxOpen", "avg_open")
+                        if c in hp.columns), None)
+    close_px_col = next((c for c in ("avg_px_close", "AvgPxClose", "avg_close")
+                         if c in hp.columns), None)
+    hp = hp.copy()
+    pnl_num = _positions_pnl_series(hp)
+    closed_dt = pd.to_datetime(hp[close_col], errors="coerce", utc=True)
+    open_col = "ts_opened" if "ts_opened" in hp.columns else (
+        "ts_init" if "ts_init" in hp.columns else None)
+    opened_dt = (pd.to_datetime(hp[open_col], errors="coerce", utc=True)
+                 if open_col else None)
+    leg_keys = _leg_key_series(hp)   # per-leg identity, unique in both paths
+    clip_ts = pd.to_datetime(clip_ns, unit="ns", utc=True)
+    for tid, curve in trader_curves.items():
+        slot_pnl = _slot_balance_pnl_at_ns(curve, clip_ns)
+        if slot_pnl is None:
+            continue
+        idxs = list(hp.index[leg_keys == str(tid)])
+        if not idxs:
+            continue
+        realized_before = 0.0
+        open_idxs = []
+        for i in idxs:
+            # A position opened AFTER the clip is a future trade (e.g. a later
+            # trading day when this is called per-day) — leave it untouched.
+            if opened_dt is not None:
+                o = opened_dt.loc[i]
+                if pd.notna(o) and o.value > clip_ns:
+                    continue
+            c = closed_dt.loc[i]
+            if pd.notna(c) and c.value < clip_ns:
+                realized_before += float(pnl_num.loc[i])
+            else:  # NaT (still open) or closed after the breach → truncate
+                open_idxs.append(i)
+        if not open_idxs:
+            continue  # slot was flat at the breach — nothing to truncate
+        remaining = slot_pnl - realized_before
+        for j, i in enumerate(open_idxs):
+            val = remaining if j == len(open_idxs) - 1 else 0.0
+            if base_col is not None:
+                hp.at[i, base_col] = val
+            if money_col is not None:
+                _raw = str(hp.at[i, money_col])
+                _ccy = _raw.split(" ", 1)[1] if " " in _raw else ""
+                hp.at[i, money_col] = (f"{val} {_ccy}").strip()
+            hp.at[i, close_col] = clip_ts
+            # Keep AVG EXIT PRICE consistent with the truncated PnL. Derive the
+            # breach-time exit price from the position's OWN price→PnL scale
+            # (= qty × multiplier, sign-aware: ``orig_pnl / (nat_exit − entry)``),
+            # so the displayed (exit − entry) × scale == val. Otherwise the
+            # orderbook would show the stale natural-exit price next to the
+            # breach PnL and they wouldn't reconcile.
+            if open_px_col and close_px_col:
+                try:
+                    _entry = float(hp.at[i, open_px_col])
+                    _nat = float(hp.at[i, close_px_col])
+                    _orig = float(pnl_num.loc[i])
+                    if val == 0.0 and _entry:
+                        hp.at[i, close_px_col] = _entry            # zero PnL → exit at entry
+                    elif _entry and _nat != _entry and _orig != 0.0:
+                        _scale = _orig / (_nat - _entry)
+                        if _scale != 0.0:
+                            hp.at[i, close_px_col] = _entry + val / _scale
+                except (TypeError, ValueError, ZeroDivisionError):
+                    pass
+            if clip_reason_tag:
+                hp.at[i, "exit_reason_tag"] = clip_reason_tag
+    return hp
+
+
 def _splice_merged_results(head: dict, tail: dict, clip_ns: int,
-                           starting_capital: float) -> dict:
+                           starting_capital: float,
+                           trader_curves: dict | None = None,
+                           clip_reason_tag: str | None = None) -> dict:
     """Splice a pass-1 merged result (``head``) with a ReExecute replay
     segment (``tail``) at ``clip_ns``.
 
@@ -107,6 +266,9 @@ def _splice_merged_results(head: dict, tail: dict, clip_ns: int,
 
     hf = _before(head.get("fills_report"), "ts_init")
     hp = _before(head.get("positions_report"), "ts_opened")
+    # Close-at-breach (spec "Closes all legs"): truncate each slot's open-at-clip
+    # position to its mark-to-market at clip_ns instead of its natural exit.
+    hp = _truncate_open_positions_at_clip(hp, trader_curves, clip_ns, clip_reason_tag)
     tf = tail.get("fills_report")
     tp = tail.get("positions_report")
     fills = pd.concat([d for d in (hf, tf) if d is not None and not d.empty],
@@ -208,6 +370,7 @@ def _merge_portfolio_results(
     total_flat = 0
     all_positions_reports = []
     all_fills_reports = []
+    all_account_reports = []
 
     per_strategy = {}
 
@@ -228,6 +391,14 @@ def _merge_portfolio_results(
             all_positions_reports.append(r["positions_report"])
         if r.get("fills_report") is not None and not r["fills_report"].empty:
             all_fills_reports.append(r["fills_report"])
+        # Per-slot account report (already generated by _extract_results) was
+        # being dropped at merge time. Collect it, tagged by slot, so the
+        # portfolio result surfaces an account report like the single-strategy
+        # path does. Output-only — does not touch any backtest computation.
+        if r.get("account_report") is not None and not r["account_report"].empty:
+            _ar = r["account_report"].copy()
+            _ar.insert(0, "slot_id", slot.slot_id)
+            all_account_reports.append(_ar)
 
         # Extract trade PnLs from positions_report. Prefer the base-currency
         # column added by positions_report_with_base — falling back to the
@@ -296,6 +467,24 @@ def _merge_portfolio_results(
             all_curves.append(curve)
 
     equity_curve_ts = _merge_equity_curves(all_curves)
+    # Merged per-bar MARK-TO-MARKET curve (live combined P&L incl. open positions)
+    # for the portfolio SL/Target. Empty when no slot produced one (e.g. Path B) →
+    # the clip falls back to the realized equity_curve_ts.
+    _mtm_curves = [c for c in (r.get("equity_curve_mtm") for r in slot_results.values()) if c]
+    if _mtm_curves:
+        # Per-slot MtM curves are P&L-based (balance = slot P&L, capital 0) so a
+        # slot that hasn't started trading yet contributes 0 to the merge — NOT a
+        # missing capital chunk (which would fake a huge negative). Sum the P&Ls,
+        # then add the portfolio capital back so the clip's
+        # (balance - starting_capital) equals the live combined P&L.
+        _merged_pnl = _merge_equity_curves(_mtm_curves)
+        equity_curve_mtm = [
+            {"timestamp": p.get("timestamp"),
+             "balance": portfolio.starting_capital + float(p.get("balance", 0.0) or 0.0)}
+            for p in _merged_pnl
+        ]
+    else:
+        equity_curve_mtm = []
     equity = [pt["balance"] for pt in equity_curve_ts] if equity_curve_ts else [portfolio.starting_capital]
 
     # Max drawdown from merged equity
@@ -334,6 +523,7 @@ def _merge_portfolio_results(
     # Merge DataFrames
     merged_positions = pd.concat(all_positions_reports, ignore_index=True) if all_positions_reports else pd.DataFrame()
     merged_fills = pd.concat(all_fills_reports, ignore_index=True) if all_fills_reports else pd.DataFrame()
+    merged_account = pd.concat(all_account_reports, ignore_index=True) if all_account_reports else None
 
     # Global user-level caps (spec §3 Level 3). Prefer user-scoped limits from
     # config/users.json over the legacy portfolio-level fallback. PnL is the
@@ -391,6 +581,17 @@ def _merge_portfolio_results(
     # the trigger point, drops post-clip trades from the merged outputs.
     pf_sl_settings, pf_sl_warnings = _resolve_pf_stoploss(portfolio)
     pf_tgt_settings, pf_tgt_warnings = _resolve_pf_target(portfolio)
+    # Unified-engine LIVE enforcement: when the portfolio monitor closed legs
+    # in-engine on the combined-SL breach, the realized P&L already reflects the
+    # SqOff — the post-run clip must NOT re-clip (would double-count). Disable the
+    # post-run pf_sl clip in that case (pf_tgt / user / tag clips are unaffected).
+    if any(bool(r.get("pf_monitor_enforced")) for r in slot_results.values()):
+        if pf_sl_settings.enabled:
+            pf_sl_settings = dataclasses.replace(pf_sl_settings, enabled=False)
+            print("[PF_SL] live monitor enforcement active -> post-run pf_sl clip skipped")
+        if pf_tgt_settings.enabled:
+            pf_tgt_settings = dataclasses.replace(pf_tgt_settings, enabled=False)
+            print("[PF_TGT] live monitor enforcement active -> post-run pf_tgt clip skipped")
     for w in pf_sl_warnings:
         print(f"[PF_SL] {w}")
     for w in pf_tgt_warnings:
@@ -445,6 +646,12 @@ def _merge_portfolio_results(
             for slot in portfolio.enabled_slots
             if slot_results.get(slot.slot_id) is not None
         }
+        # Portfolio Combined-Loss/Profit detection walks the per-bar MARK-TO-MARKET
+        # curve when available, so it fires on the LIVE combined P&L every bar
+        # (incl. open positions' unrealized) rather than only realized P&L at
+        # closes. Falls back to the realized curve when MtM is absent (e.g. Path B).
+        # (User/tag/underlying clips still use the realized curve for now.)
+        _clip_curve = equity_curve_mtm or equity_curve_ts
         # Underlying-based SL/Target types (spec §2.1 / §5.1) are evaluated
         # against the primary slot's price series, separately from the PnL
         # clip. For each side that is underlying-based we disable its branch
@@ -458,6 +665,58 @@ def _merge_portfolio_results(
             pf_tgt_settings.enabled
             and pf_tgt_settings.tgt_type in _UNDERLYING_PF_TGT_TYPES
         )
+        # ── Day-scoped portfolio SqOff (spec: SL SqOff is an independent DAILY
+        # cycle) ────────────────────────────────────────────────────────────
+        # When the SL action is a plain SqOff (not underlying, not ReExecute),
+        # the combined-loss reference RESETS each trading day. On a day's breach,
+        # every open leg is squared AT the breach and re-entry is blocked only
+        # until end-of-day; the next day starts fresh (yesterday's hit doesn't
+        # carry over). Handled here on the per-bar MtM curve, then the SL side is
+        # disabled below so the single-clip doesn't double-count it.
+        _sl_action = str(getattr(pf_sl_settings, "action", "") or "").strip().lower().replace(" ", "")
+        if (pf_sl_settings.enabled and not sl_is_underlying
+                and _sl_action == "sqoff" and equity_curve_mtm):
+            _, _sq_tz = effective_portfolio_squareoff(portfolio)
+            _day_clips = _daily_sqoff_clips(
+                equity_curve_mtm, portfolio.starting_capital,
+                float(pf_sl_settings.value or 0.0), _sq_tz or "UTC")
+            if _day_clips:
+                _tcurves = {}
+                for _slot in portfolio.enabled_slots:
+                    _r = slot_results.get(_slot.slot_id)
+                    _pr = _r.get("positions_report") if _r else None
+                    if (_pr is not None and not getattr(_pr, "empty", True)
+                            and ("trader_id" in _pr.columns or "strategy_id" in _pr.columns)
+                            and _r.get("equity_curve_mtm")):
+                        try:
+                            _tcurves[_leg_key_of(_pr)] = _r["equity_curve_mtm"]
+                        except Exception:  # noqa: BLE001
+                            pass
+                _tag = f"Portfolio Stoploss: combined {float(pf_sl_settings.value or 0):g} hit -> SqOff"
+
+                def _drop_day_window(df, lo, hi):
+                    if df is None or getattr(df, "empty", True) or "ts_init" not in df.columns:
+                        return df
+                    _ti = pd.to_datetime(df["ts_init"], errors="coerce", utc=True).astype("int64")
+                    return df.loc[~((_ti > lo) & (_ti <= hi))].reset_index(drop=True)
+
+                for _cns, _eod in _day_clips:
+                    merged_positions = _truncate_open_positions_at_clip(
+                        merged_positions, _tcurves, _cns, _tag)
+                    merged_positions = _drop_day_window(merged_positions, _cns, _eod)
+                    merged_fills = _drop_day_window(merged_fills, _cns, _eod)
+                print(f"[PF_CLIP] DAILY_SQOFF | {len(_day_clips)} day(s) breached "
+                      f"-> close-at-breach + block to EOD")
+                if not merged_positions.empty:
+                    _bc = next((c for c in merged_positions.columns
+                                if c.startswith("realized_pnl_") and c != "realized_pnl_"), None)
+                    if _bc is not None:
+                        total_pnl = float(merged_positions[_bc].sum())
+                    total_trades = len(merged_positions)
+                    final_balance = portfolio.starting_capital + total_pnl
+                    total_return_pct = (total_pnl / portfolio.starting_capital * 100) if portfolio.starting_capital > 0 else 0
+            # SL handled here as a daily cycle — disable it in the single-clip below.
+            pf_sl_settings = dataclasses.replace(pf_sl_settings, enabled=False)
         if sl_is_underlying or tgt_is_underlying:
             underlying_curve = next(
                 (slot_results[s.slot_id].get("underlying_curve")
@@ -472,7 +731,7 @@ def _merge_portfolio_results(
             pf_tgt_for_clip = (dataclasses.replace(pf_tgt_settings, enabled=False)
                                if tgt_is_underlying else pf_tgt_settings)
             candidates = [_apply_portfolio_clip(
-                equity_curve_ts, portfolio.starting_capital,
+                _clip_curve, portfolio.starting_capital,
                 pf_sl_for_clip, pf_tgt_for_clip, slot_pnl_at_clip,
                 slot_curves=slot_curves,
             )]
@@ -491,7 +750,7 @@ def _merge_portfolio_results(
             clip_result = _earliest_clip(*candidates)
         else:
             clip_result = _apply_portfolio_clip(
-                equity_curve_ts, portfolio.starting_capital,
+                _clip_curve, portfolio.starting_capital,
                 pf_sl_settings, pf_tgt_settings, slot_pnl_at_clip,
                 slot_curves=slot_curves,
             )
@@ -506,32 +765,31 @@ def _merge_portfolio_results(
 
         if clip_result.clip_ts is not None and clip_result.clipped_slots:
             # Drop post-clip rows from merged_fills / merged_positions for the
-            # clipped slot set. We match by trader_id (slot_to_trader_id is
-            # built below — compute it inline here since we need it earlier).
-            _slot_to_trader_pre = {}
+            # clipped slot set. Match by the per-leg key (trader_id|strategy_id),
+            # unique in both the per-slot and unified engines.
+            _slot_to_legkey_pre = {}
             for slot in portfolio.enabled_slots:
                 r = slot_results.get(slot.slot_id)
                 if r and r.get("positions_report") is not None and not r["positions_report"].empty:
-                    tids = r["positions_report"]["trader_id"].unique()
-                    if len(tids) > 0:
-                        _slot_to_trader_pre[slot.slot_id] = str(tids[0])
+                    _lk = _leg_key_of(r["positions_report"])
+                    if _lk is not None:
+                        _slot_to_legkey_pre[slot.slot_id] = _lk
 
-            clipped_traders = {
-                _slot_to_trader_pre[sid] for sid in clip_result.clipped_slots
-                if sid in _slot_to_trader_pre
+            clipped_legkeys = {
+                _slot_to_legkey_pre[sid] for sid in clip_result.clipped_slots
+                if sid in _slot_to_legkey_pre
             }
             clip_ns = _ts_iso_to_ns(clip_result.clip_ts)
 
             def _filter_post_clip(df: "pd.DataFrame") -> "pd.DataFrame":
-                if df.empty or not clipped_traders:
+                if df.empty or not clipped_legkeys:
                     return df
-                if "trader_id" not in df.columns or "ts_init" not in df.columns:
+                if ("trader_id" not in df.columns and "strategy_id" not in df.columns) \
+                        or "ts_init" not in df.columns:
                     return df
-                # Drop rows where trader_id ∈ clipped_traders AND ts_init > clip_ns.
-                # ts_init in the report is typically a pandas Timestamp object;
-                # convert to int ns for comparison.
+                # Drop rows where leg-key ∈ clipped_legkeys AND ts_init > clip_ns.
                 ts_int = pd.to_datetime(df["ts_init"], errors="coerce", utc=True).astype("int64")
-                mask = (df["trader_id"].astype(str).isin(clipped_traders)) & (ts_int > clip_ns)
+                mask = (_leg_key_series(df).isin(clipped_legkeys)) & (ts_int > clip_ns)
                 return df.loc[~mask].reset_index(drop=True)
 
             # v1 ReExecute is documented as "clip + flag, no replay" (see
@@ -661,11 +919,17 @@ def _merge_portfolio_results(
         # Chronological clip events (ts, reason, action) — drives the
         # ReExecute replay loop (_USE_PF_REEXEC_REPLAY). Empty when no clip.
         "pf_clip_events": list(clip_result.clip_events),
+        # True when the unified live monitor enforced the portfolio action
+        # in-engine (SqOff or ReExecute) — the post-run clip and the two-pass
+        # ReExecute replay are both suppressed in that case (no double-count).
+        "pf_monitor_enforced": any(
+            bool(r.get("pf_monitor_enforced")) for r in slot_results.values()
+        ),
         "portfolio_name": portfolio.name,
         "allocation_mode": portfolio.allocation_mode,
         "fills_report": merged_fills,
         "positions_report": merged_positions,
-        "account_report": None,
+        "account_report": merged_account,
         "slot_to_strategy_id": slot_to_strategy_id,
         "slot_to_trader_id": slot_to_trader_id,
         "errors": errors,

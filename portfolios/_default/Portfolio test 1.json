@@ -3,7 +3,7 @@
   "description": "",
   "portfolio_tag": null,
   "created_at": "2026-05-23T11:15:06.443274+00:00",
-  "updated_at": "2026-05-23T11:15:06.451887+00:00",
+  "updated_at": "2026-06-02T09:21:01.109720+00:00",
   "starting_capital": 1000000,
   "max_loss": null,
   "max_profit": null,
@@ -11,10 +11,10 @@
   "start_date": "2024-01-01",
   "end_date": "2024-06-30",
   "squareoff_time": "16:15",
-  "squareoff_tz": "Asia/Kolkata",
+  "squareoff_tz": "UTC",
   "product": "MIS",
   "mis_squareoff_time": "16:15",
-  "mis_squareoff_tz": "Asia/Kolkata",
+  "mis_squareoff_tz": "UTC",
   "run_on_days": null,
   "entry_start_time": "09:30:00",
   "entry_end_time": "16:15:00",
@@ -53,7 +53,7 @@
   "move_sl_no_buy_legs": false,
   "move_sl_hit_on_leg_sl": false,
   "move_sl_hit_on_leg_target": true,
-  "move_sl_ltp_buffer": 0.0,
+  "move_sl_ltp_buffer": 0,
   "move_sl_agg_pnl_enabled": false,
   "move_sl_agg_pnl_threshold": 0,
   "move_sl_agg_pnl_direction": "loss",
@@ -132,9 +132,9 @@
         "target_stop_basis": 1,
         "timezone_offset_min": 0
       },
-      "bar_type_str": "USDJPY.FOREX_MS-1-MINUTE-MID-EXTERNAL",
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-ASK-EXTERNAL",
       "strategy_bar_types": [
-        "USDJPY.FOREX_MS-30-MINUTE-MID-INTERNAL@1-MINUTE-EXTERNAL"
+        "EURUSD.FOREX_MS-30-MINUTE-ASK-INTERNAL@1-MINUTE-EXTERNAL"
       ],
       "lots": 10,
       "allocation_pct": 100,
@@ -169,13 +169,13 @@
         "max_re_entries": 0,
         "armed_at_start": true,
         "squareoff_time": "16:00",
-        "squareoff_tz": "Asia/Kolkata"
+        "squareoff_tz": "UTC"
       },
       "enabled": true,
       "start_date": null,
       "end_date": null,
       "squareoff_time": "16:00",
-      "squareoff_tz": "Asia/Kolkata"
+      "squareoff_tz": "UTC"
     }
   ]
 }

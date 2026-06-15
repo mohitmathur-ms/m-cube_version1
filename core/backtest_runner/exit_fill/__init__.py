@@ -320,6 +320,10 @@ def _apply_vwap_fill(positions_report, fills_report, vwap_lookup) -> int:
                 exit_px = s_vwap if s_vwap > hit else hit      # MAX
         # Long pnl rises with the exit price; short pnl falls with it.
         delta = (exit_px - actual_px) * qty if was_long else (actual_px - exit_px) * qty
+        # Rewrite the displayed exit price to the spec §4.2 fill so the orderbook
+        # AVG EXIT PRICE reconciles with the repriced PnL. avg_px_close is a bare
+        # float price column (not a Money string), so write the raw float.
+        positions_report.at[idx, close_col] = exit_px
         if delta == 0.0:
             continue
         _vwap_adjust_pnl_cell(positions_report, idx, pnl_col, delta)
@@ -454,6 +458,9 @@ def _apply_directional_close_fill(
             continue
         # Long pnl rises with the exit price; short pnl falls with it.
         delta = (dir_close - actual_px) * qty if was_long else (actual_px - dir_close) * qty
+        # Rewrite the displayed exit price to the §8.1 directional close so the
+        # orderbook AVG EXIT PRICE matches the repriced PnL (bare float column).
+        positions_report.at[idx, close_col] = dir_close
         if delta == 0.0:
             continue
         _vwap_adjust_pnl_cell(positions_report, idx, pnl_col, delta)

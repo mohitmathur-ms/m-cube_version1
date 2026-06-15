@@ -65,6 +65,10 @@ class _PfTargetSettings:
     trail_every: float = 0.0
     trail_by: float = 0.0
     target_portfolio: str = ""  # spec §2.4(d)
+    # Selective partial-close on a Target hit (sl_features.html §2.4). Mutually
+    # exclusive; default False = full SqOff. TARGET_TRAIL ignores these (§5).
+    sqoff_only_loss_legs: bool = False
+    sqoff_only_profit_legs: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -130,6 +134,23 @@ _VALID_MOVE_SL_ACTIONS_FX = ("Move Only for Profitable Legs",
 _OPTIONS_ONLY_MOVE_SL_ACTIONS: tuple[str, ...] = ()
 
 
+def _canon_move_sl_action(action: str | None) -> str:
+    """Map any Move-SL-action spelling to one of the 3 canonical engine values.
+
+    Tolerant of spacing/case so the UI's "Move SL for All Legs Despite Loss / Profit"
+    (spaces around the slash), the spec's shorter "Move SL for All Legs", and the
+    engine's "…Loss/Profit" all resolve to the same variant — instead of failing
+    the exact-string allow-list and silently degrading to profitable-only. Mirrors
+    the token match in ManagedExitStrategy._check_exits.
+    """
+    a = (action or "").lower().replace(" ", "")
+    if "ltp" in a and "buffer" in a:
+        return "Move SL to LTP + Buffer for Loss Making Legs"
+    if "alllegs" in a:
+        return "Move SL for All Legs Despite Loss/Profit"
+    return "Move Only for Profitable Legs"
+
+
 def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
     """Validate portfolio.pf_sl_* fields per portfolio_sl_tgt.html §1-§2.
 
@@ -167,6 +188,20 @@ def _resolve_pf_stoploss(portfolio) -> tuple[_PfStoplossSettings, list[str]]:
         action = "SqOff"
 
     value = max(0.0, float(getattr(portfolio, "pf_sl_value", 0.0) or 0.0))
+    # Value input mode (spec §2.1): when flagged percent AND the type is
+    # PnL-based (Combined Loss), interpret pf_sl_value as % of starting_capital
+    # and convert to a currency amount (the clip compares combined PnL in
+    # currency). % is meaningless for underlying-price types (value is a price
+    # level) — ignored there with a warning.
+    if bool(getattr(portfolio, "pf_sl_value_is_pct", False)) and value > 0:
+        if sl_type == "Combined Loss":
+            cap0 = float(getattr(portfolio, "starting_capital", 0.0) or 0.0)
+            value = value / 100.0 * cap0
+        else:
+            warnings.append(
+                f"pf_sl_value_is_pct ignored for pf_sl_type={sl_type!r} "
+                f"(% applies only to the PnL-based 'Combined Loss' type)."
+            )
     delay = max(0, int(getattr(portfolio, "pf_sl_delay_sec", 0) or 0))
     reexec = max(0, int(getattr(portfolio, "pf_sl_reexecute_count", 0) or 0))
 
@@ -258,8 +293,30 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
         action = "SqOff"
 
     value = max(0.0, float(getattr(portfolio, "pf_tgt_value", 0.0) or 0.0))
+    # Value input mode (spec §2.4): % of starting_capital for the PnL-based
+    # "Combined Profit" type; ignored (warn) for the underlying-price type.
+    if bool(getattr(portfolio, "pf_tgt_value_is_pct", False)) and value > 0:
+        if tgt_type == "Combined Profit":
+            cap0 = float(getattr(portfolio, "starting_capital", 0.0) or 0.0)
+            value = value / 100.0 * cap0
+        else:
+            warnings.append(
+                f"pf_tgt_value_is_pct ignored for pf_tgt_type={tgt_type!r} "
+                f"(% applies only to the PnL-based 'Combined Profit' type)."
+            )
     delay = max(0, int(getattr(portfolio, "pf_tgt_delay_sec", 0) or 0))
     reexec = max(0, int(getattr(portfolio, "pf_tgt_reexecute_count", 0) or 0))
+
+    # Selective partial-close on a Target hit (sl_features.html §2.4) — mirror of
+    # the SL pair (§1.9/§1.10), mutually exclusive.
+    sqoff_loss = bool(getattr(portfolio, "pf_tgt_sqoff_only_loss_legs", False))
+    sqoff_profit = bool(getattr(portfolio, "pf_tgt_sqoff_only_profit_legs", False))
+    if sqoff_loss and sqoff_profit:
+        warnings.append(
+            "pf_tgt_sqoff_only_loss_legs and pf_tgt_sqoff_only_profit_legs are "
+            "mutually exclusive (sl_features.html §2.4) — disabling both."
+        )
+        sqoff_loss = sqoff_profit = False
 
     trail_enabled = bool(getattr(portfolio, "pf_tgt_trail_enabled", False))
     trail_lock = max(0.0, float(getattr(portfolio, "pf_tgt_trail_lock_min_profit", 0.0) or 0.0))
@@ -297,6 +354,8 @@ def _resolve_pf_target(portfolio) -> tuple[_PfTargetSettings, list[str]]:
         trail_when_profit_reach=trail_reach,
         trail_every=trail_every, trail_by=trail_by,
         target_portfolio=target_pf,
+        sqoff_only_loss_legs=sqoff_loss,
+        sqoff_only_profit_legs=sqoff_profit,
     ), warnings
 
 
@@ -341,17 +400,15 @@ def _resolve_move_sl_to_cost(portfolio) -> tuple[_MoveSLConfig, list[str]]:
             agg_pnl_direction=agg_pnl_direction,
         ), warnings
 
-    action = getattr(portfolio, "move_sl_action", "Move Only for Profitable Legs") \
-        or "Move Only for Profitable Legs"
+    # Canonicalise tolerantly (spacing/case-insensitive) so UI / spec / engine
+    # spellings of the same variant all resolve correctly instead of failing the
+    # exact-string allow-list and degrading to profitable-only.
+    _raw_action = getattr(portfolio, "move_sl_action", "Move Only for Profitable Legs")
+    action = _canon_move_sl_action(_raw_action)
     if action in _OPTIONS_ONLY_MOVE_SL_ACTIONS:
         warnings.append(
-            f"move_sl_action={action!r} (LTP + Buffer variant) is options-flavoured; "
+            f"move_sl_action={_raw_action!r} (LTP + Buffer variant) is options-flavoured; "
             f"downgraded to 'Move Only for Profitable Legs' for FX/crypto."
-        )
-        action = "Move Only for Profitable Legs"
-    elif action not in _VALID_MOVE_SL_ACTIONS_FX:
-        warnings.append(
-            f"Invalid move_sl_action={action!r} — falling back to 'Move Only for Profitable Legs'."
         )
         action = "Move Only for Profitable Legs"
 

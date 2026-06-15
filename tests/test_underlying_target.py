@@ -64,16 +64,33 @@ def test_underlying_tgt_skipped_without_curve():
     assert any("UNDERLYING_TGT_SKIPPED" in line for line in clip.logs)
 
 
-def test_underlying_tgt_delay_shifts_clip_ts():
+def test_underlying_tgt_delay_confirms_then_fires():
+    # Confirmation delay (spec §5.3): the cross must HOLD for delay_sec before
+    # firing; the clip lands at the TRIGGER bar (not shifted forward).
     tgt = _PfTargetSettings(
         enabled=True, tgt_type="Underlying Movement", value=1.10, delay_sec=120,
     )
     clip = _underlying_tgt_clip(
-        _ucurve(1.08, 1.11), _EQ, _SL_OFF, tgt,
+        # cross at 00:02:00; price stays above the level for the next 120 s.
+        _ucurve(1.08, 1.11, 1.12, 1.13), _EQ, _SL_OFF, tgt,
         slot_pnl_at_clip={"s1": 0.0}, starting_capital=10_000.0,
     )
-    # Cross at 00:02:00 + 120 s delay → 00:04:00.
-    assert _ts_iso_to_ns(clip.clip_ts) == _ts_iso_to_ns("2024-01-01T00:04:00+00:00")
+    assert clip.clip_ts == "2024-01-01T00:02:00+00:00"
+    assert clip.clip_reason == "TARGET"
+
+
+def test_underlying_tgt_delay_cancels_on_recovery():
+    # If the price falls back below the level within the delay window, the
+    # pending clip is cancelled — oscillation guard (spec §5.3).
+    tgt = _PfTargetSettings(
+        enabled=True, tgt_type="Underlying Movement", value=1.10, delay_sec=120,
+    )
+    clip = _underlying_tgt_clip(
+        # cross up at 00:02:00, then drops back below at 00:03:00 (< 120 s).
+        _ucurve(1.08, 1.11, 1.08), _EQ, _SL_OFF, tgt,
+        slot_pnl_at_clip={"s1": 0.0}, starting_capital=10_000.0,
+    )
+    assert clip.clip_ts is None
 
 
 # ── _resolve_pf_target — type validation ────────────────────────────────────

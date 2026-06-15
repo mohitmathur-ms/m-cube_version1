@@ -12,9 +12,10 @@ Resolution order at fill time (`execution/engine.pyx::_determine_oms_type`, ~L14
 2. If UNSPECIFIED -> fall through to the venue/exec client's native `oms_type`.
 3. If no client at all -> default NETTING.
 
-Position ID rules (`execution/engine.pyx`):
-- NETTING: deterministic ID `f"{instrument_id}-{strategy_id}"` (`_determine_netting_position_id`, L1524). One netted position per instrument+strategy; closed position is snapshotted before ID reuse on flip/reopen.
-- HEDGING: new generated ID per entry (`_pos_id_generator.generate`); venue can also generate venue position IDs. Reopening a closed position in HEDGING just logs a warning (not allowed in NETTING).
+Position ID rules (`execution/engine.pyx`, verified 1.224.0):
+- NETTING: deterministic ID `PositionId(f"{fill.instrument_id}-{fill.strategy_id}")` (`_determine_netting_position_id`, L1524-1525). STRATEGY_ID IS IN THE KEY => positions are ISOLATED per (instrument, strategy). Two strategies trading same instrument under NETTING get TWO separate netted positions, NOT one shared. Closed position snapshotted before ID reuse on flip/reopen.
+- HEDGING: new generated ID per entry via `_pos_id_generator.generate(strategy_id)` (`_determine_hedging_position_id`, L1517). Generator (`common/generators.pyx` L293-322) keys counts per strategy_id and embeds `strategy_id.get_tag()` in the ID `P-<dt>-<trader>-<strat_tag>-<count>[F]`. Reopening a closed position in HEDGING just logs a warning (not allowed in NETTING, raises RuntimeError L1686).
+- Dispatch (`_handle_position_update` L1641-1648): looks up position by `fill.position_id`; if None/closed -> `_open_position`; elif `_will_flip_position` (opposite side AND fill qty > pos qty, L1735) -> `_flip_position` (nets: closes original + opens remainder); else `_update_position` (reduce/add). So NETTING flip nets to one position; HEDGING opposite SELL gets a fresh position_id => SEPARATE short alongside the long.
 
 Backtest venue config: `BacktestVenueConfig.oms_type` (`backtest/config.py`), required field (no default). `BacktestEngine.add_venue(oms_type=...)` is also required (positional). Docstring: "If HEDGING will generate new position IDs." Matching engine `_get_position_id` (backtest/engine.pyx L7573) implements venue-side ID gen for HEDGING.
 

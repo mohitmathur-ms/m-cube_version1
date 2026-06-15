@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL/Target Testing Process — Artifacts &amp; Verification</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --purple:#8250df; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1120px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#1a7f37 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:23px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:19px; margin-top:30px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  h3 { font-size:15px; margin-top:18px; }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12px; background:#f6f8fa; padding:1px 5px; border-radius:3px; color:#d63384; }
+  pre { background:#f6f8fa; border:1px solid var(--border); border-radius:6px; padding:12px 16px; overflow-x:auto; font-size:12px; line-height:1.5; }
+  pre code { background:none; color:var(--text); padding:0; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .ours { color:var(--purple); font-weight:600; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px; }
+  .split .box { border:1px solid var(--border); border-radius:6px; padding:10px 14px; font-size:13px; background:var(--panel); }
+  .split .box.b1 { border-left:3px solid var(--muted); } .split .box.b2 { border-left:3px solid var(--purple); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>SL/Target Testing Process — Artifacts &amp; Verification</h1>
+  <p>Our testing process. Artifact formats modelled on a real run; design &amp; methodology stay ours.</p>
+</header>
+
+<div class="callout"><strong>Inspiration vs ours.</strong> <em>Borrowed format:</em> the column/layout shapes of the orderbook, logs, portfolio reference, and report. <em>Kept ours:</em> what we test (futures + equity features), how we verify (Time/Logic/Price + manual traces), and every spec decision (limit orders, MIS/NRML/CNC, step-based trailing, <code>curr_leg_pnl</code> anchor).</div>
+
+<h2>Document set — read in this order</h2>
+<p><strong>This is the entry point.</strong> The testing work spans five docs:</p>
+<table>
+  <thead><tr><th>#</th><th>Doc</th><th>What it gives you</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>sl_tgt_testing_process</code> (this)</td><td>the process + artifact formats (config reference, orderbook, logs, report)</td></tr>
+    <tr><td>2</td><td><code>sl_tgt_test_portfolios</code></td><td>the test portfolios + per-feature <strong>manual traces</strong> (what to test, expected answers)</td></tr>
+    <tr><td>3</td><td><code>product_modes_limit_orders</code></td><td>the <strong>order / fill model</strong> + MIS / NRML / CNC behaviour</td></tr>
+    <tr><td>4</td><td><code>manual_verification_process</code></td><td>the <strong>Time / Logic / Price</strong> check, step by step against the orderbook</td></tr>
+    <tr><td>5</td><td><code>test_strategies_catalog</code></td><td>the <strong>EMA-cross harness</strong> to make the portfolios runnable on real data</td></tr>
+  </tbody>
+</table>
+
+<h2>1. The pipeline</h2>
+<pre><code>Define test portfolios → Run engine → Emit Orderbook + Logs → Verify (Time/Logic/Price) → Result/Report → Freeze regression → Sign-off
+     (you/oracle)          (dev)           (dev)                    (you)                    (dev)             (you)            (you)</code></pre>
+<ul>
+  <li><strong>Dev produces:</strong> the run, the orderbook, the logs, the summary report.</li>
+  <li><strong>You verify:</strong> recompute expected Time/Logic/Price from the config and check the artifacts. Evidence before assertions.</li>
+</ul>
+
+<h2>2. Artifact A — Test-portfolio config reference <span style="font-size:13px;color:var(--muted)">(the oracle)</span></h2>
+<p>Our futures/equity portfolios laid out as a quick-ref table + feature matrix + per-PF cards (layout borrowed from the real reference):</p>
+<table>
+  <thead><tr><th>PF</th><th>Level</th><th>Instrument</th><th>Legs</th><th>Target</th><th>Stoploss</th><th>Mode</th><th>Cross-PF</th><th>Feature focus</th></tr></thead>
+  <tbody>
+    <tr><td>PF-1L</td><td>Leg</td><td>NIFTY-FUT</td><td>1 long</td><td>Premium %</td><td>Premium %</td><td>NRML</td><td>—</td><td>leg SL/TGT trigger + fill</td></tr>
+    <tr><td>PF-1S</td><td>Leg</td><td>6E</td><td>1 short</td><td>—</td><td>Points</td><td>NRML</td><td>—</td><td>short-side SL</td></tr>
+    <tr><td>PF-ATR</td><td>Leg</td><td>BTC</td><td>1 long</td><td>—</td><td>ATR (mult)</td><td>NRML</td><td>—</td><td>ATR SL sizing</td></tr>
+    <tr><td>PF-WAIT</td><td>Leg</td><td>NIFTY-FUT</td><td>1 long</td><td>—</td><td>SL + SL-Wait</td><td>NRML</td><td>—</td><td>delay/wait timing</td></tr>
+    <tr><td>PF-2</td><td>Leg</td><td>GC</td><td>2 legs</td><td>—</td><td>Move-SL-to-Cost + Trail-After</td><td>NRML</td><td>—</td><td>move-to-cost + trail (<code>curr_leg_pnl</code>)</td></tr>
+    <tr><td>PF-3</td><td>Portfolio</td><td>BANKNIFTY-FUT</td><td>3 legs</td><td>Combined Profit + Trailing Target</td><td>Combined Loss + Trailing SL</td><td>NRML</td><td>—</td><td>portfolio SL/TGT, trailing, breach</td></tr>
+    <tr><td>PF-U</td><td>User</td><td>NIFTY-FUT + 6E</td><td>2 portfolios</td><td>—</td><td>Max Loss / Max Profit</td><td>NRML</td><td>user cascade</td><td>user level</td></tr>
+    <tr><td>PF-MIS</td><td>Mode</td><td>NIFTY-FUT</td><td>1</td><td>—</td><td>SL</td><td><strong>MIS</strong></td><td>—</td><td>intraday cutoff square-off</td></tr>
+    <tr><td>PF-CNC</td><td>Mode</td><td>RELIANCE (equity)</td><td>1</td><td>—</td><td>SL</td><td><strong>CNC</strong></td><td>—</td><td>equity delivery carry</td></tr>
+    <tr><td>PF-XPF</td><td>Portfolio</td><td>NIFTY-FUT → 6E</td><td>1+1</td><td>SqOff/Execute/Start Other</td><td>—</td><td>NRML</td><td>→ target PF</td><td>cross-portfolio actions</td></tr>
+  </tbody>
+</table>
+<p>Each PF also gets a <strong>card</strong> (full config) and a row in a <strong>feature-coverage matrix</strong> (feature × PF, ✓/—) — same layout as the real reference, so coverage gaps show at a glance.</p>
+
+<h3>Run dimensions — every PF runs across timeframes (and assets)</h3>
+<p>A test portfolio is <strong>not one run</strong> — it's run across <strong>timeframes</strong> and, where relevant, <strong>asset classes</strong>. The SL/Target logic is identical, but these change per cell and must be re-verified.</p>
+<p><strong>Timeframes: 1m · 3m · 5m · 2h · 1d · 1w · 1M.</strong> Where exact intrabar ordering must be settled, drop to <strong>tick / 1-sec</strong> as the finest resolution (see "Intrabar ordering" below).</p>
+<table>
+  <thead><tr><th>Timeframe-specific check</th><th>What to verify</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ATR period (in bars)</strong></td><td><code>ATR(N)</code> spans N <strong>bars</strong> → <code>ATR(14)</code> = 14 min on 1m, 70 min on 5m, 28 h on 2h, 14 days on 1d, 14 months on 1M. The <strong>same <code>(period, mult)</code> gives a different SL distance</strong> per timeframe. Recompute per cell — don't assume cross-timeframe equality.</td></tr>
+    <tr><td><strong>SL-Wait / delay units</strong></td><td><code>wait</code> in <strong>bars</strong> scales with bar size (2 bars = 2 min on 1m, 10 min on 5m, 2 days on 1d); <code>sl_wait_sec</code> is <strong>wall-clock</strong> (timeframe-independent).</td></tr>
+    <tr><td><strong>Safety Seconds vs bar size</strong></td><td>Safety &lt; bar size (e.g. 30 s on a 1m bar) → engine <strong>refuses + warns</strong>; ≥ bar size → applies at trigger-event + safety.</td></tr>
+    <tr><td><strong>Trigger granularity</strong></td><td>finer timeframes pierce the level on smaller bars → trigger <strong>timestamp differs</strong>; the level/price is identical.</td></tr>
+    <tr><td><strong>Intrabar ordering</strong></td><td>all seven are coarse bars → use the high-then-low convention when a bar both makes a new high and breaches; only <strong>tick / 1-sec</strong> data (the finest resolution) resolves the order exactly.</td></tr>
+    <tr><td><strong>Tick snapping</strong></td><td>timeframe-independent — depends only on the instrument.</td></tr>
+  </tbody>
+</table>
+<p><strong>Assets:</strong> test each type across <strong>different asset classes</strong> — re-check the per-asset specifics (tick size, lot multiplier, currency) per cell.</p>
+<p><strong>Sweep policy by level.</strong> Sweep a dimension only where the logic <em>interacts</em> with it — a full level × asset × timeframe cross would be thousands of runs that re-prove nothing. The leg fixtures get the full sweep because tick-snap, lot multiplier, currency and ATR-in-bars all bite at the atomic SL; higher levels inherit that and add only their own interactions:</p>
+<table>
+  <thead><tr><th>Level</th><th>What to sweep</th><th>Asset coverage</th><th>Timeframe coverage</th><th>Why these dimensions bite</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Leg</strong></td><td>the SL types (%, points, ATR) + SL-Wait</td><td><strong>all 7 assets</strong></td><td><strong>all 7 (1m…1M)</strong> + tick/1-sec for intrabar ordering</td><td>tick-snap, lot-mult, currency, ATR-in-bars all bite at the atomic SL; wait-units scale with bar size</td></tr>
+    <tr><td><strong>Portfolio</strong></td><td>dynamic — Trailing SL, Profit-Lock, Move-to-Cost, Delay; static — Combined Loss/Profit</td><td><strong>1 INR + 1 USD</strong> asset (exercises currency inside Combined PnL)</td><td>dynamic: <strong>all 7</strong>; static: 1m + a coarse-TF spot-check (e.g. 1d)</td><td>step ratchet &amp; profit-lock floor fire on bar boundaries → the step bar shifts per timeframe; Combined PnL aggregates across multiplier + currency</td></tr>
+    <tr><td><strong>User</strong></td><td>Max Loss/Profit + User Trailing</td><td><strong>cross-currency cascade</strong> (INR PF + USD PF) + an all-INR baseline</td><td>1m + a coarse-TF spot-check on the trailing cases</td><td>the user roll-up normalises both books to a base currency; same-bar User→Portfolio→Leg precedence depends on which bar</td></tr>
+    <tr><td><strong>Cross-PF</strong></td><td>the dispatch pair</td><td>as configured</td><td>1m + a coarse TF for the cross-PF delay (2 s/3 s)</td><td>the cross-PF delay is wall-clock → re-check against bar size</td></tr>
+    <tr><td><strong>Product mode</strong></td><td>MIS, NRML, CNC</td><td>MIS on a future, CNC on equity</td><td>any one TF (e.g. 1m)</td><td>square-off cutoff &amp; delivery carry are clock/calendar logic, not bar-size sensitive</td></tr>
+  </tbody>
+</table>
+<p>The runnable per-case version (with the exact TL/TP/TU/TX case IDs) is in <code>sl_tgt_test_portfolios</code> §7.</p>
+<div class="callout"><strong>Why not sweep everything.</strong> A <em>cell</em> = one (case × asset × timeframe) run, and each cell costs a <strong>manual Time/Logic/Price walk</strong> — that hand-reconciliation, not CPU, is the budget. Sweep a dimension only where the <em>logic</em> changes with it: at the <strong>leg</strong> the SL number itself moves (tick size, lot multiplier, currency, ATR-in-bars) so the full 7×7 is real; <strong>above the leg</strong> the core arithmetic (Σ leg PnL vs a threshold) is scale- and timeframe-free, so re-running it across 49 cells just re-proves the same sum. Targeting the cells that bite (<strong>≈ 240</strong>) versus a blind full cross (<strong>≈ 2,250</strong>) is roughly a <strong>10× difference in manual effort for zero extra bug coverage</strong>. Widen surgically only when a specific interaction is suspected — characterising a bug across timeframes, possible cross-currency rounding, or a wall-clock timer used where bars were intended.</div>
+
+<h2>3. Artifact B — Orderbook <span style="font-size:13px;color:var(--muted)">(primary evidence)</span></h2>
+<table>
+  <thead><tr><th>Column</th><th>Source</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td><code>USERID SYMBOL EXCHANGE TRANSACTION QUANTITY LOTS MULTIPLIER</code></td><td>real</td><td>identity + PnL math (lot × mult)</td></tr>
+    <tr><td><code>OrderID</code> (with <code>_exec.reentry</code> suffix) · <code>_PARENT_ID</code></td><td>real</td><td>trace re-executions / re-entries</td></tr>
+    <tr><td><code>ENTRY TIME · ENTRY PRICE · ENTRY REASON</code></td><td>real</td><td>when/why a position opened</td></tr>
+    <tr><td><code>EXIT TIME · AVG EXIT PRICE · EXIT REASON · PNL</code></td><td>real</td><td>when/why/at-what-price it closed</td></tr>
+    <tr><td><code>PORTFOLIO NAME · STRATEGY · PRODUCT_MODE</code></td><td>real (+mode)</td><td>which PF + MIS/NRML/CNC</td></tr>
+    <tr><td class="ours"><code>LEVEL_PRICE · CURRENT_SL · CURRENT_TGT</code></td><td class="ours">ours</td><td>the level at the event — for the <strong>Price</strong> check</td></tr>
+    <tr><td class="ours"><code>MOVE_SL_ANCHOR · ANCHOR_PNL</code></td><td class="ours">ours</td><td>trailing/move-to-cost state — re-walk the ratchet</td></tr>
+    <tr><td class="ours"><code>COMBINED_PNL · UNDERLYING</code></td><td class="ours">ours</td><td>portfolio/underlying thresholds</td></tr>
+    <tr><td class="ours"><code>BAR_O/H/L/C</code> (or bid/ask/ltp)</td><td class="ours">ours</td><td>the bar that caused the row — <strong>Time</strong> + reach check</td></tr>
+  </tbody>
+</table>
+<p><strong>Reason vocabulary</strong> (borrow + extend) — <em>entry:</em> <code>Start time entry</code> · <code>Portfolio re-executed due to TARGET/SL</code> · <code>ReEntry at original price</code> · <code>Triggered by &lt;PF&gt; TARGET/STOPLOSS</code> · <code>Started by &lt;PF&gt;</code>. <em>Exit:</em> <code>SL HIT</code> · <code>TARGET HIT</code> · <code>COMBINED LOSS/PROFIT HIT</code> · <code>TRAIL_SL</code> · <code>TARGET_TRAIL</code> · <code>MOVE_TO_COST</code> · <code>UNDERLYING MOVEMENT HIT</code> · <code>LOSS AND RANGE HIT</code> · <code>MIS_CUTOFF</code> · <code>SqOff Time</code>.</p>
+
+<h2>4. Artifact C — Logs <span style="font-size:13px;color:var(--muted)">(per-event timing)</span></h2>
+<table>
+  <thead><tr><th>Column</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td><code>Timestamp</code> (wall) · <code>Backtest_Timestamp</code> (sim)</td><td>the time axis for every event</td></tr>
+    <tr><td><code>Log Type</code> (TRADING / MESSAGE)</td><td>filter trades vs system messages</td></tr>
+    <tr><td><code>Message</code></td><td>event + reason in words (ENTRY/EXIT/trigger/delay/reexec/winter-time/global-limits)</td></tr>
+    <tr><td><code>UserID · Strategy Tag · Portfolio</code></td><td>which entity</td></tr>
+  </tbody>
+</table>
+<p>The logs carry what the orderbook can't: <strong>delay countdowns, trail-step updates, "Triggered by" dispatch, Winter-Time adjustments, Global-limit status, DELAY_CLEARED</strong> — how you settle the <strong>Time</strong> axis (e.g. did the 2s cross-PF delay elapse; did the SL fire on the <em>first</em> qualifying second).</p>
+
+<h2>5. Artifact D — Result / Report <span style="font-size:13px;color:var(--muted)">(summary)</span></h2>
+<p>Per-PF roll-up (layout borrowed): trades, hits-by-feature, PnL, win/loss, and a <strong>feature-fired tally</strong> so you confirm every targeted feature triggered at least once.</p>
+
+<h2>6. Verification — Time / Logic / Price <span style="font-size:13px;color:var(--muted)">(our methodology)</span></h2>
+<p>Apply the 3-axis check (full detail in <code>manual_verification_process</code>) to every event row, recomputing from the config:</p>
+<ul>
+  <li><strong>TIME</strong> — event <code>Backtest_Timestamp</code> == first bar the condition is true (±wait/±safety); same-bar precedence User→Portfolio→Leg.</li>
+  <li><strong>LOGIC</strong> — <code>EXIT REASON</code> matches the condition actually true; correct action; guards respected (trailing only-tightens, lock only-rises, re-exec count).</li>
+  <li><strong>PRICE</strong> — recompute the level from <code>ENTRY PRICE</code> + config (tick-snapped) → must equal <code>CURRENT_SL</code>/<code>LEVEL_PRICE</code>; <code>PNL = (exit−entry) × MULTIPLIER × LOTS</code>; fill per the model (limit-level / VWAP — <em>pending parked question</em>).</li>
+</ul>
+<p><strong>Loop:</strong> run → export orderbook+logs → sort by <code>Backtest_Timestamp</code> → 3-axis check each row → green/red. For dynamic features, walk the rows in sequence so state (<code>CURRENT_SL</code>, anchors) evolves exactly as the manual trace says.</p>
+
+<h2>7. Sign-off + regression</h2>
+<ul>
+  <li>Every feature in the §2 matrix has a green Time/Logic/Price result.</li>
+  <li>Cross-PF actions verified end-to-end (source trigger → target action, with delay).</li>
+  <li>Once green + hand-reconciled, <strong>freeze the orderbook as a regression baseline</strong> (one per asset class / mode); re-run on every code change; any drift = fail.</li>
+</ul>
+
+<div class="split">
+  <div class="box b1"><strong>Carried over (format only)</strong><br>Orderbook columns · logs <code>Backtest_Timestamp</code> + Log Type/Message · reason strings · reference table + feature matrix + cards · report roll-up.</div>
+  <div class="box b2"><strong>Stayed ours (what matters)</strong><br>Futures + equity scope · the test portfolios &amp; feature cases · Time/Logic/Price + manual traces · limit-order / product-mode / step-trailing / <code>curr_leg_pnl</code> decisions · the parked fill-price + gap questions.</div>
+</div>
+
+</div>
+</body>
+</html>

@@ -90,7 +90,7 @@ Override-path legend:
 | `_SYMBOL_NORMALIZE` | `{"EUROUSD":"EURUSD","GPBUSD":"GBPUSD"}` | Fixed misspelling-fix map for source pair names. | None |
 | `_DAILY_FX_PATTERN` | `DD.MM.YYYY_(BID\|ASK)_OHLCV.csv` | FX daily filename regex. | None |
 | `_DAILY_COMMODITY_PATTERN` | `(ASK\|BID).csv` | Commodity daily filename regex. | None |
-| `_DAILY_INDEX_PATTERN` | `DD.MM.YYYY_complete_df_OHLCV.csv` | Index daily filename regex. | None |
+| `_DAILY_INDEX_PATTERN` | `DD.MM.YYYY_<infix>_OHLCV.csv` | Index daily filename regex; `<infix>` is the dataset tag (e.g. `complete_df`, `nifty_spot`) and is unconstrained. | None |
 | `_CRYPTO_YEAR_DIR_PATTERN` / `_CRYPTO_MONTH_DIR_PATTERN` | `^\d{4}$` / `^\d{1,2}$` | Year/month directory-name gates for the crypto layout. | None |
 | `_FLAT_FX_FILE_PATTERN` | `{PAIR}_{PAIR}_DDMMMYYYY_DDMMMYYYY_(ASK\|BID\|MID)_OHLCV.csv` | Consolidated-FX filename regex. | None |
 | `_MONTH_ABBR` | `JAN…DEC` | Month-abbreviation table for synthetic display filenames. | None |

@@ -40,12 +40,14 @@ _DAILY_FX_PATTERN = re.compile(
 # the regex captures only the side.
 _DAILY_COMMODITY_PATTERN = re.compile(r"^(ASK|BID)\.csv$", re.IGNORECASE)
 
-# Index daily-file naming: "DD.MM.YYYY_complete_df_OHLCV.csv" — one consolidated
+# Index daily-file naming: "DD.MM.YYYY_<infix>_OHLCV.csv" — one consolidated
 # file per trading day (no ASK/BID split — the index level itself is the bar
-# stream). Layout is three-deep with no symbol directory:
-# <root>/YYYY/MM/<DD.MM.YYYY>_complete_df_OHLCV.csv
+# stream). The <infix> identifies the dataset (e.g. "complete_df" for futures,
+# "nifty_spot" for spot) and is intentionally not constrained, so any daily
+# index file shaped this way is picked up. Layout is three-deep with no symbol
+# directory: <root>/YYYY/MM/<DD.MM.YYYY>_<infix>_OHLCV.csv
 _DAILY_INDEX_PATTERN = re.compile(
-    r"^(\d{2})\.(\d{2})\.(\d{4})_complete_df_OHLCV\.csv$",
+    r"^(\d{2})\.(\d{2})\.(\d{4})_.+_OHLCV\.csv$",
     re.IGNORECASE,
 )
 

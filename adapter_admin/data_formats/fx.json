@@ -26,8 +26,7 @@
     ],
     "price_precision": 5,
     "size_precision": 0,
-    "currency_type": 0,
-    "timeframe": "1-MINUTE"
+    "currency_type": 0
   },
   "trading": {
     "maker_fee": null,

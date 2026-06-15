@@ -34,7 +34,9 @@ from core.backtest_runner.bar_filters import (
 )
 from core.backtest_runner.bar_types import (
     _aggregate_target_for_slot,
+    _normalize_primary_to_mid,
     _pair_bid_ask_bar_type,
+    _same_ts_sort_key,
 )
 from core.backtest_runner.data_cache import _cached_catalog_bars
 from core.backtest_runner.exit_fill import (
@@ -50,7 +52,10 @@ from core.backtest_runner.path_b import (
     _path_b_active,
     _path_b_supports_filters,
 )
-from core.backtest_runner.portfolio_clip import _build_underlying_curve
+from core.backtest_runner.portfolio_clip import (
+    _build_underlying_curve,
+    _underlying_curve_from_bars,
+)
 from core.backtest_runner.portfolio_exit_config import _MoveSLConfig
 from core.backtest_runner.profiling import (
     _config_supports_aggregate_to,
@@ -65,6 +70,32 @@ from core.backtest_runner.results import (
     positions_report_with_base,
 )
 from core.backtest_runner.single_backtest import run_backtest
+
+
+def _bidask_data_available(paired_strs, missing_pairs) -> bool:
+    """True when a COMPLETE BID/ASK pair is loaded for the slot.
+
+    Gate for auto-promoting the default OHLCV exit format to Format A (spec
+    §4.1): only when both quote sides exist in the catalog (``paired_strs``
+    derived and none of them ``missing_pairs``) is it safe to trigger SL/Target
+    on bid_high/ask_low. A non-FX (LAST/genuine-OHLCV) bar type yields an empty
+    ``paired_strs`` → False → the slot stays on the single-series (Format B)
+    path, so this never promotes a slot that lacks bid/ask data.
+    """
+    return bool(paired_strs) and not any(p in missing_pairs for p in paired_strs)
+
+
+def _capture_underlying_curve(catalog_path, bar_type_str, start_date, end_date) -> list[dict]:
+    """Build the underlying (timestamp, close) curve from the cached catalog read
+    rather than the engine cache — path-independent and safe after the engine is
+    disposed (grouped / Path-B runs). Used to enforce the portfolio-level
+    Underlying-Movement / Loss-and-Range SL on every execution path (spec §2.1).
+    The primary bar type's close IS the underlying (D5 "underlying = self")."""
+    try:
+        bars = _cached_catalog_bars(catalog_path, bar_type_str, start_date, end_date)
+    except Exception:
+        return []
+    return _underlying_curve_from_bars(bars)
 
 
 def _run_single_backtest_task(
@@ -145,6 +176,7 @@ def _run_single_slot_node(
     default_other_settings: "_OtherSettings | None" = None,
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
+    default_capture_underlying: bool = False,
 ) -> dict:
     """Path B variant of _run_single_slot.
 
@@ -247,6 +279,7 @@ def _run_single_slot_node(
                     instrument_id=instrument_id,
                     bar_type=primary_bt,
                     trade_size=slot_qty,
+                    auto_bidask=_bidask_data_available(paired_strs, missing_pairs),
                     squareoff_time=eff_squareoff_time,
                     squareoff_tz=eff_squareoff_tz,
                     rbo_settings=default_rbo_settings,
@@ -300,6 +333,14 @@ def _run_single_slot_node(
         results["elapsed_seconds"] = round(_time.time() - _t_slot_start, 3)
         results["worker_pid"] = os.getpid()
         results["path_b"] = True
+
+        # Underlying price series for portfolio-level Underlying-Movement /
+        # Loss-and-Range SL (spec §2.1). Built from the cached catalog read (not
+        # the engine cache) so it survives BacktestNode's post-run disposal.
+        if default_capture_underlying:
+            results["underlying_curve"] = _capture_underlying_curve(
+                catalog_path, slot.bar_type_str, start_date, end_date
+            )
 
         if missing_pairs:
             results["warning"] = (
@@ -355,6 +396,7 @@ def _run_single_slot(
     default_directional_fill: bool = False,
     default_reexec_entry_price: float = 0.0,
     default_reexec_entry_was_long: bool = True,
+    default_reexec_market_mode: bool = False,
 ) -> dict:
     """Run a single strategy slot in its own engine.
 
@@ -391,6 +433,7 @@ def _run_single_slot(
             default_other_settings=default_other_settings,
             default_move_sl_settings=default_move_sl_settings,
             user_id=user_id,
+            default_capture_underlying=default_capture_underlying,
         )
 
     import os
@@ -544,15 +587,23 @@ def _run_single_slot(
             ))
 
             venue = instrument_id.venue
+            # Account base currency from the slot venue's adapter config
+            # (account_base_currency), default USD — INR for NIFTY, USD for FX/crypto.
+            from core.venue_config import account_currency_code_for_bar_type as _acct_ccy_code
+            from nautilus_trader.model.objects import Currency as _Currency
+            _acct_ccy = _Currency.from_str(_acct_ccy_code(slot.bar_type_str))
             engine.add_venue(
                 venue=venue,
                 oms_type=OmsType.NETTING,
                 account_type=AccountType.MARGIN,
-                starting_balances=[Money(capital, USD)],
-                base_currency=USD,
+                starting_balances=[Money(capital, _acct_ccy)],
+                base_currency=_acct_ccy,
                 default_leverage=Decimal(1),
             )
             engine.add_instrument(instrument)
+            # Project-wide same-ts order: quotes (ASK,BID) before MID — deterministic
+            # by contract, identical rule as the unified path (no flag).
+            all_bars.sort(key=_same_ts_sort_key)
             engine.add_data(all_bars)
             # VWAP fill (spec §4.2/§3): index ASK/BID bars with the session-
             # cumulative volume-weighted VWAP before the bar list is dropped, so
@@ -574,6 +625,13 @@ def _run_single_slot(
                 if (default_directional_fill
                     or os.environ.get("_USE_DIRECTIONAL_FILL", "0") == "1")
                 else None
+            )
+            # Per-bar (ts_ns, close) for THIS slot's execution bar type — feeds the
+            # mark-to-market portfolio-P&L curve so the portfolio SL/Target can fire
+            # on live combined P&L every bar. Sorted by ts; built before the bars drop.
+            bar_closes = sorted(
+                (int(b.ts_event), float(b.close))
+                for b in all_bars if str(b.bar_type) == slot.bar_type_str
             )
             # Free the bar list reference; Nautilus has copied into its internal cache.
             del all_bars
@@ -613,6 +671,7 @@ def _run_single_slot(
                     instrument_id=instrument_id,
                     bar_type=primary_bt,
                     trade_size=slot_qty,
+                    auto_bidask=_bidask_data_available(paired_strs, missing_pairs),
                     rbo_settings=default_rbo_settings,
                     other_settings=default_other_settings,
                     move_sl_settings=default_move_sl_settings,
@@ -644,6 +703,8 @@ def _run_single_slot(
                     # waits for price to return to it. 0 = plain ReExecute.
                     reexec_entry_price=default_reexec_entry_price,
                     reexec_entry_was_long=default_reexec_entry_was_long,
+                    # Plain ReExecute → immediate market re-entry (spec §5.2).
+                    reexec_market_mode=default_reexec_market_mode,
                 )
                 strategy = ManagedExitStrategy(managed_config)
             else:
@@ -681,7 +742,7 @@ def _run_single_slot(
             fx_resolver = FxRateResolver.from_adapter_config(adapter_cfg, catalog_path)
 
         with _phase("extract_results", phase_times):
-            results = _extract_results(engine, capital, fx_resolver, vwap_lookup, close_lookup)
+            results = _extract_results(engine, capital, fx_resolver, vwap_lookup, close_lookup, bar_closes)
             # Capture the underlying price series for portfolio-level
             # Underlying-Movement / Loss-and-Range SL (spec §2.1). Only built
             # when the portfolio actually uses an underlying SL type — keeps
@@ -771,6 +832,7 @@ def _extract_slot_from_group_reports(
     fx_resolver,
     vwap_lookup: dict | None = None,
     close_lookup: dict | None = None,
+    bar_closes: list | None = None,
 ) -> dict:
     """Build one slot's result dict by filtering a shared-engine's reports by strategy_id.
 
@@ -894,6 +956,21 @@ def _extract_slot_from_group_reports(
                     ts_iso = None
             equity_curve_ts.append({"timestamp": ts_iso, "balance": running})
 
+    # Per-bar mark-to-market curve for the portfolio SL/Target — mirrors the
+    # per-slot _extract_results path so the unified/grouped engine's results feed
+    # the same intraday combined-P&L clip. P&L-based (capital 0); the portfolio
+    # merge adds the portfolio capital back. Empty when no bar_closes supplied
+    # (e.g. the legacy grouping path), in which case the clip falls back to the
+    # realized curve — unchanged behaviour there.
+    equity_curve_mtm: list = []
+    if bar_closes and not slot_positions.empty and pnl_col:
+        from core.backtest_runner.equity_curves import _build_mtm_equity_curve
+        from core.backtest_runner.results import _row_pnl_to_base
+        equity_curve_mtm = _build_mtm_equity_curve(
+            slot_positions, 0.0, bar_closes,
+            lambda row, _pc=pnl_col, _tc=ts_col: _row_pnl_to_base(row, _pc, _tc, fx_resolver),
+        )
+
     # Max drawdown from the equity curve
     balances = [pt["balance"] for pt in equity_curve_ts]
     peak = balances[0]
@@ -932,6 +1009,7 @@ def _extract_slot_from_group_reports(
         "max_drawdown": max_dd,
         "equity_curve": balances,
         "equity_curve_ts": equity_curve_ts,
+        "equity_curve_mtm": equity_curve_mtm,
         "positions_report": positions_report_with_base(slot_positions, fx_resolver),
         "fills_report": slot_fills,
         "account_report": None,  # shared in a group, not per-slot
@@ -959,6 +1037,7 @@ def _run_slot_group_node(
     default_move_sl_settings: "_MoveSLConfig | None" = None,
     user_id: str | None = None,
     portfolio_name: str = "",
+    default_capture_underlying: bool = False,
 ) -> list[dict]:
     """Path B variant of _run_slot_group.
 
@@ -1081,6 +1160,7 @@ def _run_slot_group_node(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        auto_bidask=_bidask_data_available(paired_strs, missing_pairs),
                         # Intraday entry window — only passed (so the strategy
                         # gates entries internally) when the whole group is
                         # managed and its post-window bars were kept.
@@ -1145,6 +1225,13 @@ def _run_slot_group_node(
 
             slot_results: list[dict] = []
             group_elapsed = round(_time.time() - _t_group_start, 3)
+            # Underlying price series (spec §2.1) — same primary series for the
+            # whole group; built once from the cached catalog read so it survives
+            # node disposal, then attached to every slot result.
+            _group_underlying = (
+                _capture_underlying_curve(catalog_path, primary_bar_type_str, start_date, end_date)
+                if default_capture_underlying else None
+            )
             for i, (slot, capital) in enumerate(group):
                 strategy_id = (
                     actual_strategy_ids[i] if i < len(actual_strategy_ids)
@@ -1153,6 +1240,8 @@ def _run_slot_group_node(
                 r = _extract_slot_from_group_reports(
                     positions_report, fills_report, strategy_id, slot, capital, fx_resolver,
                 )
+                if _group_underlying is not None:
+                    r["underlying_curve"] = _group_underlying
                 r["elapsed_seconds"] = group_elapsed
                 r["worker_pid"] = os.getpid()
                 r["group_index"] = group_index
@@ -1210,6 +1299,8 @@ def _run_slot_group(
     default_vwap_fill: bool = False,
     default_directional_fill: bool = False,
     default_reexec_entry_prices: dict | None = None,
+    default_reexec_market_mode: bool = False,
+    default_capture_underlying: bool = False,
 ) -> list[dict]:
     """Run a group of slots sharing (bar_type, date_range) in ONE BacktestEngine.
 
@@ -1257,6 +1348,7 @@ def _run_slot_group(
             default_move_sl_settings=default_move_sl_settings,
             user_id=user_id,
             portfolio_name=portfolio_name,
+            default_capture_underlying=default_capture_underlying,
         )
 
     import os
@@ -1385,15 +1477,23 @@ def _run_slot_group(
             # independently. NETTING would merge all strategies' orders on the
             # same (venue, instrument) into a single position record — breaks
             # per-strategy round-trip accounting.
+            # Account base currency from the group venue's adapter config (all
+            # slots in a group share the venue), default USD.
+            from core.venue_config import account_currency_code_for_venue as _grp_ccy_code
+            from nautilus_trader.model.objects import Currency as _GrpCurrency
+            _grp_acct_ccy = _GrpCurrency.from_str(_grp_ccy_code(str(venue)))
             engine.add_venue(
                 venue=venue,
                 oms_type=OmsType.HEDGING,
                 account_type=AccountType.MARGIN,
-                starting_balances=[Money(total_capital, USD)],
-                base_currency=USD,
+                starting_balances=[Money(total_capital, _grp_acct_ccy)],
+                base_currency=_grp_acct_ccy,
                 default_leverage=Decimal(1),
             )
             engine.add_instrument(instrument)
+            # Project-wide same-ts order: quotes (ASK,BID) before MID — deterministic
+            # by contract, identical rule as the unified path (no flag).
+            all_bars.sort(key=_same_ts_sort_key)
             engine.add_data(all_bars)
             # VWAP fill (spec §4.2/§3): index ASK/BID bars with the session-
             # cumulative volume-weighted VWAP before the list is dropped, so each
@@ -1470,6 +1570,7 @@ def _run_slot_group(
                         rbo_settings=default_rbo_settings,
                         other_settings=default_other_settings,
                         move_sl_settings=default_move_sl_settings,
+                        auto_bidask=_bidask_data_available(paired_strs, missing_pairs),
                         # Day-of-week filter (portfolio.run_on_days) — gated
                         # inside the strategy so bars stay continuous for the
                         # internal aggregator. Same pattern as _run_single_slot.
@@ -1486,6 +1587,8 @@ def _run_slot_group(
                             slot.slot_id, (0.0, True))[0],
                         reexec_entry_was_long=(default_reexec_entry_prices or {}).get(
                             slot.slot_id, (0.0, True))[1],
+                        # Plain ReExecute → immediate market re-entry (spec §5.2).
+                        reexec_market_mode=default_reexec_market_mode,
                     )
                     strategy = ManagedExitStrategy(managed_config)
                 else:
@@ -1540,6 +1643,14 @@ def _run_slot_group(
 
             slot_results: list[dict] = []
             group_elapsed = round(_time.time() - _t_group_start, 3)
+            # Underlying price series (spec §2.1) — same primary series for the
+            # whole group; built once from the cached catalog read and attached
+            # to every slot result so the underlying SL is enforced on grouped
+            # runs too (not just per-slot Path A).
+            _group_underlying = (
+                _capture_underlying_curve(catalog_path, primary_bar_type_str, start_date, end_date)
+                if default_capture_underlying else None
+            )
             for i, (slot, capital) in enumerate(group):
                 strategy_id = (
                     actual_strategy_ids[i] if i < len(actual_strategy_ids)
@@ -1549,6 +1660,8 @@ def _run_slot_group(
                     positions_report, fills_report, strategy_id, slot, capital, fx_resolver,
                     vwap_lookup, close_lookup,
                 )
+                if _group_underlying is not None:
+                    r["underlying_curve"] = _group_underlying
                 # Per-leg SL/target hit timestamps (spec §2.3) — read from the
                 # strategy instance (same insertion index as strategy_id) so
                 # the two-pass aggregate-Move-SL runner can pre-seed pass 2.

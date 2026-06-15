@@ -170,6 +170,7 @@ def load_csv_and_store(
     catalog_path: str = DEFAULT_CATALOG_PATH,
     venue: str = "BINANCE",
     data_format: dict | None = None,
+    timeframe: str | None = None,
 ) -> dict:
     """
     Full pipeline: load local CSV → wrangle → store in catalog.
@@ -185,6 +186,11 @@ def load_csv_and_store(
     data_format : dict | None
         Data format config from data_formats/<asset_class>.json.
         Contains csv, instrument, and trading sections.
+    timeframe : str | None
+        Nautilus "<step>-<aggregation>" bar size (e.g. "1-SECOND", "1-MINUTE",
+        "5-MINUTE") selected on the Load Data page. This is the bar size the
+        CSV rows are stored as in the catalog. When None, falls back to the
+        data-format's legacy default and finally "1-MINUTE".
 
     Returns
     -------
@@ -247,8 +253,11 @@ def load_csv_and_store(
         size_precision=inst_config.get("size_precision"),
     )
 
-    # Step 3: Wrangle into Nautilus Bar objects
-    timeframe = inst_config.get("timeframe") or "1-DAY"
+    # Step 3: Wrangle into Nautilus Bar objects.
+    # The timeframe is chosen on the Load Data page (UI) and passed in; the
+    # data-format config no longer carries a fixed per-asset-class timeframe.
+    # Keep the legacy fallback so any caller that omits it still works.
+    timeframe = timeframe or inst_config.get("timeframe") or "1-MINUTE"
 
     # FX entries carry an explicit side ("ASK" | "BID" | "MID");
     # everything else (e.g. crypto) defaults to LAST.

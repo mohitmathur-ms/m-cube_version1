@@ -6,6 +6,7 @@ Used by the portfolio system to add exit management to any strategy from the sig
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -58,6 +59,122 @@ def get_cross_slot_bus(portfolio_id: str) -> dict[str, dict[str, int]]:
 def clear_cross_slot_bus(portfolio_id: str) -> None:
     """Reset the cross-slot event bus between portfolio runs."""
     _CROSS_SLOT_EVENT_BUSES.pop(portfolio_id, None)
+
+
+# ── Portfolio-SL "fired" bus (unified-engine live enforcement) ──────────────
+# The portfolio-monitor strategy appends a breach ts here on a combined-loss
+# breach; each leg (when ``pf_monitor_enforced``) reads it in on_bar and closes
+# its own position live. Separate from the cross-slot Move-SL bus so it never
+# perturbs that {slot_id: {...}} structure. Keyed by portfolio_id; a plain list
+# of UTC-ns breach timestamps.
+_PF_SL_FIRED_BUSES: dict[str, list] = {}
+
+
+def get_pf_sl_bus(portfolio_id: str) -> list:
+    """Return the shared portfolio-SL fire bus for a portfolio (idempotent)."""
+    return _PF_SL_FIRED_BUSES.setdefault(portfolio_id or "_standalone_", [])
+
+
+def clear_pf_sl_bus(portfolio_id: str) -> None:
+    """Reset the portfolio-SL fire bus between portfolio runs."""
+    _PF_SL_FIRED_BUSES.pop(portfolio_id or "_standalone_", None)
+
+
+# ── Portfolio aggregate Move-SL trigger bus (unified-engine live Move-SL) ────
+# The monitor appends the bar ts at which the COMBINED P&L first crossed the
+# aggregate Move-SL threshold; each leg reads bus[-1] as a live
+# `move_sl_agg_trigger_ns` (replaces the two-pass discovery's static config).
+# Keyed by portfolio_id; a plain list of one trigger ts (append-once).
+_PF_AGG_FIRED_BUSES: dict[str, list] = {}
+
+
+def get_pf_agg_bus(portfolio_id: str) -> list:
+    """Return the shared aggregate-Move-SL trigger bus for a portfolio."""
+    return _PF_AGG_FIRED_BUSES.setdefault(portfolio_id or "_standalone_", [])
+
+
+def clear_pf_agg_bus(portfolio_id: str) -> None:
+    """Reset the aggregate-Move-SL trigger bus between portfolio runs."""
+    _PF_AGG_FIRED_BUSES.pop(portfolio_id or "_standalone_", None)
+
+
+# ── Conservative-fill adjustment bus (live monitor consistency) ──────────────
+# Each leg, when an SL/TP close fills, adds its conservative-vs-engine fill delta
+# (the same §4.2 adjustment the POST-RUN reprice applies) here. The portfolio
+# monitor adds this CUMULATIVE adjustment to its live combined P&L so its
+# SqOff/Target/ReExecute decisions use the conservative exit prices — consistent
+# with the final reported P&L — instead of the raw engine fills. A 1-element list
+# [float] holder keyed by portfolio_id (mutable so the monitor sees updates).
+_PF_CONS_ADJ_BUSES: dict[str, list] = {}
+
+
+def get_pf_cons_bus(portfolio_id: str) -> list:
+    """Return the shared conservative-adjustment accumulator ([cum_delta])."""
+    return _PF_CONS_ADJ_BUSES.setdefault(portfolio_id or "_standalone_", [0.0])
+
+
+def clear_pf_cons_bus(portfolio_id: str) -> None:
+    """Reset the conservative-adjustment bus between portfolio runs."""
+    _PF_CONS_ADJ_BUSES.pop(portfolio_id or "_standalone_", None)
+
+
+# ── Live conservative-FILL price bus (custom FillModel) ──────────────────────
+# When `_USE_LIVE_FILL_MODEL` is on, a leg writes the conservative §4.2 exit price
+# here keyed by instrument id BEFORE submitting its SL/TP close; the venue's
+# ConservativeFillModel reads it and hands the matching engine a synthetic book at
+# that price so the close fills AT the conservative price DURING the run (no
+# post-run reprice). `{instrument_id_str: price}` per portfolio_id. Cleared by the
+# leg on the close fill.
+_PF_FILL_PX_BUSES: dict[str, dict] = {}
+
+
+def get_pf_fill_px_bus(portfolio_id: str) -> dict:
+    """Return the shared pending-conservative-fill-price map for a portfolio."""
+    return _PF_FILL_PX_BUSES.setdefault(portfolio_id or "_standalone_", {})
+
+
+def clear_pf_fill_px_bus(portfolio_id: str) -> None:
+    """Reset the conservative-fill-price bus between portfolio runs."""
+    _PF_FILL_PX_BUSES.pop(portfolio_id or "_standalone_", None)
+
+
+# ── Per-leg live P&L bus (multi-portfolio scoped monitor) ────────────────────
+# The backtest cache PURGES closed positions, so a scoped monitor cannot rebuild a
+# strategy's cumulative realized from cache.positions/_closed when an instrument is
+# shared by >1 portfolio. Instead each leg, which sees its OWN fills, accumulates its
+# realized and publishes ``realized + open-unrealized`` here every bar; the scoped
+# monitor sums its scope's legs. ``{strategy_id_str: pnl_base_ccy}`` per portfolio_id.
+_PF_LEGPNL_BUSES: dict[str, dict] = {}
+
+
+def get_pf_legpnl_bus(portfolio_id: str) -> dict:
+    """Return the shared per-leg live-P&L map for a portfolio."""
+    return _PF_LEGPNL_BUSES.setdefault(portfolio_id or "_standalone_", {})
+
+
+def clear_pf_legpnl_bus(portfolio_id: str) -> None:
+    """Reset the per-leg P&L bus between portfolio runs."""
+    _PF_LEGPNL_BUSES.pop(portfolio_id or "_standalone_", None)
+
+
+# ── Live backtest-PROGRESS bus (UI day-wise progress) ────────────────────────
+# The PortfolioMonitorStrategy sees every bar and already detects day boundaries.
+# On each new simulated day it publishes the latest processed timestamp here so the
+# streaming endpoint (which runs in the request thread while the engine runs in a
+# background thread, same process) can surface "Processed up to <date>" on the UI.
+# A 1-element holder [{"data_ts": int_ns, "day": "YYYY-MM-DD"}] keyed by portfolio_id;
+# last-writer-wins, so a multi-year run emits at most a few hundred tiny updates.
+_PF_PROGRESS_BUSES: dict[str, list] = {}
+
+
+def get_pf_progress_bus(portfolio_id: str) -> list:
+    """Return the shared latest-processed-day holder for a portfolio."""
+    return _PF_PROGRESS_BUSES.setdefault(portfolio_id or "_standalone_", [])
+
+
+def clear_pf_progress_bus(portfolio_id: str) -> None:
+    """Reset the progress bus between portfolio runs."""
+    _PF_PROGRESS_BUSES.pop(portfolio_id or "_standalone_", None)
 
 
 def advance_trailing_target(
@@ -146,6 +263,27 @@ def _canon_exit_type(value: str | None, table: dict[str, str]) -> str:
         return "none"
     key = str(value).strip().lower().replace(" ", "").replace("_", "")
     return table.get(key, str(value).strip())
+
+
+def _apply_value_mode(canon_type: str, is_absolute) -> str:
+    """Honour the spec §4.4 abs/% input-mode flag.
+
+    Spec §4.4: "Premium" is one type whose value is read as EITHER a percentage
+    OR an absolute distance, chosen by a separate input-mode flag — not by the
+    type name. This overrides the percentage/points choice that ``_canon_exit_type``
+    inferred from the name, so a ``Premium`` leg explicitly flagged absolute
+    computes ``entry ∓ value`` instead of silently running as a percentage.
+
+        is_absolute is True  → force "points"     (sl/tp = entry ∓ value)
+        is_absolute is False → force "percentage"  (sl/tp = entry × (1 ∓ v/100))
+        is_absolute is None  → keep the name-inferred canonical type (default).
+
+    Only the Premium family (percentage ↔ points) is remapped; none / atr /
+    trailing pass through untouched.
+    """
+    if is_absolute is None or canon_type not in ("percentage", "points"):
+        return canon_type
+    return "points" if is_absolute else "percentage"
 
 
 def resolve_trigger_hl(
@@ -320,6 +458,14 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # signal's market price. 0.0 = no pin (plain ReExecute). Not user-saved.
     reexec_entry_price: float = 0.0
     reexec_entry_was_long: bool = True
+    # Portfolio plain "ReExecute" (spec portfolio_sl_tgt.html: "Closes all legs
+    # and immediately re-opens them"). When True, the replay re-enters the leg
+    # with an immediate MARKET order on the original side on the first bar after
+    # the breach — no signal, no price-wait. Reuses ``reexec_entry_was_long``
+    # for the side; ``reexec_entry_price`` carries the captured price only to
+    # flag "a re-entry is pending" (the gate is ``reexec_entry_price > 0``).
+    # False → entry-price-limit (when price pinned) or legacy signal re-entry.
+    reexec_market_mode: bool = False
     # Spec §1.2 1.2(c): when False, this leg ignores its own signals until
     # a sibling's "execute" action arms it via the cross-slot bus.
     armed_at_start: bool = True
@@ -408,6 +554,36 @@ class ManagedExitConfig(StrategyConfig, frozen=True):
     # disable the bus (single-leg or unscoped strategies). Set by config_from_exit.
     portfolio_id: str = ""
     slot_id: str = ""
+    # Conservative-fill bus id. A multi-portfolio SESSION sets this to the SESSION id
+    # so the one per-venue ConservativeFillModel serves every portfolio (the per-leg
+    # {instrument}|{strategy} pin keeps fills unique). Empty → falls back to
+    # portfolio_id, so single-portfolio is unchanged.
+    fill_bus_id: str = ""
+    # Multi-portfolio SESSION: True when this leg runs in a session engine whose
+    # shared bar stream was NOT entry-window pre-filtered (because co-resident
+    # portfolios may have different windows). The leg then self-filters its own
+    # pre-entry_start bars in on_bar, reproducing the single-portfolio stream
+    # pre-filter per leg. False (default) → single-portfolio path, stream already
+    # filtered, leg does not self-filter → byte-identical.
+    session_window_self_filter: bool = False
+    # Unified-engine live enforcement: when True, this leg watches the portfolio-SL
+    # fire bus and closes its own position live on a combined-loss breach (the
+    # one-pass replacement for the post-run clip). Default False → inert (per-slot
+    # and default Path B are untouched).
+    pf_monitor_enforced: bool = False
+    # Live-enforcement portfolio action: "sqoff" (close + block rest of day) or
+    # "reexecute" (close + re-arm a re-entry at the captured entry price, or market
+    # for plain ReExecute). pf_monitor_market_mode selects market vs entry-price.
+    pf_monitor_action: str = "sqoff"
+    pf_monitor_market_mode: bool = False
+    # True when the post-run conservative §4.2 fill (vwap_exit_fill) is active for
+    # this run → the leg publishes a live conservative-vs-engine delta so the monitor
+    # decides on conservative P&L (consistent with the final report).
+    cons_fill_active: bool = False
+    # True when the §8.1 directional close fill (directional_close_fill) is active →
+    # the leg pins the directional close (bid_close/ask_close, Format A) for MARKET
+    # exits so they fill there in-engine.
+    dir_fill_active: bool = False
 
     # ReExecute Tab P1 (spec: 5. Logics/ReExecute_Logics.html).
     # When True, suppresses the configured re_execute action when the SL
@@ -466,6 +642,65 @@ class ManagedExitStrategy(Strategy):
         self._sibling_bus: dict[str, dict[str, int]] = get_cross_slot_bus(
             getattr(config, "portfolio_id", "") or "_standalone_"
         )
+        # Unified-engine live portfolio-SL enforcement (gated; inert by default).
+        self._pf_monitor_enforced: bool = bool(getattr(config, "pf_monitor_enforced", False))
+        self._pf_monitor_action: str = str(getattr(config, "pf_monitor_action", "sqoff") or "sqoff").lower()
+        self._pf_monitor_market_mode: bool = bool(getattr(config, "pf_monitor_market_mode", False))
+        self._pf_sl_bus: list = get_pf_sl_bus(getattr(config, "portfolio_id", "") or "_standalone_")
+        self._pf_sl_handled_ns: int = 0
+        self._pf_sl_blocked_date = None  # UTC date entries are blocked (rest-of-day SqOff)
+        self._pf_sl_blocked_forever = False  # rest-of-run block (absolute SqOff, e.g. pf_tgt)
+        # Live aggregate Move-SL trigger bus (monitor publishes the cross ts).
+        self._pf_agg_bus: list = get_pf_agg_bus(getattr(config, "portfolio_id", "") or "_standalone_")
+        # Live conservative-fill adjustment: track running session VWAP(s) so an
+        # SL/TP exit's conservative §4.2 fill (MIN/MAX(vwap, hit)) is fed to the
+        # monitor's combined P&L — making its SqOff/Target/ReExecute decisions
+        # consistent with the post-run conservative exits. Formats: A=bid/ask vwap,
+        # B=single vwap, C=ltp (no vwap → no adjustment). DEFAULT ON when enforcing
+        # AND the conservative reprice is active (cons_fill_active = vwap_exit_fill);
+        # escape hatch _USE_LIVE_CONS_ADJ=0.
+        self._cons_fill_active: bool = bool(getattr(config, "cons_fill_active", False))
+        # §8.1 directional close (directional_close_fill): MARKET exits (squareoff /
+        # portfolio) fill at the directional close — Format A bid_close/ask_close;
+        # B/C already fill at close/ltp (no pin needed).
+        self._dir_fill_active: bool = bool(getattr(config, "dir_fill_active", False))
+        # LIVE-FILL mode (_USE_LIVE_FILL_MODEL): the exit close fills AT the pinned
+        # price in-engine (via ConservativeFillModel) — single pass, no post-run
+        # reprice. On when enforcing and EITHER the §4.2 conservative (vwap) or the
+        # §8.1 directional fill is active. CONS-BUS mode (default escape): engine fills
+        # as usual, the leg publishes a conservative delta the monitor consumes
+        # (post-run reprices the reports). Mutually exclusive; both need the live VWAP.
+        self._live_fill_on: bool = (self._pf_monitor_enforced
+                                    and (self._cons_fill_active or self._dir_fill_active)
+                                    and os.environ.get("_USE_LIVE_FILL_MODEL", "1") != "0")
+        self._cons_adj_on: bool = (self._pf_monitor_enforced and self._cons_fill_active
+                                   and not self._live_fill_on
+                                   and os.environ.get("_USE_LIVE_CONS_ADJ", "1") != "0")
+        self._cons_vwap_on: bool = self._cons_adj_on or self._live_fill_on
+        self._cons_bus: list = get_pf_cons_bus(getattr(config, "portfolio_id", "") or "_standalone_")
+        self._fill_px_bus: dict = get_pf_fill_px_bus(
+            getattr(config, "fill_bus_id", "") or getattr(config, "portfolio_id", "") or "_standalone_")
+        # Per-leg live-P&L publish (multi-portfolio scoped monitor). Active only in a
+        # SESSION (fill_bus_id is the session id, distinct from this leg's portfolio_id);
+        # in single-portfolio it's inert (no publish, no per-bar cost).
+        _fbid = getattr(config, "fill_bus_id", "") or ""
+        self._in_session: bool = bool(_fbid and _fbid != (getattr(config, "portfolio_id", "") or ""))
+        self._legpnl_bus: dict = get_pf_legpnl_bus(getattr(config, "portfolio_id", "") or "_standalone_")
+        self._cum_realized: float = 0.0          # accumulated realized across closed cycles
+        self._realized_seen: set = set()         # position ids already counted (dedup)
+        try:
+            from core.backtest_runner.exit_fill import _session_start_minute as _ssm
+            self._cons_session_min: int = _ssm(str(getattr(config, "bar_type", "")))
+        except Exception:  # noqa: BLE001
+            self._cons_session_min = 0
+        # Per-side running VWAP + latest bar extremes (single / bid / ask).
+        self._cons_state: dict = {
+            s: {"pv": 0.0, "v": 0.0, "bucket": None, "vwap": 0.0, "hi": 0.0, "lo": 0.0, "close": 0.0}
+            for s in ("single", "bid", "ask")
+        }
+        self._pending_cons_px: float = 0.0   # conservative exit price awaiting the close fill
+        self._pending_cons_qty: float = 0.0
+        self._pending_cons_long: bool = True
         # Pass-2 pre-seed (spec §2.3): the module-level bus is per-process, so
         # the runner injects pass-1's cross-slot SL/target hit timestamps via
         # config.move_sl_preseeded_bus. Merge them in (keep the latest ns per
@@ -488,20 +723,27 @@ class ManagedExitStrategy(Strategy):
         # armed_at_start=False start dormant and only fire entries after a
         # sibling slot's "execute" action arms them via the bus.
         self._armed_for_entry: bool = bool(getattr(config, "armed_at_start", True))
+        self._cross_pf_seen: set = set()  # consumed cross-portfolio event idems (once each)
         # 1.2(d) ReEntry (price-wait): when set, blocks signal entries until
         # the live price crosses the configured re-entry trigger.
         self._reentry_armed: bool = False
         self._reentry_target_price: float = 0.0
         self._reentry_was_long: bool = True
-        # Portfolio "ReExecute at Entry Price" (spec §5.2): when the replay
-        # injects a pre-clip entry price, arm the §1.2(d) price-wait at start so
-        # the slot's first re-entry waits until the instrument returns to that
-        # original entry price before the signal can fire.
+        # Portfolio "ReExecute at Entry Price" (spec ✅ in sl_features.html): when
+        # the replay injects a pre-clip entry price, submit a resting LIMIT at
+        # that price on the original side so the re-entry fills AT the entry
+        # price on a bar touch — no signal needed. One-shot, isolated to this
+        # action; the leg-level ReEntry price-wait (§1.2(d), _reentry_armed
+        # above) is left untouched. Submitted in _check_entries, cleared on fill
+        # (on_order_filled), abandoned at the daily squareoff if still unfilled.
         _reexec_px = float(getattr(config, "reexec_entry_price", 0.0) or 0.0)
-        if _reexec_px > 0:
-            self._reentry_armed = True
-            self._reentry_target_price = _reexec_px
-            self._reentry_was_long = bool(getattr(config, "reexec_entry_was_long", True))
+        self._reexec_limit_px: float = _reexec_px if _reexec_px > 0 else 0.0
+        self._reexec_limit_is_long: bool = bool(getattr(config, "reexec_entry_was_long", True))
+        # Plain ReExecute → immediate MARKET re-entry instead of an entry-price
+        # limit (spec portfolio_sl_tgt.html "immediately re-opens them").
+        self._reexec_market_mode: bool = bool(getattr(config, "reexec_market_mode", False))
+        self._reexec_limit_submitted: bool = False
+        self._reexec_limit_client_id = None
         self.re_entry_count: int = 0
         self.position_side = None  # "LONG" or "SHORT" or None
         self._expecting_close_fill = False  # next on_order_filled is a close, not an open
@@ -564,6 +806,16 @@ class ManagedExitStrategy(Strategy):
         # for the current position; gates the trail_after suppression.
         self._entry_filled_at_ns: int = 0
         self._move_sl_fired_this_position: bool = False
+        # Spec §7 (sl_moved_to_cost persistence): the moved-to-cost mark is
+        # sticky for the whole TRADING DAY (never cleared within a day; a new
+        # day starts fresh) and carries across re-execution cycles.
+        # _move_sl_fired_this_position above is per-position (reset on each entry
+        # fill); this companion is per-day, so the ReExecute / ReEntry gates keep
+        # blocking a leg that already flattened at cost earlier today even after
+        # it re-executed into a fresh position. _move_sl_day_key tracks the
+        # current trading day (session-tz ordinal) to detect the rollover reset.
+        self._move_sl_fired_today: bool = False
+        self._move_sl_day_key: int | None = None
         # Profit anchor for the dedicated post-move trail (spec §4.6); set to
         # profit_pct on the bar Move SL to Cost fires.
         self._move_sl_trail_anchor: float = 0.0
@@ -614,6 +866,19 @@ class ManagedExitStrategy(Strategy):
         self._entry_start_min: int = int(getattr(config, "entry_start_minute", -1))
         self._entry_end_min: int = int(getattr(config, "entry_end_minute", -1))
         self._no_reentry_after_end: bool = bool(getattr(config, "no_reentry_after_end", False))
+        # Multi-portfolio session: self-filter pre-entry_start bars (the shared
+        # stream wasn't pre-filtered). Gated on this flag — NOT _in_session — so a
+        # 1-portfolio session (fill_bus_id == portfolio_id → _in_session False) also
+        # self-filters and stays at single-portfolio parity.
+        self._window_self_filter: bool = bool(getattr(config, "session_window_self_filter", False))
+        # Multi-portfolio session + NON-aggregating leg + entry window: feed the
+        # signal/ATR indicators MANUALLY (gated by the on_bar self-filter) instead of
+        # register_indicator_for_bars, which auto-feeds from EVERY engine bar of this
+        # bar type — including pre-window base bars another portfolio pulled in — and
+        # so can't be window-gated. Manual feed (in _on_primary_bar, after the
+        # self-filter) warms the indicator only on in-window bars, matching the single
+        # path. Populated in on_start; empty (auto-register) otherwise.
+        self._manual_feed_inds: list = []
 
         # Day-of-week entry filter — UTC weekday ints (0=Mon..6=Sun). Tri-state:
         #   None    → no filter (all days allowed; default)
@@ -665,6 +930,11 @@ class ManagedExitStrategy(Strategy):
                 self._aggregating = False
                 self._primary_agg = None
 
+        # Non-agg leg in a session WITH an entry window → feed indicators manually
+        # (window-gated) instead of auto-registering (see _manual_feed_inds comment).
+        _manual_ind = (self._window_self_filter and not self._aggregating
+                       and self._entry_start_min >= 0)
+
         for ind_name, ind_spec in signal_entry["indicators"].items():
             period = params.get(ind_spec["param_key"], ind_spec["default"])
 
@@ -683,7 +953,10 @@ class ManagedExitStrategy(Strategy):
 
             self.indicators[ind_name] = indicator
             if not self._aggregating:
-                self.register_indicator_for_bars(self.config.bar_type, indicator)
+                if _manual_ind:
+                    self._manual_feed_inds.append(indicator)
+                else:
+                    self.register_indicator_for_bars(self.config.bar_type, indicator)
 
         # ATR-based SL: register a dedicated ATR indicator so it warms up
         # alongside the signal indicators. indicators_initialized() also waits
@@ -691,14 +964,20 @@ class ManagedExitStrategy(Strategy):
         if self.config.stop_loss_type == "atr" and self.config.sl_atr_period > 0:
             self._atr = AverageTrueRange(int(self.config.sl_atr_period))
             if not self._aggregating:
-                self.register_indicator_for_bars(self.config.bar_type, self._atr)
+                if _manual_ind:
+                    self._manual_feed_inds.append(self._atr)
+                else:
+                    self.register_indicator_for_bars(self.config.bar_type, self._atr)
 
         # ATR-based Target: dedicated indicator (spec §1.1 fn.4). Registered so
         # indicators_initialized() also waits on it before the leg may enter.
         if self.config.target_type == "atr" and self.config.tgt_atr_period > 0:
             self._tgt_atr = AverageTrueRange(int(self.config.tgt_atr_period))
             if not self._aggregating:
-                self.register_indicator_for_bars(self.config.bar_type, self._tgt_atr)
+                if _manual_ind:
+                    self._manual_feed_inds.append(self._tgt_atr)
+                else:
+                    self.register_indicator_for_bars(self.config.bar_type, self._tgt_atr)
 
         # Indicators fed manually from the aggregated bar (aggregating mode) and
         # used for the readiness gate in both modes.
@@ -711,10 +990,12 @@ class ManagedExitStrategy(Strategy):
         self.subscribe_bars(self.config.bar_type)
 
         # Format A (Bid/Ask): also subscribe to the paired BID/ASK series so
-        # SL/Target triggers can consult them. Indicators stay registered on
-        # the primary bar type only, so entry signals are unaffected. When
-        # aggregating, build matching bid/ask aggregators so the trigger series
-        # are aggregated to the same windows as the primary.
+        # SL/Target triggers can consult them. Indicators stay registered on the
+        # primary bar type only, so entry signals are unaffected. SL/Target
+        # triggers consult these BASE bid/ask bars at base-data resolution — even
+        # when the signal is aggregated to a higher timeframe, exits run on the
+        # base bar (see _on_bar_aggregating_bidask), so no bid/ask aggregators
+        # are needed.
         if self._exit_fmt == "bidask" and self._bid_bt_str and self._ask_bt_str:
             try:
                 self._fa_bid_bt = BarType.from_str(self._bid_bt_str)
@@ -725,21 +1006,6 @@ class ManagedExitStrategy(Strategy):
                     self.subscribe_bars(self._fa_bid_bt)
                 if self._fa_ask_bt != self.config.bar_type:
                     self.subscribe_bars(self._fa_ask_bt)
-                if self._aggregating:
-                    _tf = timeframe_of_bar_type(str(self._primary_agg.target_bar_type))
-                    _tgt_bid, _tgt_ask = _derive_bid_ask_bar_types(
-                        str(self._primary_agg.target_bar_type)
-                    )
-                    if _tgt_bid and _tgt_ask:
-                        self._bid_agg = BarAggregator(
-                            self.instrument, BarType.from_str(_tgt_bid), _tf
-                        )
-                        self._ask_agg = BarAggregator(
-                            self.instrument, BarType.from_str(_tgt_ask), _tf
-                        )
-                    else:
-                        # Can't aggregate the trigger pair — fall back to OHLCV.
-                        self._exit_fmt = "ohlcv"
             except Exception as e:  # noqa: BLE001 — degrade, don't crash the run
                 self.log.warning(
                     f"Format A: could not subscribe bid/ask bars ({e}); "
@@ -786,11 +1052,122 @@ class ManagedExitStrategy(Strategy):
                 self._extra_sub_bts.discard(bt)
 
     def on_bar(self, bar: Bar) -> None:
+        # Multi-portfolio SESSION only: the shared per-bar-type stream is NOT
+        # entry-window pre-filtered (different portfolios on the same instrument
+        # may have different windows, so a single global pre-filter would corrupt
+        # the others' warmup). Each leg therefore drops its OWN pre-entry_start
+        # bars here, reproducing the single-portfolio start-side stream pre-filter
+        # (`_filter_bars_by_time_of_day(bars, start, None)`) per leg. START side
+        # only — post-end bars still run so exits keep processing. No-op in the
+        # single-portfolio path (_in_session False; its stream is already filtered),
+        # so that proven path stays byte-identical.
+        if self._window_self_filter and self._entry_start_min >= 0:
+            if (int(bar.ts_event) % 86_400_000_000_000) // 60_000_000_000 < self._entry_start_min:
+                return
+
         # Extra strategy-subscribe bar types are received so they are
         # available, but the single-signal logic runs on the primary bar
         # type (``config.bar_type``) only — ignore the extras here.
         if bar.bar_type in self._extra_sub_bts:
             return
+
+        # Live conservative-fill VWAP: accumulate the running session VWAP — same
+        # cumulation the post-run `_running_vwap` does — so an SL/TP exit can be
+        # repriced conservatively live for the monitor. Format A tracks bid/ask
+        # independently; Format B tracks the single primary stream. Inert unless
+        # gated on.
+        if self._cons_vwap_on:
+            if self._exit_fmt == "bidask":
+                if bar.bar_type == self._fa_bid_bt:
+                    self._update_cons_vwap(bar, "bid")
+                elif bar.bar_type == self._fa_ask_bt:
+                    self._update_cons_vwap(bar, "ask")
+            elif self._exit_fmt == "ohlcv" and bar.bar_type == self.config.bar_type:
+                self._update_cons_vwap(bar, "single")
+
+        # Unified-engine live portfolio-SL enforcement (gated; inert by default).
+        # The monitor publishes a combined-loss breach ts to the shared fire bus;
+        # we close our OWN position live this bar (one-pass SqOff) and block
+        # re-entry for the rest of the day. handled_ns dedups the per-day fire
+        # across the primary + bid/ask bars sharing a timestamp.
+        if self._pf_monitor_enforced and self._pf_sl_bus:
+            _fire = self._pf_sl_bus[-1]
+            # Bus entries are action-aware dicts {ts, action, market} (the monitor
+            # carries each fire's own action so pf_sl and pf_tgt can differ);
+            # tolerate a bare int for forward/backward safety.
+            if isinstance(_fire, dict):
+                _fts = int(_fire["ts"])
+                _fire_action = str(_fire.get("action", self._pf_monitor_action))
+                _fire_market = bool(_fire.get("market", self._pf_monitor_market_mode))
+                _fire_reason = _fire.get("reason")
+            else:
+                _fts = int(_fire)
+                _fire_action = self._pf_monitor_action
+                _fire_market = self._pf_monitor_market_mode
+                _fire_reason = None
+            if _fts > self._pf_sl_handled_ns:
+                self._pf_sl_handled_ns = _fts
+                self._current_bar_ts_ns = int(bar.ts_event)
+                if _fire_action == "reexecute":
+                    # ReExecute: close our position and RE-ARM a re-entry at the
+                    # captured entry price (or market for plain ReExecute) — reusing
+                    # the existing `_try_reexec_reentry` machinery. Capture entry +
+                    # side BEFORE the close wipes them; arm AFTER (the close's
+                    # _reset_exit_state clears _reexec_limit_px). Do NOT block. The
+                    # close carries the monitor's reason (so it reads "-> ReExecute
+                    # at Entry Price", not "-> SqOff").
+                    if self.entry_price != 0:
+                        _e = self.entry_price
+                        _long = (self.position_side == "LONG")
+                        self._force_portfolio_sl_close(_fire_reason)
+                        self._reexec_limit_px = _e
+                        self._reexec_limit_is_long = _long
+                        self._reexec_market_mode = _fire_market
+                        self._reexec_limit_submitted = False
+                else:
+                    # SqOff: close (only when holding — a flat leg whose sibling
+                    # triggered the breach must not set _expecting_close_fill, which
+                    # no fill would clear) then block re-entry. "sqoff" = rest of day
+                    # (day-scoped pf_sl); "sqoff_run" = rest of run (absolute pf_tgt).
+                    if self.entry_price != 0:
+                        self._force_portfolio_sl_close(_fire_reason)
+                    if _fire_action == "sqoff_run":
+                        self._pf_sl_blocked_forever = True
+                    else:
+                        self._pf_sl_blocked_date = datetime.fromtimestamp(
+                            int(bar.ts_event) / 1e9, tz=self._utc_tz
+                        ).date()
+
+        # ── Cross-portfolio action consume (multi-portfolio session, SAME bar) ──
+        # Another portfolio's monitor published a verb targeting THIS leg's portfolio;
+        # act on it live this bar (spec §2.1(h)/(i)/(j)). Idempotent per event. Inert
+        # for single-portfolio (the bus is empty/cleared). A TARGET portfolio may have
+        # no enforcement of its own, so gate on portfolio_id only — not _pf_monitor_enforced.
+        if self.config.portfolio_id:
+            try:
+                from core.backtest_runner.cross_portfolio import peek_cross_pf_live
+                _xevts = peek_cross_pf_live(self.config.portfolio_id, int(bar.ts_event))
+            except Exception:  # noqa: BLE001
+                _xevts = []
+            for _xe in _xevts:
+                _idem = _xe.get("idem")
+                if _idem in self._cross_pf_seen:
+                    continue
+                self._cross_pf_seen.add(_idem)
+                _verb = _xe.get("verb"); _src = _xe.get("source")
+                self._current_bar_ts_ns = int(bar.ts_event)
+                if _verb == "sqoff":
+                    if self.entry_price != 0:
+                        self._force_portfolio_sl_close(
+                            f"Portfolio Stoploss: cross-portfolio SqOff from {_src}")
+                    self._pf_sl_blocked_date = datetime.fromtimestamp(
+                        int(bar.ts_event) / 1e9, tz=self._utc_tz).date()
+                elif _verb in ("execute", "start"):
+                    # Activate the target leg's entries (and, for Start, clear any block).
+                    self._armed_for_entry = True
+                    if _verb == "start":
+                        self._pf_sl_blocked_forever = False
+                        self._pf_sl_blocked_date = None
 
         # Custom streaming aggregation: convert the BASE bar(s) into the
         # higher-timeframe aggregated bar(s) and run the strategy logic on
@@ -798,11 +1175,14 @@ class ManagedExitStrategy(Strategy):
         # aggregation). Returns None mid-window.
         if self._aggregating:
             if self._exit_fmt != "bidask":
+                # Exits (SL/TP/trailing/square-off) run on EVERY base bar so they
+                # trigger at base-data resolution, not at the aggregated window.
+                self._manage_open_position(bar)
+                # Signal/entry runs only when the aggregated window closes.
                 agg = self._primary_agg.on_bar(bar)
-                if agg is None:
-                    return
-                self._feed_indicators(agg)
-                self._on_primary_bar(agg)
+                if agg is not None:
+                    self._feed_indicators(agg)
+                    self._evaluate_entry(agg)
             else:
                 self._on_bar_aggregating_bidask(bar)
             return
@@ -848,52 +1228,50 @@ class ManagedExitStrategy(Strategy):
             ind.handle_bar(agg_bar)
 
     def _indicators_ready(self) -> bool:
-        """Readiness gate that works in both aggregating and base-bar modes."""
-        if self._aggregating:
+        """Readiness gate that works in aggregating, manual-feed, and base-bar modes."""
+        # Aggregating OR manual-feed (non-agg session leg with a window): the
+        # indicators are NOT registered with the strategy, so indicators_initialized()
+        # (which checks REGISTERED indicators) is wrong — check the manually-fed set
+        # directly (``_agg_indicators`` holds the same indicator objects in both modes).
+        if self._aggregating or self._manual_feed_inds:
             return all(ind.initialized for ind in self._agg_indicators)
         return self.indicators_initialized()
 
     def _on_bar_aggregating_bidask(self, bar: Bar) -> None:
-        """Format A under aggregation: feed each base stream to its aggregator
-        and dispatch when the (primary, bid, ask) aggregated trio for a window
-        close is complete (or a later primary window proves it final)."""
+        """Format A under aggregation: exits run on the BASE (primary, bid, ask)
+        trio per ts_event (base-data resolution); signal/entry runs on the
+        aggregated PRIMARY window. Mirrors the no-aggregation Format A buffering in
+        on_bar, but routes exits to _manage_open_position and entries to the
+        aggregated bar."""
+        # ── Exits on the base trio (same buffering as the no-aggregation path) ──
+        ts = bar.ts_event
+        stale = sorted(t for t in self._fa_pending if t < ts)
+        for t in stale:
+            g = self._fa_pending.pop(t)
+            if "primary" in g:
+                self._manage_open_position(g["primary"], g.get("bid"), g.get("ask"))
+        slot = self._fa_pending.setdefault(ts, {})
         bt = bar.bar_type
         if bt == self.config.bar_type:
-            self._collect_agg("primary", self._primary_agg.on_bar(bar))
-            # Slot configured directly on one side of the pair → same bar.
-            if self._bid_agg is not None and self._fa_bid_bt is not None and bt == self._fa_bid_bt:
-                self._collect_agg("bid", self._bid_agg.on_bar(bar))
-            if self._ask_agg is not None and self._fa_ask_bt is not None and bt == self._fa_ask_bt:
-                self._collect_agg("ask", self._ask_agg.on_bar(bar))
-        elif self._bid_agg is not None and self._fa_bid_bt is not None and bt == self._fa_bid_bt:
-            self._collect_agg("bid", self._bid_agg.on_bar(bar))
-        elif self._ask_agg is not None and self._fa_ask_bt is not None and bt == self._fa_ask_bt:
-            self._collect_agg("ask", self._ask_agg.on_bar(bar))
-        self._drain_agg_pending()
+            slot["primary"] = bar
+            if self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+                slot["bid"] = bar
+            if self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+                slot["ask"] = bar
+        elif self._fa_bid_bt is not None and bt == self._fa_bid_bt:
+            slot["bid"] = bar
+        elif self._fa_ask_bt is not None and bt == self._fa_ask_bt:
+            slot["ask"] = bar
+        if "primary" in slot and "bid" in slot and "ask" in slot:
+            self._fa_pending.pop(ts)
+            self._manage_open_position(slot["primary"], slot["bid"], slot["ask"])
 
-    def _collect_agg(self, kind: str, agg_bar: Bar | None) -> None:
-        if agg_bar is None:
-            return
-        self._agg_pending.setdefault(agg_bar.ts_event, {})[kind] = agg_bar
-
-    def _drain_agg_pending(self) -> None:
-        """Dispatch complete aggregated trios in window-close order. A window
-        whose primary is present but whose close-ts predates the latest primary
-        window is final — its missing bid/ask defaulted (OHLCV fallback)."""
-        if not self._agg_pending:
-            return
-        primary_ts = [t for t, g in self._agg_pending.items() if "primary" in g]
-        if not primary_ts:
-            return
-        watermark = max(primary_ts)
-        for t in sorted(self._agg_pending):
-            g = self._agg_pending[t]
-            complete = "primary" in g and "bid" in g and "ask" in g
-            final = "primary" in g and t < watermark
-            if complete or final:
-                self._agg_pending.pop(t)
-                self._feed_indicators(g["primary"])
-                self._on_primary_bar(g["primary"], g.get("bid"), g.get("ask"))
+        # ── Signal/entry on the aggregated primary window close ──
+        if bt == self.config.bar_type:
+            agg = self._primary_agg.on_bar(bar)
+            if agg is not None:
+                self._feed_indicators(agg)
+                self._evaluate_entry(agg)
 
     def _on_primary_bar(self, bar: Bar, bid_bar: Bar | None = None,
                         ask_bar: Bar | None = None) -> None:
@@ -902,6 +1280,14 @@ class ManagedExitStrategy(Strategy):
         # every call site. on_order_filled also reads it for the re-entry
         # delay starting point.
         self._current_bar_ts_ns = bar.ts_event
+
+        # Manual indicator feed (non-agg session leg with a window): _on_primary_bar
+        # runs only AFTER on_bar's self-filter has dropped pre-window bars, so feeding
+        # here warms the indicators on in-window bars only — matching the single path's
+        # filtered-stream auto-feed. Fed before _indicators_ready()/signal eval so the
+        # current bar is included, exactly like register_indicator_for_bars would.
+        for _ind in self._manual_feed_inds:
+            _ind.handle_bar(bar)
 
         # Mark Price (spec §3, approach B): capture the PREVIOUS bar's close for
         # this bar's trigger, then roll the rolling prev-close forward. Done
@@ -943,6 +1329,9 @@ class ManagedExitStrategy(Strategy):
                 self._squareoff_done_date = None
 
             if local_min >= self._squareoff_min and self._squareoff_done_date != local_date:
+                # Abandon any unfilled ReExecute-at-Entry-Price limit at the
+                # cutoff (re-entries are blocked past squareoff; one-shot).
+                self._cancel_reexec_limit()
                 if not is_flat:
                     # Plain close — bypass on_sl/on_target action wiring so
                     # squareoff doesn't accidentally re_execute or reverse.
@@ -970,6 +1359,95 @@ class ManagedExitStrategy(Strategy):
             self._check_exits(close, is_long, is_short, eff_high, eff_low)
         else:
             self._check_entries(close, is_flat, is_long, is_short)
+
+    # ── Aggregating mode: exits on the BASE bar, signal on the aggregated bar ──
+    # These two helpers split _on_primary_bar's responsibilities so the exit
+    # engine (SL/TP/trailing/target-lock/move-to-cost/square-off) is evaluated at
+    # base-data resolution, while the strategy signal/entry keeps operating on the
+    # subscribed (aggregated) timeframe. The exit/entry PARAMETER logic itself
+    # (_check_exits / _force_squareoff / _check_entries) is unchanged — only which
+    # bar drives it, and when. Used only by the aggregating branch of on_bar; the
+    # non-aggregating path stays on the combined _on_primary_bar above.
+    def _manage_open_position(self, bar: Bar, bid_bar: Bar | None = None,
+                              ask_bar: Bar | None = None) -> None:
+        """Exit/envelope side — runs on every BASE bar. Mark-price roll, square-off
+        and SL/TP/trailing via _check_exits. No indicators, no entries."""
+        self._current_bar_ts_ns = bar.ts_event
+
+        # Mark Price (spec §3, approach B): previous (base) bar's close.
+        _mark_prev_close = self._prev_close
+        self._prev_close = float(bar.close)
+
+        is_flat = self.position_side is None
+        is_long = self.position_side == "LONG"
+        is_short = self.position_side == "SHORT"
+
+        # Square-off is the deterministic outer envelope (identical logic to
+        # _on_primary_bar) — now evaluated per base bar so it fires at the exact
+        # base-resolution timestamp rather than the aggregated window close.
+        if self._squareoff_min >= 0:
+            local_dt = datetime.fromtimestamp(bar.ts_event / 1e9, tz=self._utc_tz).astimezone(self._squareoff_tz)
+            local_min = local_dt.hour * 60 + local_dt.minute
+            local_date = local_dt.date()
+
+            if self._squareoff_done_date is not None and local_date != self._squareoff_done_date:
+                self._squareoff_done_date = None
+
+            if local_min >= self._squareoff_min and self._squareoff_done_date != local_date:
+                # Abandon any unfilled ReExecute-at-Entry-Price limit at the
+                # cutoff (re-entries are blocked past squareoff; one-shot) — same
+                # as the non-aggregating _on_primary_bar path. Without this, a
+                # leg still waiting for price to return to its entry price would
+                # keep waiting from the next session instead of falling through
+                # to its own signal logic.
+                self._cancel_reexec_limit()
+                if not is_flat:
+                    self._force_squareoff()
+                self._squareoff_done_date = local_date
+                return
+            if self._squareoff_done_date == local_date:
+                return
+
+        if not is_flat:
+            close = float(bar.close)
+            bh = float(bid_bar.high) if bid_bar is not None else None
+            bl = float(bid_bar.low) if bid_bar is not None else None
+            ah = float(ask_bar.high) if ask_bar is not None else None
+            al = float(ask_bar.low) if ask_bar is not None else None
+            eff_high, eff_low = resolve_trigger_hl(
+                self._exit_fmt, is_long, is_short, close,
+                float(bar.high), float(bar.low),
+                bid_high=bh, bid_low=bl, ask_high=ah, ask_low=al,
+                mark_price=_mark_prev_close,
+            )
+            self._check_exits(close, is_long, is_short, eff_high, eff_low)
+        elif self._reexec_limit_px > 0:
+            # Flat with a pending portfolio-ReExecute re-entry: process it here on
+            # the BASE bar so it fires at base-data resolution — the next base bar
+            # (plain ReExecute) or the instant price returns to the entry price
+            # (ReExecute at Entry Price) — NOT delayed to the aggregated window.
+            self._try_reexec_reentry(float(bar.close), is_flat)
+
+    def _evaluate_entry(self, bar: Bar) -> None:
+        """Signal/entry side — runs only when a new AGGREGATED bar closes. RBO step,
+        readiness gate, and _check_entries when flat. A square-off that already
+        fired today (set on the base-bar path) still blocks fresh entries."""
+        if self._rbo_enabled:
+            self._rbo_step(bar)
+
+        if not self._indicators_ready():
+            return
+
+        if self._squareoff_min >= 0 and self._squareoff_done_date is not None:
+            local_date = datetime.fromtimestamp(
+                bar.ts_event / 1e9, tz=self._utc_tz
+            ).astimezone(self._squareoff_tz).date()
+            if self._squareoff_done_date == local_date:
+                return
+
+        if self.position_side is None:
+            close = float(bar.close)
+            self._check_entries(close, True, False, False)
 
     # ─────────────────────────────────────────────────────────────────────
     # RBO (Range Breakout) — per-day state machine.
@@ -1089,10 +1567,103 @@ class ManagedExitStrategy(Strategy):
         self._expecting_close_fill = True
         hh = self._squareoff_min // 60
         mm = self._squareoff_min % 60
-        tz_name = getattr(self._squareoff_tz, "key", None) or str(self._squareoff_tz)
-        reason = f"Squareoff: daily close @ {hh:02d}:{mm:02d} {tz_name}"
+        # Reports are displayed in IST. The squareoff time is configured/stored in
+        # self._squareoff_tz (the UI sends it to the backend as UTC); express it
+        # in IST here so the reason label matches the IST time columns rather than
+        # showing e.g. "10:45 UTC".
+        try:
+            _ref = (datetime.fromtimestamp(self._current_bar_ts_ns / 1e9, tz=self._utc_tz)
+                    .astimezone(self._squareoff_tz)
+                    .replace(hour=hh, minute=mm, second=0, microsecond=0))
+            _ist = _ref.astimezone(ZoneInfo("Asia/Kolkata"))
+            reason = f"Squareoff: daily close @ {_ist:%H:%M} IST"
+        except Exception:  # noqa: BLE001 — fall back to the configured tz label
+            tz_name = getattr(self._squareoff_tz, "key", None) or str(self._squareoff_tz)
+            reason = f"Squareoff: daily close @ {hh:02d}:{mm:02d} {tz_name}"
+        self._pin_directional_close()
         self._close_with_reason(reason)
         self._reset_exit_state()
+
+    def _pin_directional_close(self, vwap_enhance: bool = False) -> None:
+        """Live §8.1 fill for a MARKET exit, pinned for the ConservativeFillModel.
+
+        Spec §8.1 SPLIT (by who triggers the close):
+        - TIME squareoff / End Time / EOD (``_force_squareoff``, vwap_enhance=False):
+          the **directional close only** — Format A LONG→bid_close, SHORT→ask_close.
+          (Format B/C need no pin — the engine already fills at close/ltp, which IS
+          the directional close.)
+        - PORTFOLIO SqOff = portfolio SL/Target hit / force-sqoff (``_force_portfolio_sl_close``,
+          vwap_enhance=True): the directional close with the **§8.1 VWAP enhancement**
+          layered on — LONG→MIN(vwap, close), SHORT→MAX(vwap, close) (conservative:
+          receive less / pay more). Format A uses bid/ask vwap+close; Format B the
+          single vwap+close; Format C (ltp) has no vwap → no pin.
+
+        Inert off live-fill / directional-fill / when flat."""
+        if not (self._live_fill_on and self._dir_fill_active and self.position_side):
+            return
+        long = self.position_side == "LONG"
+        px = 0.0
+        if self._exit_fmt == "bidask":
+            st = self._cons_state["bid" if long else "ask"]
+            close = st.get("close", 0.0)
+            if not (close and close > 0):
+                return
+            px = close
+            if vwap_enhance:  # §8.1 VWAP enhancement (Portfolio SqOff only)
+                vw = st.get("vwap", 0.0)
+                if vw and vw > 0:
+                    px = min(vw, close) if long else max(vw, close)
+        elif self._exit_fmt == "ohlcv":
+            # Format B directional close = close = engine fill → a pin is only needed
+            # for the Portfolio-SqOff VWAP enhancement.
+            if not vwap_enhance:
+                return
+            st = self._cons_state["single"]
+            close = st.get("close", 0.0)
+            vw = st.get("vwap", 0.0)
+            if not (close and close > 0 and vw and vw > 0):
+                return
+            px = min(vw, close) if long else max(vw, close)
+        else:
+            return  # Format C (ltp): no VWAP → engine fill = ltp
+        if px and px > 0:
+            # Key per (instrument, strategy) so two portfolios sharing a venue can't
+            # collide on the pin. order.strategy_id == self.id at fill time, so this
+            # is byte-identical for single portfolio (the key always matches).
+            self._fill_px_bus[f"{self.config.instrument_id}|{self.id}"] = px
+
+    def _force_portfolio_sl_close(self, reason: str | None = None) -> None:
+        """Unified-engine live portfolio close on a combined SL/Target breach from
+        the monitor. Like ``_force_squareoff`` (no re_execute/reverse). ``reason``
+        is the monitor's action-aware tag (e.g. "Portfolio Stoploss: combined 60
+        hit -> ReExecute at Entry Price" or "Portfolio Target: ... -> SqOff"); the
+        re-entry (for ReExecute) is armed by the caller AFTER this. No-op when flat."""
+        self._expecting_close_fill = True
+        # §8.1: Portfolio SqOff (SL/Target hit) → directional close + VWAP enhancement.
+        self._pin_directional_close(vwap_enhance=True)
+        self._close_with_reason(reason or "Portfolio Stoploss: combined SL hit -> SqOff")
+        self._reset_exit_state()
+
+    def _update_cons_vwap(self, bar, side: str) -> None:
+        """Running session VWAP for one side ("single"/"bid"/"ask"), replicating the
+        post-run `_running_vwap`: cumulative (H+L+C)/3 × volume, reset at the session
+        boundary; also stores the bar's high/low (the §4.2 "hit"). Drives the live
+        conservative-fill adjustment fed to the monitor."""
+        st = self._cons_state[side]
+        total_min = int(bar.ts_event) // 60_000_000_000
+        bucket = (total_min - self._cons_session_min) // 1440
+        if bucket != st["bucket"]:
+            st["bucket"] = bucket
+            st["pv"] = 0.0
+            st["v"] = 0.0
+        h = float(bar.high); l = float(bar.low); c = float(bar.close); v = float(bar.volume)
+        typical = (h + l + c) / 3.0
+        st["pv"] += typical * v
+        st["v"] += v
+        st["vwap"] = (st["pv"] / st["v"]) if st["v"] > 0 else typical
+        st["hi"] = h
+        st["lo"] = l
+        st["close"] = c  # §8.1 directional close (bid_close / ask_close)
 
     def _close_with_reason(self, reason: str | None) -> None:
         """Close all open positions on this slot's instrument with a tag.
@@ -1110,6 +1681,19 @@ class ManagedExitStrategy(Strategy):
             kwargs["tags"] = [reason]
         self.close_all_positions(instrument_id, **kwargs)
 
+    def _current_trading_day_key(self) -> int:
+        """Day index of the current bar in the squareoff/session timezone, used
+        to reset the per-trading-day sl_moved_to_cost flag at session rollover
+        (spec §7). When no non-UTC squareoff tz is configured (``_squareoff_tz``
+        falls back to ``_utc_tz``) this is a cheap integer UTC-day bucket — no
+        per-bar datetime conversion; otherwise it's the local-date ordinal."""
+        if self._squareoff_tz is self._utc_tz:
+            return self._current_bar_ts_ns // 86_400_000_000_000
+        local_dt = datetime.fromtimestamp(
+            self._current_bar_ts_ns / 1e9, tz=self._utc_tz
+        ).astimezone(self._squareoff_tz)
+        return local_dt.toordinal()
+
     def _check_exits(
         self,
         close: float,
@@ -1120,6 +1704,14 @@ class ManagedExitStrategy(Strategy):
     ) -> None:
         if self.entry_price == 0:
             return
+
+        # Per-day reset (spec §7): the sticky moved-to-cost-today flag is cleared
+        # only at each TRADING-DAY rollover, so a new day starts fresh while the
+        # mark persists across re-execution cycles within the same day.
+        _day = self._current_trading_day_key()
+        if self._move_sl_day_key != _day:
+            self._move_sl_day_key = _day
+            self._move_sl_fired_today = False
 
         # Intrabar SL/TP triggering (spec execution_logic.html §4.1). A bar
         # whose range straddles the SL/TP level fires even if the bar CLOSE
@@ -1184,8 +1776,16 @@ class ManagedExitStrategy(Strategy):
                 skip = self.config.move_sl_no_buy_legs and is_long
                 if not skip:
                     in_profit = profit_pct > 0
-                    move_all = self.config.move_sl_action == "Move SL for All Legs Despite Loss/Profit"
-                    ltp_buffer_action = self.config.move_sl_action == "Move SL to LTP + Buffer for Loss Making Legs"
+                    # Match the Move-SL variant tolerantly. The UI emits
+                    # "Move SL for All Legs Despite Loss / Profit" (spaces around
+                    # the slash), older configs/tests use "…Loss/Profit", and the
+                    # spec label is just "Move SL for All Legs" — an exact-string
+                    # compare silently missed the UI spelling and degraded to
+                    # profitable-only. Normalise (lower + strip spaces) and key on
+                    # stable tokens so every spelling resolves to the same variant.
+                    _act = (self.config.move_sl_action or "").lower().replace(" ", "")
+                    ltp_buffer_action = "ltp" in _act and "buffer" in _act
+                    move_all = "alllegs" in _act and not ltp_buffer_action
                     if ltp_buffer_action and not in_profit:
                         # Action v3 (spec execution_logic.html §4.5): on a losing
                         # leg slide SL toward LTP by a MULTIPLICATIVE buffer —
@@ -1225,6 +1825,12 @@ class ManagedExitStrategy(Strategy):
         # Independent of move_sl_enabled — it is a portfolio-level trigger, not
         # a sub-option of per-slot Move SL to Cost.
         agg_ns = self.config.move_sl_agg_trigger_ns
+        # Unified-engine live aggregate Move-SL: the monitor publishes the combined-
+        # P&L cross ts to the shared agg bus; use it as the trigger (replacing the
+        # two-pass discovery's static config value). Inert unless enforcing + a
+        # trigger has been published.
+        if self._pf_monitor_enforced and self._pf_agg_bus:
+            agg_ns = max(int(agg_ns), int(self._pf_agg_bus[-1]))
         if (agg_ns > 0 and not self._move_sl_fired_this_position
                 and self._entry_filled_at_ns > 0
                 and self._current_bar_ts_ns >= agg_ns
@@ -1241,9 +1847,12 @@ class ManagedExitStrategy(Strategy):
 
         # When Move SL to Cost just fired this bar, anchor the dedicated
         # post-move trail (spec §4.6) at the current profit so subsequent
-        # ratchet steps measure gain from the move point, not from entry.
+        # ratchet steps measure gain from the move point, not from entry. Also
+        # stamp the per-day sticky flag (spec §7) so the ReExecute/ReEntry gates
+        # keep blocking this leg for the rest of the trading day.
         if not _move_fired_before and self._move_sl_fired_this_position:
             self._move_sl_trail_anchor = profit_pct
+            self._move_sl_fired_today = True
 
         # Target locking. When triggered, raises (long) or lowers (short)
         # current_sl to the target_lock_minimum. Sets _was_trailed for the
@@ -1278,9 +1887,17 @@ class ManagedExitStrategy(Strategy):
                     if is_long and locked > self.current_sl:
                         self.current_sl = locked
                         self._was_trailed = True
+                        self.log.info(  # spec §4.6 observability token
+                            f"LEG_TRAIL_SL_UPDATED | steps={steps} | sl={self.current_sl} "
+                            f"| profit_pct={profit_pct:.4f}"
+                        )
                     elif is_short and (self.current_sl == 0 or locked < self.current_sl):
                         self.current_sl = locked
                         self._was_trailed = True
+                        self.log.info(  # spec §4.6 observability token
+                            f"LEG_TRAIL_SL_UPDATED | steps={steps} | sl={self.current_sl} "
+                            f"| profit_pct={profit_pct:.4f}"
+                        )
             # else: move not fired yet → trailing suppressed (spec §3.4).
         elif self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
             steps = int(self.highest_profit / self.config.trailing_sl_step)
@@ -1318,7 +1935,10 @@ class ManagedExitStrategy(Strategy):
                 if self.sl_wait_count < self.config.sl_wait_bars:
                     sl_hit = False
             if sl_hit:
-                self._handle_exit("sl", is_long, close=close)
+                # Trigger extreme that pierced the SL: LONG fires on bar_low,
+                # SHORT on bar_high (eff_high/eff_low = bid/ask under Format A).
+                self._handle_exit("sl", is_long, close=close,
+                                  trigger_px=(bar_low if is_long else bar_high))
                 return
         else:
             self.sl_wait_count = 0
@@ -1330,6 +1950,8 @@ class ManagedExitStrategy(Strategy):
         # back to the locked floor exits the leg (reason TARGET_TRAIL).
         tgt_trail_hit = False
         if self.config.tgt_trail_enabled:
+            _prev_tt_active = self._tgt_trail_active
+            _prev_tt_stop = self._tgt_trail_stop
             (self._tgt_trail_active, self._tgt_trail_stop,
              self._tgt_trail_anchor, tgt_trail_hit) = advance_trailing_target(
                 self._tgt_trail_active, self._tgt_trail_stop,
@@ -1338,6 +1960,19 @@ class ManagedExitStrategy(Strategy):
                 self.config.tgt_trail_lock_min_profit,
                 self.config.tgt_trail_every, self.config.tgt_trail_by,
             )
+            # Spec §4.7 observability tokens: ACTIVATED on the bar profit first
+            # reaches the activation threshold; UPDATED whenever the locked floor
+            # ratchets up.
+            if not _prev_tt_active and self._tgt_trail_active:
+                self.log.info(
+                    f"LEG_TRAIL_TARGET_ACTIVATED | when_reach={self.config.tgt_trail_when_profit_reach} "
+                    f"| lock={self._tgt_trail_stop:.4f} | profit_pct={profit_pct:.4f}"
+                )
+            elif self._tgt_trail_active and self._tgt_trail_stop != _prev_tt_stop:
+                self.log.info(
+                    f"LEG_TRAIL_TARGET_UPDATED | current_stop={self._tgt_trail_stop:.4f} "
+                    f"| profit_pct={profit_pct:.4f}"
+                )
 
         # Check TP hit — intrabar, mirrored: LONG TP fires on bar HIGH,
         # SHORT TP fires on bar LOW. A trailing-target floor breach also
@@ -1367,13 +2002,17 @@ class ManagedExitStrategy(Strategy):
                         fire = False
             if fire:
                 self._tp_was_trail = tgt_trail_hit
-                self._handle_exit("tp", is_long, close=close)
+                # Trigger extreme that hit the TP: LONG fires on bar_high, SHORT
+                # on bar_low. (Ignored by the PnL-based trailing-target reason.)
+                self._handle_exit("tp", is_long, close=close,
+                                  trigger_px=(bar_high if is_long else bar_low))
         else:
             # No TP condition this bar — clear the Target-Wait counters.
             self.tp_wait_count = 0
             self._tp_wait_started_ns = 0
 
-    def _handle_exit(self, exit_type: str, was_long: bool, close: float = 0.0) -> None:
+    def _handle_exit(self, exit_type: str, was_long: bool, close: float = 0.0,
+                     trigger_px: float = 0.0) -> None:
         # Publish this leg's exit event to the cross-slot bus so sibling legs
         # with Hit-On-Leg-SL / Hit-On-Leg-Target can react (spec §3).
         # _exit_events_self mirrors the publish so the two-pass runner can
@@ -1383,6 +2022,48 @@ class ManagedExitStrategy(Strategy):
             _evt_key = "sl_ns" if exit_type == "sl" else "tgt_ns"
             entry[_evt_key] = self._current_bar_ts_ns
             self._exit_events_self[_evt_key] = self._current_bar_ts_ns
+
+        # Live conservative-fill (gated): capture this SL/TP exit's conservative §4.2
+        # price so the close fill can publish the conservative-vs-engine delta to the
+        # monitor (matches the post-run reprice). Format A uses bid/ask vwap vs the
+        # opposite side's extreme; Format B uses the single vwap vs trigger_px (the
+        # §4.2 hit); Format C (ltp) has no vwap → no adjustment (fill == engine close).
+        if self._cons_vwap_on and self._cons_fill_active and exit_type in ("sl", "tp"):
+            _cons = 0.0
+            if self._exit_fmt == "bidask":
+                if was_long:
+                    _vw = self._cons_state["bid"]["vwap"]
+                    _hit = self._cons_state["ask"]["lo"] if exit_type == "sl" else self._cons_state["ask"]["hi"]
+                    if _vw > 0 and _hit > 0:
+                        _cons = min(_vw, _hit)
+                else:
+                    _vw = self._cons_state["ask"]["vwap"]
+                    _hit = self._cons_state["bid"]["hi"] if exit_type == "sl" else self._cons_state["bid"]["lo"]
+                    if _vw > 0 and _hit > 0:
+                        _cons = max(_vw, _hit)
+            elif self._exit_fmt == "ohlcv":
+                _vw = self._cons_state["single"]["vwap"]
+                if _vw > 0 and trigger_px > 0:
+                    _cons = min(_vw, trigger_px) if was_long else max(_vw, trigger_px)
+            if _cons > 0:
+                if self._live_fill_on:
+                    # Pin the conservative price; the venue's ConservativeFillModel
+                    # fills this leg's close AT it (single-pass, no post-run reprice).
+                    # Keyed per (instrument, strategy) — see _maybe_pin_directional_close.
+                    self._fill_px_bus[f"{self.config.instrument_id}|{self.id}"] = _cons
+                else:  # cons-bus mode: stash for the close-fill delta to the monitor
+                    _q = 0.0
+                    try:
+                        _op = self.cache.positions_open(
+                            instrument_id=self.config.instrument_id, strategy_id=self.id)
+                        if _op:
+                            _q = abs(float(_op[0].quantity))
+                    except Exception:  # noqa: BLE001
+                        _q = 0.0
+                    if _q > 0:
+                        self._pending_cons_px = _cons
+                        self._pending_cons_qty = _q
+                        self._pending_cons_long = was_long
 
         raw_action = self.config.on_sl_action if exit_type == "sl" else self.config.on_target_action
         # Action combinations (spec §4.8): on_sl_action / on_target_action may
@@ -1410,7 +2091,7 @@ class ManagedExitStrategy(Strategy):
             # still fire.
             if (
                 self.config.no_reexec_sl_cost
-                and self._move_sl_fired_this_position
+                and (self._move_sl_fired_this_position or self._move_sl_fired_today)
                 and "re_execute" in actions
             ):
                 actions = [a for a in actions if a != "re_execute"] or ["close"]
@@ -1419,7 +2100,7 @@ class ManagedExitStrategy(Strategy):
             # block price-wait re-entry when SL was moved to cost. Default ON.
             if (
                 self.config.no_reentry_sl_cost
-                and self._move_sl_fired_this_position
+                and (self._move_sl_fired_this_position or self._move_sl_fired_today)
                 and "re_entry" in actions
             ):
                 actions = [a for a in actions if a != "re_entry"] or ["close"]
@@ -1438,8 +2119,15 @@ class ManagedExitStrategy(Strategy):
         # orderbook's EXIT REASON column shows "Stop Loss" / "Take Profit" /
         # "Trailing SL" / "Reverse on SL" instead of the order-type-derived
         # "Market Exit" placeholder.
+        # Reporting price: the TRIGGER EXTREME that actually fired the exit
+        # (execution_logic.html §4.1) — Format A bid_high/ask_low, Format B bar
+        # high/low — NOT the bar close. This makes "price={px} {op} SL/TP"
+        # reflect the real trigger crossing (a short SL fires on the bar HIGH,
+        # which can sit above a close that's below the level). Falls back to the
+        # close for trigger-less exits (e.g. PnL-based trailing-target).
+        px = trigger_px if trigger_px > 0 else close
         if self.entry_price:
-            raw_pct = ((close - self.entry_price) / self.entry_price) * 100
+            raw_pct = ((px - self.entry_price) / self.entry_price) * 100
         else:
             raw_pct = 0.0
         # Convention: positive pct == in profit (matches profit_pct elsewhere).
@@ -1453,7 +2141,7 @@ class ManagedExitStrategy(Strategy):
             label = "Trailing SL" if self._was_trailed else "Stop Loss"
             if "reverse" in actions:
                 label = "Reverse on SL"
-            reason = (f"{label}: price={close:.{prec}f} {op} SL={self.current_sl:.{prec}f} "
+            reason = (f"{label}: price={px:.{prec}f} {op} SL={self.current_sl:.{prec}f} "
                       f"(entry {self.entry_price:.{prec}f}, {pct:+.2f}%)")
             # For atr-type SLs, expose the ATR used at entry so a verifier can
             # check expected_sl = entry ∓ mult × ATR purely from the orderbook.
@@ -1471,7 +2159,7 @@ class ManagedExitStrategy(Strategy):
                 reason = (f"{label}: profit {pct:+.2f}% fell to locked floor "
                           f"{self._tgt_trail_stop:+.2f}% (entry {self.entry_price:.{prec}f})")
             else:
-                reason = (f"{label}: price={close:.{prec}f} {op} TP={self.current_tp:.{prec}f} "
+                reason = (f"{label}: price={px:.{prec}f} {op} TP={self.current_tp:.{prec}f} "
                           f"(entry {self.entry_price:.{prec}f}, {pct:+.2f}%)")
 
         # 1.2(e) KeepLegRunning: ignore the trigger entirely. Position remains
@@ -1515,6 +2203,14 @@ class ManagedExitStrategy(Strategy):
                 side = OrderSide.SELL if was_long else OrderSide.BUY
                 self._submit_order(side)
                 self._set_exit_levels(side)
+                # Mark the reversed-into side SYNCHRONOUSLY. The open fill is async
+                # (processed after on_bar), so without this the leg's position_side
+                # stays None for the rest of THIS bar — and in aggregating mode the
+                # same-bar aggregated-window entry check (_evaluate_entry, gated on
+                # position_side is None) would fire a CONFLICTING fresh signal entry
+                # on the reverse bar (3 orders → net flat → leg/cache desync). The
+                # open fill later re-sets the same value (idempotent).
+                self.position_side = "LONG" if side == OrderSide.BUY else "SHORT"
             elif action == "execute":
                 # 1.2(c) Execute (other leg by leg_id): arm the target slot via
                 # the cross-slot bus. The target's _check_entries sees the arm
@@ -1535,7 +2231,57 @@ class ManagedExitStrategy(Strategy):
                         self._reentry_target_price = float(trigger)
                         self._reentry_was_long = was_long
 
+    def _try_reexec_reentry(self, close: float, is_flat: bool) -> bool:
+        """Process a pending portfolio-ReExecute re-entry. Returns True when a
+        re-entry is pending (so the caller blocks its normal entry path).
+
+        Called on the BASE bar — from ``_manage_open_position`` in aggregating
+        mode, and from ``_check_entries`` in the non-aggregating path — so the
+        re-entry fires at base-data resolution, NOT only at the aggregated window
+        close: plain ReExecute → immediate market on the next base bar; ReExecute
+        at Entry Price → fills the instant price returns to the entry price.
+        Cleared on fill (on_order_filled) or by a configured squareoff.
+        """
+        if self._reexec_limit_px <= 0:
+            return False
+        if is_flat and not self._reexec_limit_submitted:
+            if self._reexec_market_mode:
+                # Plain ReExecute → "immediately re-opens them" at next-bar
+                # market on the original side.
+                self._submit_reexec_market()
+                self._reexec_limit_submitted = True
+            else:
+                # ReExecute at Entry Price → re-enter AT the captured entry price
+                # E, only once price has RETURNED to it. A plain resting limit at
+                # E is immediately marketable when E is on the far side of the
+                # breach price (e.g. a long stopped at a loss → market below E),
+                # so hold flat until price returns to E, then rest the limit
+                # (which fills at E exactly on the touch).
+                _E = self._reexec_limit_px
+                _premature = (close < _E) if self._reexec_limit_is_long else (close > _E)
+                if not _premature:
+                    self._submit_reexec_limit()
+                    self._reexec_limit_submitted = True
+                # else: price hasn't returned to E yet — wait (stay flat).
+        return True
+
     def _check_entries(self, close: float, is_flat: bool, is_long: bool, is_short: bool) -> None:
+        # Unified-engine SqOff re-entry block. Rest-of-run (absolute pf_tgt SqOff)
+        # blocks permanently; rest-of-day (day-scoped pf_sl SqOff) blocks until the
+        # next calendar day. Honour a block whenever one is SET — including a block
+        # set by a CROSS-PORTFOLIO SqOff on a target portfolio that has no enforcement
+        # of its own. Single-portfolio with no block → the flags are None/False, so
+        # this reduces to the original `_pf_monitor_enforced` gate (unchanged).
+        if (self._pf_monitor_enforced or self._pf_sl_blocked_forever
+                or self._pf_sl_blocked_date is not None):
+            if self._pf_sl_blocked_forever:
+                return
+            if self._pf_sl_blocked_date is not None:
+                _d = datetime.fromtimestamp(self._current_bar_ts_ns / 1e9, tz=self._utc_tz).date()
+                if _d == self._pf_sl_blocked_date:
+                    return
+                self._pf_sl_blocked_date = None
+
         # 1.2(c) Execute: consume any pending arm event from a sibling slot.
         # `arm_ns` set by another leg's "execute" action flips us to armed.
         if not self._armed_for_entry and self.config.slot_id:
@@ -1544,6 +2290,14 @@ class ManagedExitStrategy(Strategy):
                 self._armed_for_entry = True
                 my_evt.pop("arm_ns", None)
         if not self._armed_for_entry:
+            return
+
+        # Portfolio "ReExecute" re-entry (spec §5.2 / portfolio_sl_tgt.html).
+        # Sits ahead of the window gate (re-executions bypass the intraday entry
+        # window, §7 P3) and blocks the signal path while pending. In aggregating
+        # mode this also runs on the base bar (_manage_open_position); this call
+        # covers the non-aggregating path. Cleared on fill or squareoff.
+        if self._try_reexec_reentry(close, is_flat):
             return
 
         # 1.2(d) ReEntry (price-wait): gate the next entry until live price
@@ -1637,17 +2391,72 @@ class ManagedExitStrategy(Strategy):
         # For simplicity, use current close as proxy
         pass
 
+    def on_position_closed(self, event) -> None:
+        """Multi-portfolio: accumulate this leg's realized P&L as EACH position closes
+        — for ANY reason (SL/Target, squareoff, signal flip / NETTING auto-close,
+        re-execute). The backtest cache purges closed positions, so this event is the
+        reliable capture point; the scoped portfolio monitor sums legs' published P&L.
+        ``realized_pnl`` already reflects the conservative/pinned fill. Inert outside a
+        multi-portfolio session."""
+        if not self._in_session:
+            return
+        try:
+            rp = getattr(event, "realized_pnl", None)
+            if rp is not None:
+                self._cum_realized += float(rp.as_double())
+        except Exception:  # noqa: BLE001
+            pass
+        # Publish (instrument, up-to-date realized); the monitor adds live open
+        # realized+unrealized itself. Keyed by strategy so the shared-instrument
+        # scoped monitor can pick this leg's realized for the right instrument.
+        self._legpnl_bus[str(self.id)] = (str(self.config.instrument_id), self._cum_realized)
+
     def on_order_filled(self, event) -> None:
         """Set exit levels when an order fills.
 
-        If this fill is the CLOSE of an existing position (flagged by
-        ``_expecting_close_fill`` in ``_handle_exit``), do not treat it as
-        an entry — skip state updates so the position stays flat.
+        Classify CLOSE vs OPEN/entry by the filled order's intrinsic
+        ``is_reduce_only`` flag — every close goes through close_all_positions/
+        close_position (reduce-only); every entry/reverse-open via _submit_order
+        is not. This replaces the positional ``_expecting_close_fill`` boolean,
+        which mislabeled fills when a reverse's close found no position (the open
+        then got eaten as the "close"), desyncing the leg from the engine cache —
+        a bug that fires even single-portfolio (verified). Fall back to the flag
+        only if the order can't be read from cache.
         """
-        if self._expecting_close_fill:
+        _is_close = self._expecting_close_fill
+        try:
+            _ord = self.cache.order(event.client_order_id)
+            if _ord is not None:
+                _is_close = bool(_ord.is_reduce_only)
+        except Exception:  # noqa: BLE001 — fall back to the flag
+            pass
+        if _is_close:
             self._expecting_close_fill = False
+            # Live-fill mode: the close just filled at the pinned conservative price;
+            # clear the pin so it doesn't affect later orders on this instrument.
+            if self._live_fill_on:
+                self._fill_px_bus.pop(f"{self.config.instrument_id}|{self.id}", None)
+            # Cons-bus: the engine just filled the close at last_px;
+            # publish the conservative-vs-engine P&L delta (same as the post-run
+            # §4.2 reprice) so the monitor's combined P&L reflects the conservative
+            # exit. delta adds to realized: long → (cons - fill)·qty, short → (fill
+            # - cons)·qty. Cleared after one use.
+            if self._cons_adj_on and self._pending_cons_px > 0 and self._pending_cons_qty > 0:
+                try:
+                    _fill = float(event.last_px)
+                    _cons = self._pending_cons_px
+                    _q = self._pending_cons_qty
+                    _delta = (_cons - _fill) * _q if self._pending_cons_long else (_fill - _cons) * _q
+                    self._cons_bus[0] += _delta
+                except Exception:  # noqa: BLE001
+                    pass
+            self._pending_cons_px = 0.0
+            self._pending_cons_qty = 0.0
             return
 
+        # Entry/open fill — clear any stale close-flag (classification is by
+        # reduce_only now, not this flag) so it can't carry to a later fill.
+        self._expecting_close_fill = False
         self.entry_price = float(event.last_px)
         self.highest_profit = 0.0
         self.sl_wait_count = 0
@@ -1673,6 +2482,12 @@ class ManagedExitStrategy(Strategy):
 
         is_buy = event.order_side == OrderSide.BUY
         self.position_side = "LONG" if is_buy else "SHORT"
+
+        # ReExecute-at-Entry-Price limit just filled (at the exact entry price):
+        # clear the one-shot pin so normal signal entries resume after this trade.
+        if self._reexec_limit_px > 0:
+            self._reexec_limit_px = 0.0
+            self._reexec_limit_client_id = None
 
         # Compute SL (snap to instrument tick — TBD-2 resolved)
         if self.config.stop_loss_type in ("percentage", "trailing"):
@@ -1780,6 +2595,67 @@ class ManagedExitStrategy(Strategy):
         self.submit_order(order)
         self._pending_entry_reason = None
 
+    def _submit_reexec_limit(self) -> None:
+        """Submit the one-shot ReExecute-at-Entry-Price resting LIMIT (spec ✅).
+
+        BUY limit for a long re-execution, SELL for a short, at the captured
+        pre-clip entry price. The matching engine fills limits from bar high/low,
+        so the re-entry fills AT the exact entry price when a bar touches it —
+        not a signal-gated market fill.
+        """
+        side = OrderSide.BUY if self._reexec_limit_is_long else OrderSide.SELL
+        order = self.order_factory.limit(
+            instrument_id=self.config.instrument_id,
+            order_side=side,
+            quantity=self.instrument.make_qty(self.config.trade_size),
+            price=self.instrument.make_price(self._reexec_limit_px),
+            time_in_force=TimeInForce.GTC,
+            tags=["ReExecute at Entry Price (limit) — re-entry fired by portfolio SL/Target"],
+        )
+        self._reexec_limit_client_id = order.client_order_id
+        self.submit_order(order)
+
+    def _submit_reexec_market(self) -> None:
+        """Submit the one-shot plain-ReExecute immediate MARKET re-entry.
+
+        Spec portfolio_sl_tgt.html: plain "ReExecute" *"Closes all legs and
+        immediately re-opens them"*. The replay restarts this slot flat at the
+        breach; on the first bar after it we re-open the closed leg at market on
+        the original side — no signal, no price-wait. One-shot, isolated to this
+        action; cleared on fill (on_order_filled). The matching engine fills the
+        market order at the next bar, giving "close at breach → re-open next bar
+        at market".
+        """
+        side = OrderSide.BUY if self._reexec_limit_is_long else OrderSide.SELL
+        order = self.order_factory.market(
+            instrument_id=self.config.instrument_id,
+            order_side=side,
+            quantity=self.instrument.make_qty(self.config.trade_size),
+            time_in_force=TimeInForce.GTC,
+            tags=["ReExecute (market) — re-entry fired by portfolio SL/Target"],
+        )
+        self._reexec_limit_client_id = order.client_order_id
+        self.submit_order(order)
+
+    def _cancel_reexec_limit(self) -> None:
+        """Abandon a still-resting ReExecute-at-Entry-Price limit (one-shot).
+
+        Called at the daily squareoff cutoff: a re-exec limit unfilled by then is
+        cancelled and not resubmitted (re-entries are blocked past squareoff)."""
+        if self._reexec_limit_px <= 0:
+            return
+        oid = self._reexec_limit_client_id
+        if oid is not None:
+            try:
+                order = self.cache.order(oid)
+                if order is not None and not order.is_closed:
+                    self.cancel_order(order)
+            except Exception:  # noqa: BLE001 — best-effort cancel
+                pass
+        self._reexec_limit_px = 0.0
+        self._reexec_limit_client_id = None
+        self._reexec_limit_submitted = False
+
     def on_stop(self) -> None:
         # Drain trailing partial windows (no order action — matches Nautilus,
         # which never emits an in-progress window).
@@ -1803,9 +2679,18 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
                      subscribe_bar_types: list | None = None,
                      allowed_weekdays: list | None = None,
                      portfolio_id: str = "",
+                     fill_bus_id: str = "",
+                     session_window_self_filter: bool = False,
                      slot_id: str = "",
                      reexec_entry_price: float = 0.0,
-                     reexec_entry_was_long: bool = True) -> ManagedExitConfig:
+                     reexec_entry_was_long: bool = True,
+                     reexec_market_mode: bool = False,
+                     pf_monitor_enforced: bool = False,
+                     pf_monitor_action: str = "sqoff",
+                     pf_monitor_market_mode: bool = False,
+                     cons_fill_active: bool = False,
+                     dir_fill_active: bool = False,
+                     auto_bidask: bool = False) -> ManagedExitConfig:
     """Build a ManagedExitConfig from an ExitConfig dataclass.
 
     ``order_id_tag`` is optional and passes through to ``StrategyConfig``; when
@@ -1857,6 +2742,16 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
     _fmt = str(getattr(exit_config, "exit_price_format", "ohlcv") or "ohlcv").strip().lower()
     if _fmt not in ("ohlcv", "ltp", "bidask", "mark"):
         _fmt = "ohlcv"
+    # Auto-Format-A (spec §4.1): when the leg didn't explicitly pick a non-OHLCV
+    # format AND the runner confirmed a complete BID/ASK pair is loaded for this
+    # slot (auto_bidask), promote the default OHLCV path to Bid/Ask so SL/Target
+    # triggers consult bid_high/ask_low instead of the single-series high/low.
+    # Gated on auto_bidask — which the runner sets only when the pair actually
+    # exists in the catalog — so a slot without bid/ask data never gets promoted
+    # and never stalls waiting on the Format-A (primary,bid,ask) trio buffer.
+    # An explicit "ltp" / "mark" / already-"bidask" choice is left untouched.
+    if _fmt == "ohlcv" and auto_bidask:
+        _fmt = "bidask"
     # "mark" (Mark Price, spec §3) passes through here; the crypto-only gate is
     # enforced in ManagedExitStrategy.on_start (downgrades to OHLCV with a log
     # on non-crypto venues) where the venue is known.
@@ -1878,13 +2773,19 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         ask_bar_type=_ask_bt,
         subscribe_bar_types=[],
         aggregate_to_bar_type=_aggregate_to,
-        stop_loss_type=_canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
+        stop_loss_type=_apply_value_mode(
+            _canon_exit_type(exit_config.stop_loss_type, _SL_TYPE_CANON),
+            getattr(exit_config, "sl_value_is_absolute", None),
+        ),
         stop_loss_value=exit_config.stop_loss_value,
         trailing_sl_step=exit_config.trailing_sl_step,
         trailing_sl_offset=exit_config.trailing_sl_offset,
         sl_atr_period=int(getattr(exit_config, "sl_atr_period", 0) or 0),
         sl_atr_multiplier=float(getattr(exit_config, "sl_atr_multiplier", 0.0) or 0.0),
-        target_type=_canon_exit_type(exit_config.target_type, _TGT_TYPE_CANON),
+        target_type=_apply_value_mode(
+            _canon_exit_type(exit_config.target_type, _TGT_TYPE_CANON),
+            getattr(exit_config, "target_value_is_absolute", None),
+        ),
         target_value=exit_config.target_value,
         tgt_atr_period=int(getattr(exit_config, "tgt_atr_period", 0) or 0),
         tgt_atr_multiplier=float(getattr(exit_config, "tgt_atr_multiplier", 0.0) or 0.0),
@@ -1908,6 +2809,7 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         armed_at_start=bool(getattr(exit_config, "armed_at_start", True)),
         reexec_entry_price=float(reexec_entry_price or 0.0),
         reexec_entry_was_long=bool(reexec_entry_was_long),
+        reexec_market_mode=bool(reexec_market_mode),
         squareoff_minute=_parse_squareoff_minute(squareoff_time),
         squareoff_tz=squareoff_tz or "UTC",
         # Intraday entry window (spec §9) — UTC minute-of-day, -1 = disabled.
@@ -1919,7 +2821,14 @@ def config_from_exit(exit_config: ExitConfig, signal_name: str, signal_params: d
         # field-level comment for why we gate here instead of pre-filtering.
         allowed_weekdays=(None if allowed_weekdays is None else list(allowed_weekdays)),
         portfolio_id=portfolio_id,
+        fill_bus_id=fill_bus_id,
+        session_window_self_filter=session_window_self_filter,
         slot_id=slot_id,
+        pf_monitor_enforced=pf_monitor_enforced,
+        pf_monitor_action=pf_monitor_action,
+        pf_monitor_market_mode=pf_monitor_market_mode,
+        cons_fill_active=cons_fill_active,
+        dir_fill_active=dir_fill_active,
     )
     if order_id_tag is not None:
         kwargs["order_id_tag"] = order_id_tag
