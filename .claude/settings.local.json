@@ -68,7 +68,12 @@
       "Bash(TRACE_LABEL=single_pathB _USE_BACKTEST_NODE=1 _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py single)",
       "Bash(TRACE_LABEL=slot_EDGE03_pathA _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py slot:EDGE_03_formatA_atr)",
       "Bash(TRACE_LABEL=group_EDGE03_pathA _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py group:EDGE_03_formatA_atr)",
-      "Bash(TRACE_LABEL=pf_EDGE03_pathA_perslot _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py portfolio:EDGE_03_formatA_atr)"
+      "Bash(TRACE_LABEL=pf_EDGE03_pathA_perslot _PROFILE_PHASES=1 venv/Scripts/python.exe html_docs/traces/_run_trace.py portfolio:EDGE_03_formatA_atr)",
+      "Bash(python -c \"import json; d=json.load\\(open\\(r'd:\\\\m-cube_version1\\\\portfolios\\\\_default\\\\ALL_FEATURES_TEST.json'\\)\\); print\\('OK', len\\(d['slots']\\), 'slots'\\); [print\\(s['slot_id'], '|', s['bar_type_str'], '| enabled=', s['enabled'], '| fmt=', s['exit_config']['exit_price_format']\\) for s in d['slots']]\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('server.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('core/models/portfolio_config/__init__.py',encoding='utf-8'\\).read\\(\\)\\); print\\('PY OK'\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\('config/portfolio_tabs/timing.json',encoding='utf-8'\\)\\); print\\('JSON OK'\\)\")",
+      "Bash(python -c \"from core.models.serialization import portfolio_from_dict, portfolio_to_dict; p=portfolio_from_dict\\({'name':'t','entry_start_time':'23:30','entry_end_time':'01:30','entry_window_overnight':True}\\); print\\('FIELD OK', p.entry_window_overnight, '->', portfolio_to_dict\\(p\\)['entry_window_overnight']\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans"

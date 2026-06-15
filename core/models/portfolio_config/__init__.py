@@ -62,6 +62,18 @@ class PortfolioConfig:
     entry_start_time: Optional[str] = None  # "HH:MM" UTC, e.g. "09:30"
     entry_end_time: Optional[str] = None    # "HH:MM" UTC, e.g. "16:00"
 
+    # Overnight entry window opt-in. When True, the intra-day entry window
+    # and/or square-off are allowed to cross midnight (e.g. enter until 23:30,
+    # square off 01:30 the NEXT day) — typical for NRML carry / 24h FX/crypto
+    # sessions. The runtime bar filter already wraps such a window
+    # (bar_filters._filter_bars_by_time_of_day, the lo>hi branch) and square-off
+    # is a per-calendar-day trigger, so this flag only governs SAVE VALIDATION
+    # and UI intent: with it OFF, a window whose End/SqOff decreases past
+    # midnight is rejected as a typo; with it ON, the validator compares the
+    # window in elapsed minutes. MIS (intraday) must close same-session, so the
+    # UI forces this OFF for product == "MIS"; it is a NRML/session concept.
+    entry_window_overnight: bool = False
+
     # Winter Time Adjustment (spec execution_logic_target.html §9). For
     # US-listed instruments whose data/config straddle a DST boundary, the
     # engine shifts every configured local time (entry window, square-off,

@@ -523,6 +523,7 @@ const Portfolio = {
         // the saved values on re-edit instead of resetting to the defaults.
         if (pf.entry_start_time) pf._ui.start_time = pf.entry_start_time;
         if (pf.entry_end_time) pf._ui.end_time = pf.entry_end_time;
+        if (pf.entry_window_overnight !== undefined) pf._ui.overnight = pf.entry_window_overnight;
         if (pf.rbo_enabled !== undefined) pf._ui.rbo_enabled = pf.rbo_enabled;
         if (pf.range_monitoring_start) pf._ui.range_monitoring_start = pf.range_monitoring_start;
         if (pf.range_monitoring_end) pf._ui.range_monitoring_end = pf.range_monitoring_end;
@@ -784,6 +785,12 @@ const Portfolio = {
                             <div class="pf-field-row" title="Intra-day entry window end (UTC). Bars after this time are dropped from the backtest.">
                                 <span class="pf-field-label">End Time</span>
                                 <input type="time" class="form-control" id="pf-m-endtime" value="${ui.end_time || '16:15:00'}" step="1" style="flex:1;">
+                            </div>
+                            <div class="pf-field-row" title="Allow the entry window / square-off to cross midnight (e.g. enter until 23:30, square off 01:30 the next day). For NRML / 24h sessions — disabled for MIS, which must close intraday.">
+                                <label style="font-size:0.8rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                                    <input type="checkbox" id="pf-m-overnight" ${ui.overnight ? 'checked' : ''} ${(ui.product === 'MIS') ? 'disabled' : ''}>
+                                    Window spans to next day (overnight)
+                                </label>
                             </div>
                             <div class="pf-field-row pf-live-only" title="Live-only, read-only mirror of the SqOff Time on the Timing tab (portfolio.squareoff_time). Empty when no square-off is set.">
                                 <span class="pf-field-label">SqOff Time</span>
@@ -1508,6 +1515,11 @@ const Portfolio = {
         if (row) row.style.display = v === "MIS" ? "flex" : "none";
         const note = document.getElementById("pf-mis-sqoff-note");
         if (note) note.style.display = v === "MIS" ? "block" : "none";
+        const overnight = document.getElementById("pf-m-overnight");
+        if (overnight) {
+            if (v === "MIS") { overnight.checked = false; overnight.disabled = true; }
+            else { overnight.disabled = false; }
+        }
     },
 
     /* Mirror the two square-off fields so they always represent the SAME value:
@@ -2127,6 +2139,9 @@ const Portfolio = {
             ? pf._ui.start_time : null;
         pf.entry_end_time = pf._ui.end_time && pf._ui.end_time !== "23:59:59"
             ? pf._ui.end_time : null;
+        // Overnight entry-window opt-in (explicit flag, not inferred from
+        // start>end). MIS forces it off in _onProductChange / render.
+        pf.entry_window_overnight = document.getElementById("pf-m-overnight")?.checked || false;
         pf._ui.start_day = document.getElementById("pf-m-startday")?.value || "Before Expiry";
         pf._ui.start_day_offset = parseInt(document.getElementById("pf-m-startdayoff")?.value) || 1;
         pf._ui.sqoff_day = parseInt(document.getElementById("pf-m-sqoffday")?.value) || 0;
@@ -2352,9 +2367,18 @@ const Portfolio = {
         if (!sqTime && String(pf.product || "").toUpperCase() === "MIS") {
             sqTime = pf.mis_squareoff_time;
         }
+        const overnight = !!pf.entry_window_overnight;
+        const DAY = 24 * 60;
         const es = toMin(pf.entry_start_time);
-        const ee = toMin(pf.entry_end_time);
-        const sq = toMin(sqTime);
+        let ee = toMin(pf.entry_end_time);
+        let sq = toMin(sqTime);
+        // Roll later endpoints past midnight when overnight is enabled, mirroring
+        // server _validate_portfolio_times.
+        if (overnight && es !== null && ee !== null && ee < es) ee += DAY;
+        if (overnight && sq !== null) {
+            const ref = (ee !== null) ? ee : es;
+            if (ref !== null && sq < ref) sq += DAY;
+        }
         if (es !== null && ee !== null && es > ee) {
             return `Entry Start Time ${pf.entry_start_time} is after Entry End Time ${pf.entry_end_time} (spec §9: Start ≤ End).`;
         }

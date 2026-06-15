@@ -1320,21 +1320,44 @@ def _validate_portfolio_times(portfolio_config) -> tuple[bool, str]:
             )
 
     # Intraday window ordering (spec §9): Start ≤ End ≤ SqOff.
+    #
+    # Default: same-day window, so a numerically-decreasing sequence (e.g.
+    # End 23:30 < SqOff 01:30) is a typo and is rejected. When the portfolio
+    # opts into an overnight window via ``entry_window_overnight`` (NRML carry /
+    # 24h FX/crypto), End and SqOff may roll past midnight: each endpoint that
+    # lands at/before the previous one in the Start→End→SqOff chain is
+    # interpreted as +1 day, and the ordering is checked in elapsed minutes.
+    # The runtime already supports this (bar_filters._filter_bars_by_time_of_day
+    # wraps the window; square-off is a per-calendar-day trigger).
+    overnight = bool(getattr(pf, "entry_window_overnight", False))
     es = _parse_hhmm_minute(pf.entry_start_time)
     ee = _parse_hhmm_minute(pf.entry_end_time)
-    if es is not None and ee is not None and es > ee:
+    sq_time, _ = effective_portfolio_squareoff(pf)
+    sq = _parse_hhmm_minute(sq_time)
+
+    _DAY = 24 * 60
+    # Roll later endpoints into the next day (overnight only), relative to the
+    # previous endpoint in the chain, so a missing Start or End still anchors.
+    ee_cmp = ee
+    if overnight and es is not None and ee is not None and ee_cmp < es:
+        ee_cmp += _DAY
+    sq_cmp = sq
+    if overnight and sq is not None:
+        ref = ee_cmp if ee_cmp is not None else es
+        if ref is not None and sq_cmp < ref:
+            sq_cmp += _DAY
+
+    if es is not None and ee_cmp is not None and es > ee_cmp:
         return False, (
             f"Entry Start Time {pf.entry_start_time} is after Entry End Time "
             f"{pf.entry_end_time} (spec §9: Start ≤ End)."
         )
-    sq_time, _ = effective_portfolio_squareoff(pf)
-    sq = _parse_hhmm_minute(sq_time)
-    if ee is not None and sq is not None and ee > sq:
+    if ee_cmp is not None and sq_cmp is not None and ee_cmp > sq_cmp:
         return False, (
             f"Entry End Time {pf.entry_end_time} is after Square-off Time "
             f"{sq_time} (spec §9: End ≤ SqOff Time)."
         )
-    if es is not None and sq is not None and es > sq:
+    if es is not None and sq_cmp is not None and es > sq_cmp:
         return False, (
             f"Entry Start Time {pf.entry_start_time} is after Square-off Time "
             f"{sq_time} (spec §9: Start ≤ SqOff Time)."
