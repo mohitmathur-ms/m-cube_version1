@@ -73,10 +73,26 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('server.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('core/models/portfolio_config/__init__.py',encoding='utf-8'\\).read\\(\\)\\); print\\('PY OK'\\)\")",
       "Bash(python -c \"import json; json.load\\(open\\('config/portfolio_tabs/timing.json',encoding='utf-8'\\)\\); print\\('JSON OK'\\)\")",
       "Bash(python -c \"from core.models.serialization import portfolio_from_dict, portfolio_to_dict; p=portfolio_from_dict\\({'name':'t','entry_start_time':'23:30','entry_end_time':'01:30','entry_window_overnight':True}\\); print\\('FIELD OK', p.entry_window_overnight, '->', portfolio_to_dict\\(p\\)['entry_window_overnight']\\)\")",
-      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)"
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(venv/Scripts/python.exe portfolios/testing2/_generate_portfolios.py)",
+      "Bash(timeout 600 venv/Scripts/python.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -c \"h=open\\('SL_TGT_Testing/new_tests/manual_verification_v2.html',encoding='utf-8'\\).read\\(\\); print\\('table',h.count\\('<table>'\\),h.count\\('</table>'\\),'div',h.count\\('<div'\\),h.count\\('</div>'\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://127.0.0.1:5000/api/reports/portfolio_VP-01_long_sl_pct_16_june_2026_report.html\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -H \"X-User-Id: testing2\" \"http://127.0.0.1:5000/api/reports/portfolio_VP-01_long_sl_pct_16_june_2026_report.html\")",
+      "Bash(curl -s \"http://127.0.0.1:5000/api/reports/portfolio_VP-01_long_sl_pct_16_june_2026_report.html\")",
+      "Bash(./venv/Scripts/python.exe -c \"import flask, werkzeug; print\\('flask', flask.__version__\\); print\\('werkzeug', werkzeug.__version__\\)\")",
+      "Bash(python -c \"import flask, werkzeug; print\\('flask', flask.__version__\\); print\\('werkzeug', werkzeug.__version__\\)\")",
+      "Bash(./venv/Scripts/python.exe -m py_compile server.py)",
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(./venv/Scripts/python.exe portfolios/testing2/_verify_lib.py)",
+      "Bash(./venv/Scripts/python.exe -c \"import matplotlib; print\\('matplotlib', matplotlib.__version__\\)\")",
+      "Bash(./venv/Scripts/python.exe -c \"import mplfinance; print\\('mplfinance', mplfinance.__version__\\)\")",
+      "Bash(./venv/Scripts/python.exe portfolios/testing2/_build_verification_report.py)",
+      "Bash(cd /d/m-cube_version1; rm -f portfolios/testing2/_chart_preview_*.png; echo \"cleaned previews\"; ls portfolios/testing2/manual_verification_v2_RESULTS.html)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\ADMIN\\.claude\\plans"
+      "C:\\Users\\ADMIN\\.claude\\plans",
+      "D:\\m-cube_version1\\portfolios\\testing2"
     ]
   }
 }

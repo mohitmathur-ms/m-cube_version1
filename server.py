@@ -19,6 +19,7 @@ from pathlib import Path
 import time as _time
 
 from flask import Flask, jsonify, request, send_from_directory, Response, stream_with_context
+from werkzeug.exceptions import HTTPException
 from flask_cors import CORS
 import pandas as pd
 
@@ -43,7 +44,14 @@ CORS(app)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    """Return JSON for any unhandled server error."""
+    """Return JSON for any unhandled server error.
+
+    HTTPExceptions (a 404 from a missing report file, 400/401 from validation,
+    etc.) already carry the right status code and must pass through unchanged —
+    otherwise e.g. a missing-file 404 gets masked as a confusing 500.
+    """
+    if isinstance(e, HTTPException):
+        return e
     return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 # Default paths
@@ -1206,7 +1214,13 @@ def _resolve_user_id() -> str:
     pre-migration portfolios. To enforce a strict-401 policy later, swap
     this for ``_get_user_or_401``.
     """
-    uid = (request.headers.get("X-User-Id") or "").strip() or DEFAULT_USER_ID
+    # Header wins (normal fetch() calls). Browser-initiated downloads
+    # (<a download> / link.click()) cannot set the X-User-Id header, so we
+    # also accept a ?user= query param as a fallback for those URLs.
+    uid = (request.headers.get("X-User-Id") or "").strip()
+    if not uid:
+        uid = (request.args.get("user") or "").strip()
+    uid = uid or DEFAULT_USER_ID
     user = _get_user(uid)
     return user["user_id"] if user else DEFAULT_USER_ID
 

@@ -215,8 +215,10 @@ const Orderbook = {
     exportCSV() {
         // If viewing a saved file, just trigger download from the server
         if (this._currentSource !== "live") {
+            const uid = App.getUserId();
+            const q = uid ? `?user=${encodeURIComponent(uid)}` : "";
             const link = document.createElement("a");
-            link.href = `/api/reports/${encodeURIComponent(this._currentSource)}`;
+            link.href = `/api/reports/${encodeURIComponent(this._currentSource)}${q}`;
             link.download = this._currentSource;
             link.click();
             return;

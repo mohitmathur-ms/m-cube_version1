@@ -7,6 +7,12 @@
       "allowed_instruments": null
     },
     {
+      "user_id": "testing2",
+      "alias": "Testing v2 (manual-verification set)",
+      "multiplier": 1.0,
+      "allowed_instruments": null
+    },
+    {
       "user_id": "alice",
       "alias": "Alice (FX)",
       "multiplier": 2.0,

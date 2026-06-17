@@ -3100,7 +3100,9 @@ const Portfolio = {
         }
         let reportBtnHTML = "";
         if (r.report_file) {
-            reportBtnHTML = `<a class="btn btn-sm btn-primary" href="/api/reports/${encodeURIComponent(r.report_file)}" download style="margin-right:6px;">&#128196; Download Report</a>`;
+            const _uid = App.getUserId();
+            const _q = _uid ? `?user=${encodeURIComponent(_uid)}` : "";
+            reportBtnHTML = `<a class="btn btn-sm btn-primary" href="/api/reports/${encodeURIComponent(r.report_file)}${_q}" download style="margin-right:6px;">&#128196; Download Report</a>`;
         }
         let warningsHTML = "";
         if (r.warnings && r.warnings.length) {
