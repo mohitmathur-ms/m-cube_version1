@@ -162,6 +162,117 @@ def api_orderbook_load():
     return jsonify({"data": records})
 
 
+@app.route("/api/visual-verification/analyze", methods=["POST"])
+def visual_verification_analyze():
+    """Bar-driven Time/Logic/Price verification of a backtest's exits.
+
+    Accepts either a saved order book (form/query ``file=order_book_*.csv``) or an
+    uploaded CSV / HTML report (multipart ``file``). Re-derives each exit against
+    the catalog's 1-second feed and returns per-trade verdicts (no bars — the UI
+    draws charts via the existing ``/api/data/bars``). ``feed_in_catalog=false``
+    means the matching feed isn't loaded, so charts/level checks are unavailable.
+    """
+    import io
+    import re
+    from core.visual_verification import analyze as _vv_analyze, guess_feed_bar_type, orderbook_rows_from_html
+
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    uid = user_or_resp["user_id"]
+
+    catalog_path = request.form.get("catalog_path") or request.args.get("path") or CATALOG_PATH
+    bar_type = (request.form.get("bar_type") or request.args.get("bar_type") or "").strip()
+
+    rows, source = None, None
+    upload = request.files.get("file")
+    if upload is not None and upload.filename:
+        name = upload.filename.lower()
+        content = upload.read()
+        try:
+            if name.endswith((".html", ".htm")):
+                rows = orderbook_rows_from_html(content.decode("utf-8", "replace"))
+            else:
+                rows = pd.read_csv(io.BytesIO(content)).fillna("").to_dict(orient="records")
+        except Exception as e:
+            return jsonify({"error": f"Could not parse uploaded file: {e}"}), 400
+        source = upload.filename
+    else:
+        fname = (request.form.get("file") or request.args.get("file") or "").strip()
+        safe_name = Path(fname).name  # prevent directory traversal
+        if not safe_name.startswith("order_book_") or not safe_name.endswith(".csv"):
+            return jsonify({"error": "Provide a saved order_book_*.csv (file=) or upload a CSV/HTML report."}), 400
+        filepath = _user_reports_dir(uid) / safe_name
+        if not filepath.exists():
+            return jsonify({"error": "File not found"}), 404
+        rows = pd.read_csv(filepath).fillna("").to_dict(orient="records")
+        source = safe_name
+
+    if not rows:
+        return jsonify({"error": "No trades found in the provided order book."}), 400
+
+    sym = str(rows[0].get("SYMBOL", "")).strip()
+    exch = str(rows[0].get("EXCHANGE", "")).strip()
+    instrument = f"{sym}.{exch}" if sym and exch else sym
+    if not bar_type:
+        bar_type = guess_feed_bar_type(catalog_path, instrument)
+
+    # Per-feature verdict parity: for a SAVED portfolio order book, load its JSON
+    # config so analyze() can apply the SL-Wait gate the way the RESULTS report
+    # does. The portfolio name is encoded in the saved filename
+    # (order_book_portfolio_<name>_<DD>_<month>_<YYYY>.csv). Uploaded CSVs have no
+    # config -> generic (stricter) check + a UI note. Best-effort; never fatal.
+    config, config_loaded = None, False
+    if not (upload is not None and upload.filename):
+        m = re.match(r"^order_book_portfolio_(.+?)_\d{1,2}_[A-Za-z]+_\d{4}\.csv$", source or "")
+        if m:
+            pjson = Path(_user_portfolios_dir(uid)) / f"{m.group(1)}.json"
+            if pjson.exists():
+                try:
+                    config = json.loads(pjson.read_text(encoding="utf-8"))
+                    config_loaded = True
+                except Exception:
+                    config = None
+
+    try:
+        trades, have_bars = _vv_analyze(rows, catalog_path, bar_type, config=config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    n = len(trades)
+    npass = sum(1 for t in trades if t["verdict"] == "PASS")
+    nfail = sum(1 for t in trades if t["verdict"] == "FAIL")
+
+    # Execution-realism roll-up (diagnostic — independent of the PASS/FAIL verdict).
+    rl = [t["realism"] for t in trades if t.get("realism")]
+    entry_chk = [t for t in trades if t.get("entry_ok") is not None]
+
+    def _fin(xs):
+        return sum(x for x in xs if x is not None and x == x)
+    realism = {
+        "n_level": len(rl),
+        "favorable": sum(1 for r in rl if r["favorable"]),
+        "adverse": sum(1 for r in rl if r["adverse"]),
+        "at_level": sum(1 for r in rl if not r["favorable"] and not r["adverse"]),
+        "gap": sum(1 for r in rl if r["gap"]),
+        "cross_session": sum(1 for r in rl if r["cross_session"]),
+        "infl_sum": _fin(r["infl"] for r in rl),
+        "fav_sum": _fin(r["infl"] for r in rl if r["infl"] is not None and r["infl"] > 0),
+        "adv_sum": _fin(r["infl"] for r in rl if r["infl"] is not None and r["infl"] < 0),
+        "slip_haircut": _fin(r["slip"] for r in rl),
+        "entry_n": len(entry_chk),
+        "entry_ok": sum(1 for t in entry_chk if t["entry_ok"]),
+    }
+    return jsonify({
+        "trades": trades,
+        "summary": {"n": n, "pass": npass, "fail": nfail, "na": n - npass - nfail},
+        "realism": realism,
+        "bar_type": bar_type, "instrument": instrument,
+        "feed_in_catalog": bool(have_bars), "source": source,
+        "config_loaded": config_loaded,
+    })
+
+
 # ─── Catalog API ─────────────────────────────────────────────────────────────
 
 @app.route("/api/catalog/status")

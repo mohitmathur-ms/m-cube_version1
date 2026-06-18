@@ -55,6 +55,7 @@
 <div class="toc">
   <p><a href="#how">0 · How this set works (3 engine facts)</a></p>
   <p><a href="#loop">1 · The 3-axis loop + worked example</a></p>
+  <p><a href="#realism">1b · The expanded axes — execution realism (6 caveats)</a></p>
   <p><a href="#nosq">2 · MIS + 15:29 IST square-off (NSE close)</a></p>
   <p><a href="#vp">3 · Verification cases VP-01 … VP-12</a></p>
   <p><a href="#zero">4 · Zero-value deep dive</a></p>
@@ -101,6 +102,22 @@ expected_sl = round( F × (1 − 0.5/100) , tick 0.01 )<br>
   </tbody>
 </table>
 <div class="callout"><strong>The brief's "entered at 100 → SL at 95 (5%)" rule</strong> is exactly this, scaled: replace <code>F=24722</code>, <code>0.5%</code> with your fill and pct. The point is you can compute the SL the moment you read the fill, then watch the chart for the bar that touches it.</div>
+
+<h2 id="realism">1b · The expanded axes — execution realism (the 6 caveats)</h2>
+<div class="callout flaw"><strong>What the 3 axes do NOT prove.</strong> Time·Logic·Price proves the SL/Target <em>level</em> is right, trips on the right second, and that the fill equals the trigger bar's close. It does <strong>not</strong> prove the fill is <em>realistic</em>. In particular: <strong>a stop is triggered using the bar's high/low, but the trade is filled at that same bar's CLOSE</strong> — which can give unrealistically good exits and inflate performance. The cases below now carry a second, <strong>diagnostic</strong> tier covering six caveats the 3-axis loop missed. These quantify behaviour per trade; they do <em>not</em> flip a Time·Logic·Price verdict, because every one is <strong>documented base-engine behaviour</strong>, not a bug.</div>
+<table>
+  <thead><tr><th>Axis</th><th>The caveat</th><th>How it's checked / quantified</th></tr></thead>
+  <tbody>
+    <tr><td><b>D · Entry correctness</b></td><td>The MARKET entry must fill at the EMA <em>signal bar's close</em> — not the next bar's open (which would be look-ahead). No latency, no slippage on entry either.</td><td>Reconcile <code>ENTRY PRICE</code> against the bar feed at the entry second; confirm entries are MARKET/GTC fired on the signal bar.</td></tr>
+    <tr><td><b>E · Realistic fills</b></td><td>The reduce-only MARKET exit fills at the <strong>trigger bar's close</strong>, NOT at the SL/Target level. <strong>Trigger ≠ fill.</strong></td><td>Per trade, the <code>Δ fill−lvl</code> column = the gap between the close-fill and the level. (This is the Price axis, now reported as a signed realism number.)</td></tr>
+    <tr><td><b>F · Slippage</b></td><td>The default <code>FillModel</code> applies <strong>zero</strong> slippage (<code>prob_slippage=0.0</code>). Real fills would be at least a tick worse.</td><td>Reported as an engine fact + a conservative <strong>1-tick-per-exit</strong> P&amp;L haircut so you can see the order of magnitude removed.</td></tr>
+    <tr><td><b>G · Gap behaviour</b></td><td>When a bar <em>opens</em> already past the level (an intraday gap, or an overnight hold gapping at the next open) the close-fill can land far from the level. m-cube's manual market exit <strong>bypasses</strong> Nautilus' gap-aware native-stop fill (which would fill a stop at the trigger on a smooth move-through, or at the gapped open on a gap).</td><td>A <code>↑gap</code> marker per trade where the trigger bar opened past the level + a count of gap-through and cross-session holds. Large gaps (esp. overnight) are flagged.</td></tr>
+    <tr><td><b>H · Intrabar ordering</b></td><td>Inside one bar the engine walks a <strong>fixed Open→High→Low→Close</strong> path (<code>bar_adaptive_high_low_ordering</code> defaults OFF) and checks SL before TP. So if a single bar's range spans both an SL and a Target, the <strong>SL wins</strong>.</td><td>Dual-level files (VP-03/04, OT-05): a count of genuine same-bar SL+Target collisions where the SL correctly took precedence.</td></tr>
+    <tr><td><b>I · P&amp;L realism</b></td><td>The headline caveat — the inflation/deflation from filling at the close instead of the level. A favourable close-fill (price recovered past the stop within the bar) makes the exit look better than the stop; an adverse gap makes it worse.</td><td>A <strong>fill-at-level counterfactual</strong>: re-price every level exit AT its level (= what a native move-through stop would give) and report the net P&amp;L inflation per case and overall. Favourable fills are the "unrealistically good exits" the brief warns about.</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><strong>Read the new columns this way.</strong> A <span style="color:#9a6700;font-weight:700">+Δ favourable</span> fill INFLATES the result (the close beat the stop) — that is the realism risk, even though Time·Logic·Price still PASS. A <span style="color:#cf222e;font-weight:700">−Δ adverse</span> fill (often <code>↑gap</code>, often a cross-session hold) shows the close-fill cutting the other way. Net P&amp;L inflation across all level exits is the single number to watch: it is how much the bar-close fill model flattered (or hurt) the backtest vs a fill-at-the-stop model. For tick-accurate fills the engine docs recommend quote/trade data instead of bars — this set runs on 1-second bars, the finest available here.</div>
+<div class="callout"><strong>Engine facts (NautilusTrader 1.224.0, verified via the ntm3 docs + <code>core/managed_strategy.py</code>):</strong> intrabar path is fixed <code>O→H→L→C</code>; a MARKET order submitted in <code>on_bar</code> with no <code>LatencyModel</code> fills at the <strong>current bar's close</strong> (not next-bar-open); the default FillModel applies <strong>no slippage</strong>; native gap-aware stop fills are <strong>bypassed</strong> by m-cube's manual market-on-breach exit, so those exits fill at the close regardless of where the bar opened.</div>
 
 <h2 id="nosq">2 · MIS trade type + 15:29 IST hard square-off (NSE close)</h2>
 <p>Every <code>testing2/</code> portfolio is <code>product="MIS"</code> (intraday trade type) with a <strong>hard square-off at the NSE close, 15:29 IST</strong> (<code>squareoff_time="15:29:00"</code>, <code>squareoff_tz="Asia/Kolkata"</code>). The NIFTY session is <strong>09:15–15:30 IST</strong> (= 03:45–10:00 UTC). The intra-day entry window is left <strong>open</strong> (the session already bounds the data), so the feature can exit any time within the session — and the square-off is the daily outer envelope.</p>
@@ -222,19 +239,20 @@ expected_sl = round( F × (1 − 0.5/100) , tick 0.01 )<br>
 </ol>
 
 <h2 id="sheet">7 · Pass / fail recording sheet</h2>
+<p>The first three axes are the PASS/FAIL verdict; the last four (D–I, grouped) are the diagnostic realism tier — record the numbers, they don't fail the case but they tell you how realistic the result is.</p>
 <table>
-  <thead><tr><th>Case</th><th>Trade #</th><th>A · Time</th><th>B · Logic</th><th>C · Price</th><th>Fill vs level Δ</th><th>Screenshot</th><th>Notes / red detail</th></tr></thead>
+  <thead><tr><th>Case</th><th>Trade #</th><th>A · Time</th><th>B · Logic</th><th>C · Price</th><th>Δ fill−lvl (E)</th><th>Gap? (G)</th><th>P&amp;L infl. (I)</th><th>Screenshot</th><th>Notes / red detail</th></tr></thead>
   <tbody>
-    <tr><td>VP-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>VP-02</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>VP-03</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>…</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>OT-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>OT-02</td><td>save</td><td colspan="5">expect HTTP 400 — rejected ☐</td><td></td></tr>
-    <tr><td>OT-03</td><td>save</td><td colspan="5">expect HTTP 400 — rejected ☐</td><td></td></tr>
+    <tr><td>VP-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>VP-02</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>VP-03</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>…</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>OT-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>OT-02</td><td>save</td><td colspan="7">expect HTTP 400 — rejected ☐</td><td></td></tr>
+    <tr><td>OT-03</td><td>save</td><td colspan="7">expect HTTP 400 — rejected ☐</td><td></td></tr>
   </tbody>
 </table>
-<div class="callout ok"><strong>Done means:</strong> every trade in every runnable file passes A/B/C to the tick and to the second; the two rejection files 400 on save; VP-11 shows zero SL/Target exits and one MIS square-off per session at 15:29 IST; VP-12 shows the at-entry near-instant exit; and each row carries a screenshot. Reds carry the offending trade + bar for the dev team.</div>
+<div class="callout ok"><strong>Done means:</strong> every trade in every runnable file passes A/B/C to the tick and to the second; the two rejection files 400 on save; VP-11 shows zero SL/Target exits and one MIS square-off per session at 15:29 IST; VP-12 shows the at-entry near-instant exit; and each row carries a screenshot. <strong>And the realism tier (D–I) is recorded:</strong> the Δ fill−lvl, any gap/cross-session holds, and the net P&amp;L inflation (close-fill vs fill-at-level) — so the reader knows how much the bar-close fill model flattered the result, on top of zero slippage. Reds carry the offending trade + bar for the dev team; large favourable Δ or large adverse gaps are flagged even when A/B/C pass.</div>
 
 <p style="margin-top:30px;font-size:12px;color:var(--muted)">Generated 2026-06-16 · portfolios in <code>portfolios/testing2/</code> (regenerate via <code>_generate_portfolios.py</code>) · catalog: NIFTY 1-sec spot, tick 0.01, window 2026-03-02 → 2026-03-20 · <strong>product MIS, square-off 15:29 IST / NSE close (Asia/Kolkata, fires every session; 15:30 would be dormant as the data's last bar is 15:29:59), session 09:15–15:30 IST</strong> · engine + square-off/end-of-data facts verified against <code>core/managed_strategy.py</code> (on_stop flatten), order-type &amp; session/timezone details from the ntm3 NautilusTrader docs.</p>
 

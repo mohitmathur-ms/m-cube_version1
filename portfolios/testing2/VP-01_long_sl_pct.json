@@ -3,7 +3,7 @@
   "description": "VERIFY: leg fixed SL %. SL=0.5%. For a LONG fill F, expected SL = F*(1-0.005) snapped to tick 0.01. Trigger = first 1-sec bar with low<=SL; realised exit = that trigger bar's CLOSE (market reduce-only close, NOT the SL level). No squareoff/window.",
   "portfolio_tag": null,
   "created_at": "2026-06-16T00:00:00+00:00",
-  "updated_at": "2026-06-17T04:37:22.640569+00:00",
+  "updated_at": "2026-06-18T07:53:38.655686+00:00",
   "starting_capital": 300000,
   "max_loss": null,
   "max_profit": null,

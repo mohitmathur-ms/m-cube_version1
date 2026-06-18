@@ -89,6 +89,43 @@ so you can pin the **exact second** an SL/Target level was touched. The
   15:29 is flattened by `on_stop` at data end — m-cube's own close; Nautilus does
   **not** auto-flatten, and fills in `on_stop` even bypass `on_order_filled`.
 
+## Execution realism — the six caveats (diagnostic tier)
+
+The Time / Logic / Price loop proves the SL/Target **level** is correct, trips on
+the right second, and that the fill equals the trigger bar's close. It does **not**
+prove the fill is *realistic*. The single most important caveat:
+
+> **A stop is triggered using the bar's high/low, but the trade is filled at that
+> same bar's CLOSE. This can give unrealistically good exits and inflate
+> performance.**
+
+The RESULTS report now carries a second, **diagnostic** tier (it quantifies these
+per trade but does **not** flip a Time/Logic/Price verdict — every one is
+documented base-engine behaviour, not a bug):
+
+| Axis | Caveat | How it's quantified in the report |
+|---|---|---|
+| **D · Entry correctness** | The MARKET entry fills at the signal bar's **close** (no next-bar-open look-ahead, no latency). | `ENTRY PRICE` reconciled against the bar feed; entries are MARKET/GTC on the EMA signal bar. |
+| **E · Realistic fills** | The reduce-only MARKET exit fills at the **trigger bar's close**, not at the level — *trigger ≠ fill*. | Per-trade `Δ fill−lvl` column (signed). |
+| **F · Slippage** | Default `FillModel` applies **zero** slippage (`prob_slippage=0.0`). | An engine-fact note + a conservative **1-tick-per-exit** P&L haircut. |
+| **G · Gap behaviour** | A bar that **opens** past the level (intraday gap / overnight hold) fills the close far from the level. m-cube's manual market exit **bypasses** Nautilus' gap-aware native-stop fill. | A `↑gap` marker + counts of gap-through and cross-session holds. |
+| **H · Intrabar ordering** | Fixed **Open→High→Low→Close** path (`bar_adaptive_high_low_ordering` defaults off); SL checked before TP, so SL wins a same-bar collision. | Dual-level files (VP-03/04, OT-05): count of genuine same-bar SL+Target collisions. |
+| **I · P&L realism** | The inflation/deflation from filling at the close instead of the level — favourable fills are the "unrealistically good exits". | A **fill-at-level counterfactual** (= a native move-through stop): net P&L inflation per case and overall. |
+
+**Engine facts** (NautilusTrader 1.224.0, verified via the ntm3 docs +
+`core/managed_strategy.py`): intrabar path is fixed `O→H→L→C`; a MARKET order
+submitted in `on_bar` with no `LatencyModel` fills at the **current bar's close**
+(not the next bar's open); the default FillModel applies **no slippage**; m-cube's
+manual market-on-breach exits **bypass** the engine's gap-aware native-stop fill, so
+they fill at the bar close regardless of where the bar opened. The docs note bar
+data is lower-fidelity for fills — quote/trade/L2 data is more realistic.
+
+> **Favourable Δ = inflation.** A `+Δ fill−lvl` (the close beat the stop within the
+> bar) makes the exit look better than the stop and **inflates** reported P&L, even
+> though Time/Logic/Price still PASS. A `−Δ` (often `↑gap`, often a cross-session
+> hold) cuts the other way. The net inflation across all level exits is the number
+> that says how much the bar-close fill model flattered the backtest.
+
 ## How to read a case
 
 - **Goal** — the feature/order-type it isolates.
@@ -238,6 +275,7 @@ Run a file → export the **orderbook** (fills, exits, reasons, per-bar
 | Short side | VP-04 |
 | Trailing / ATR / Wait / Re-Execute / Reverse | VP-05, VP-06, VP-07, VP-08, VP-09 |
 | Different order types: market / limit / GTT / stop-loss / SL(limit·market) / GTC | OT-01 … OT-06 |
+| **Execution realism: entry correctness, realistic fills, slippage, gap behaviour, intrabar ordering, P&L realism** | diagnostic tier on every runnable VP/OT (see *Execution realism* above) |
 
 ## Notes & caveats
 
