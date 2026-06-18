@@ -54,6 +54,22 @@ class PortfolioMonitorConfig(StrategyConfig, frozen=True):
     # day-scoped, mirroring the two-pass replay's reset-from-clip semantics).
     action: str = "sqoff"
     reexec_cap: int = 0  # 0 → unlimited (hard cap 50, like the replay)
+    # Combined-Loss SL scope: True (default) = DAY-scoped (daily loss limit, the
+    # per-portfolio pf_sl semantic); False = ABSOLUTE rest-of-run single fire (the
+    # TAG / user cap semantic — tag limits are absolute amounts, spec §11).
+    sl_day_scoped: bool = True
+    # ── Trailing SL / Trailing Target ratchet (live port of the post-run clip;
+    # spec sl_features §3 / execution_logic §6.1). When enabled the SL/Target uses
+    # the RATCHETED level instead of the fixed cap. Used by the Tag/User monitors
+    # (and any monitor given these). One-shot per run (the group squares off). ──
+    pf_sl_trail_enabled: bool = False
+    pf_sl_trail_every: float = 0.0   # ratchet step in combined PnL
+    pf_sl_trail_by: float = 0.0      # tighten the loss cap by this per step
+    pf_tgt_trail_enabled: bool = False
+    pf_tgt_trail_when_reach: float = 0.0   # activation profit threshold
+    pf_tgt_trail_lock: float = 0.0         # locked-in min profit on activation
+    pf_tgt_trail_every: float = 0.0
+    pf_tgt_trail_by: float = 0.0
     market_mode: bool = False  # pf_sl ReExecute: market re-entry vs entry-price limit
     # Combined-PROFIT target (symmetric to pf_sl): day-scoped SqOff or trailing-reset
     # ReExecute on the profit side. Same fire bus, action carried per fire.
@@ -104,6 +120,11 @@ class PortfolioMonitorConfig(StrategyConfig, frozen=True):
     # session engine — both portfolios share one in-process engine).
     cross_pf_target: str = ""
     cross_pf_verb: str = ""
+    # TAG-level enforcement (spec §11): a tag monitor scopes to the legs of SEVERAL
+    # portfolios sharing a portfolio_tag and, on a tag breach, fires ``cross_pf_verb``
+    # (sqoff) at EACH of these portfolio ids — squaring off the whole group live. The
+    # tag monitor has no legs of its own; ``cross_pf_targets`` IS its enforcement.
+    cross_pf_targets: tuple = ()
     # Progress-only mode: when False the monitor still publishes day-wise UI
     # progress (cheap, every bar) but SKIPS the per-bar combined-P&L valuation and
     # curve growth — so a plain portfolio (no SL/TP/detection) can attach the
@@ -126,6 +147,13 @@ class PortfolioMonitorStrategy(Strategy):
         self._tz = None
         self._cur_day = None
         self._day_start_pnl = 0.0
+        # Trailing SL / Target ratchet state (mirrors the post-run clip).
+        self._sl_current = float(config.pf_sl_value or 0.0)
+        self._sl_trail_anchor = 0.0
+        self._tgt_trail_active = False
+        self._tgt_floor = 0.0
+        self._tgt_trail_anchor = 0.0
+        self._trail_fired = False  # one-shot: group squared once on a trailing hit
         self._pf_sl_bus = None  # shared fire bus (set in on_start when enforcing)
         self._pf_agg_bus = None      # aggregate Move-SL trigger bus (set in on_start)
         self._agg_triggered = False  # one-shot: agg trigger already published
@@ -299,16 +327,20 @@ class PortfolioMonitorStrategy(Strategy):
     def on_bar(self, bar) -> None:
         ts = int(bar.ts_event)
 
-        # Day-wise UI progress (ALWAYS, even in progress-only mode): publish the
-        # latest processed day at most once per day. A cheap integer UTC-day bucket
-        # guards the (relatively expensive) tz-aware date conversion so it stays off
-        # the per-bar hot path (24M bars). The streaming endpoint reads this bus.
+        # Day-wise UI progress (ALWAYS, even in progress-only mode): APPEND each
+        # newly-completed day (once per calendar day) so the streaming endpoint can
+        # emit EVERY day in order — never skipping days when many complete between
+        # polls. A cheap integer UTC-day bucket guards the (relatively expensive)
+        # tz-aware date conversion so it stays off the per-bar hot path (24M bars).
+        # The single-run endpoint reads the latest (``[-1]``); the session endpoint
+        # drains the whole list. Bus is cleared per run, so it only holds this run's
+        # days (≈ one small dict per trading day).
         if self._progress_bus is not None:
             _bucket = ts // 86_400_000_000_000
             if _bucket != self._prog_bucket:
                 self._prog_bucket = _bucket
                 _d = pd.Timestamp(ts, unit="ns", tz="UTC").tz_convert(self._tz).date()
-                self._progress_bus[:] = [{"data_ts": ts, "day": str(_d)}]
+                self._progress_bus.append({"data_ts": ts, "day": str(_d)})
 
         # Progress-only monitor: skip all valuation / curve growth / enforcement.
         if not self._track:
@@ -395,14 +427,19 @@ class PortfolioMonitorStrategy(Strategy):
         # loss limit, resets each day); pf_tgt SqOff is ABSOLUTE SINGLE (first time
         # combined profit hits the target → close all + stop for the rest of the
         # run). ReExecute (both sides) is trailing-reset, capped.
-        if _sl_on:
-            self._eval_side(ts, pnl, is_loss=True, side="sl", day_scoped=True,
+        # Trailing SL / Target (Tag/User tiers): when enabled, the ratcheted level
+        # REPLACES the fixed SL/Target check on that side (one-shot per run).
+        if (self.config.pf_sl_trail_enabled or self.config.pf_tgt_trail_enabled):
+            self._eval_trailing(ts, pnl)
+        if _sl_on and not self.config.pf_sl_trail_enabled:
+            self._eval_side(ts, pnl, is_loss=True, side="sl",
+                            day_scoped=bool(self.config.sl_day_scoped),
                             value=float(self.config.pf_sl_value),
                             action=self.config.action,
                             market=bool(self.config.market_mode),
                             cap=int(self.config.reexec_cap or 0),
                             delay_ns=int(self.config.pf_sl_delay_sec or 0) * 1_000_000_000)
-        if _tgt_on:
+        if _tgt_on and not self.config.pf_tgt_trail_enabled:
             self._eval_side(ts, pnl, is_loss=False, side="tgt", day_scoped=False,
                             value=float(self.config.pf_tgt_value),
                             action=self.config.tgt_action,
@@ -419,12 +456,18 @@ class PortfolioMonitorStrategy(Strategy):
                                     "market": bool(market), "reason": reason})
         # Cross-portfolio action: on this breach fire the configured verb to the
         # TARGET portfolio's legs, live the SAME bar (spec §2.1(h)/(i)/(j)).
-        if self.config.enforce and self.config.cross_pf_target and self.config.cross_pf_verb:
+        if self.config.enforce and self.config.cross_pf_verb and (
+                self.config.cross_pf_target or self.config.cross_pf_targets):
             try:
                 from core.backtest_runner.cross_portfolio import publish_cross_pf_live
-                publish_cross_pf_live(self.config.cross_pf_target,
-                                      self.config.cross_pf_verb, int(ts),
-                                      self.config.portfolio_id)
+                _targets = list(self.config.cross_pf_targets)
+                if self.config.cross_pf_target:
+                    _targets.append(self.config.cross_pf_target)
+                for _tgt in _targets:
+                    # TAG SqOff: fire the verb at every portfolio in the tag group
+                    # (cross_pf_targets) — and/or the single cross_pf_target — live.
+                    publish_cross_pf_live(_tgt, self.config.cross_pf_verb, int(ts),
+                                          self.config.portfolio_id)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -535,6 +578,48 @@ class PortfolioMonitorStrategy(Strategy):
                 self._tgt_pending_at = 0
             return True
         return False  # holding within the window
+
+    def _eval_trailing(self, ts: int, pnl: float) -> None:
+        """Live trailing-SL / trailing-target ratchet — a faithful port of the
+        post-run clip steps 1-3 (portfolio_clip). One-shot: the first trailing hit
+        fires SqOff (and, for Tag/User monitors, the cross-pf publish in _fire
+        squares the whole group). Runs only when a trailing side is enabled."""
+        if self._trail_fired:
+            return
+        c = self.config
+        # ── Trailing SL: ratchet the loss cap tighter as profit grows, then check ──
+        if c.pf_sl_trail_enabled and c.pf_sl_enabled:
+            if c.pf_sl_trail_every > 0:
+                gain = pnl - self._sl_trail_anchor
+                if gain >= c.pf_sl_trail_every:
+                    steps = int(gain / c.pf_sl_trail_every)
+                    self._sl_current = max(0.0, self._sl_current - steps * c.pf_sl_trail_by)
+                    self._sl_trail_anchor += steps * c.pf_sl_trail_every
+            # No-base-cap guard: a pure trailing SL (no Max-Loss base) must NOT fire at
+            # breakeven before any profit — only once the ratchet has engaged (anchor moved).
+            if (c.pf_sl_value > 0 or self._sl_trail_anchor > 0) and pnl <= -self._sl_current:
+                self._trail_fired = True
+                self._fire(ts, "sqoff", False,
+                           f"Portfolio Stoploss: trailing SL {self._sl_current:g} hit -> SqOff")
+                return
+        # ── Trailing Target: activate at when_reach, ratchet the lock up, then check ──
+        if c.pf_tgt_trail_enabled and c.pf_tgt_enabled:
+            if (not self._tgt_trail_active and c.pf_tgt_trail_when_reach > 0
+                    and pnl >= c.pf_tgt_trail_when_reach):
+                self._tgt_trail_active = True
+                self._tgt_floor = c.pf_tgt_trail_lock
+                self._tgt_trail_anchor = c.pf_tgt_trail_when_reach
+            if self._tgt_trail_active and c.pf_tgt_trail_every > 0:
+                gain = pnl - self._tgt_trail_anchor
+                if gain >= c.pf_tgt_trail_every:
+                    steps = int(gain / c.pf_tgt_trail_every)
+                    self._tgt_floor += steps * c.pf_tgt_trail_by
+                    self._tgt_trail_anchor += steps * c.pf_tgt_trail_every
+            if self._tgt_trail_active and pnl <= self._tgt_floor:
+                self._trail_fired = True
+                self._fire(ts, "sqoff", False,
+                           f"Portfolio Target: trailing lock {self._tgt_floor:g} hit -> SqOff")
+                return
 
     def _eval_side(self, ts, pnl, is_loss, side, value, action, market, cap, day_scoped,
                    delay_ns: int = 0) -> None:

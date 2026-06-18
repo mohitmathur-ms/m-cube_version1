@@ -143,6 +143,18 @@ def _build_node_run_config(catalog_path, bt_meta, venue_capital, live_fill,
     return BacktestRunConfig(venues=venues, data=data, engine=engine_cfg, chunk_size=chunk_size)
 
 
+# Engine-wide account report captured during a multi-portfolio SESSION run — one
+# shared engine = one account, so there is a single combined account report for the
+# whole session. Keyed by the session ``portfolio_name`` ("SESSION"); read by
+# ``run_session_backtest`` / the session endpoint to write the combined account CSV.
+_SESSION_ENGINE_REPORTS: dict = {}
+
+
+def get_session_engine_reports(portfolio_name: str):
+    """Pop the engine-wide reports captured for the named session run (or {})."""
+    return _SESSION_ENGINE_REPORTS.pop(portfolio_name or "SESSION", {})
+
+
 def _run_portfolio_unified(
     catalog_path: str,
     slot_capital_pairs: list[tuple],   # [(slot, capital), ...] for ALL enabled slots
@@ -180,6 +192,7 @@ def _run_portfolio_unified(
     default_pf_tgt_delay_sec: int = 0,
     session_pf_specs: list | None = None,
     slot_pf_ids: dict | None = None,
+    session_tag_specs: list | None = None,
 ) -> tuple[dict, list]:
     """Run every leg of a portfolio in ONE engine. Returns ``({slot_id: result}, errors)``.
 
@@ -808,8 +821,53 @@ def _run_portfolio_unified(
                     cross_pf_verb=str(_sp.get("cross_pf_verb") or ""),
                 ))
             _mons = [(_sp, _mk_mon(_k, _sp)) for _k, _sp in enumerate(session_pf_specs)]
-            # 4) register: enforcing monitors FIRST (fire reaches legs same bar),
-            #    then legs, then non-enforcing monitors.
+            # 3b) TAG monitors (spec §11): one per tag group. Scopes to the legs of
+            # ALL portfolios sharing the tag; on a tag combined-loss / combined-profit
+            # breach it fires SqOff at EVERY portfolio in the tag (cross_pf_targets),
+            # squaring off the whole group live. Tag caps are ABSOLUTE (sl_day_scoped
+            # False). The tag monitor has no legs of its own.
+            _tag_mons = []
+            for _tk, _tg in enumerate(session_tag_specs or []):
+                _pids = set(_tg.get("portfolio_ids") or [])
+                _tscope = [str(_st.id) for (_sl, _st, _pp) in _built if _pp in _pids]
+                if not _tscope:
+                    continue
+                _tiid, _tbt = set(), set()
+                for (_sl, _st, _pp) in _built:
+                    if _pp in _pids:
+                        _mm = bt_meta[_sl.bar_type_str]
+                        _tiid.add(str(_mm["bt"].instrument_id)); _tbt.add(_sl.bar_type_str)
+                _ml = float(_tg.get("max_loss") or 0.0)
+                _mp = float(_tg.get("max_profit") or 0.0)
+                _tsl = _tg.get("trail_sl") or {}      # {every, by} or {}
+                _ttg = _tg.get("trail_tgt") or {}     # {when_reach, lock, every, by} or {}
+                # Trailing SL needs a base loss cap to ratchet from; default to a large
+                # one (effectively the trailing floor only) when no Max-Loss is set.
+                _sl_on = (_ml > 0) or bool(_tsl)
+                _tag_mons.append(_PMS(_PMC(
+                    monitor_instrument_ids=tuple(sorted(_tiid)),
+                    monitor_bar_types=tuple(sorted(_tbt)),
+                    starting_capital=0.0,
+                    pf_sl_enabled=_sl_on, pf_sl_value=_ml, sl_day_scoped=False,
+                    pf_tgt_enabled=(_mp > 0) or bool(_ttg), pf_tgt_value=_mp,
+                    pf_sl_trail_enabled=bool(_tsl),
+                    pf_sl_trail_every=float(_tsl.get("every", 0.0) or 0.0),
+                    pf_sl_trail_by=float(_tsl.get("by", 0.0) or 0.0),
+                    pf_tgt_trail_enabled=bool(_ttg),
+                    pf_tgt_trail_when_reach=float(_ttg.get("when_reach", 0.0) or 0.0),
+                    pf_tgt_trail_lock=float(_ttg.get("lock", 0.0) or 0.0),
+                    pf_tgt_trail_every=float(_ttg.get("every", 0.0) or 0.0),
+                    pf_tgt_trail_by=float(_ttg.get("by", 0.0) or 0.0),
+                    day_tz=_tg.get("day_tz") or "UTC", enforce=True,
+                    portfolio_id=f"TAG::{_tg.get('tag')}", action="sqoff", tgt_action="sqoff",
+                    pf_sl_type="Combined Loss", track=True, order_id_tag=f"TAGMON{_tk:03d}",
+                    scope_strategy_ids=tuple(_tscope), shared_instrument_ids=_shared_iids,
+                    cross_pf_targets=tuple(sorted(_pids)), cross_pf_verb="sqoff",
+                )))
+            # 4) register: enforcing monitors (incl. tag monitors) FIRST (fire reaches
+            #    legs same bar), then legs, then non-enforcing monitors.
+            for _m in _tag_mons:
+                engine.add_strategy(_m)
             for _sp, _m in _mons:
                 if bool(_sp.get("enforce")):
                     engine.add_strategy(_m)
@@ -912,6 +970,23 @@ def _run_portfolio_unified(
             positions_report = engine.trader.generate_positions_report()
         except Exception:
             pass
+        # SESSION: capture the engine-wide account report (one shared account across
+        # all portfolios) so the combined session report has a real, non-approximated
+        # account ledger. Single-portfolio path skips this (its account report is
+        # generated downstream per the existing flow).
+        if session_pf_specs is not None:
+            _acct = None
+            try:
+                _accs = list(engine.kernel.cache.accounts())
+                if _accs:
+                    from nautilus_trader.model.identifiers import Venue as _Venue
+                    _acct = engine.trader.generate_account_report(
+                        _Venue(str(_accs[0].id.get_issuer())))
+            except Exception:  # noqa: BLE001
+                _acct = None
+            _SESSION_ENGINE_REPORTS[portfolio_name or "SESSION"] = {
+                "account_report": _acct,
+            }
         # Exclude the monitor (not a leg) so leg indices line up with slots
         # regardless of whether it was registered first (enforce) or last.
         actual = [s for s in engine.trader.strategies()

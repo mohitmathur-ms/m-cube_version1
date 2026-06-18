@@ -66,9 +66,18 @@ const Orderbook = {
         return r.order_book;
     },
 
-    /** Get the live orderbook rows from whichever result set is available. */
+    /** Collect the single COMBINED orderbook from a multi-portfolio SESSION run.
+     *  The backend already builds one order book across all portfolios with each
+     *  row tagged by its own PORTFOLIO NAME. */
+    _collectFromSession() {
+        return App.state.sessionOrderbook || [];
+    },
+
+    /** Get the live orderbook rows from whichever result set is available.
+     *  A session run (most recent) wins, else single-portfolio, else backtest. */
     _getLiveData() {
-        // Prefer portfolio results if they exist and have orderbook data
+        const sess = this._collectFromSession();
+        if (sess.length > 0) return sess;
         const pf = this._collectFromPortfolio();
         if (pf.length > 0) return pf;
         return this._collectFromBacktest();

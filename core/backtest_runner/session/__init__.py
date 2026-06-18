@@ -205,13 +205,64 @@ def run_session_backtest(catalog_path: str, portfolios: list[PortfolioConfig],
     if union_end is not None:
         merged["default_end_date"] = union_end
 
-    slot_results, errors = _run_portfolio_unified(
-        session_pf_specs=specs, slot_pf_ids=all_maps, **merged)
+    # ── TAG-level enforcement (spec §11): group portfolios by portfolio_tag and,
+    # for each tag carrying a Max-Loss / Max-Profit limit (config/tags.json), build
+    # a tag spec → the unified session adds a tag monitor that SqOffs the whole tag
+    # group live when its combined P&L breaches. DEFAULT ON; escape `_USE_TAG_ENFORCE=0`
+    # (a no-op anyway unless ≥1 portfolio is tagged AND the tag has a limit). ──
+    import os
+    tag_specs: list = []
+    if os.environ.get("_USE_TAG_ENFORCE", "1") != "0":
+        try:
+            from core.tags import (get_tag_max_loss, get_tag_max_profit,
+                                    get_tag_trailing_sl, get_tag_trailing_target)
+            _by_tag: dict = {}
+            for pf in portfolios:
+                _tg = getattr(pf, "portfolio_tag", None)
+                if _tg:
+                    _by_tag.setdefault(_tg, []).append(getattr(pf, "name", ""))
+            for _tg, _pids in _by_tag.items():
+                _ml, _mp = get_tag_max_loss(_tg), get_tag_max_profit(_tg)
+                _tsl, _ttg = get_tag_trailing_sl(_tg), get_tag_trailing_target(_tg)
+                if _ml is None and _mp is None and not _tsl and not _ttg:
+                    continue  # tag defined but no SL/Target/trailing → nothing to enforce
+                tag_specs.append({"tag": _tg, "portfolio_ids": _pids,
+                                  "max_loss": _ml or 0.0, "max_profit": _mp or 0.0,
+                                  "trail_sl": _tsl, "trail_tgt": _ttg, "day_tz": "UTC"})
+        except Exception:  # noqa: BLE001 — tag enforcement is best-effort, never breaks a run
+            tag_specs = []
 
+    # ── USER-level enforcement (top tier): the user-wide combined cap is just a
+    # "tag" whose group is ALL of this user's portfolios in the session. When the
+    # user's Max-Loss / Max-Profit (config/users.json) breaches → SqOff every
+    # portfolio. Reuses the tag-monitor mechanism with scope = all portfolios.
+    # DEFAULT ON; escape `_USE_USER_ENFORCE=0` (no-op unless the user has a cap). ──
+    if os.environ.get("_USE_USER_ENFORCE", "1") != "0" and user_id:
+        try:
+            from core.users import (get_user_max_loss, get_user_max_profit,
+                                     get_user_trailing_sl, get_user_trailing_target)
+            _uml, _ump = get_user_max_loss(user_id), get_user_max_profit(user_id)
+            _utsl, _uttg = get_user_trailing_sl(user_id), get_user_trailing_target(user_id)
+            if _uml is not None or _ump is not None or _utsl or _uttg:
+                tag_specs.append({"tag": f"USER::{user_id}",
+                                  "portfolio_ids": [getattr(p, "name", "") for p in portfolios],
+                                  "max_loss": _uml or 0.0, "max_profit": _ump or 0.0,
+                                  "trail_sl": _utsl, "trail_tgt": _uttg, "day_tz": "UTC"})
+        except Exception:  # noqa: BLE001 — best-effort, never breaks a run
+            pass
+
+    slot_results, errors = _run_portfolio_unified(
+        session_pf_specs=specs, slot_pf_ids=all_maps,
+        session_tag_specs=(tag_specs or None), **merged)
+
+    # When user/tag caps were enforced LIVE this session, the per-portfolio merge
+    # must NOT also run the post-run user/tag clip (double-clip). tag_specs is
+    # non-empty exactly when a live user/tag monitor was built.
+    _live_caps = bool(tag_specs)
     out = {}
     for ns_pf, caps in merge_inputs:
         ids = {s.slot_id for s in ns_pf.enabled_slots}
         sub = {sid: r for sid, r in slot_results.items() if sid in ids}
         out[getattr(ns_pf, "name", "")] = _merge_portfolio_results(
-            ns_pf, sub, caps, errors, user_id=user_id)
+            ns_pf, sub, caps, errors, user_id=user_id, live_session_caps=_live_caps)
     return out

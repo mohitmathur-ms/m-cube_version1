@@ -11,6 +11,7 @@ const Portfolio = {
     portfolios: [],       // array of all portfolio objects shown in the table
     activeIndex: null,     // index of portfolio selected for backtest
     results: null,
+    sessionResults: null,  // {pf_name: metrics} from a multi-portfolio session run
     templates: {},
     slotCounter: 0,
     _editingSlotIndex: null,
@@ -196,7 +197,7 @@ const Portfolio = {
             </td></tr>`;
         } else {
             rows = this.portfolios.map((pf, i) => {
-                const enabled = pf._enabled !== false;
+                const enabled = pf._enabled === true;   // default OFF until the user toggles it on
                 const statusBadge = enabled
                     ? `<span class="badge badge-success">Enabled</span>`
                     : `<span class="badge" style="background:var(--bg-muted); color:var(--text-muted);">Disabled</span>`;
@@ -242,7 +243,8 @@ const Portfolio = {
         }
 
         let resultsHTML = "";
-        if (this.results) resultsHTML = this._renderResults();
+        if (this.sessionResults) resultsHTML = this._renderSessionResults();
+        else if (this.results) resultsHTML = this._renderResults();
 
         // Pre-fill the global From/To inputs from the selected portfolio so
         // they mirror the Timing-tab dates. Empty when nothing is selected.
@@ -301,6 +303,10 @@ const Portfolio = {
                     <button class="btn btn-primary btn-sm" onclick="Portfolio.runSelectedBacktest()" style="padding: 5px 16px;">
                         &#9654; Start Testing
                     </button>
+                    <button class="btn btn-sm" onclick="Portfolio.runSession()" style="padding: 5px 16px;"
+                            title="Run ALL enabled portfolios together in ONE session — cross-portfolio actions, tag &amp; user caps enforce live">
+                        &#9778; Run Session (enabled)
+                    </button>
                     <button class="btn btn-sm" onclick="Portfolio.openGlobalSettings()" style="padding: 5px 14px;">Settings</button>
                 </div>
             </div>
@@ -323,6 +329,7 @@ const Portfolio = {
     selectPortfolio(index) {
         this.activeIndex = index;
         this.results = null;
+        this.sessionResults = null;
         this.renderApp();
         App.log(`Selected portfolio: ${this.portfolios[index].name}`, "MESSAGE", "Multileg");
     },
@@ -358,7 +365,152 @@ const Portfolio = {
     runBacktestFor(index) {
         this.activeIndex = index;
         this._currentPortfolio = this.portfolios[index];
+        this.sessionResults = null;
         this.runBacktest();
+    },
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       MULTI-PORTFOLIO SESSION RUN — runs all ENABLED portfolios together in
+       ONE engine via /api/portfolios/session-backtest (cross-portfolio actions,
+       tag & user caps all enforce live). Non-streaming: one POST, render the
+       per-portfolio result table.
+       ═══════════════════════════════════════════════════════════════════════ */
+    async runSession() {
+        const enabled = this.portfolios.filter(pf => pf._enabled === true);
+        if (enabled.length < 2) {
+            App.toast("Enable at least 2 portfolios (the 'On' column) to run a session.", "error");
+            return;
+        }
+        const names = enabled.map(p => p.name);
+        const dup = names.find((n, i) => names.indexOf(n) !== i);
+        if (dup) {
+            App.toast(`Portfolio names must be unique for a session — duplicate: "${dup}".`, "error");
+            return;
+        }
+        // Each portfolio must have at least one enabled slot.
+        const empty = enabled.find(pf => (pf.slots || []).filter(s => s.enabled !== false).length === 0);
+        if (empty) { App.toast(`Portfolio "${empty.name}" has no enabled slots.`, "error"); return; }
+
+        const configs = enabled.map(pf => this._cleanForSave(pf));
+        const resDiv = document.getElementById("pf-results");
+        // Live progress card (one shared bar — all portfolios run on one engine
+        // timeline; we fill it against the union [earliest start → latest end]).
+        if (resDiv) resDiv.innerHTML = `<div class="card" style="padding:16px;">
+            <div class="progress-text" id="sess-progress-text">Starting session of <strong>${enabled.length}</strong> portfolios…</div>
+            <div class="progress-bar-container"><div class="progress-bar-fill" id="sess-progress-bar" style="width:0%;"></div></div>
+            <div id="sess-progress-names" style="margin-top:8px; font-size:0.85rem; color:var(--text-secondary);">${names.join(" · ")}</div>
+            <div id="sess-progress-details" style="margin-top:4px; font-size:0.85rem; color:var(--text-secondary);"></div>
+        </div>`;
+        App.log(`Session backtest: ${enabled.length} portfolios [${names.join(", ")}]`, "MESSAGE", "Multileg");
+
+        try {
+            const response = await fetch("/api/portfolios/session-backtest", {
+                method: "POST",
+                headers: App.userHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ portfolios: configs }),
+            });
+            if (!response.ok) {   // config / permission error returned before the stream
+                let msg = `HTTP ${response.status}`;
+                try { const j = await response.json(); msg = j.error || msg; } catch (_) {}
+                throw new Error(msg);
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "", unionEnd = null;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n"); buffer = lines.pop();
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    let evt; try { evt = JSON.parse(line); } catch (_) { continue; }
+                    const bar = document.getElementById("sess-progress-bar");
+                    const text = document.getElementById("sess-progress-text");
+                    const namesEl = document.getElementById("sess-progress-names");
+                    const details = document.getElementById("sess-progress-details");
+                    if (evt.event === "start") {
+                        unionEnd = evt.union_end;
+                        if (text) text.textContent = `Running ${(evt.portfolios || []).length} portfolios in one engine…`;
+                        // Portfolio names + union range — set once, kept for the whole run.
+                        if (namesEl) namesEl.textContent = (evt.union_start && evt.union_end)
+                            ? `${(evt.portfolios || []).join(" · ")}  ·  range ${evt.union_start} → ${evt.union_end}`
+                            : (evt.portfolios || []).join(" · ");
+                    } else if (evt.event === "progress") {
+                        if (evt.total > 0 && bar) bar.style.width = Math.min(100, Math.round((evt.completed / evt.total) * 100)) + "%";
+                        if (text) text.textContent = evt.message || "Processing…";
+                        // Date progress on its OWN line — never overwrites the names.
+                        if (details && evt.data_ts_day) {
+                            details.textContent = `Processed up to ${evt.data_ts_day}` + (unionEnd ? `  (range → ${unionEnd})` : "");
+                        }
+                    } else if (evt.event === "complete") {
+                        if (bar) bar.style.width = "100%";
+                        this.sessionResults = evt.results || {};
+                        this.sessionReportFile = evt.report_file || "";
+                        this.results = null;
+                        // Feed the Orderbook page's "Current Results (Live)" with the
+                        // ONE combined session order book (most recent run wins).
+                        App.state.sessionResults = this.sessionResults;
+                        App.state.sessionOrderbook = evt.order_book || [];
+                        if (resDiv) resDiv.innerHTML = this._renderSessionResults();
+                        App.toast(`Session complete — ${Object.keys(this.sessionResults).length} portfolios.`, "success");
+                        App.log(`Session complete in ${evt.elapsed?.toFixed?.(1) || "?"}s`, "SUCCESS", "Multileg");
+                    } else if (evt.event === "error") {
+                        throw new Error(evt.error || "Session run failed");
+                    }
+                }
+            }
+        } catch (e) {
+            if (resDiv) resDiv.innerHTML = `<div class="alert alert-danger">Session run failed: ${e.message}</div>`;
+            App.toast(`Session run failed: ${e.message}`, "error");
+            App.log(`Session run failed: ${e.message}`, "ERROR", "Multileg");
+        }
+    },
+
+    _renderSessionResults() {
+        const r = this.sessionResults || {};
+        const fmt = (n) => App.formatNumber(Number(n || 0));
+        const entries = Object.entries(r);
+        const rows = entries.map(([name, m]) => {
+            const pnl = Number(m.total_pnl || 0);
+            const pnlCls = pnl >= 0 ? "color:var(--success);" : "color:var(--danger);";
+            const cap = m.max_loss_hit ? "🔴 loss cap"
+                      : m.max_profit_hit ? "🟢 profit cap" : "—";
+            return `<tr>
+                <td><strong>${name}</strong></td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums; ${pnlCls}">$${fmt(pnl)}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums;">${m.total_trades ?? 0}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums;">${m.wins ?? 0} / ${m.losses ?? 0}</td>
+                <td style="text-align:right; font-variant-numeric:tabular-nums;">$${fmt(m.final_balance)}</td>
+                <td style="text-align:center;">${cap}</td>
+            </tr>`;
+        }).join("");
+        const totPnl = entries.reduce((s, [, m]) => s + Number(m.total_pnl || 0), 0);
+        const totTr = entries.reduce((s, [, m]) => s + Number(m.total_trades || 0), 0);
+        const totCls = totPnl >= 0 ? "color:var(--success);" : "color:var(--danger);";
+        return `<div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Session Results &middot; ${entries.length} portfolios (one engine)</h3>
+            <div style="overflow-x:auto;"><table>
+                <thead><tr>
+                    <th>Portfolio</th>
+                    <th style="text-align:right;">P&amp;L</th>
+                    <th style="text-align:right;">Trades</th>
+                    <th style="text-align:right;">W / L</th>
+                    <th style="text-align:right;">Final Balance</th>
+                    <th style="text-align:center;">Cap Hit</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+                <tfoot><tr style="font-weight:600; border-top:2px solid var(--border);">
+                    <td>Combined</td>
+                    <td style="text-align:right; ${totCls}">$${fmt(totPnl)}</td>
+                    <td style="text-align:right;">${totTr}</td>
+                    <td colspan="3"></td>
+                </tr></tfoot>
+            </table></div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:8px 0 0;">
+                Ran in one session engine — cross-portfolio actions, tag caps and user caps enforced live.
+            </p>
+        </div>`;
     },
 
     runSelectedBacktest() {
@@ -1091,11 +1243,12 @@ const Portfolio = {
                 </fieldset>
             </div>
 
-            <!-- Target Tab. Backend-wired for FX/crypto via post-hoc clip
-                 in core.backtest_runner._apply_portfolio_clip. Spec:
-                 5. Logics/portfolio_sl_tgt.html §4-§5. Options-only Type
-                 values and cross-portfolio Action values are marked gray
-                 (pf-live-only) inside the dropdowns. -->
+            <!-- Target Tab. Backend-wired for FX/crypto via the live portfolio
+                 monitor (post-hoc clip is the fallback). Spec:
+                 5. Logics/portfolio_sl_tgt.html §4-§5. Options-only Type values
+                 are marked gray (pf-live-only). Cross-portfolio Action values are
+                 wired end-to-end (fire live same-bar in a multi-portfolio Run
+                 Session) and shown as plain enabled options. -->
             <div class="pf-tab-content" id="pf-tab-pf-target" style="display:none;">
                 <div style="display:flex; gap:14px; flex-wrap:wrap;">
                     <fieldset class="pf-fieldset" style="flex:1; min-width:260px;">
@@ -1128,10 +1281,10 @@ const Portfolio = {
                                 ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
             // ReExecute family is wired (config-driven replay, spec §2.4 — the
             // entry-price variants replay as plain ReExecute, the FX adaptation).
-            // Cross-portfolio "…Other Portfolio" actions dispatch via the event
-            // bus but only fire on the target portfolio's next run in the session.
-            const xpf = o.endsWith("Other Portfolio");
-            return `<option value="${o}" class="${xpf ? 'pf-live-only' : ''}" ${(ui.on_target || 'SqOff') === o ? 'selected' : ''}>${o}${xpf ? ' (cross-portfolio)' : ''}</option>`;
+            // Cross-portfolio "…Other Portfolio" actions are wired end-to-end: they
+            // fire LIVE same-bar at the target in a multi-portfolio Run Session
+            // (verified). Treated as plain wired actions (no live-only marking).
+            return `<option value="${o}" ${(ui.on_target || 'SqOff') === o ? 'selected' : ''}>${o}</option>`;
         }).join("")}
                             </select>
                         </div>
@@ -1233,10 +1386,10 @@ const Portfolio = {
                                 ${["SqOff", "SqOff Other Portfolio", "Execute Other Portfolio", "Start Other Portfolio", "ReExecute", "ReExecute at Entry Price", "ReExecute Same Contract at EntryPrice"].map(o => {
             // ReExecute family is wired (config-driven replay, spec §2.4 — the
             // entry-price variants replay as plain ReExecute, the FX adaptation).
-            // Cross-portfolio "…Other Portfolio" actions dispatch via the event
-            // bus but only fire on the target portfolio's next run in the session.
-            const xpf = o.endsWith("Other Portfolio");
-            return `<option value="${o}" class="${xpf ? 'pf-live-only' : ''}" ${(ui.on_sl_action || 'SqOff') === o ? 'selected' : ''}>${o}${xpf ? ' (cross-portfolio)' : ''}</option>`;
+            // Cross-portfolio "…Other Portfolio" actions are wired end-to-end: they
+            // fire LIVE same-bar at the target in a multi-portfolio Run Session
+            // (verified). Treated as plain wired actions (no live-only marking).
+            return `<option value="${o}" ${(ui.on_sl_action || 'SqOff') === o ? 'selected' : ''}>${o}</option>`;
         }).join("")}
                             </select>
                         </div>
@@ -2829,6 +2982,9 @@ const Portfolio = {
     async runBacktest() {
         const pf = this._currentPortfolio;
         if (!pf) { App.toast("No portfolio selected.", "error"); return; }
+        this.sessionResults = null;   // single run clears any prior session results
+        App.state.sessionResults = null;   // so the Orderbook "Live" view reflects this single run, not a prior session
+        App.state.sessionOrderbook = null;
         const enabledSlots = (pf.slots || []).filter(s => s.enabled !== false);
         if (enabledSlots.length === 0) { App.toast("Portfolio has no enabled slots.", "error"); return; }
 

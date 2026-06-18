@@ -361,6 +361,7 @@ def _merge_portfolio_results(
     capitals: dict,
     errors: list,
     user_id: str | None = None,
+    live_session_caps: bool = False,
 ) -> dict:
     """Merge individual slot results into portfolio-level metrics."""
     total_pnl = 0.0
@@ -571,10 +572,25 @@ def _merge_portfolio_results(
 
     # Roll this portfolio's PnL into the user AND tag aggregators so subsequent
     # portfolios (or repeat runs in the same orchestrator session) see it.
-    if user_id:
+    # SKIP in a live session: the user/tag MONITORS already enforced the caps live,
+    # and the aggregator is the LEGACY sequential-run model (would double-count).
+    if user_id and not live_session_caps:
         add_user_pnl(user_id, total_pnl)
-    if pf_tag:
+    if pf_tag and not live_session_caps:
         add_tag_pnl(pf_tag, total_pnl)
+    if live_session_caps:
+        # Live session: the user/tag monitors already squared the group on breach,
+        # so NULL the post-run user+tag caps here to avoid a DOUBLE clip. (Portfolio
+        # pf_sl/pf_tgt is already skipped below via pf_monitor_enforced.)
+        user_max_loss = user_max_profit = None
+        user_trail_sl = user_trail_tgt = None
+        tag_max_loss = tag_max_profit = None
+        tag_trail_sl = tag_trail_tgt = None
+        cum_user_pnl = cum_tag_pnl = 0.0
+        eff_max_loss, eff_max_profit = portfolio.max_loss, portfolio.max_profit
+        combined_pnl = total_pnl
+        max_loss_hit = eff_max_loss is not None and combined_pnl <= -abs(eff_max_loss)
+        max_profit_hit = eff_max_profit is not None and combined_pnl >= eff_max_profit
 
     # Portfolio-level Stoploss / Target post-hoc clip. Spec:
     # 5. Logics/portfolio_sl_tgt.html. Walks the merged equity curve, finds

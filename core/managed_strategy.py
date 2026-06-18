@@ -729,6 +729,14 @@ class ManagedExitStrategy(Strategy):
         self._reentry_armed: bool = False
         self._reentry_target_price: float = 0.0
         self._reentry_was_long: bool = True
+        # Leg-level SqOff (close action) "done for the day": the UTC date on which a
+        # plain close/SqOff fired; blocks this leg's re-entry until the next calendar
+        # day (leg_actions_explained.html §SqOff). None = not blocked.
+        self._leg_sqoff_blocked_date = None
+        # Leg-level Execute: when THIS leg's SL/Target fired an Execute action, this
+        # leg is CLOSED for good (no re-entry, rest of run) — it pivots to the sibling
+        # (leg_actions_explained.html §Execute: state CLOSED, re-entry trigger none).
+        self._leg_perm_closed: bool = False
         # Portfolio "ReExecute at Entry Price" (spec ✅ in sl_features.html): when
         # the replay injects a pre-clip entry price, submit a resting LIMIT at
         # that price on the original side so the re-entry fills AT the entry
@@ -739,11 +747,22 @@ class ManagedExitStrategy(Strategy):
         _reexec_px = float(getattr(config, "reexec_entry_price", 0.0) or 0.0)
         self._reexec_limit_px: float = _reexec_px if _reexec_px > 0 else 0.0
         self._reexec_limit_is_long: bool = bool(getattr(config, "reexec_entry_was_long", True))
+        # Entry-tag for the re-entry order, set by whoever arms the reexec (leg
+        # Re-Execute/ReEntry vs portfolio ReExecute) so the orderbook ENTRY DETAILED
+        # REASON accurately says WHY this re-entry fired. Empty → the portfolio default.
+        self._reexec_reason_tag: str = ""
         # Plain ReExecute → immediate MARKET re-entry instead of an entry-price
         # limit (spec portfolio_sl_tgt.html "immediately re-opens them").
         self._reexec_market_mode: bool = bool(getattr(config, "reexec_market_mode", False))
         self._reexec_limit_submitted: bool = False
         self._reexec_limit_client_id = None
+        # Bar ts at which a ReExecute/ReEntry re-entry was armed (portfolio-breach
+        # ReExecute, leg-level Re-Execute, or leg-level ReEntry). The re-entry must
+        # NOT fire on that same base bar (it would share the breach/close timestamp,
+        # incl. the 5-min aggregation-boundary case); it is deferred to the next base
+        # bar (ts strictly greater). 0 = no re-entry arm pending. Reverse is a
+        # separate path (_submit_order) and is intentionally not gated here.
+        self._reexec_arm_ts_ns: int = 0
         self.re_entry_count: int = 0
         self.position_side = None  # "LONG" or "SHORT" or None
         self._expecting_close_fill = False  # next on_order_filled is a close, not an open
@@ -1124,6 +1143,10 @@ class ManagedExitStrategy(Strategy):
                         self._reexec_limit_is_long = _long
                         self._reexec_market_mode = _fire_market
                         self._reexec_limit_submitted = False
+                        self._reexec_reason_tag = ""  # use the portfolio default tag
+                        # Defer the re-entry to the NEXT base bar: record the arm
+                        # bar so _try_reexec_reentry won't submit on this same bar.
+                        self._reexec_arm_ts_ns = int(bar.ts_event)
                 else:
                     # SqOff: close (only when holding — a flat leg whose sibling
                     # triggered the breach must not set _expecting_close_fill, which
@@ -1902,8 +1925,14 @@ class ManagedExitStrategy(Strategy):
         elif self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
             steps = int(self.highest_profit / self.config.trailing_sl_step)
             if steps > 0:
+                # Lock IN profit: for every `trailing_sl_step` of profit gained, move
+                # the SL `trailing_sl_offset` further onto the PROFIT side (above entry
+                # for a long, below for a short). Use a NEGATIVE pct so _compute_sl_price
+                # places the SL on the profit side — matching the post-move trail path
+                # (:1898). (A POSITIVE offset put the SL on the loss side and, with the
+                # tighten-only guard below, froze it at entry∓offset and never trailed.)
                 trail_offset = steps * self.config.trailing_sl_offset
-                trail_sl = self._compute_sl_price(is_long, trail_offset)
+                trail_sl = self._compute_sl_price(is_long, -trail_offset)
                 if is_long and trail_sl > self.current_sl:
                     self.current_sl = trail_sl
                     self._was_trailed = True
@@ -2162,6 +2191,16 @@ class ManagedExitStrategy(Strategy):
                 reason = (f"{label}: price={px:.{prec}f} {op} TP={self.current_tp:.{prec}f} "
                           f"(entry {self.entry_price:.{prec}f}, {pct:+.2f}%)")
 
+        # Append the configured action so the orderbook EXIT DETAILED REASON shows
+        # WHAT fired on the hit, e.g. "Stop Loss: … -> Re-Execute" / "… -> SqOff".
+        # 'reverse' is already in the label; keep_leg_running doesn't close (below).
+        _ACT_LBL = {"close": "SqOff", "re_execute": "Re-Execute", "re_entry": "ReEntry",
+                    "execute": f"Execute({self.config.execute_target_leg_id})",
+                    "keep_leg_running": "KeepLegRunning"}
+        _act_str = ", ".join(_ACT_LBL.get(a, a) for a in actions if a != "reverse")
+        if _act_str:
+            reason += f" -> {_act_str}"
+
         # 1.2(e) KeepLegRunning: ignore the trigger entirely. Position remains
         # open; SL/TP are disarmed for the rest of this trade so we don't
         # immediately re-fire on the next bar. The next exit only happens via
@@ -2187,20 +2226,38 @@ class ManagedExitStrategy(Strategy):
             if action == "re_execute":
                 if self.re_execution_count < self.config.max_re_executions:
                     self.re_execution_count += 1
-                    # Arm the slot-level re-execution delay (Other Settings spec
-                    # §2). Counts from the current bar's timestamp; _check_entries
-                    # checks this before allowing the fresh entry on subsequent
-                    # bars. delay_between_legs_sec=0 (default) → no block.
-                    # ReExecute_Logics.html P2: no_wait_trade_reexec skips the
-                    # delay entirely on re-executions.
+                    # leg_actions_explained.html (§Re-Execute): re-enter at the
+                    # next-bar MARKET price on the ORIGINAL side (immediate), up to
+                    # max_re_executions — NOT "wait for the next signal". Reuse the
+                    # reexec machinery in MARKET mode (_try_reexec_reentry fires it on
+                    # the next base bar via _submit_reexec_market). _reexec_limit_px>0
+                    # only flags "a re-entry is pending"; the side is _reexec_limit_is_long.
+                    if saved_entry_price > 0:
+                        self._reexec_limit_px = float(saved_entry_price)
+                        self._reexec_limit_is_long = was_long
+                        self._reexec_market_mode = True
+                        self._reexec_limit_submitted = False
+                        self._reexec_reason_tag = (
+                            "Re-Execute (market) — re-opened immediately after leg "
+                            + ("Stop Loss" if exit_type == "sl" else "Take Profit") + " hit")
+                        # Defer to the NEXT base bar: record the arm bar so the
+                        # re-entry can't fire on this same bar — including when the
+                        # exit lands on a 5-min aggregation boundary (where the
+                        # aggregated entry-check would otherwise re-enter same-bar).
+                        self._reexec_arm_ts_ns = self._current_bar_ts_ns
+                    # Optional Other-Settings re-execution delay (default 0 = none).
                     if self.config.delay_between_legs_sec > 0 and not self.config.no_wait_trade_reexec:
                         self._reentry_blocked_until_ns = (
                             self._current_bar_ts_ns
                             + int(self.config.delay_between_legs_sec) * 1_000_000_000
                         )
-                    # Allow re-entry on next signal
             elif action == "reverse":
                 side = OrderSide.SELL if was_long else OrderSide.BUY
+                # Tag the flipped entry so the orderbook ENTRY DETAILED REASON reads
+                # "Reverse on SL/TP — flipped from long/short".
+                self._pending_entry_reason = (
+                    "Reverse on " + ("SL" if exit_type == "sl" else "TP")
+                    + " — flipped from " + ("long" if was_long else "short"))
                 self._submit_order(side)
                 self._set_exit_levels(side)
                 # Mark the reversed-into side SYNCHRONOUSLY. The open fill is async
@@ -2214,22 +2271,46 @@ class ManagedExitStrategy(Strategy):
             elif action == "execute":
                 # 1.2(c) Execute (other leg by leg_id): arm the target slot via
                 # the cross-slot bus. The target's _check_entries sees the arm
-                # event and flips its _armed_for_entry flag.
+                # event and flips its _armed_for_entry flag. Per leg_actions_explained
+                # .html §Execute, THIS leg is now CLOSED for good (pivot to the
+                # sibling) — block its own re-entry for the rest of the run.
                 target = self.config.execute_target_leg_id
                 if target:
                     entry = self._sibling_bus.setdefault(target, {})
                     entry["arm_ns"] = self._current_bar_ts_ns
+                self._leg_perm_closed = True
             elif action == "re_entry":
-                # 1.2(d) ReEntry (price-wait re-entry): set a price trigger; the
-                # next signal entry is gated until live price crosses it in the
-                # correct direction (back through original entry, by default).
-                cap = self.config.max_re_entries
-                if cap == 0 or self.re_entry_count < cap:
+                # leg_actions_explained.html (§ReEntry): re-enter at EXACTLY the
+                # original entry price via a resting LIMIT, filled the instant price
+                # RETURNS to it (no signal needed), up to max_re_entries. Reuse the
+                # reexec machinery in ENTRY-PRICE (limit) mode — market_mode=False →
+                # _try_reexec_reentry holds flat until price returns to E, then rests
+                # a limit that fills at E.
+                # max_re_entries == 0 → NO re-entry (consistent with Re-Execute's
+                # max_re_executions == 0 = none). >0 caps the number of re-entries.
+                if self.re_entry_count < self.config.max_re_entries:
                     trigger = self.config.reentry_price or saved_entry_price
                     if trigger > 0:
-                        self._reentry_armed = True
-                        self._reentry_target_price = float(trigger)
-                        self._reentry_was_long = was_long
+                        self.re_entry_count += 1
+                        self._reexec_limit_px = float(trigger)
+                        self._reexec_limit_is_long = was_long
+                        self._reexec_market_mode = False
+                        self._reexec_limit_submitted = False
+                        self._reexec_reason_tag = (
+                            f"ReEntry at entry price {trigger:.{prec}f} (limit) — after leg "
+                            + ("Stop Loss" if exit_type == "sl" else "Take Profit") + " hit")
+                        # Same next-base-bar deferral as Re-Execute: the limit can't
+                        # be submitted on the exit bar itself (incl. aggregation
+                        # boundaries); it rests from the next base bar onward.
+                        self._reexec_arm_ts_ns = self._current_bar_ts_ns
+
+        # leg_actions_explained.html §SqOff: a plain close is terminal "for the day".
+        # When close is the ONLY action (no re_execute / re_entry / reverse / execute
+        # re-arm pending), block this leg's re-entry until the next calendar day.
+        if "close" in actions and not any(
+                a in actions for a in ("re_execute", "re_entry", "reverse", "execute")):
+            self._leg_sqoff_blocked_date = datetime.fromtimestamp(
+                self._current_bar_ts_ns / 1e9, tz=self._utc_tz).date()
 
     def _try_reexec_reentry(self, close: float, is_flat: bool) -> bool:
         """Process a pending portfolio-ReExecute re-entry. Returns True when a
@@ -2244,6 +2325,14 @@ class ManagedExitStrategy(Strategy):
         """
         if self._reexec_limit_px <= 0:
             return False
+        # Never re-enter on the SAME base bar as the breach/close — defer until a
+        # base bar STRICTLY AFTER the arm bar (next base bar). Applies to BOTH the
+        # portfolio-breach ReExecute AND leg-level Re-Execute / ReEntry (all set
+        # _reexec_arm_ts_ns when they arm). This also closes the aggregation-boundary
+        # case where the aggregated entry-check would otherwise re-enter same-bar.
+        # Returns True so the leg's normal entry stays blocked while pending.
+        if self._reexec_arm_ts_ns > 0 and self._current_bar_ts_ns <= self._reexec_arm_ts_ns:
+            return True
         if is_flat and not self._reexec_limit_submitted:
             if self._reexec_market_mode:
                 # Plain ReExecute → "immediately re-opens them" at next-bar
@@ -2281,6 +2370,20 @@ class ManagedExitStrategy(Strategy):
                 if _d == self._pf_sl_blocked_date:
                     return
                 self._pf_sl_blocked_date = None
+
+        # Leg-level SqOff (close action) "done for the day": after a plain close on an
+        # SL/Target hit, this leg sits idle until the NEXT calendar day, then resumes
+        # (leg_actions_explained.html §SqOff). Resets on day rollover.
+        if self._leg_sqoff_blocked_date is not None:
+            _d = datetime.fromtimestamp(self._current_bar_ts_ns / 1e9, tz=self._utc_tz).date()
+            if _d == self._leg_sqoff_blocked_date:
+                return
+            self._leg_sqoff_blocked_date = None
+
+        # Leg-level Execute: a leg that pivoted to its sibling is CLOSED for good —
+        # never re-enters (leg_actions_explained.html §Execute).
+        if self._leg_perm_closed:
+            return
 
         # 1.2(c) Execute: consume any pending arm event from a sibling slot.
         # `arm_ns` set by another leg's "execute" action flips us to armed.
@@ -2488,6 +2591,7 @@ class ManagedExitStrategy(Strategy):
         if self._reexec_limit_px > 0:
             self._reexec_limit_px = 0.0
             self._reexec_limit_client_id = None
+            self._reexec_arm_ts_ns = 0
 
         # Compute SL (snap to instrument tick — TBD-2 resolved)
         if self.config.stop_loss_type in ("percentage", "trailing"):
@@ -2610,7 +2714,8 @@ class ManagedExitStrategy(Strategy):
             quantity=self.instrument.make_qty(self.config.trade_size),
             price=self.instrument.make_price(self._reexec_limit_px),
             time_in_force=TimeInForce.GTC,
-            tags=["ReExecute at Entry Price (limit) — re-entry fired by portfolio SL/Target"],
+            tags=[self._reexec_reason_tag
+                  or "ReExecute at Entry Price (limit) — re-entry fired by portfolio SL/Target"],
         )
         self._reexec_limit_client_id = order.client_order_id
         self.submit_order(order)
@@ -2632,7 +2737,8 @@ class ManagedExitStrategy(Strategy):
             order_side=side,
             quantity=self.instrument.make_qty(self.config.trade_size),
             time_in_force=TimeInForce.GTC,
-            tags=["ReExecute (market) — re-entry fired by portfolio SL/Target"],
+            tags=[self._reexec_reason_tag
+                  or "ReExecute (market) — re-entry fired by portfolio SL/Target"],
         )
         self._reexec_limit_client_id = order.client_order_id
         self.submit_order(order)
@@ -2655,6 +2761,7 @@ class ManagedExitStrategy(Strategy):
         self._reexec_limit_px = 0.0
         self._reexec_limit_client_id = None
         self._reexec_limit_submitted = False
+        self._reexec_arm_ts_ns = 0
 
     def on_stop(self) -> None:
         # Drain trailing partial windows (no order action — matches Nautilus,

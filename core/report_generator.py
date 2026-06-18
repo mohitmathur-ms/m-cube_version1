@@ -238,7 +238,7 @@ def _build_fills_lookup(fills_report) -> dict:
 
 
 def _build_orderbook(all_results: dict, user_id: str | None = None,
-                     exit_sell_first: bool = True) -> list[dict]:
+                     exit_sell_first: bool = True, portfolio_name: str = "") -> list[dict]:
     """Build the ORDERBOOK trade list from all strategy results.
 
     Each closed position becomes one trade record in the template's format.
@@ -409,6 +409,24 @@ def _build_orderbook(all_results: dict, user_id: str | None = None,
             entry_detailed_reason = (entry_fill.get("tags") or "").strip()
             exit_detailed_reason = exit_tags_raw
 
+            # Stamp WHICH portfolio (and strategy/leg) this row belongs to into the
+            # detailed reasons, so a "Portfolio Target/Stoploss hit" or a leg-level
+            # "Stop Loss"/"Take Profit" is self-describing in a combined multi-portfolio
+            # orderbook. Per-leg ``portfolio_name`` (set on each entry by the combined
+            # SESSION builder) wins; else the function-level one (single/per-pf run).
+            _leg_pf = results.get("portfolio_name") or portfolio_name
+            if _leg_pf:
+                _strat_disp = strategy_name
+                _tail = strategy_name.rsplit("__", 1)
+                if len(_tail) == 2 and len(_tail[1]) == 8 and all(c in "0123456789abcdef" for c in _tail[1]):
+                    _strat_disp = _tail[0]   # drop the helper's 8-hex disambiguation token
+                _strat_disp = _strat_disp.rstrip("_")
+                _ctx = f" — Portfolio: {_leg_pf} · Strategy: {_strat_disp}"
+                if exit_detailed_reason:
+                    exit_detailed_reason += _ctx
+                if entry_detailed_reason:
+                    entry_detailed_reason += _ctx
+
             # qty from the positions report is post-multiplier (the user's
             # multiplier is applied at order placement in backtest_runner).
             # LOTS exposes the pre-multiplier base size so that
@@ -429,7 +447,7 @@ def _build_orderbook(all_results: dict, user_id: str | None = None,
                 "ENTRY DETAILED REASON": entry_detailed_reason,
                 "OPTION TYPE": "",
                 "STRIKE": "",
-                "PORTFOLIO NAME": strategy_name,
+                "PORTFOLIO NAME": _leg_pf or strategy_name,
                 "STRATEGY": strategy_name,
                 "SLOT_ID": slot_id,
                 "EXIT TIME": exit_time,
@@ -442,9 +460,10 @@ def _build_orderbook(all_results: dict, user_id: str | None = None,
             }
             trades.append(trade)
 
-    # Base order: chronological by entry time. ENTRY TIME is a DD-MM-YYYY string,
-    # so parse it to a real datetime first (a plain string sort would order by
-    # day-of-month); rows with a missing/unparseable time sort to the top.
+    # Base order: chronological by EXIT time (the close event). ENTRY/EXIT TIME
+    # are DD-MM-YYYY strings, so parse to a real datetime first (a plain string
+    # sort would order by day-of-month); rows with a missing/unparseable exit
+    # time sort to the top.
     _BATCH_EXIT_PREFIXES = ("Squareoff", "Portfolio")
 
     def _entry_ts(t):
@@ -452,47 +471,36 @@ def _build_orderbook(all_results: dict, user_id: str | None = None,
                             format="%d-%m-%Y %H:%M:%S", errors="coerce")
         return ts if pd.notna(ts) else pd.Timestamp.min
 
+    def _exit_ts(t):
+        ts = pd.to_datetime(t.get("EXIT TIME") or "",
+                            format="%d-%m-%Y %H:%M:%S", errors="coerce")
+        return ts if pd.notna(ts) else pd.Timestamp.min
+
     def _is_batch(t):
         return str(t.get("EXIT REASON", "")).startswith(_BATCH_EXIT_PREFIXES)
 
-    # §8.2 "Exit Sell Legs First" (default ON): the spec orders by the CLOSE BATCH,
-    # not by entry time. Each batch-exit event = the rows that share one EXIT TIME
-    # and a Squareoff/Portfolio reason; it is treated as a unit, anchored at the
-    # batch's EARLIEST entry time, and its SELL-leg closes are listed before its
-    # BUY-leg closes regardless of each leg's own entry time. Non-batch rows
-    # (individual SL/Target, entries) keep strict entry-time order. OFF reproduces
-    # pure chronological order. This deliberately lets a later-entering batch leg
-    # precede an earlier one — for batch closes the spec's close-event ordering
-    # outranks entry chronology; fills/PnL are unaffected (log order only).
-    batch_anchor: dict = {}
-    if exit_sell_first:
-        for t in trades:
-            if _is_batch(t):
-                k = str(t.get("EXIT TIME", ""))
-                ets = _entry_ts(t)
-                if k not in batch_anchor or ets < batch_anchor[k]:
-                    batch_anchor[k] = ets
-
+    # Rows are ordered primarily by EXIT TIME (the close event). §8.2 "Exit Sell
+    # Legs First" (default ON): within a batch close (rows sharing one EXIT TIME
+    # with a Squareoff/Portfolio reason) the SELL-leg closes are listed before the
+    # BUY-leg closes; batch rows sit before non-batch rows at the same exit time;
+    # ties broken by each leg's own entry time for a stable order. OFF reproduces
+    # pure exit-time order. fills/PnL are unaffected (log order only).
     def _sort_key(t):
+        xts = _exit_ts(t)
         ets = _entry_ts(t)
         if exit_sell_first and _is_batch(t):
-            xt = str(t.get("EXIT TIME", ""))
-            anchor = batch_anchor.get(xt, ets)
             side_rank = 0 if str(t.get("TRANSACTION", "")).upper() == "SELL" else 1
-            # (batch anchor time, 0 = batch block sits before same-time non-batch,
-            #  EXIT TIME = batch identity so two distinct batches that share an
-            #  earliest entry don't interleave, SELL legs first, then each leg's
-            #  own entry time for a stable order)
-            return (anchor, 0, xt, side_rank, ets)
-        # Non-batch rows: position 1 = 1 (after batch blocks at the same anchor),
-        # "" placeholder keeps the tuple shape/type aligned for comparison.
-        return (ets, 1, "", 0, ets)
+            # (exit time, 0 = batch block before same-time non-batch, SELL legs
+            #  first, then each leg's own entry time for a stable order)
+            return (xts, 0, side_rank, ets)
+        # Non-batch rows: position 1 (after batch blocks at the same exit time).
+        return (xts, 1, 0, ets)
     trades.sort(key=_sort_key)
     return trades
 
 
 def build_orderbook_dataframe(all_results: dict, user_id: str | None = None,
-                              exit_sell_first: bool = True) -> pd.DataFrame:
+                              exit_sell_first: bool = True, portfolio_name: str = "") -> pd.DataFrame:
     """Build an order book DataFrame matching the full CSV schema.
 
     Parameters
@@ -511,7 +519,8 @@ def build_orderbook_dataframe(all_results: dict, user_id: str | None = None,
     pd.DataFrame
         DataFrame with columns matching the order book CSV spec.
     """
-    trades = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first)
+    trades = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first,
+                              portfolio_name=portfolio_name)
     if not trades:
         return pd.DataFrame()
 
@@ -674,10 +683,13 @@ def _build_summary(orderbook: list[dict]) -> dict:
         max_idx = cumulative.index(max_cum)
         min_idx = cumulative.index(min_cum)
 
-        # Build per-portfolio leg stats for Min/Max PNL column
+        # Build per-leg stats for the Min/Max PNL column. Keyed by STRATEGY (the
+        # per-leg identity) — NOT PORTFOLIO NAME, which now holds the real portfolio
+        # name (shared by all legs of a portfolio). Identical values pre-change
+        # (PORTFOLIO NAME == STRATEGY then), so the daily breakdown is unchanged.
         portfolio_stats: dict = {}
         for trade in day_trades:
-            pf = trade.get("PORTFOLIO NAME", "")
+            pf = trade.get("STRATEGY", "") or trade.get("PORTFOLIO NAME", "")
             if pf not in portfolio_stats:
                 portfolio_stats[pf] = {"max_pnl": 0.0, "leg_stats": {}}
             pnl = float(trade["PNL"])
@@ -690,7 +702,7 @@ def _build_summary(orderbook: list[dict]) -> dict:
                     "min_pnl_time": entry_time,
                     "max_pnl_time": entry_time,
                 }
-            pf_pnls = [float(t["PNL"]) for t in day_trades if t.get("PORTFOLIO NAME") == pf]
+            pf_pnls = [float(t["PNL"]) for t in day_trades if (t.get("STRATEGY", "") or t.get("PORTFOLIO NAME")) == pf]
             portfolio_stats[pf]["max_pnl"] = sum(pf_pnls)
 
         summary[date_str] = {
@@ -711,6 +723,7 @@ def generate_report(
     user_id: str | None = None,
     date_range: dict | None = None,
     exit_sell_first: bool = True,
+    portfolio_name: str = "",
 ) -> str:
     """Generate a self-contained HTML backtest report.
 
@@ -741,7 +754,8 @@ def generate_report(
 
     template = Path(template_path).read_text(encoding="utf-8")
 
-    orderbook = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first)
+    orderbook = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first,
+                                 portfolio_name=portfolio_name)
     summary = _build_summary(orderbook)
     logs: list = []
 
