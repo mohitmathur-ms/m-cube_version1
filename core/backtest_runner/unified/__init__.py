@@ -850,6 +850,7 @@ def _run_portfolio_unified(
                     starting_capital=0.0,
                     pf_sl_enabled=_sl_on, pf_sl_value=_ml, sl_day_scoped=False,
                     pf_tgt_enabled=(_mp > 0) or bool(_ttg), pf_tgt_value=_mp,
+                    tgt_day_scoped=False,  # tag/user MAX-PROFIT caps stay ABSOLUTE (rest-of-run)
                     pf_sl_trail_enabled=bool(_tsl),
                     pf_sl_trail_every=float(_tsl.get("every", 0.0) or 0.0),
                     pf_sl_trail_by=float(_tsl.get("by", 0.0) or 0.0),

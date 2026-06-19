@@ -78,6 +78,11 @@ class PortfolioMonitorConfig(StrategyConfig, frozen=True):
     tgt_action: str = "sqoff"
     tgt_market_mode: bool = False
     tgt_reexec_cap: int = 0
+    # Combined-Profit Target scope (mirror of sl_day_scoped): True (default) =
+    # DAY-scoped (daily profit target, resets each day, fires once/day, blocks
+    # re-entry to EOD, resumes next day); False = ABSOLUTE rest-of-run single fire
+    # (hit the target once → stop for the whole run).
+    tgt_day_scoped: bool = True
     # §5.3 confirmation-delay window (seconds) for the PnL Target path — a breach
     # must HOLD this long before it fires (0 = immediate). The SL side reuses
     # ``pf_sl_delay_sec`` (declared in the underlying block above).
@@ -423,10 +428,11 @@ class PortfolioMonitorStrategy(Strategy):
 
         # A combined-loss and a combined-profit breach can't occur on the same bar
         # (opposite directions from the day baseline), so order doesn't matter.
-        # Semantics match the post-run reference: pf_sl SqOff is DAY-SCOPED (daily
-        # loss limit, resets each day); pf_tgt SqOff is ABSOLUTE SINGLE (first time
-        # combined profit hits the target → close all + stop for the rest of the
-        # run). ReExecute (both sides) is trailing-reset, capped.
+        # Both SqOff sides are DAY-SCOPED by default (daily loss limit / daily profit
+        # target — reset each calendar day, fire once/day, block re-entry to EOD,
+        # resume next day), gated by sl_day_scoped / tgt_day_scoped. Set either False
+        # for ABSOLUTE rest-of-run single-fire (the TAG/user-cap semantic).
+        # ReExecute (both sides) is trailing-reset, capped.
         # Trailing SL / Target (Tag/User tiers): when enabled, the ratcheted level
         # REPLACES the fixed SL/Target check on that side (one-shot per run).
         if (self.config.pf_sl_trail_enabled or self.config.pf_tgt_trail_enabled):
@@ -440,7 +446,8 @@ class PortfolioMonitorStrategy(Strategy):
                             cap=int(self.config.reexec_cap or 0),
                             delay_ns=int(self.config.pf_sl_delay_sec or 0) * 1_000_000_000)
         if _tgt_on and not self.config.pf_tgt_trail_enabled:
-            self._eval_side(ts, pnl, is_loss=False, side="tgt", day_scoped=False,
+            self._eval_side(ts, pnl, is_loss=False, side="tgt",
+                            day_scoped=bool(self.config.tgt_day_scoped),
                             value=float(self.config.pf_tgt_value),
                             action=self.config.tgt_action,
                             market=bool(self.config.tgt_market_mode),
