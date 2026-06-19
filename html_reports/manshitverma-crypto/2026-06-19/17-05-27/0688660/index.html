@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make combined-profit target scope configurable (day vs. absolute) and tune multi-portfolio verification fixtures — 0688660</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">merger_path_A_B</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/068866079d6071a5e2c8d75fdf735fc14bb05971'><code>0688660</code></a></span>
+      <span class="sep">|</span>
+      <span>manshitverma-crypto</span>
+    </div>
+    <h1>Make combined-profit target scope configurable (day vs. absolute) and tune multi-portfolio verification fixtures</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-06-19 11:36 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>Previously, when the system&#x27;s combined-profit guardrail fired during a backtest, it always used a one-and-done rule: once the portfolio hit its profit target for the entire run, it stopped trading for good. This push gives that rule a new option — it can instead reset each day, just like the combined-loss guardrail already does, letting the portfolio resume trading the next morning after a profitable day.</p><p>Five sample portfolio configurations used for internal testing were also updated. They now specify a trading window (entries only allowed between 4:00 AM and roughly 10:45 AM), which better reflects realistic intraday trading hours. One portfolio was also switched from Ethereum on Coinbase to Bitcoin on Binance, and another had its date range and product type corrected to match more useful historical data.</p><p>The session window for the Nifty Futures market data adapter was extended from ending at 1:44 PM to 7:14 PM, which means the system now recognizes a longer tradeable session for that market.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>The core change is in `core/portfolio_monitor.py`: `PortfolioMonitorConfig` gains a new frozen field `tgt_day_scoped: bool = True`. The `_eval_side` call on the profit-target branch now reads `day_scoped=bool(self.config.tgt_day_scoped)` instead of the previously hardcoded `day_scoped=False`. This means the default behavior flips: the combined-profit target is now day-scoped (resets daily, fires once per day, blocks re-entry until next session) unless the caller explicitly sets `tgt_day_scoped=False`.</p><p>To preserve the original absolute semantic for tag/user-tier caps, `core/backtest_runner/unified/__init__.py` passes `tgt_day_scoped=False` explicitly when constructing the `PortfolioMonitorConfig` for that tier. This is the only callsite changed, so all other callers (which don&#x27;t set the field) now get day-scoped behavior by default — a behavioral change for any portfolio that relies on a combined-profit cap.</p><p>Five portfolio JSON fixtures under `portfolios/_default/` were updated: all gained `entry_start_time`/`entry_end_time`/`entry_window_overnight` fields (trading window 04:00–10:45 UTC or 04:00–09:45); `PFCP_REEXEC` swapped its second slot from ETHUSD.COINBASE_MS to BTCUSD.BINANCE_MS (including the aggregated bar type string); `PFCP_SQOFF` changed backtest dates (2026-01 → 2025-01/2025-06), added a 18:29 UTC squareoff, changed product from NRML to MIS, and reduced `pf_tgt_value` from 100 to 10. `PFCL_REEXEC` also adjusted EMA periods from (50/100) to (10/20) on its second slot.</p><p>The `nifty_futures_ms.json` adapter config&#x27;s `session_end_time` was extended from `13:44:00` to `19:14:00`, affecting what bars the system considers within the tradeable session for that venue.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>Before this push, the profit-target path in PortfolioMonitorStrategy was always absolute:</p><p># Old code (hardcoded)
+  self._eval_side(ts, pnl, is_loss=False, side=&quot;tgt&quot;, day_scoped=False, ...)</p><p>After the push it reads the new config field:</p><p># New code
+  self._eval_side(ts, pnl, is_loss=False, side=&quot;tgt&quot;,
+                  day_scoped=bool(self.config.tgt_day_scoped), ...)</p><p>For a portfolio with `pf_tgt_value=100` and the default `tgt_day_scoped=True`: if combined P&amp;L hits $100 on Monday, the portfolio squares off for the rest of Monday but resumes on Tuesday — matching the day-scoped SL semantics. For the tag/user tier, the unified runner passes `tgt_day_scoped=False` explicitly, preserving the old one-shot absolute behaviour.</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><svg viewBox="0 0 940 618" width="100%" role="img" aria-label="dependency graph" style="max-width:940px"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker></defs><text x="150" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depended on by</text><text x="470" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Changed files</text><text x="790" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depends on</text><line x1="275" y1="87" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="135" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="279" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="327" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="183" x2="345" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="423" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="471" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="135" x2="665" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="231" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="279" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="327" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="375" x2="345" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="423" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="471" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="519" x2="345" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="567" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><g><title>core/backtest_runner/orchestration/__init__.py</title><rect x="25" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">orchestration/__init__.py</text></g><g><title>core/backtest_runner/session/__init__.py</title><rect x="25" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">session/__init__.py</text></g><g><title>core/backtest_runner/unified/__init__.py</title><rect x="25" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">unified/__init__.py</text></g><g><title>crosspf_execute_test.py</title><rect x="25" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">crosspf_execute_test.py</text></g><g><title>crosspf_live_test.py</title><rect x="25" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">crosspf_live_test.py</text></g><g><title>multiportfolio_heterogeneous_test.py</title><rect x="25" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">multiportfolio_heterogeneous_…</text></g><g><title>multiportfolio_parity_test.py</title><rect x="25" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">multiportfolio_parity_test.py</text></g><g><title>multiportfolio_session_parity_test.py</title><rect x="25" y="406" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">multiportfolio_session_parity…</text></g><g><title>multiportfolio_settings_matrix.py</title><rect x="25" y="454" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="475" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">multiportfolio_settings_matri…</text></g><g><title>multiportfolio_user_tag_test.py</title><rect x="25" y="502" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="523" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">multiportfolio_user_tag_test.…</text></g><g><title>server.py</title><rect x="25" y="550" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="571" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">server.py</text></g><g><title>core/backtest_runner/unified/__init__.py</title><rect x="345" y="70" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">unified/__init__.py</text></g><g><title>core/portfolio_monitor.py</title><rect x="345" y="118" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/portfolio_monitor.py</text></g><g><title>core/backtest_runner/bar_filters/__init__.py</title><rect x="665" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">bar_filters/__init__.py</text></g><g><title>core/backtest_runner/cross_portfolio/__init__.py</title><rect x="665" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">cross_portfolio/__init__.py</text></g><g><title>core/backtest_runner/slot_execution/__init__.py</title><rect x="665" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">slot_execution/__init__.py</text></g><g><title>core/conservative_fill_model.py</title><rect x="665" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/conservative_fill_model.…</text></g><g><title>core/custom_strategy_loader.py</title><rect x="665" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/custom_strategy_loader.py</text></g><g><title>core/fx_rates.py</title><rect x="665" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/fx_rates.py</text></g><g><title>core/managed_strategy.py</title><rect x="665" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/managed_strategy.py</text></g><g><title>core/portfolio_monitor.py</title><rect x="665" y="406" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/portfolio_monitor.py</text></g><g><title>core/venue_config.py</title><rect x="665" y="454" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="475" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/venue_config.py</text></g></svg></div><table class='dep'><thead><tr><th>Changed file</th><th>Depended on by &larr;</th><th>Depends on &rarr;</th></tr></thead><tbody><tr><td><code>core/backtest_runner/unified/__init__.py</code></td><td><code>core/backtest_runner/orchestration/__init__.py</code><br><code>core/backtest_runner/session/__init__.py</code><br><code>crosspf_execute_test.py</code><br><code>crosspf_live_test.py</code><br><code>multiportfolio_heterogeneous_test.py</code><br><code>multiportfolio_session_parity_test.py</code><br><code>multiportfolio_settings_matrix.py</code><br><code>server.py</code></td><td><code>core/backtest_runner/bar_filters/__init__.py</code><br><code>core/backtest_runner/cross_portfolio/__init__.py</code><br><code>core/backtest_runner/slot_execution/__init__.py</code><br><code>core/conservative_fill_model.py</code><br><code>core/custom_strategy_loader.py</code><br><code>core/fx_rates.py</code><br><code>core/managed_strategy.py</code><br><code>core/portfolio_monitor.py</code><br><code>core/venue_config.py</code></td></tr><tr><td><code>core/portfolio_monitor.py</code></td><td><code>core/backtest_runner/unified/__init__.py</code><br><code>multiportfolio_parity_test.py</code><br><code>multiportfolio_user_tag_test.py</code></td><td><code>core/backtest_runner/cross_portfolio/__init__.py</code><br><code>core/managed_strategy.py</code></td></tr></tbody></table><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>adapter_admin/adapters_config/nifty_futures_ms.json</code></li><li><code>portfolios/_default/PFCL_REEXEC.json</code></li><li><code>portfolios/_default/PFCL_REEXEC_ENTRY.json</code></li><li><code>portfolios/_default/PFCL_SQOFF.json</code></li><li><code>portfolios/_default/PFCP_REEXEC.json</code></li><li><code>portfolios/_default/PFCP_SQOFF.json</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>adapter_admin/adapters_config/nifty_futures_ms.json</code></td><td>session_end_time extended from 13:44:00 to 19:14:00</td></tr><tr><td><code>core/backtest_runner/unified/__init__.py</code></td><td>explicitly passes tgt_day_scoped=False when building PortfolioMonitorConfig for tag/user-cap tier</td></tr><tr><td><code>core/portfolio_monitor.py</code></td><td>adds tgt_day_scoped: bool = True field to PortfolioMonitorConfig; _eval_side target call now uses bool(self.config.tgt_day_scoped) instead of hardcoded False; updated docstring to document both sides as day-scoped by default</td></tr><tr><td><code>portfolios/_default/PFCL_REEXEC.json</code></td><td>adds entry window 04:00–10:45, changes EMA params to 10/20</td></tr><tr><td><code>portfolios/_default/PFCL_REEXEC_ENTRY.json</code></td><td>adds entry window 04:00–10:45</td></tr><tr><td><code>portfolios/_default/PFCL_SQOFF.json</code></td><td>adds entry window 04:00–10:45</td></tr><tr><td><code>portfolios/_default/PFCP_REEXEC.json</code></td><td>adds entry window 04:00–09:45, switches slot B from ETHUSD.COINBASE_MS to BTCUSD.BINANCE_MS</td></tr><tr><td><code>portfolios/_default/PFCP_SQOFF.json</code></td><td>date range to 2025, product NRML→MIS with 18:29 UTC squareoff, pf_tgt_value 100→10, adds entry window 04:00–10:45</td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>Default flip risk: tgt_day_scoped now defaults to True, which changes runtime behavior for any existing portfolio that previously relied on the absolute (rest-of-run) profit-target semantic without explicitly setting the field — the portfolio will now resume trading the next day after hitting its target.</li><li>The only callsite that sets tgt_day_scoped=False is the unified runner&#x27;s tag/user-tier path; callers using PortfolioMonitorConfig directly (e.g. tests, portfolio_monitor skeleton) silently inherit the new day-scoped default.</li><li>PFCP_SQOFF.json&#x27;s pf_tgt_value was reduced from 100 to 10 — may cause this verification portfolio to trigger its combined-profit cap much more aggressively, potentially masking test failures that were previously only visible above $100.</li><li>PFCP_REEXEC slot B instrument change (ETHUSD→BTCUSD/BINANCE_MS) means the catalog must have BTCUSD.BINANCE_MS data for this fixture to run without a data-not-found error.</li><li>nifty_futures_ms.json session end extension to 19:14 should be verified against actual exchange hours; an overly wide session window can admit stale or illiquid bars in the backtest.</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat</h2>
+    <pre>.../adapters_config/nifty_futures_ms.json          |  4 ++--
+ core/backtest_runner/unified/__init__.py           |  1 +
+ core/portfolio_monitor.py                          | 17 +++++++++++-----
+ portfolios/_default/PFCL_REEXEC.json               | 11 ++++++-----
+ portfolios/_default/PFCL_REEXEC_ENTRY.json         |  7 ++++---
+ portfolios/_default/PFCL_SQOFF.json                |  7 ++++---
+ portfolios/_default/PFCP_REEXEC.json               | 11 ++++++-----
+ portfolios/_default/PFCP_SQOFF.json                | 23 +++++++++++-----------
+ 8 files changed, 47 insertions(+), 34 deletions(-)</pre>
+  </section>
+
+  <footer>
+    Commit 068866079d6071a5e2c8d75fdf735fc14bb05971 on <strong>merger_path_A_B</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>
