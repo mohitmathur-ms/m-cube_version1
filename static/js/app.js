@@ -27,6 +27,7 @@ const App = {
             backtest: Backtest,
             tearsheet: Tearsheet,
             orderbook: Orderbook,
+            visual_verification: VisualVerification,
             portfolio: Portfolio,
             portfolio_tearsheet: PortfolioTearsheet,
         };

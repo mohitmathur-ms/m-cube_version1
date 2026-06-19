@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Visual Verification Tool and 18-portfolio SL/TP test suite for manual backtest auditing — 9c39377</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">merger_path_A_B</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/9c39377ab94dd267e2ae0592ed1e0789df356004'><code>9c39377</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>Add Visual Verification Tool and 18-portfolio SL/TP test suite for manual backtest auditing</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-06-18 12:00 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>This push adds a new &quot;Visual Verification&quot; page to the backtesting platform. After running a backtest, a user can upload the trade order-book export (a CSV file) to this new tool and it will automatically check whether every stop-loss, take-profit, trailing stop, and other exit was computed and triggered correctly — giving a per-trade verdict rather than leaving the developer to verify by hand.</p><p>Alongside the tool, 18 pre-built &quot;verification portfolio&quot; files were added (VP-01 through VP-12 and OT-01 through OT-06). Each portfolio isolates one feature — for example, VP-01 tests a percentage stop-loss in isolation, VP-05 tests a trailing stop, VP-10 tests portfolio-level combined loss limits against leg-level stops. These serve as a permanent, reproducible test bed for the exit-management engine.</p><p>Batch scripts were also added to run all 18 portfolios in one go and produce a consolidated HTML report, along with a detailed written guide (manual_verification_v2.html) that explains exactly what to check, how to re-derive expected prices by hand, and what engine behaviors (like filling at a bar&#x27;s close rather than the exact stop level) are expected quirks versus bugs.</p><p>The developer documentation (CLAUDE.md) was substantially expanded: the runtime-flag table now covers all active execution paths (unified engine, per-slot, Path B, session), the architecture section was updated to reflect that several backend files have been reorganized into sub-packages, and new sections document notable core modules.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>**core/visual_verification.py (new, ~337 lines):** The verification backend. Given an order-book CSV path and a loaded `PortfolioConfig`, it iterates every trade row and runs three verification axes per trade: (A) TIME — finds the first bar where the trigger condition holds (`low ≤ sl_level` for a long SL) and compares to the logged exit timestamp; (B) LOGIC — checks that the logged reason matches the condition, that actions (re-execute count, reverse side) are consistent, and that SL/TP never both fire on the same trade; (C) PRICE — recomputes `expected_sl = round(entry × (1 − pct/100), tick 0.01)` and diffs against `current_sl` in the CSV, then computes the fill-vs-level gap (the close-fill realism metric). It also reports six execution-realism diagnostics (D–I): entry correctness, realistic fills (close ≠ level), zero-slippage note, gap-through detection, intrabar SL-before-TP ordering, and a fill-at-level counterfactual P&amp;L to quantify close-fill inflation.</p><p>**server.py (+129 lines):** New endpoint `POST /api/visual-verification/analyze` accepts a multipart CSV upload (`file`) plus `X-User-Id` header. It resolves the portfolio name from the filename convention, loads the config via `portfolio_from_dict`, invokes `core.visual_verification.analyze_order_book`, and returns the full analysis JSON (keys: `summary`, `trades`, `realism`, `config_loaded`, `feed_in_catalog`). A separate `GET /api/visual-verification/portfolios` lists eligible portfolios for the dropdown.</p><p>**static/js/visual_verification.js (~425 lines):** New SPA page wired into `app.js`. Renders the analysis JSON into a per-trade table (columns: kind, entry/exit price, expected level, Δ fill−level, timing verdict, logic verdict, price verdict, gap flag) plus a summary bar and realism panel. Added as a route in `App` alongside existing pages.</p><p>**portfolios/testing2/ (new directory):** 18 JSON portfolio configs generated programmatically by `_generate_portfolios.py` from a shared NIFTY/EMA-cross template (1-sec feed, 5-min composite, 2026-03-02 to 2026-03-20, product=MIS, squareoff 15:29 IST). Each file varies exactly one exit-config dimension. `_run_all_backtests.py` POSTs each config to the live Flask server and collects order-book CSVs; `_build_full_report.py` (~812 lines) calls `visual_verification` for each and renders a consolidated HTML report. `_verify_lib.py` (~121 lines) is shared assertion helpers.</p><p>**config/users.json:** Added `testing2` user so the test portfolio namespace resolves under `portfolios/testing2/`.</p><p>**CLAUDE.md:** Branch note on package modularization added; runtime flags table expanded from 3 rows (grouping/path-B/profiling) to 14 rows covering unified engine, per-slot force, PF enforce, live fill model, VWAP/directional fill, lazy stream, multi-portfolio; architecture diagram updated to reflect `core/backtest_runner/` as a package tree; new sections for notable core/ modules, strategy `_shared/` package, session/unified paths, package layout of `core/models/`, Strategy Tags tier, and CI/report pipeline.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>VP-01 (long SL 0.5%) end-to-end through the new tool:</p><p>User runs the VP-01 portfolio, exports `order_book_portfolio_VP-01_long_sl_pct_....csv`, uploads it to /visual-verification.</p><p>In `core/visual_verification.py`, for a trade with entry_price = 24722.00:
+  expected_sl = round(24722.00 × (1 − 0.005), 0.01) = 24598.39
+  logged current_sl from CSV → 24598.39  ✓ (PRICE PASS)
+  first bar where low ≤ 24598.39 → 2026-03-02T08:47:00Z
+  logged exit_time from CSV      → 2026-03-02T08:47:00Z  ✓ (TIME PASS)
+  logged reason                  → &#x27;SL&#x27;                  ✓ (LOGIC PASS)
+  exit_fill (trigger-bar close)  → 24591.20  ≠ 24598.39
+  Δ fill−level = −7.19 (adverse, close-fill realism gap, expected engine behavior)</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><svg viewBox="0 0 940 666" width="100%" role="img" aria-label="dependency graph" style="max-width:940px"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker></defs><text x="150" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depended on by</text><text x="470" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Changed files</text><text x="790" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depends on (+7 more)</text><line x1="595" y1="87" x2="665" y2="519" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="87" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="279" x2="665" y2="471" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="135" x2="345" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="279" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="327" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="423" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="471" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="519" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="567" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="375" x2="665" y2="615" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="183" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="231" x2="345" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="279" x2="345" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="327" x2="345" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="375" x2="345" y2="375" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><g><title>portfolios/testing2/_build_full_report.py</title><rect x="25" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_build_full_report.py</text></g><g><title>portfolios/testing2/_run_all_backtests.py</title><rect x="25" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_run_all_backtests.py</text></g><g><title>server.py</title><rect x="25" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">server.py</text></g><g><title>tests/smoke_tests/smoke_test_user_layer.py</title><rect x="25" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">smoke_tests/smoke_test_user_l…</text></g><g><title>tests/smoke_tests/stress_test_extreme_path_b.py</title><rect x="25" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">smoke_tests/stress_test_extre…</text></g><g><title>tests/smoke_tests/stress_test_portfolios.py</title><rect x="25" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">smoke_tests/stress_test_portf…</text></g><g><title>tests/test_portfolio_tags.py</title><rect x="25" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">tests/test_portfolio_tags.py</text></g><g><title>core/visual_verification.py</title><rect x="345" y="70" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/visual_verification.py</text></g><g><title>portfolios/testing2/_build_full_report.py</title><rect x="345" y="118" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_build_full_report.py</text></g><g><title>portfolios/testing2/_build_verification_report.py</title><rect x="345" y="166" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_build_verification_…</text></g><g><title>portfolios/testing2/_generate_portfolios.py</title><rect x="345" y="214" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_generate_portfolios…</text></g><g><title>portfolios/testing2/_run_all_backtests.py</title><rect x="345" y="262" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_run_all_backtests.py</text></g><g><title>portfolios/testing2/_verify_lib.py</title><rect x="345" y="310" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">testing2/_verify_lib.py</text></g><g><title>server.py</title><rect x="345" y="358" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">server.py</text></g><g><title>core/__init__.py</title><rect x="665" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/__init__.py</text></g><g><title>core/backtest_runner/__init__.py</title><rect x="665" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">backtest_runner/__init__.py</text></g><g><title>core/backtest_runner/session/__init__.py</title><rect x="665" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">session/__init__.py</text></g><g><title>core/backtest_runner/unified/__init__.py</title><rect x="665" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">unified/__init__.py</text></g><g><title>core/csv_loader/__init__.py</title><rect x="665" y="262" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="283" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">csv_loader/__init__.py</text></g><g><title>core/custom_strategy_loader.py</title><rect x="665" y="310" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="331" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/custom_strategy_loader.py</text></g><g><title>core/managed_strategy.py</title><rect x="665" y="358" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="379" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/managed_strategy.py</text></g><g><title>core/migrate_users.py</title><rect x="665" y="406" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="427" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/migrate_users.py</text></g><g><title>core/models/__init__.py</title><rect x="665" y="454" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="475" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">models/__init__.py</text></g><g><title>core/nautilus_loader.py</title><rect x="665" y="502" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="523" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/nautilus_loader.py</text></g><g><title>core/report_generator.py</title><rect x="665" y="550" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="571" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/report_generator.py</text></g><g><title>core/runtime_history.py</title><rect x="665" y="598" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="619" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/runtime_history.py</text></g></svg></div><table class='dep'><thead><tr><th>Changed file</th><th>Depended on by &larr;</th><th>Depends on &rarr;</th></tr></thead><tbody><tr><td><code>core/visual_verification.py</code></td><td><code>portfolios/testing2/_build_full_report.py</code><br><code>server.py</code></td><td><code>core/nautilus_loader.py</code></td></tr><tr><td><code>portfolios/testing2/_build_full_report.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/visual_verification.py</code></td></tr><tr><td><code>portfolios/testing2/_build_verification_report.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_generate_portfolios.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_run_all_backtests.py</code></td><td><span class='muted'>&mdash;</span></td><td><code>core/models/__init__.py</code><br><code>server.py</code></td></tr><tr><td><code>portfolios/testing2/_verify_lib.py</code></td><td><span class='muted'>&mdash;</span></td><td><span class='muted'>&mdash;</span></td></tr><tr><td><code>server.py</code></td><td><code>portfolios/testing2/_run_all_backtests.py</code><br><code>tests/smoke_tests/smoke_test_user_layer.py</code><br><code>tests/smoke_tests/stress_test_extreme_path_b.py</code><br><code>tests/smoke_tests/stress_test_portfolios.py</code><br><code>tests/test_portfolio_tags.py</code></td><td><code>core/__init__.py</code><br><code>core/backtest_runner/__init__.py</code><br><code>core/backtest_runner/session/__init__.py</code><br><code>core/backtest_runner/unified/__init__.py</code><br><code>core/csv_loader/__init__.py</code><br><code>core/custom_strategy_loader.py</code><br><code>core/managed_strategy.py</code><br><code>core/migrate_users.py</code><br><code>core/models/__init__.py</code><br><code>core/nautilus_loader.py</code><br><code>core/report_generator.py</code><br><code>core/runtime_history.py</code><br><code>core/session_windows.py</code><br><code>core/tags.py</code><br><code>core/templates.py</code><br><code>core/users.py</code><br><code>core/venue_config.py</code><br><code>core/visual_verification.py</code></td></tr></tbody></table><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.claude/settings.local.json</code></li><li><code>CLAUDE.md</code></li><li><code>Mergin_Branches_Workflow_StepWise.excalidraw</code></li><li><code>SL_TGT_Testing/new_tests/manual_verification_v2.html</code></li><li><code>config/users.json</code></li><li><code>portfolios/testing2/OT-01_market_exit.json</code></li><li><code>portfolios/testing2/OT-02_limit_exit_blocked.json</code></li><li><code>portfolios/testing2/OT-03_sl_limit_blocked.json</code></li><li><code>portfolios/testing2/OT-04_stop_loss_market.json</code></li><li><code>portfolios/testing2/OT-05_good_till_triggered.json</code></li><li><code>portfolios/testing2/OT-06_good_till_cancelled.json</code></li><li><code>portfolios/testing2/README.md</code></li><li><code>portfolios/testing2/VP-01_long_sl_pct.json</code></li><li><code>portfolios/testing2/VP-02_long_tgt_pct.json</code></li><li><code>portfolios/testing2/VP-03_sl_and_tgt.json</code></li><li><code>portfolios/testing2/VP-04_short_sl_tgt.json</code></li><li><code>portfolios/testing2/VP-05_trailing_sl.json</code></li><li><code>portfolios/testing2/VP-06_atr_sl.json</code></li><li><code>portfolios/testing2/VP-07_sl_wait.json</code></li><li><code>portfolios/testing2/VP-08_action_reexecute.json</code></li><li><code>portfolios/testing2/VP-09_action_reverse.json</code></li><li><code>portfolios/testing2/VP-10_pf_combined_plus_leg.json</code></li><li><code>portfolios/testing2/VP-11_zero_disabled_no_exit.json</code></li><li><code>portfolios/testing2/VP-12_zero_value_pct_flaw.json</code></li><li><code>portfolios/testing2/_run_manifest.json</code></li><li><code>portfolios/testing2/manual_verification_v2_RESULTS.html</code></li><li><code>static/index.html</code></li><li><code>static/js/app.js</code></li><li><code>static/js/orderbook.js</code></li><li><code>static/js/portfolio.js</code></li><li><code>static/js/visual_verification.js</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.claude/settings.local.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>CLAUDE.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>Mergin_Branches_Workflow_StepWise.excalidraw</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>SL_TGT_Testing/new_tests/manual_verification_v2.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>config/users.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>core/visual_verification.py</code></td><td>new backend module; per-trade SL/TP/trailing/realism analysis from order-book CSV | server.py — new /api/visual-verification/analyze and /portfolios endpoints | static/js/visual_verification.js — new SPA page rendering trade-level audit results | static/js/app.js — route wired for new visual_verification page | static/index.html — script tag for visual_verification.js | portfolios/testing2/VP-01 … VP-12 (12 files) — SL/TP/trailing/reexec/reverse/portfolio feature verification portfolios | portfolios/testing2/OT-01 … OT-06 (6 files) — order type verification portfolios | portfolios/testing2/_generate_portfolios.py — programmatic config generator | portfolios/testing2/_run_all_backtests.py — batch runner posting configs to Flask | portfolios/testing2/_build_full_report.py — consolidated HTML report builder | portfolios/testing2/_build_verification_report.py — lighter single-portfolio report builder | portfolios/testing2/_verify_lib.py — shared assertion helpers | portfolios/testing2/README.md — per-portfolio design rationale | portfolios/testing2/_run_manifest.json — run metadata/outputs manifest | SL_TGT_Testing/new_tests/manual_verification_v2.html — human verification guide (3-axis + 6-realism-caveat methodology) | portfolios/testing2/manual_verification_v2_RESULTS.html — sample results output | config/users.json — testing2 user added | CLAUDE.md — major documentation expansion (flags, architecture, modules, CI) | .claude/settings.local.json — allowed bash commands for new scripts | Mergin_Branches_Workflow_StepWise.excalidraw — node color updated to green marking this step complete</td></tr><tr><td><code>portfolios/testing2/OT-01_market_exit.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/OT-02_limit_exit_blocked.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/OT-03_sl_limit_blocked.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/OT-04_stop_loss_market.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/OT-05_good_till_triggered.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/OT-06_good_till_cancelled.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/README.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-01_long_sl_pct.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-02_long_tgt_pct.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-03_sl_and_tgt.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-04_short_sl_tgt.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-05_trailing_sl.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-06_atr_sl.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-07_sl_wait.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-08_action_reexecute.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-09_action_reverse.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-10_pf_combined_plus_leg.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-11_zero_disabled_no_exit.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/VP-12_zero_value_pct_flaw.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_build_full_report.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_build_verification_report.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_generate_portfolios.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_run_all_backtests.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_run_manifest.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/_verify_lib.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/testing2/manual_verification_v2_RESULTS.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>server.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>static/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>static/js/app.js</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>static/js/orderbook.js</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>static/js/portfolio.js</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>static/js/visual_verification.js</code></td><td><span class=muted>&mdash;</span></td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>visual_verification.py reads bar data from the order-book CSV only — it does not open the parquet catalog to re-derive the trigger bar&#x27;s OHLC independently, so TIME-axis mismatches caused by data discrepancies may be missed.</li><li>The tool resolves the portfolio config by inferring the portfolio name from the uploaded CSV filename; a rename or non-standard export will silently load the wrong config.</li><li>OT-01 through OT-06 are documented as &#x27;live-market&#x27; order types that are either blocked at save or not wired in the engine — they exist as rejection/documentation probes, not runnable verification cases; this distinction may be unclear to new contributors.</li><li>The _run_all_backtests.py script requires a live Flask server on localhost:5000; it is not integrated into pytest or CI, so test results are not automatically tracked.</li><li>VP-10 (portfolio combined-loss + leg SL) depends on portfolio-level enforcement (_USE_PF_ENFORCE=on); if the flag or two-pass machinery behavior changes, VP-10 results will silently diverge.</li><li>No automated assertions are wired — _build_full_report.py renders HTML but does not exit non-zero on failures; adding CI gate would close this gap.</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat <span class='chip warn'>truncated</span></h2>
+    <pre>.claude/settings.local.json                        |  54 +-
+ CLAUDE.md                                          | 274 +++++--
+ Mergin_Branches_Workflow_StepWise.excalidraw       |  16 +-
+ .../new_tests/manual_verification_v2.html          | 261 +++++++
+ config/users.json                                  |   6 +
+ core/visual_verification.py                        | 337 +++++++++
+ portfolios/testing2/OT-01_market_exit.json         | 150 ++++
+ portfolios/testing2/OT-02_limit_exit_blocked.json  | 150 ++++
+ portfolios/testing2/OT-03_sl_limit_blocked.json    | 150 ++++
+ portfolios/testing2/OT-04_stop_loss_market.json    | 150 ++++
+ portfolios/testing2/OT-05_good_till_triggered.json | 150 ++++
+ portfolios/testing2/OT-06_good_till_cancelled.json | 150 ++++
+ portfolios/testing2/README.md                      | 317 ++++++++
+ portfolios/testing2/VP-01_long_sl_pct.json         | 151 ++++
+ portfolios/testing2/VP-02_long_tgt_pct.json        | 151 ++++
+ portfolios/testing2/VP-03_sl_and_tgt.json          | 151 ++++
+ portfolios/testing2/VP-04_short_sl_tgt.json        | 150 ++++
+ portfolios/testing2/VP-05_trailing_sl.json         | 150 ++++
+ portfolios/testing2/VP-06_atr_sl.json              | 150 ++++
+ portfolios/testing2/VP-07_sl_wait.json             | 150 ++++
+ portfolios/testing2/VP-08_action_reexecute.json    | 150 ++++
+ portfolios/testing2/VP-09_action_reverse.json      | 150 ++++
+ .../testing2/VP-10_pf_combined_plus_leg.json       | 204 ++++++
+ .../testing2/VP-11_zero_disabled_no_exit.json      | 150 ++++
+ portfolios/testing2/VP-12_zero_value_pct_flaw.json | 150 ++++
+ portfolios/testing2/_build_full_report.py          | 812 +++++++++++++++++++++
+ portfolios/testing2/_build_verification_report.py  | 406 +++++++++++
+ portfolios/testing2/_generate_portfolios.py        | 374 ++++++++++
+ portfolios/testing2/_run_all_backtests.py          |  68 ++
+ portfolios/testing2/_run_manifest.json             | 174 +++++
+ portfolios/testing2/_verify_lib.py                 | 121 +++
+ .../testing2/manual_verification_v2_RESULTS.html   | 274 +++++++
+ server.py                                          | 129 +++-
+ static/index.html                                  |   2 +
+ static/js/app.js                                   |   1 +
+ static/js/orderbook.js                             |   4 +-
+ static/js/portfolio.js                             |   4 +-
+ static/js/visual_verification.js                   | 425 +++++++++++
+ 38 files changed, 6737 insertions(+), 79 deletions(-)</pre>
+  </section>
+
+  <footer>
+    Commit 9c39377ab94dd267e2ae0592ed1e0789df356004 on <strong>merger_path_A_B</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>

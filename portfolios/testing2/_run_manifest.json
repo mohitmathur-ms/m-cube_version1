@@ -1,0 +1,174 @@
+{
+  "today": "18_june_2026",
+  "cases": [
+    {
+      "name": "OT-01_market_exit",
+      "label": "OT-01_market_exit",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_OT-01_market_exit_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 17.7
+    },
+    {
+      "name": "OT-02_limit_exit_blocked",
+      "label": "OT-02_limit_exit_blocked",
+      "runnable": false,
+      "rejected": true,
+      "reject_msg": "Exit Order Type 'Limit' is not implemented in the backtest engine \u2014 only MARKET exits are supported (spec \u00a78.1).",
+      "orderbook": null
+    },
+    {
+      "name": "OT-03_sl_limit_blocked",
+      "label": "OT-03_sl_limit_blocked",
+      "runnable": false,
+      "rejected": true,
+      "reject_msg": "Exit Order Type 'SL_Limit' is not implemented in the backtest engine \u2014 only MARKET exits are supported (spec \u00a78.1).",
+      "orderbook": null
+    },
+    {
+      "name": "OT-04_stop_loss_market",
+      "label": "OT-04_stop_loss_market",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_OT-04_stop_loss_market_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.8
+    },
+    {
+      "name": "OT-05_good_till_triggered",
+      "label": "OT-05_good_till_triggered",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_OT-05_good_till_triggered_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 18.9
+    },
+    {
+      "name": "OT-06_good_till_cancelled",
+      "label": "OT-06_good_till_cancelled",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_OT-06_good_till_cancelled_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 18.4
+    },
+    {
+      "name": "VP-01_long_sl_pct",
+      "label": "VP-01_long_sl_pct",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-01_long_sl_pct_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 20.8
+    },
+    {
+      "name": "VP-02_long_tgt_pct",
+      "label": "VP-02_long_tgt_pct",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-02_long_tgt_pct_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 19.2
+    },
+    {
+      "name": "VP-03_sl_and_tgt",
+      "label": "VP-03_sl_and_tgt",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-03_sl_and_tgt_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 18.7
+    },
+    {
+      "name": "VP-04_short_sl_tgt",
+      "label": "VP-04_short_sl_tgt",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-04_short_sl_tgt_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.9
+    },
+    {
+      "name": "VP-05_trailing_sl",
+      "label": "VP-05_trailing_sl",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-05_trailing_sl_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.6
+    },
+    {
+      "name": "VP-06_atr_sl",
+      "label": "VP-06_atr_sl",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-06_atr_sl_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.7
+    },
+    {
+      "name": "VP-07_sl_wait",
+      "label": "VP-07_sl_wait",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-07_sl_wait_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.7
+    },
+    {
+      "name": "VP-08_action_reexecute",
+      "label": "VP-08_action_reexecute",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-08_action_reexecute_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.8
+    },
+    {
+      "name": "VP-09_action_reverse",
+      "label": "VP-09_action_reverse",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-09_action_reverse_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.8
+    },
+    {
+      "name": "VP-10_pf_combined_plus_leg",
+      "label": "VP-10_pf_combined_plus_leg",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-10_pf_combined_plus_leg_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 35.9
+    },
+    {
+      "name": "VP-11_zero_disabled_no_exit",
+      "label": "VP-11_zero_disabled_no_exit",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-11_zero_disabled_no_exit_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 16.6
+    },
+    {
+      "name": "VP-12_zero_value_pct_flaw",
+      "label": "VP-12_zero_value_pct_flaw",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": "reports/testing2/order_book_portfolio_VP-12_zero_value_pct_flaw_18_june_2026.csv",
+      "status": 200,
+      "elapsed": 15.8
+    },
+    {
+      "name": "_run_manifest.json",
+      "label": "_run_manifest.json",
+      "runnable": true,
+      "rejected": false,
+      "orderbook": null,
+      "status": 200,
+      "elapsed": 0.0
+    }
+  ]
+}

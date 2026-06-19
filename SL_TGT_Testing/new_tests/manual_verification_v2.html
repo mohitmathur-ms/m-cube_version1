@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Verification v2 — SL/Target Features + Order Types</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9; --blue-bg:#ddf4ff; --purple:#8250df; --purple-bg:#fbefff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1080px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#8250df 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:23px; }
+  header.cover p { margin:0; font-size:14px; opacity:.93; }
+  h2 { font-size:19px; margin-top:34px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  h3 { font-size:15px; margin-top:20px; }
+  h3 .tag { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:4px; margin-right:6px; vertical-align:middle; }
+  .tagVP { background:var(--blue-bg); color:var(--accent); } .tagOT { background:var(--purple-bg); color:var(--purple); } .tagZ { background:var(--amber-bg); color:var(--amber); }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12px; background:#f6f8fa; padding:1px 5px; border-radius:3px; color:#d63384; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .callout.warn { background:var(--amber-bg); border-left-color:var(--amber); } .callout.warn strong { color:var(--amber); }
+  .callout.flaw { background:var(--red-bg); border-left-color:var(--red); } .callout.flaw strong { color:var(--red); }
+  .callout.ok { background:var(--green-bg); border-left-color:var(--green); } .callout.ok strong { color:var(--green); }
+  ol.steps { padding-left:22px; font-size:14px; } ol.steps li { margin:7px 0; }
+  ul { font-size:14px; } ul li { margin:4px 0; }
+  .green { color:var(--green); font-weight:600; } .red { color:var(--red); font-weight:600; }
+  .case { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:4px 16px 12px; margin:14px 0; }
+  .case h3 { margin-top:12px; }
+  .kv { font-size:13px; } .kv b { color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:10px; }
+  .pill.run { background:var(--green-bg); color:var(--green); } .pill.rej { background:var(--red-bg); color:var(--red); } .pill.doc { background:var(--amber-bg); color:var(--amber); }
+  .toc { columns:2; font-size:13.5px; } .toc a { color:var(--accent); text-decoration:none; } .toc a:hover { text-decoration:underline; }
+  .formula { background:#0d1117; color:#e6edf3; padding:10px 14px; border-radius:6px; font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12.5px; overflow-x:auto; }
+  .formula .c { color:#7ee787; } .formula .n { color:#79c0ff; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Manual Verification v2 — SL/Target Features &amp; Order Types (MIS · Indian Market)</h1>
+  <p>Indian-market framing: <strong>MIS</strong> trade type, NIFTY session <strong>09:15–15:30 IST</strong>, hard square-off at the <strong>NSE close 15:29 IST</strong> (fires every session). Fire at the open · let the FEATURE decide the intraday exit · prove the <strong>time</strong> and <strong>price</strong> match the asset data — by hand, against the order book. Companion to <code>portfolios/testing2/</code>.</p>
+</header>
+
+<div class="callout"><strong>Principle.</strong> For every trade you re-derive the expected SL/Target <em>level</em>, the expected <em>trigger second</em>, and the expected <em>fill</em> from the order book's <strong>own</strong> logged fill + bar data + config — never from what the engine claims. The two must agree to the tick / to the second. Attach a screenshot for each.</div>
+
+<h2 id="toc">Contents</h2>
+<div class="toc">
+  <p><a href="#how">0 · How this set works (3 engine facts)</a></p>
+  <p><a href="#loop">1 · The 3-axis loop + worked example</a></p>
+  <p><a href="#realism">1b · The expanded axes — execution realism (6 caveats)</a></p>
+  <p><a href="#nosq">2 · MIS + 15:29 IST square-off (NSE close)</a></p>
+  <p><a href="#vp">3 · Verification cases VP-01 … VP-12</a></p>
+  <p><a href="#zero">4 · Zero-value deep dive</a></p>
+  <p><a href="#ot">5 · Order types (live-market) OT-01 … OT-06</a></p>
+  <p><a href="#shot">6 · Screenshot checklist</a></p>
+  <p><a href="#sheet">7 · Pass / fail recording sheet</a></p>
+</div>
+
+<h2 id="how">0 · How this set works — three engine facts everything rests on</h2>
+<p>All verified against <code>core/managed_strategy.py</code> + <code>core/backtest_runner/</code> for this build (nautilus_trader 1.224.0, default Path&nbsp;A, no <code>LatencyModel</code>):</p>
+<table>
+  <thead><tr><th>Fact</th><th>What actually happens</th><th>Your "expected" value</th></tr></thead>
+  <tbody>
+    <tr><td><b>Entry fill price</b></td><td>The EMA signal fires on a (composite) bar; the entry is a <strong>MARKET / GTC</strong> order (<code>_submit_order</code>). With no latency model it fills at <strong>that signal bar's CLOSE</strong> — not the next bar's open.</td><td>signal-bar close</td></tr>
+    <tr><td><b>SL / Target exit fill</b></td><td>When <code>low ≤ SL</code> (long) the engine does <strong>not</strong> fill at the SL level — it submits a reduce-only <strong>MARKET</strong> close (<code>close_all_positions</code>), which fills at the <strong>trigger bar's CLOSE</strong>.</td><td>trigger-bar close (≠ the level)</td></tr>
+    <tr><td><b>MIS square-off timing</b></td><td>Fires on the first bar whose <strong>local (IST) time ≥ the cutoff minute</strong>, and runs <em>before</em> SL/TP (outer envelope). At <strong>15:29 IST</strong> it fires on the closing-minute bar (15:29:00–15:29:59) <strong>every session</strong> — any open position is force-closed (reason <code>squareoff</code>), re-entry blocked until next session. (A literal 15:30:00 would be dormant — the data's last bar is 15:29:59.)</td><td>square-off exit at 15:29 IST each day</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><strong>Trigger ≠ fill.</strong> The SL/Target <em>level</em> decides <em>when</em> (the trigger bar); the realised <em>fill</em> is that bar's close. Always check <strong>both</strong> and expect them to differ. The optional <code>vwap_exit_fill</code> / <code>directional_close_fill</code> repricers are <strong>OFF</strong> in every <code>testing2/</code> file, so this base behaviour is what you test.</div>
+
+<h2 id="loop">1 · The 3-axis verification loop + worked example</h2>
+<p>Run the portfolio → export the <strong>order book</strong> (fills, exits, reasons, per-bar <code>current_sl</code>) → for every row run:</p>
+<table>
+  <thead><tr><th>Axis</th><th>The check</th></tr></thead>
+  <tbody>
+    <tr><td><b>A · TIME</b></td><td>From the logged bar data, find the <em>first</em> bar the trigger condition is true. The event's second must equal that bar — not earlier (look-ahead), not later (lag) — unless a Wait/Safety delay applies. If several levels fire the same bar, precedence is <strong>User → Portfolio → Leg</strong>.</td></tr>
+    <tr><td><b>B · LOGIC</b></td><td>The <code>reason</code> matches the condition actually true (SL only if price reached SL). The correct action dispatched. Exactly one outcome where only one is valid (never both SL &amp; Target same trade). Guards held (trail only-tightens, re-exec count capped).</td></tr>
+    <tr><td><b>C · PRICE</b></td><td>Recompute the level from <code>entry_price</code> + config, tick-snap to <strong>0.01</strong>; the logged <code>current_sl</code>/<code>current_tp</code> must equal it. The fill must match the fill model (§0). PnL = <code>(exit − entry) × multiplier × lots</code> ties to <code>leg_pnl</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3>Worked example (real data) — VP-01, long SL 0.5%</h3>
+<p>NIFTY spot, 2026-03-02, session opens <strong>03:45:00 UTC (09:15 IST)</strong>; the open second prints O 24741.00 / H 24747.80 / L 24645.10 / C 24722.00. Say the first bullish EMA cross of the session enters long, filling at the signal bar's close <code>F = 24722.00</code>:</p>
+<div class="formula">
+expected_sl = round( F × (1 − 0.5/100) , tick 0.01 )<br>
+            = round( <span class="n">24722.00</span> × <span class="n">0.995</span> , 0.01 ) = <span class="c">24598.39</span>
+</div>
+<table>
+  <thead><tr><th>Axis</th><th>What to confirm</th></tr></thead>
+  <tbody>
+    <tr><td>TIME</td><td>SL exit second = the <em>first</em> second-bar where <code>low ≤ 24598.39</code>. Nothing fired before it.</td></tr>
+    <tr><td>LOGIC</td><td><code>reason = SL</code>; leg ACTIVE → CLOSED; no Target on this file.</td></tr>
+    <tr><td>PRICE</td><td>Logged <code>current_sl == 24598.39</code> to the tick. Realised exit fill = the trigger bar's <strong>close</strong> (record it; it will sit at/just below 24598.39, not exactly on it). PnL = <code>(fill − 24722.00) × 1 × 1</code>.</td></tr>
+  </tbody>
+</table>
+<div class="callout"><strong>The brief's "entered at 100 → SL at 95 (5%)" rule</strong> is exactly this, scaled: replace <code>F=24722</code>, <code>0.5%</code> with your fill and pct. The point is you can compute the SL the moment you read the fill, then watch the chart for the bar that touches it.</div>
+
+<h2 id="realism">1b · The expanded axes — execution realism (the 6 caveats)</h2>
+<div class="callout flaw"><strong>What the 3 axes do NOT prove.</strong> Time·Logic·Price proves the SL/Target <em>level</em> is right, trips on the right second, and that the fill equals the trigger bar's close. It does <strong>not</strong> prove the fill is <em>realistic</em>. In particular: <strong>a stop is triggered using the bar's high/low, but the trade is filled at that same bar's CLOSE</strong> — which can give unrealistically good exits and inflate performance. The cases below now carry a second, <strong>diagnostic</strong> tier covering six caveats the 3-axis loop missed. These quantify behaviour per trade; they do <em>not</em> flip a Time·Logic·Price verdict, because every one is <strong>documented base-engine behaviour</strong>, not a bug.</div>
+<table>
+  <thead><tr><th>Axis</th><th>The caveat</th><th>How it's checked / quantified</th></tr></thead>
+  <tbody>
+    <tr><td><b>D · Entry correctness</b></td><td>The MARKET entry must fill at the EMA <em>signal bar's close</em> — not the next bar's open (which would be look-ahead). No latency, no slippage on entry either.</td><td>Reconcile <code>ENTRY PRICE</code> against the bar feed at the entry second; confirm entries are MARKET/GTC fired on the signal bar.</td></tr>
+    <tr><td><b>E · Realistic fills</b></td><td>The reduce-only MARKET exit fills at the <strong>trigger bar's close</strong>, NOT at the SL/Target level. <strong>Trigger ≠ fill.</strong></td><td>Per trade, the <code>Δ fill−lvl</code> column = the gap between the close-fill and the level. (This is the Price axis, now reported as a signed realism number.)</td></tr>
+    <tr><td><b>F · Slippage</b></td><td>The default <code>FillModel</code> applies <strong>zero</strong> slippage (<code>prob_slippage=0.0</code>). Real fills would be at least a tick worse.</td><td>Reported as an engine fact + a conservative <strong>1-tick-per-exit</strong> P&amp;L haircut so you can see the order of magnitude removed.</td></tr>
+    <tr><td><b>G · Gap behaviour</b></td><td>When a bar <em>opens</em> already past the level (an intraday gap, or an overnight hold gapping at the next open) the close-fill can land far from the level. m-cube's manual market exit <strong>bypasses</strong> Nautilus' gap-aware native-stop fill (which would fill a stop at the trigger on a smooth move-through, or at the gapped open on a gap).</td><td>A <code>↑gap</code> marker per trade where the trigger bar opened past the level + a count of gap-through and cross-session holds. Large gaps (esp. overnight) are flagged.</td></tr>
+    <tr><td><b>H · Intrabar ordering</b></td><td>Inside one bar the engine walks a <strong>fixed Open→High→Low→Close</strong> path (<code>bar_adaptive_high_low_ordering</code> defaults OFF) and checks SL before TP. So if a single bar's range spans both an SL and a Target, the <strong>SL wins</strong>.</td><td>Dual-level files (VP-03/04, OT-05): a count of genuine same-bar SL+Target collisions where the SL correctly took precedence.</td></tr>
+    <tr><td><b>I · P&amp;L realism</b></td><td>The headline caveat — the inflation/deflation from filling at the close instead of the level. A favourable close-fill (price recovered past the stop within the bar) makes the exit look better than the stop; an adverse gap makes it worse.</td><td>A <strong>fill-at-level counterfactual</strong>: re-price every level exit AT its level (= what a native move-through stop would give) and report the net P&amp;L inflation per case and overall. Favourable fills are the "unrealistically good exits" the brief warns about.</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><strong>Read the new columns this way.</strong> A <span style="color:#9a6700;font-weight:700">+Δ favourable</span> fill INFLATES the result (the close beat the stop) — that is the realism risk, even though Time·Logic·Price still PASS. A <span style="color:#cf222e;font-weight:700">−Δ adverse</span> fill (often <code>↑gap</code>, often a cross-session hold) shows the close-fill cutting the other way. Net P&amp;L inflation across all level exits is the single number to watch: it is how much the bar-close fill model flattered (or hurt) the backtest vs a fill-at-the-stop model. For tick-accurate fills the engine docs recommend quote/trade data instead of bars — this set runs on 1-second bars, the finest available here.</div>
+<div class="callout"><strong>Engine facts (NautilusTrader 1.224.0, verified via the ntm3 docs + <code>core/managed_strategy.py</code>):</strong> intrabar path is fixed <code>O→H→L→C</code>; a MARKET order submitted in <code>on_bar</code> with no <code>LatencyModel</code> fills at the <strong>current bar's close</strong> (not next-bar-open); the default FillModel applies <strong>no slippage</strong>; native gap-aware stop fills are <strong>bypassed</strong> by m-cube's manual market-on-breach exit, so those exits fill at the close regardless of where the bar opened.</div>
+
+<h2 id="nosq">2 · MIS trade type + 15:29 IST hard square-off (NSE close)</h2>
+<p>Every <code>testing2/</code> portfolio is <code>product="MIS"</code> (intraday trade type) with a <strong>hard square-off at the NSE close, 15:29 IST</strong> (<code>squareoff_time="15:29:00"</code>, <code>squareoff_tz="Asia/Kolkata"</code>). The NIFTY session is <strong>09:15–15:30 IST</strong> (= 03:45–10:00 UTC). The intra-day entry window is left <strong>open</strong> (the session already bounds the data), so the feature can exit any time within the session — and the square-off is the daily outer envelope.</p>
+<div class="callout"><strong>The square-off FIRES every session.</strong> Any position still open at <strong>15:29 IST</strong> is force-closed (reason <code>squareoff</code>) on the first 15:29 bar, <strong>re-entry blocked until the next session</strong>. The check runs <em>before</em> SL/TP, so on a bar where both would trigger the <strong>square-off wins</strong> (outer envelope). A position the feature never exits is squared off daily at the close — not carried overnight.</div>
+<div class="callout warn"><strong>Why 15:29 and not 15:30.</strong> The square-off fires when a bar's IST minute ≥ the cutoff minute. The NSE close is 15:30 IST, but this 1-second feed's last bar each day is <strong>15:29:59 IST</strong> (minute 29) — a literal <code>15:30:00</code> cutoff (minute 30) would never be reached and would be <strong>dormant</strong> (the same reason the earlier 23:59 never fired). <code>15:29:00</code> lands on the closing-minute bars (15:29:00–15:29:59), firing at the session close as intended. Only a position opened on the <em>final</em> session and not yet at 15:29 is flattened by <code>on_stop</code> at the backtest data end (m-cube's own close; Nautilus does not auto-flatten).</div>
+<p>This surfaces flaws — both the feature and the daily square-off are checkable:</p>
+<ul>
+  <li>A position that <em>should</em> have exited on its SL/Target intraday but didn't → the feature is broken (the square-off would still catch it at 15:29, but the feature exit is missing/late).</li>
+  <li>A square-off that fires at the wrong time or doesn't block re-entry → visible on VP-11 (which has no feature, so the only exits are the daily square-offs).</li>
+</ul>
+<div class="callout"><strong>Changing the cutoff:</strong> edit <code>squareoff_time</code> / <code>squareoff_tz</code> in <code>_generate_portfolios.py</code> and re-run — e.g. <code>15:20:00</code> for an earlier intraday auto-square-off, or a post-session time to make it dormant. If you reload data whose last bar is exactly 15:30:00 IST, use <code>15:30:00</code> to match.</div>
+
+<h2 id="vp">3 · Verification cases — SL/Target features</h2>
+<p>One feature per file (EMA 9/21 entry, NIFTY 1-sec feed + 5-min composite, 2026-03-02 → 2026-03-20, <strong>product MIS</strong>, 15:29 IST square-off fires every session). <span class="pill run">RUN</span> = runnable.</p>
+<table>
+  <thead><tr><th>ID</th><th>Feature</th><th>Config delta</th><th>Verify</th></tr></thead>
+  <tbody>
+    <tr><td>VP-01</td><td>Leg SL % (long)</td><td><code>stop_loss_type=percentage, value=0.5</code></td><td>SL = F×0.995; trigger = first low≤SL; fill = trigger close</td></tr>
+    <tr><td>VP-02</td><td>Leg Target % (long)</td><td><code>target_type=percentage, value=0.5</code></td><td>TGT = F×1.005; trigger = first high≥TGT</td></tr>
+    <tr><td>VP-03</td><td>SL <b>and</b> Target</td><td>SL 0.3% + TGT 0.5%</td><td>which fired &amp; when; SL checked before TP; never both</td></tr>
+    <tr><td>VP-04</td><td>Short side SL+TGT</td><td>SL 0.4% + TGT 0.6%</td><td>SL above / TGT below entry; pick SHORT trades</td></tr>
+    <tr><td>VP-05</td><td>Trailing SL</td><td>SL 0.5%, <code>step 0.2, offset 0.1</code></td><td>SL only tightens; ratchet on the step-crossing bar</td></tr>
+    <tr><td>VP-06</td><td>ATR SL</td><td><code>atr, period 14, mult 2.0</code></td><td>SL = F − 2×ATR@entry; warm-up arms no SL</td></tr>
+    <tr><td>VP-07</td><td>SL Wait</td><td>SL 0.4%, <code>sl_wait_bars 3</code></td><td>exit = trigger + 3 bars; clears on recovery</td></tr>
+    <tr><td>VP-08</td><td>On-SL Re-Execute</td><td>SL 0.3%, <code>re_execute, count 2</code></td><td>max 3 entries; 4th suppressed</td></tr>
+    <tr><td>VP-09</td><td>On-SL Reverse</td><td>SL 0.3%, <code>reverse</code></td><td>side flips; fresh SL off new fill</td></tr>
+    <tr><td>VP-10</td><td>Portfolio SL + leg SL</td><td>2 legs SL 0.5% + <code>Combined Loss 250</code></td><td>portfolio sqoff first; both legs same bar</td></tr>
+    <tr><td>VP-11</td><td>Zero / disabled + MIS sqoff</td><td><code>type=none</code> both</td><td>NO SL/Target exit; only the daily 15:29 IST square-off closes it</td></tr>
+    <tr><td>VP-12</td><td>Zero-value flaw</td><td><code>percentage value=0</code> both</td><td>level lands on entry → ~instant exit</td></tr>
+  </tbody>
+</table>
+
+<div class="case">
+  <h3><span class="tag tagVP">VP-03</span>Multiple conditions — which one stopped the trade, and when? <span class="pill run">RUN</span></h3>
+  <p class="kv"><b>Why it matters (brief):</b> "if testing for multiple conditions — which condition caused the feature stop and at what time." SL 0.3% sits below entry, Target 0.5% above. For each trade:</p>
+  <ol class="steps">
+    <li>Compute <code>SL = F×0.997</code> and <code>TGT = F×1.005</code> (tick 0.01).</li>
+    <li>Scan bars after entry: note the first second <code>low ≤ SL</code> and the first second <code>high ≥ TGT</code>.</li>
+    <li>The earlier one should be the exit. <strong>Same-bar collision:</strong> the engine checks SL before TP, so if one bar's range spans both levels the <code>reason</code> must be <code>SL</code>.</li>
+    <li>Confirm <strong>never both</strong> fire on one trade, and the <code>reason</code> matches your earlier-touch finding.</li>
+  </ol>
+</div>
+
+<div class="case">
+  <h3><span class="tag tagVP">VP-10</span>Precedence — leg SL vs portfolio Combined Loss <span class="pill run">RUN</span></h3>
+  <p class="kv">2 legs (EMA 9/21 + 5/13), each leg SL 0.5%, plus portfolio <code>Combined Loss = 250</code>. On a drawdown that trips both: the <strong>portfolio</strong> sqoff (reason <code>PORTFOLIO_LOSS</code>) should flatten <strong>both</strong> legs on the same bar, <em>before</em> the individual leg SLs would. Record, per exit row, which level caused it and the second. <b>Pass:</b> portfolio precedes leg; both legs close together.</p>
+</div>
+
+<div class="case">
+  <h3><span class="tag tagVP">VP-05 · VP-06 · VP-07</span>Dynamic features — walk per-bar state</h3>
+  <ul>
+    <li><b>VP-05 Trailing SL:</b> log <code>current_sl</code> every bar. It must only <em>tighten</em> (long: never decrease). Each ratchet lands on the bar profit crosses the next step (0.2), by the offset (0.1). A stale or loosening SL is a red.</li>
+    <li><b>VP-06 ATR SL:</b> read the logged <code>ATR-at-entry</code>; <code>SL = F − 2.0×ATR</code> snapped. Warm-up trades (first ~14 bars, ATR not initialised) must arm <strong>no</strong> SL and carry — confirm they don't exit on a phantom level.</li>
+    <li><b>VP-07 SL Wait:</b> on the first <code>low ≤ SL</code> the exit is held; it fires only at trigger + 3 bars. If a bar inside the wait prints <code>low &gt; SL</code> the wait <strong>clears</strong> and there's no exit. Verify both the delayed-exit and the cleared path.</li>
+  </ul>
+</div>
+
+<h2 id="zero">4 · Zero-value deep dive — "what if SL and TP are 0?"</h2>
+<p>The brief asks this explicitly. The answer depends on the <strong>type</strong>, and the two cases are split into VP-11 vs VP-12 so you can see the difference:</p>
+<table>
+  <thead><tr><th>Case</th><th>Config</th><th>Computed level</th><th>Behaviour</th></tr></thead>
+  <tbody>
+    <tr><td><b>VP-11</b></td><td><code>stop_loss_type="none"</code><br><code>target_type="none"</code></td><td><code>current_sl=0</code>, <code>current_tp=0</code> → the <code>&gt; 0</code> gate <strong>skips</strong> them</td><td><span class="green">Feature DISABLED.</span> No SL/Target exit; the only exits are the <strong>daily 15:29 IST MIS square-off</strong> (one per session, re-entry next day).</td></tr>
+    <tr><td><b>VP-12</b></td><td><code>stop_loss_type="percentage", value=0</code><br><code>target_type="percentage", value=0</code></td><td><code>SL = F×(1−0) = F</code><br><code>TGT = F×(1+0) = F</code> → both <strong>on the entry</strong></td><td><span class="red">Arms AT entry.</span> SL (checked first) fires on the first <code>low ≤ entry</code> → ~immediate breakeven exit.</td></tr>
+  </tbody>
+</table>
+<div class="callout flaw"><strong>Flaw to flag:</strong> a <code>value = 0</code> with a real <em>type</em> does <strong>not</strong> disable the feature — it places the level exactly on the entry price, forcing a near-instant exit. Arguably a 0 value should be treated as "off" (like <code>type="none"</code>). VP-12 is the probe that demonstrates this; capture the orderbook showing entry and exit on the same/adjacent second at ~0 PnL.</div>
+
+<h2 id="ot">5 · Order types — live-market verification</h2>
+<div class="callout warn"><strong>Engine reality.</strong> <code>core/managed_strategy.py</code> submits <strong>only MARKET / GTC</strong> orders for entries and exits. Limit / Stop-Limit exits are <strong>not wired</strong> — they are blocked at save (<code>server._validate_portfolio_sl</code> → HTTP 400). "Good till triggered" is not even a Nautilus time-in-force. So the order-type tests are: one real fill-verification (market), two rejection tests, and three documented mappings.</div>
+
+<h3>Nautilus 1.224.0 order-type map (from the ntm3 docs)</h3>
+<table>
+  <thead><tr><th>Desk term</th><th>Nautilus type / param</th><th>In this backtest</th></tr></thead>
+  <tbody>
+    <tr><td>Market order</td><td><code>MarketOrder</code> (no price/trigger)</td><td><span class="pill run">wired</span> — fills at bar close (no latency)</td></tr>
+    <tr><td>Limit order</td><td><code>LimitOrder(price=…)</code></td><td><span class="pill rej">blocked at save</span> (live-only)</td></tr>
+    <tr><td>Stop-loss (market)</td><td><code>StopMarketOrder(trigger_price=…)</code></td><td><span class="pill doc">emulated</span> by the SL feature → market close</td></tr>
+    <tr><td>Stop-loss (limit)</td><td><code>StopLimitOrder(trigger_price, price)</code></td><td><span class="pill rej">blocked at save</span> (can miss on a gap)</td></tr>
+    <tr><td>Good-till-triggered (GTT)</td><td><em>not a TIF</em> — conditional trigger + <code>GTC</code></td><td><span class="pill doc">emulated</span> by per-bar level monitoring</td></tr>
+    <tr><td>Good-till-cancelled</td><td><code>TimeInForce.GTC</code> (the default)</td><td><span class="pill run">default on every order</span></td></tr>
+  </tbody>
+</table>
+<p class="kv"><b>Time-in-force values that exist:</b> <code>GTC</code>, <code>IOC</code>, <code>FOK</code>, <code>GTD</code>, <code>DAY</code>, <code>AT_THE_OPEN</code>, <code>AT_THE_CLOSE</code>. There is <strong>no</strong> <code>GTT</code>. "Good till cancelled" = <code>GTC</code>.</p>
+
+<div class="case">
+  <h3><span class="tag tagOT">OT-01</span>Market order — expected vs ACTUAL fill <span class="pill run">RUN</span></h3>
+  <p class="kv"><b>The brief's live test:</b> "fire at market expecting price X — when/at what price did it actually execute?" Procedure:</p>
+  <ol class="steps">
+    <li>Find the EMA signal bar. Your <strong>expected</strong> entry price = that bar's <strong>close</strong> (record it / screenshot).</li>
+    <li>Read the entry's <code>OrderFilled.last_px</code> and <code>ts_event</code> from the order book.</li>
+    <li>Confirm <code>last_px == signal-bar close</code> and <code>ts_event</code> = that bar's timestamp. With <strong>no LatencyModel</strong> there is <em>no</em> delay; if you ever add latency, the fill moves to the <em>next</em> bar's close — note which regime you ran.</li>
+    <li>Repeat for the SL exit (0.5%): expected fill = trigger-bar close.</li>
+  </ol>
+  <div class="callout">If the actual fill differs from the signal-bar close, the culprits to check (in order): a configured <code>LatencyModel</code>, a non-default <code>FillModel</code> (slippage), or <code>bar_adaptive_high_low_ordering</code> changing intrabar sequencing. All are <strong>off/default</strong> in this build.</div>
+</div>
+
+<div class="case">
+  <h3><span class="tag tagOT">OT-02 · OT-03</span>Limit &amp; Stop-Limit — rejection tests <span class="pill rej">MUST 400</span></h3>
+  <p class="kv">Load each file and attempt to <strong>save</strong> it. Expected: HTTP <strong>400</strong> with <em>"Exit Order Type '…' is not implemented in the backtest engine — only MARKET exits are supported (spec §8.1)."</em> These are negative tests: the file is the fixture, the rejection is the pass. (Verified: OT-02 <code>Limit</code> and OT-03 <code>SL_Limit</code> are the only two of the 18 that fail save-validation.)</p>
+</div>
+
+<div class="case">
+  <h3><span class="tag tagOT">OT-04 · OT-05 · OT-06</span>Stop-Market · GTT · GTC <span class="pill run">RUN</span></h3>
+  <ul>
+    <li><b>OT-04 Stop-loss (market):</b> the SL feature <em>is</em> a stop-market — watch the level, fire a market close on touch. Same verification as VP-01 (trigger second = first low≤SL; fill = trigger-bar close).</li>
+    <li><b>OT-05 Good-till-triggered:</b> SL 0.4% + Target 0.6% act as two resting triggers. The engine has no native conditional order; it <em>emulates</em> "rest until triggered" by monitoring each bar. Verify each fires on the first bar its level is touched, and not before.</li>
+    <li><b>OT-06 Good-till-cancelled:</b> no SL/Target. Every order is <code>GTC</code> by default; the entry holds intraday until the opposite EMA signal flips ("cancels") it <em>or</em> the 15:29 IST MIS square-off force-closes it at the session close. Verify the order <strong>never expires on its own</strong> (no GTD/DAY expiry) — it ends only by signal-flip or the daily square-off.</li>
+  </ul>
+</div>
+
+<h2 id="shot">6 · Screenshot checklist (per trade)</h2>
+<p>The brief asks for a screenshot at each step. Capture and file under the case ID:</p>
+<ol class="steps">
+  <li><b>Entry shot:</b> the chart at the signal bar with your computed SL/Target drawn on, + the orderbook entry row (<code>last_px</code>, <code>ts_event</code>).</li>
+  <li><b>Trigger shot:</b> the bar where <code>low ≤ SL</code> / <code>high ≥ Target</code> — show the wick touching your level + the bar's timestamp.</li>
+  <li><b>Exit shot:</b> the orderbook exit row (<code>reason</code>, <code>current_sl</code>, fill, <code>leg_pnl</code>).</li>
+  <li><b>Dynamic features (VP-05/06/07/10):</b> a shot of the per-bar <code>current_sl</code> column at each ratchet / the wait window / the portfolio sqoff bar.</li>
+</ol>
+
+<h2 id="sheet">7 · Pass / fail recording sheet</h2>
+<p>The first three axes are the PASS/FAIL verdict; the last four (D–I, grouped) are the diagnostic realism tier — record the numbers, they don't fail the case but they tell you how realistic the result is.</p>
+<table>
+  <thead><tr><th>Case</th><th>Trade #</th><th>A · Time</th><th>B · Logic</th><th>C · Price</th><th>Δ fill−lvl (E)</th><th>Gap? (G)</th><th>P&amp;L infl. (I)</th><th>Screenshot</th><th>Notes / red detail</th></tr></thead>
+  <tbody>
+    <tr><td>VP-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>VP-02</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>VP-03</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>…</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>OT-01</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>OT-02</td><td>save</td><td colspan="7">expect HTTP 400 — rejected ☐</td><td></td></tr>
+    <tr><td>OT-03</td><td>save</td><td colspan="7">expect HTTP 400 — rejected ☐</td><td></td></tr>
+  </tbody>
+</table>
+<div class="callout ok"><strong>Done means:</strong> every trade in every runnable file passes A/B/C to the tick and to the second; the two rejection files 400 on save; VP-11 shows zero SL/Target exits and one MIS square-off per session at 15:29 IST; VP-12 shows the at-entry near-instant exit; and each row carries a screenshot. <strong>And the realism tier (D–I) is recorded:</strong> the Δ fill−lvl, any gap/cross-session holds, and the net P&amp;L inflation (close-fill vs fill-at-level) — so the reader knows how much the bar-close fill model flattered the result, on top of zero slippage. Reds carry the offending trade + bar for the dev team; large favourable Δ or large adverse gaps are flagged even when A/B/C pass.</div>
+
+<p style="margin-top:30px;font-size:12px;color:var(--muted)">Generated 2026-06-16 · portfolios in <code>portfolios/testing2/</code> (regenerate via <code>_generate_portfolios.py</code>) · catalog: NIFTY 1-sec spot, tick 0.01, window 2026-03-02 → 2026-03-20 · <strong>product MIS, square-off 15:29 IST / NSE close (Asia/Kolkata, fires every session; 15:30 would be dormant as the data's last bar is 15:29:59), session 09:15–15:30 IST</strong> · engine + square-off/end-of-data facts verified against <code>core/managed_strategy.py</code> (on_stop flatten), order-type &amp; session/timezone details from the ntm3 NautilusTrader docs.</p>
+
+</div>
+</body>
+</html>
