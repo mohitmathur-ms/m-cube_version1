@@ -121,7 +121,22 @@
       "Bash(venv/Scripts/python.exe -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('config_loaded:',d.get\\('config_loaded'\\),'| summary:',d['summary']\\);print\\('realism:',d['realism']\\)\")",
       "Bash(venv/Scripts/python.exe -c \"import importlib.util as u; print\\('playwright:', bool\\(u.find_spec\\('playwright'\\)\\)\\); print\\('selenium:', bool\\(u.find_spec\\('selenium'\\)\\)\\)\")",
       "Bash(venv/Scripts/python.exe -m playwright install chromium)",
-      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe /tmp/vv_drive.py)"
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe /tmp/vv_drive.py)",
+      "PowerShell(venv\\\\Scripts\\\\python.exe -c \"import pandas as pd; df=pd.read_parquet\\(r'catalog/data/bar/NIFTY_SPOT_YYYYINR.NIFTY_FUTURES_MS-1-SECOND-LAST-EXTERNAL/2026-03-02T03-45-00-000000000Z_2026-05-22T09-59-59-000000000Z.parquet'\\); print\\(df.shape\\); print\\(df.columns.tolist\\(\\)\\); print\\(df.head\\(3\\)\\); print\\('close min/max', df['close'].min\\(\\)/1e9 if df['close'].dtype=='int64' else df['close'].min\\(\\), df['close'].max\\(\\)\\)\")",
+      "PowerShell(venv\\\\Scripts\\\\python.exe -c \"import pandas as pd; df=pd.read_parquet\\(r'catalog/data/currency_pair/NIFTY_SPOT_YYYYINR.NIFTY_FUTURES_MS/1970-01-01T00-00-00-000000000Z_1970-01-01T00-00-00-000000000Z.parquet'\\); print\\(df.T\\)\")",
+      "PowerShell(venv\\\\Scripts\\\\python.exe d:\\\\tmp\\\\check_testing2.py)",
+      "Bash(ls \"d:/m-cube_version1/.claude/skills\" 2>/dev/null; echo \"---GLOBAL---\"; ls \"C:/Users/DELL/.claude/skills\" 2>/dev/null)",
+      "Read(//c/Users/DELL/.claude/**)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\(r'd:/tmp/verify_sl_orderbook.py'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
+      "Bash(venv/Scripts/python.exe d:/tmp/verify_sl_orderbook.py)",
+      "Bash(awk -F, 'NR>1{print $16}' order_book_portfolio_TP_Test_Scenarios_20_june_2026.csv)",
+      "Bash(awk -F, 'NR>1{print $16}' order_book_portfolio_SL_Test_Scenarios_20_june_2026.csv)",
+      "Bash(awk -F, 'NR>1{print $20}' order_book_portfolio_TP_Test_Scenarios_20_june_2026.csv)",
+      "Bash(awk -F, 'NR>1{print $20}' order_book_portfolio_SL_Test_Scenarios_20_june_2026.csv)",
+      "Bash(awk -F'\",\"' 'NR>1' order_book_portfolio_SL_Test_Scenarios_20_june_2026.csv)",
+      "Bash(python d:/tmp/verify_orderbooks.py)",
+      "PowerShell(Start-Process \"d:\\\\m-cube_version1\\\\reports\\\\testing2\\\\orderbook-verification-index.html\")",
+      "Bash(cmd.exe /c start \"\" \"d:\\\\m-cube_version1\\\\reports\\\\testing2\\\\orderbook-verification-index.html\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans",
