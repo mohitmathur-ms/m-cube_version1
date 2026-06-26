@@ -3,7 +3,7 @@
   "description": "Leg-level Stop Loss test matrix: one leg per (SL type x on_sl_action) combination. SL types = percentage / points / trailing / atr (the 'none' type is excluded because it disables SL and cannot represent an SL condition). on_sl_action = close / re_execute / reverse / execute / re_entry / keep_leg_running. 4 x 6 = 24 scenario legs + 1 shared disarmed 'exec_target' leg that the 4 execute legs arm via execute_target_leg_id. PORTFOLIO-LEVEL SL is ON (pf_sl_type='Combined Loss', pf_sl_action='SqOff'): when the combined PnL across all legs breaches pf_sl_value (2% of starting_capital = 6000), EVERY leg in the portfolio is squared off (both sqoff_only_loss_legs and sqoff_only_profit_legs are false, so all legs close, not just losers/winners). Note: '*__keep_leg_running' computes the leg SL but never acts on it (expected) \u00e2\u20ac\u201d the portfolio-level SqOff still closes those legs.",
   "portfolio_tag": null,
   "created_at": "2026-06-20T00:00:00+00:00",
-  "updated_at": "2026-06-20T08:15:39.712438+00:00",
+  "updated_at": "2026-06-22T05:50:41.127985+00:00",
   "starting_capital": 300000,
   "max_loss": null,
   "max_profit": null,

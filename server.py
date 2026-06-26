@@ -242,6 +242,10 @@ def visual_verification_analyze():
     n = len(trades)
     npass = sum(1 for t in trades if t["verdict"] == "PASS")
     nfail = sum(1 for t in trades if t["verdict"] == "FAIL")
+    # Check 1 (Config -> level) roll-up: how many level exits had a statically
+    # recomputable config level, and how many of those matched the logged level.
+    config_checked = sum(1 for t in trades if t.get("config_ok") is not None)
+    config_pass = sum(1 for t in trades if t.get("config_ok") is True)
 
     # Execution-realism roll-up (diagnostic — independent of the PASS/FAIL verdict).
     rl = [t["realism"] for t in trades if t.get("realism")]
@@ -265,7 +269,8 @@ def visual_verification_analyze():
     }
     return jsonify({
         "trades": trades,
-        "summary": {"n": n, "pass": npass, "fail": nfail, "na": n - npass - nfail},
+        "summary": {"n": n, "pass": npass, "fail": nfail, "na": n - npass - nfail,
+                    "config_checked": config_checked, "config_pass": config_pass},
         "realism": realism,
         "bar_type": bar_type, "instrument": instrument,
         "feed_in_catalog": bool(have_bars), "source": source,

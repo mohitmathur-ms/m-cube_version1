@@ -187,6 +187,7 @@ const VisualVerification = {
                 <td class="center">${this._mark(t.time_ok)}</td>
                 <td class="center">${this._mark(t.logic_ok)}</td>
                 <td class="center">${this._mark(t.price_ok)}</td>
+                <td class="center" title="Check 1 — recomputed config level == logged SL/TP">${this._mark(t.config_ok)}</td>
                 <td class="num">${this._deltaCell(t)}</td>
                 <td class="center">${this._mark(t.entry_ok)}</td>
                 <td class="center"><span class="${vcls}">${t.verdict}</span></td>
@@ -208,6 +209,7 @@ const VisualVerification = {
                 <thead><tr>
                     <th>OID</th><th>Side</th><th>Type</th><th>Entry F</th><th>Level</th>
                     <th>Exit (IST)</th><th>First touch</th><th>Time</th><th>Logic</th><th>Price</th>
+                    <th title="Check 1 — recomputed config level (entry × (1±value) / entry ± points) == logged SL/TP">Config</th>
                     <th title="Realised fill minus the level: +favourable (inflates), −adverse; ↑gap = bar opened past the level">Δ fill−lvl</th>
                     <th title="Entry filled at the signal bar's close (no look-ahead)">Entry</th><th>Verdict</th>
                 </tr></thead>
@@ -272,7 +274,8 @@ const VisualVerification = {
               <tbody>
                 <tr><td><b>A · Time</b></td><td>The exit fired on the first bar its level was touched — not earlier (look-ahead), not later (lag), unless a Wait delay applies. PASS/FAIL.</td></tr>
                 <tr><td><b>B · Logic</b></td><td>The exit reason matches the condition actually true; exactly one exit per trade. PASS/FAIL.</td></tr>
-                <tr><td><b>C · Price</b></td><td>The logged level matches the recomputed level, and the fill equals the trigger bar's close. PASS/FAIL.</td></tr>
+                <tr><td><b>C · Price</b></td><td>The trigger bar reached the logged level and the fill equals that bar's close (Check 2). PASS/FAIL.</td></tr>
+                <tr><td><b>Config</b></td><td><b>Check 1</b> — the level recomputed from the leg's JSON config (percentage: entry × (1±value/100); points: entry ± value) equals the engine's logged <code>SL=</code>/<code>TP=</code>. PASS/FAIL when statically recomputable; <code>–</code> for trailing/ATR/Move-SL legs (level moves per bar) or uploaded books with no config. Click a row for the worked Check 1 + Check 2.</td></tr>
                 <tr><td><b>D · Entry correctness</b></td><td>The MARKET entry fills at the signal bar's close (no next-bar-open look-ahead). Diagnostic.</td></tr>
                 <tr><td><b>E · Realistic fills</b></td><td>The reduce-only MARKET exit fills at the trigger bar's <em>close</em>, not at the level — the <code>Δ fill−lvl</code> column. Diagnostic.</td></tr>
                 <tr><td><b>F · Slippage</b></td><td>The default FillModel applies zero slippage; the panel shows a conservative 1-tick-per-exit haircut. Diagnostic.</td></tr>
@@ -282,6 +285,53 @@ const VisualVerification = {
               </tbody>
             </table>
         </details>`;
+    },
+
+    /* ─── Per-row manual-verification recipe (Check 1 + Check 2) ───────────── */
+    _recipePanel(t) {
+        const r = t.recipe;
+        if (!r) return "";
+        const f2 = (v) => (v == null || !isFinite(v)) ? "—" : v.toFixed(2);
+        const lbl = t.kind === "SL" ? "SL" : "TP";
+
+        // Check 1 — Config → level
+        const c1 = r.check1 || {};
+        let c1body;
+        if (c1.ok == null) {
+            c1body = `<span style="color:var(--text-muted)">${App._htmlEscape(c1.note || "not statically recomputable")}</span>`;
+        } else {
+            c1body = `<code>${App._htmlEscape(c1.formula)}</code> &nbsp; ${this._mark(c1.ok)}
+                &nbsp; ${c1.ok ? "equals" : "≠"} logged <b>${lbl}=${f2(c1.logged)}</b>
+                <span class="section-caption">(${App._htmlEscape(c1.type)} ${c1.value != null ? c1.value : ""})</span>`;
+        }
+
+        // Check 2 — level → actual bar
+        const c2 = r.check2 || {};
+        let c2body;
+        if (!c2.ohlc) {
+            c2body = `<span style="color:var(--text-muted)">trigger bar not in catalog — load the feed via <b>Load Data</b> to confirm the breach on the bar.</span>`;
+        } else {
+            const o = c2.ohlc, ex = c2.extreme_label, exv = f2(c2.extreme_val);
+            const cmp = ex === "high" ? "≥" : "≤";
+            const rp = c2.reason_price;
+            const rpLine = rp == null ? ""
+                : ` · reason <code>price=${f2(rp)}</code> = bar ${ex} ${this._mark(c2.reason_price_ok)}`;
+            c2body = `bar @ <b>${t.exit_ist ? t.exit_ist.slice(11) : "—"}</b> &nbsp;
+                O ${f2(o.open)} · H ${f2(o.high)} · L ${f2(o.low)} · C ${f2(o.close)}<br>
+                ${ex} <b>${exv}</b> ${cmp} ${lbl} ${f2(c2.level)} → breach ${this._mark(c2.breach)}${rpLine}<br>
+                AVG EXIT <b>${f2(c2.fill)}</b> = bar close ${f2(c2.bar_close)} ${this._mark(c2.fill_ok)}
+                <span class="section-caption">(the reduce-only MARKET close fills at the trigger bar's close — detect on the adverse extreme, fill at close)</span>`;
+        }
+
+        return `<div class="vv-realism" style="margin:6px 0 12px;border-left-color:#3fb950;">
+            <b>Manual-verification recipe — ${t.side} ${App._htmlEscape(t.kind_label || "")}</b>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
+              <tr><td style="vertical-align:top;padding:6px 10px 6px 0;white-space:nowrap;"><b>Check 1</b><br><span class="section-caption">Config → level</span></td>
+                  <td style="padding:6px 0;">${c1body}</td></tr>
+              <tr><td style="vertical-align:top;padding:6px 10px 6px 0;white-space:nowrap;border-top:1px solid var(--border-subtle,#30363d);"><b>Check 2</b><br><span class="section-caption">level → actual bar</span></td>
+                  <td style="padding:6px 0;border-top:1px solid var(--border-subtle,#30363d);">${c2body}</td></tr>
+            </table>
+        </div>`;
     },
 
     _tradeRealism(t) {
@@ -350,6 +400,7 @@ const VisualVerification = {
             <p class="section-caption" style="margin-top:0;">Entry ${t.entry_ist} @ ${isFinite(t.F) ? t.F.toFixed(2) : "?"} ·
                 level ${t.level != null ? t.level.toFixed(2) : "—"} · exit ${t.exit_ist} @ ${isFinite(t.fill) ? t.fill.toFixed(2) : "?"}
                 (trigger-bar close ${t.trig_close != null ? t.trig_close.toFixed(2) : "—"})</p>
+            ${this._recipePanel(t)}
             ${this._tradeRealism(t)}
             <div id="vv-chart-full" style="height:340px;"></div>
             <div id="vv-chart-zoom" style="height:340px; margin-top:10px;"></div>

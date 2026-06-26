@@ -136,7 +136,16 @@
       "Bash(awk -F'\",\"' 'NR>1' order_book_portfolio_SL_Test_Scenarios_20_june_2026.csv)",
       "Bash(python d:/tmp/verify_orderbooks.py)",
       "PowerShell(Start-Process \"d:\\\\m-cube_version1\\\\reports\\\\testing2\\\\orderbook-verification-index.html\")",
-      "Bash(cmd.exe /c start \"\" \"d:\\\\m-cube_version1\\\\reports\\\\testing2\\\\orderbook-verification-index.html\")"
+      "Bash(cmd.exe /c start \"\" \"d:\\\\m-cube_version1\\\\reports\\\\testing2\\\\orderbook-verification-index.html\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import core.visual_verification as v; print\\('import OK; helpers:', [n for n in \\('_slot_ec_index','_reconstruct_sl_hit','_initial_sl','_snap','_reconstructable'\\) if hasattr\\(v,n\\)]\\)\")",
+      "Bash(python -m py_compile core/visual_verification.py server.py)",
+      "Bash(python -c 'import json,glob; *)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_visual_verification.py -v)",
+      "Bash(venv/Scripts/python.exe -m pytest tests/test_visual_verification.py -q)",
+      "Bash([ -s \"$f\" ])",
+      "Bash(sleep 5)",
+      "Bash(echo READY)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans",

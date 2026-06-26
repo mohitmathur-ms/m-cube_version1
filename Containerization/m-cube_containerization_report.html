@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>m-cube — Containerization &amp; Scalability Report</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2330; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2a3038; --accent:#4aa3ff; --green:#3fb950; --amber:#d29922; --red:#f85149;
+    --purple:#bc8cff; --mono:#79c0ff;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap{display:grid; grid-template-columns:260px 1fr; max-width:1320px; margin:0 auto;}
+  nav{
+    position:sticky; top:0; align-self:start; height:100vh; overflow:auto;
+    padding:24px 18px; border-right:1px solid var(--line); background:var(--panel);
+  }
+  nav h2{font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:18px 0 8px}
+  nav a{display:block; color:var(--ink); text-decoration:none; padding:5px 10px; border-radius:6px; font-size:13.5px; opacity:.85}
+  nav a:hover{background:var(--panel2); opacity:1}
+  nav .brand{font-weight:700; font-size:18px; letter-spacing:.02em}
+  nav .brand span{color:var(--accent)}
+  nav .sub{color:var(--muted); font-size:12px; margin-top:2px}
+  main{padding:42px 48px 120px; min-width:0}
+  h1{font-size:30px; margin:0 0 6px; letter-spacing:-.01em}
+  h2.sec{font-size:22px; margin:46px 0 14px; padding-top:12px; border-top:1px solid var(--line)}
+  h3{font-size:17px; margin:26px 0 10px; color:#cdd9e5}
+  p{margin:12px 0}
+  .lede{color:var(--muted); font-size:16px}
+  code,kbd{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; font-size:.88em; color:var(--mono); background:#1b2230; padding:1.5px 5px; border-radius:4px}
+  pre{background:#0b0f15; border:1px solid var(--line); border-radius:10px; padding:16px 18px; overflow:auto; line-height:1.5}
+  pre code{color:#cbd5e1; background:none; padding:0; font-size:13px}
+  .pill{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:999px; vertical-align:middle}
+  .pill.green{background:rgba(63,185,80,.15); color:var(--green); border:1px solid rgba(63,185,80,.35)}
+  .pill.amber{background:rgba(210,153,34,.15); color:var(--amber); border:1px solid rgba(210,153,34,.35)}
+  .pill.red{background:rgba(248,81,73,.15); color:var(--red); border:1px solid rgba(248,81,73,.35)}
+  .pill.blue{background:rgba(74,163,255,.15); color:var(--accent); border:1px solid rgba(74,163,255,.35)}
+  table{border-collapse:collapse; width:100%; margin:16px 0; font-size:13.5px}
+  th,td{border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:#cdd9e5; font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 22px; margin:18px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .callout{border-left:4px solid var(--accent); background:var(--panel2); border-radius:0 8px 8px 0; padding:12px 18px; margin:18px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .callout.bad{border-left-color:var(--red)}
+  .callout.good{border-left-color:var(--green)}
+  .callout .t{font-weight:700; margin-bottom:4px}
+  .cite{color:var(--purple); font-size:12px; font-style:italic}
+  .diagram{background:#0b0f15; border:1px solid var(--line); border-radius:10px; padding:18px; overflow:auto}
+  .diagram pre{background:none; border:none; padding:0; color:#9fd0ff; font-size:12.5px; line-height:1.35}
+  .meta{color:var(--muted); font-size:13px; margin-top:8px}
+  ul,ol{margin:10px 0; padding-left:22px}
+  li{margin:5px 0}
+  .legend span{margin-right:18px; font-size:12.5px; color:var(--muted)}
+  .footer{margin-top:60px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px}
+  a.ref{color:var(--accent); text-decoration:none}
+  a.ref:hover{text-decoration:underline}
+  .kv{display:grid; grid-template-columns:160px 1fr; gap:4px 16px; font-size:13.5px}
+  .kv div:nth-child(odd){color:var(--muted)}
+  @media (max-width:980px){.wrap{grid-template-columns:1fr}nav{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}main{padding:28px 20px}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand">m<span>·</span>cube</div>
+  <div class="sub">Containerization &amp; Scalability</div>
+  <h2>Sections</h2>
+  <a href="#summary">0 · Executive summary</a>
+  <a href="#nautilus">1 · Why Nautilus fits</a>
+  <a href="#current">2 · Current state &amp; gaps</a>
+  <a href="#target">3 · Target architecture</a>
+  <a href="#multiuser">4 · Multi-user across containers</a>
+  <a href="#dataflow">5 · Data flow</a>
+  <a href="#artifacts">6 · Concrete artifacts</a>
+  <a href="#risks">7 · Risks &amp; gotchas</a>
+  <a href="#rollout">8 · Phased rollout</a>
+  <a href="#sources">9 · Sources</a>
+</nav>
+
+<main>
+  <h1>Containerizing m-cube for Scale</h1>
+  <p class="lede">How NautilusTrader runs in a dockerized setting, how many users run backtests across containers,
+  and what the end-to-end data flow looks like.</p>
+  <div class="meta">Research &amp; design report · prepared for the <code>merger_path_A_B</code> branch ·
+  Nautilus findings from the <code>ntm3</code> concept docs (<code>nautilus_trader==1.224.0</code>),
+  m-cube findings from the codebase. <strong>No application code was changed</strong> — the Dockerfile/compose/queue
+  shim below are recommendations.</div>
+
+  <!-- ================= 0 ================= -->
+  <h2 class="sec" id="summary">0 · Executive summary</h2>
+  <div class="card">
+    <p style="margin-top:0"><strong>The thesis in one paragraph.</strong> Backtests on NautilusTrader are
+    <em>embarrassingly parallel</em>: every <code>BacktestEngine</code> is a self-contained, in-process, ephemeral
+    object — its Cache, MessageBus, Portfolio, matching engine and clock all live <em>inside</em> the engine and die
+    with it. A backtest needs <strong>no database, no Redis, no message broker</strong>. That makes one backtest run a
+    perfectly isolated unit of work — the ideal thing to hand to a container/worker. So containerizing m-cube is
+    <em>not</em> a Nautilus problem; it is a web-app plumbing problem. The work is: (1) replace the Flask dev server
+    with a production WSGI server, (2) move the CPU-bound backtest out of the HTTP request into a <strong>job queue
+    + a pool of stateless backtest-worker containers</strong>, (3) externalize the little in-memory job state that
+    exists today, and (4) put the shared <code>catalog/</code> and the per-user <code>portfolios/</code> /
+    <code>reports/</code> directories on shared volumes. The web tier is already nearly stateless
+    (<code>X-User-Id</code> header, no sessions), so it replicates horizontally with no further work.</p>
+  </div>
+  <div class="grid2">
+    <div class="callout good"><div class="t">What is already container-ready</div>
+      Stateless HTTP tier (header-based identity, no cookies/sessions) · isolated per-run Nautilus engines ·
+      append-only Parquet catalog · per-user data already namespaced by <code>&lt;user_id&gt;</code>.</div>
+    <div class="callout warn"><div class="t">What must change</div>
+      Werkzeug dev server → gunicorn · in-request <code>ProcessPoolExecutor</code> → queue + worker pool ·
+      in-memory CSV-job dict → Redis · local disk → shared volumes.</div>
+  </div>
+
+  <!-- ================= 1 ================= -->
+  <h2 class="sec" id="nautilus">1 · Why NautilusTrader is container-friendly</h2>
+  <p>This is the single most important fact for the whole design, and it comes straight from the Nautilus concept docs.</p>
+
+  <h3>1.1 — The engine is in-process and ephemeral</h3>
+  <p>A <code>BacktestEngine</code> bundles the Cache, MessageBus, Portfolio, simulated exchange and clock as objects
+  constructed <em>inside</em> it. The low-level lifecycle is just
+  <code>BacktestEngine()</code> → <code>add_venue / add_instrument / add_data / add_strategy</code> → <code>run()</code> —
+  no connection strings, no broker, no DB handle anywhere. When the data stream is exhausted the engine produces
+  results and is discarded.</p>
+  <p class="cite">Source: Backtesting.txt — "A <code>BacktestEngine</code> processes a stream of historical data.
+  When the stream is exhausted, the engine produces results…"</p>
+  <p>The high-level API (<code>BacktestNode</code> + a list of <code>BacktestRunConfig</code>) is explicit that
+  <strong>"each run gets a fresh engine with clean state — no <code>reset()</code> needed."</strong> That is exactly the
+  property you want for a worker: a job arrives, a clean engine is built, it runs, results are emitted, the process can
+  exit. Nothing leaks between runs and nothing is shared out-of-band.</p>
+  <p class="cite">Source: Backtesting.txt — high-level API / "Each run gets a fresh engine with clean state."</p>
+
+  <h3>1.2 — No Redis / no database required for backtests</h3>
+  <p>Nautilus <em>does</em> have a Redis-backed Cache and an external-publishing MessageBus — but both are
+  <strong>opt-in and aimed at live/multi-node deployments</strong>. The Cache is a "central in-memory database" whose
+  <code>DatabaseConfig</code> defaults to <code>None</code>; the docs say a DB backend matters only for
+  <em>persistence across restarts</em>, <em>audit history</em>, or <em>multi-node shared state</em> — none of which apply
+  to an ephemeral backtest. The MessageBus's Redis backing is configured on a <code>TradingNodeConfig</code> (the
+  <em>live</em> path) for external publishing between producer/consumer nodes.</p>
+  <p class="cite">Sources: Cache.txt — "central in-memory database", <code>DatabaseConfig | None = None</code>;
+  MessageBus.txt — external publishing via Redis is configured on the live <code>TradingNodeConfig</code>.</p>
+  <div class="callout"><div class="t">Takeaway</div>Do <strong>not</strong> provision Redis for the Nautilus engine.
+  We will add Redis to m-cube — but only as the <em>application's</em> job queue, never as a Nautilus dependency.</div>
+
+  <h3>1.3 — Determinism (and the one cross-process caveat)</h3>
+  <p>Given the same data + the same config in the <strong>same process</strong>, a backtest is deterministic — including
+  a deterministic <code>TradeId</code> per fill. The probabilistic fill model's PRNG is pinned by <code>random_seed</code>.
+  The caveat that matters for sharding work across containers: <strong>cross-process reruns are only "expected to match"</strong>
+  and may differ in rare cases due to hash-ordering effects outside the fill model.</p>
+  <p class="cite">Source: Backtesting.txt — "Reproducible results: A fixed <code>random_seed</code> pins the … PRNG.
+  Same-process reruns are expected to match; cross-process reruns may differ in rare cases…"</p>
+  <div class="callout warn"><div class="t">Design consequence</div>For audit / exact-repro of a specific run, pin
+  <code>random_seed</code> and reproduce in a fresh process with the same image/environment. Treat results as
+  <em>near</em>-identical across heterogeneous workers, not bitwise-identical. (Don't cite the Rust "DST" harness here —
+  per <code>DST_timezone.txt</code> it explicitly excludes the Python backtest path.)</div>
+
+  <h3>1.4 — Memory is boundable (matches m-cube's streaming flags)</h3>
+  <p>For datasets that don't fit in memory the docs give two levers, both of which m-cube already mirrors:
+  the streaming API (<code>engine.add_data_iterator(...)</code> for automatic chunking, or the manual
+  <code>add_data → run(streaming=True) → clear_data()</code> loop), and bounded Cache capacities
+  (<code>bar_capacity</code> / <code>tick_capacity</code> default 10,000, oldest evicted). These map onto m-cube's
+  <code>_USE_LAZY_STREAM</code> / <code>_USE_UNIFIED_STREAMING</code> flags. The docs give <strong>no absolute memory
+  figure</strong> — per-worker RAM must be profiled (<code>_PROFILE_PHASES=1</code>).</p>
+  <p class="cite">Source: Backtesting.txt — "Strategy 3: Use streaming API for very large datasets"; Cache.txt — capacities.</p>
+
+  <h3>1.5 — Why backtest scaling is easy but live scaling is hard</h3>
+  <table>
+    <tr><th>Concern</th><th>Backtest node (what we containerize)</th><th>Live trading node (future, out of scope)</th></tr>
+    <tr><td>External services</td><td><span class="pill green">None</span> in-process only</td><td>Exchange adapters, often Redis-backed Cache/Bus</td></tr>
+    <tr><td>Venue</td><td>In-process <code>SimulatedExchange</code></td><td>Real network sessions + credentials</td></tr>
+    <tr><td>Reconciliation</td><td><span class="pill green">N/A</span> — engine controls both sides</td><td><span class="pill red">Required</span> — <code>LiveExecutionEngine</code> reconciles vs venue</td></tr>
+    <tr><td>State lifetime</td><td>Ephemeral (born → run → die)</td><td>Long-lived stateful service</td></tr>
+    <tr><td>Clock / failures</td><td>Replayed deterministic clock, no I/O failures</td><td>Real-time clock, timeouts, disconnects</td></tr>
+  </table>
+  <p class="cite">Source: Live Trading.txt — "Only the <code>LiveExecutionEngine</code> performs reconciliation, since
+  backtesting controls both sides."</p>
+
+  <!-- ================= 2 ================= -->
+  <h2 class="sec" id="current">2 · Current m-cube architecture &amp; containerization gaps</h2>
+  <p>What the app does today, and the four things that need to change. File references are real.</p>
+  <table>
+    <tr><th>Area</th><th>Today</th><th>Gap for containers</th><th>Fix</th></tr>
+    <tr>
+      <td>HTTP server</td>
+      <td><code>app.run(debug=True, host="0.0.0.0", port=5000, threaded=True)</code> — Werkzeug dev server (<code>server.py</code> ~line 2360); no gunicorn/waitress in <code>requirements.txt</code></td>
+      <td><span class="pill red">Not production-grade</span> single process, debug mode</td>
+      <td>Run under <strong>gunicorn</strong>; port via env</td>
+    </tr>
+    <tr>
+      <td>Backtest execution</td>
+      <td>CPU-bound, run via <code>ProcessPoolExecutor</code> (<code>max_workers = min(runs, cpu_count, 32)</code>, LPT-scheduled) <em>inside</em> the HTTP request — <code>/api/backtest/run-stream</code> → <code>core/backtest_runner/slot_execution/_run_single_backtest_task</code></td>
+      <td><span class="pill amber">Couples CPU to web tier</span>; a long run ties up a web replica; jobs die with the request/container</td>
+      <td>Move to a <strong>queue + worker pool</strong> (§3)</td>
+    </tr>
+    <tr>
+      <td>Identity</td>
+      <td><code>X-User-Id</code> header only; no sessions/cookies — <code>server.py::_resolve_user_id</code> / <code>_get_user_or_401</code>, <code>core/users.py</code></td>
+      <td><span class="pill green">Already stateless</span></td>
+      <td>Replicate freely; add real auth at the proxy (§4)</td>
+    </tr>
+    <tr>
+      <td>CSV-ingest jobs</td>
+      <td>In-memory dict <code>_csv_jobs</code> + <code>threading.Lock</code> (<code>server.py</code> ~line 381); polled via <code>/api/csv/jobs/&lt;id&gt;</code></td>
+      <td><span class="pill red">Lost on restart</span>; invisible to other replicas ("job not found")</td>
+      <td>Externalize job state to <strong>Redis</strong></td>
+    </tr>
+    <tr>
+      <td>Market data</td>
+      <td>Shared, read-mostly <code>catalog/</code> (ParquetDataCatalog; ~24M FX bars); cached handle <code>_CATALOG_CACHE</code> in <code>core/nautilus_loader.py</code>; filename fast-path <code>server.py::_bar_type_range_from_files</code></td>
+      <td>Per-process cache (benign, rebuilt); needs one source of truth</td>
+      <td><strong>Shared volume</strong>, read-only for runners</td>
+    </tr>
+    <tr>
+      <td>Per-user data</td>
+      <td><code>portfolios/&lt;uid&gt;/</code>, <code>reports/&lt;uid&gt;/</code>, <code>custom_strategies/</code> — already namespaced</td>
+      <td>Local disk won't survive/replicate</td>
+      <td><strong>Shared persistent volume</strong> (RWX)</td>
+    </tr>
+    <tr>
+      <td>Shared config</td>
+      <td><code>config/users.json</code>, <code>config/tags.json</code>, <code>adapter_admin/adapters_config/*.json</code>, <code>.runtime_history.json</code></td>
+      <td>Must be identical across replicas; venue-window writes are an un-locked read-modify-write (<code>core/venue_config.py</code>)</td>
+      <td>Shared volume; serialize ingest writes</td>
+    </tr>
+  </table>
+  <div class="callout"><div class="t">In-memory state audit</div>Most module-level caches (<code>_CATALOG_CACHE</code>,
+  the session-window cache, the strategy registry built at import) are <strong>benign</strong> — they rebuild on demand,
+  and each <code>ProcessPoolExecutor</code> worker already reloads the merged strategy registry. The only state that is
+  genuinely <em>lost</em> on restart and invisible across replicas is the <strong>CSV-ingest job dict</strong> (and the
+  session-PnL aggregator used by multi-portfolio session runs). Those are the two things that must move to Redis.</div>
+
+  <!-- ================= 3 ================= -->
+  <h2 class="sec" id="target">3 · Target containerized architecture</h2>
+  <p>Three roles, scaled independently: a stateless <strong>web</strong> tier, a Redis <strong>queue</strong>, and a pool
+  of stateless backtest <strong>workers</strong>. Shared state lives on volumes.</p>
+
+  <div class="diagram"><pre>
+                              ┌───────────────────────────┐
+        users (browser)  ───► │   reverse proxy / LB       │  (auth, TLS, X-User-Id injection)
+                              └─────────────┬──────────────┘
+                                            │  HTTP
+                ┌───────────────────────────┼───────────────────────────┐
+                ▼                           ▼                           ▼
+        ┌───────────────┐           ┌───────────────┐           ┌───────────────┐
+        │  web replica  │           │  web replica  │  …  N      │  web replica  │   gunicorn + Flask
+        │ (stateless)   │           │ (stateless)   │           │ (stateless)   │   CRUD + ENQUEUE
+        └──────┬────────┘           └──────┬────────┘           └──────┬────────┘
+               │ enqueue job / read status │                          │
+               └─────────────┬─────────────┴──────────────┬───────────┘
+                             ▼                             ▼
+                      ┌──────────────────────────────────────────┐
+                      │            Redis  (job queue)             │  jobs + status + results-ptr
+                      └───────────────┬──────────────────────────┘
+                                      │  BRPOP / consume
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+ ┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+ │ backtest      │            │ backtest      │  …  M       │ backtest      │  builds Nautilus
+ │ worker        │            │ worker        │            │ worker        │  BacktestEngine,
+ │ (stateless)   │            │ (stateless)   │            │ (stateless)   │  runs, writes results
+ └──────┬────────┘            └──────┬────────┘            └──────┬────────┘
+        │  read bars (RO)            │  write results             │
+        └───────────────┬───────────┴────────────────┬───────────┘
+                        ▼                            ▼
+            ┌───────────────────────┐   ┌───────────────────────────────────────────┐
+            │  catalog/  (RO mount) │   │  portfolios/<uid>/  reports/<uid>/  config/ │  (RWX shared volume)
+            │  Parquet market data  │   │  adapter_admin/  .runtime_history.json       │
+            └───────────────────────┘   └───────────────────────────────────────────┘
+  </pre></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">web service <span class="pill blue">N replicas</span></h3>
+      <ul>
+        <li>gunicorn + the existing Flask app (<code>server:app</code>).</li>
+        <li>Serves the SPA + all CRUD (portfolios, catalog status, tags).</li>
+        <li>For a backtest: validates the user/allowlist, then <strong>enqueues a job</strong> instead of running it inline; returns a <code>job_id</code>.</li>
+        <li>Streams/polls status &amp; results back from Redis.</li>
+        <li>Stateless ⇒ any replica serves any request; no session affinity.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">worker service <span class="pill blue">M replicas</span></h3>
+      <ul>
+        <li>Same image, different entrypoint: a loop that pulls jobs from Redis.</li>
+        <li>Reuses <code>run_portfolio_backtest</code> / <code>_run_single_backtest_task</code> <em>unchanged</em>.</li>
+        <li>Reads bars from <code>catalog/</code> (RO, streaming), runs the engine, writes <code>reports/&lt;uid&gt;/</code>, updates job status.</li>
+        <li>CPU-bound ⇒ size by cores; scale M independently of N.</li>
+        <li>Crash-safe: an un-acked job can be requeued.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Volume strategy</h3>
+  <table>
+    <tr><th>Volume</th><th>Mode</th><th>Mounted by</th><th>Notes</th></tr>
+    <tr><td><code>catalog/</code></td><td><span class="pill green">RO</span> for web+worker; RW only for ingest</td><td>all</td><td>Largest, read-mostly; append-only Parquet</td></tr>
+    <tr><td><code>portfolios/</code>, <code>reports/</code>, <code>custom_strategies/</code></td><td>RWX</td><td>web + worker</td><td>Namespaced by <code>&lt;user_id&gt;</code>; results unique by timestamp</td></tr>
+    <tr><td><code>config/</code>, <code>adapter_admin/</code></td><td>RWX shared</td><td>all</td><td>Serialize the venue session-window RMW (§7)</td></tr>
+    <tr><td><code>.runtime_history.json</code></td><td>RWX shared</td><td>worker</td><td>Better LPT scheduling estimates across the pool</td></tr>
+    <tr><td>Redis</td><td>—</td><td>web + worker</td><td>Job queue + status + CSV-ingest job state</td></tr>
+  </table>
+
+  <!-- ================= 4 ================= -->
+  <h2 class="sec" id="multiuser">4 · Multi-user backtests across containers</h2>
+  <p>"Multiple people run backtests" works <em>because</em> each backtest is an isolated unit and the web tier is
+  stateless. Here is the lifecycle of one user's run in the containerized model:</p>
+  <ol>
+    <li><strong>Request lands on any web replica.</strong> No session affinity needed — identity is the
+      <code>X-User-Id</code> header, resolved per-request (<code>server.py::_resolve_user_id</code>). The proxy
+      authenticates the human and injects/verifies the header.</li>
+    <li><strong>Validation stays on the web tier.</strong> The user's <code>multiplier</code> and
+      <code>allowed_instruments</code> allow-list (<code>core/users.py</code>) and the portfolio allow-list check
+      run before the job is enqueued — a bad request never reaches a worker.</li>
+    <li><strong>Job is enqueued with its <code>user_id</code></strong> as part of the payload. The queue is shared, so
+      <em>any</em> worker can pick up <em>any</em> user's job.</li>
+    <li><strong>A worker runs it in full isolation.</strong> A fresh Nautilus engine per run means User A's run cannot
+      affect User B's — no shared engine, cache, or bus.</li>
+    <li><strong>Results land in the user's namespace.</strong> The worker writes to <code>reports/&lt;uid&gt;/</code>
+      (unique timestamped filenames) and reads/writes <code>portfolios/&lt;uid&gt;/</code> — already isolated by user id.</li>
+    <li><strong>Any web replica reads back the status/result</strong> from Redis (or the shared reports volume).</li>
+  </ol>
+  <h3>Fairness &amp; isolation</h3>
+  <ul>
+    <li><strong>Per-user concurrency caps:</strong> enforce a max in-flight jobs per <code>user_id</code> at enqueue
+      time (or use per-user queues) so one user's parameter sweep can't starve others. The existing
+      <code>multiplier</code> field is a natural place to also encode a priority/quota.</li>
+    <li><strong>No cross-user state:</strong> the only shared writable surfaces are the namespaced per-user dirs and the
+      append-only catalog — so concurrent users don't collide.</li>
+    <li><strong>Determinism note:</strong> because cross-process repro is only "expected to match" (§1.3), if two users
+      run the identical config they should get the same answer in practice, but pin <code>random_seed</code> if exact
+      equality is contractually required.</li>
+  </ul>
+  <div class="callout bad"><div class="t">Security caveat (unchanged from today)</div>The <code>X-User-Id</code> header
+  is <strong>spoofable</strong> — <code>core/users.py</code> is an identity-only layer with no auth. In a multi-container
+  deployment exposed beyond a trusted LAN, put <strong>real authentication at the reverse proxy</strong> and have it set
+  the header; never let clients send it directly.</div>
+
+  <!-- ================= 5 ================= -->
+  <h2 class="sec" id="dataflow">5 · Data flow</h2>
+
+  <h3>5.1 — Backtest run (the hot path)</h3>
+  <div class="diagram"><pre>
+ browser ──POST /api/portfolios/backtest (X-User-Id)──► web replica
+   │                                                      │ 1. validate user + allow-lists
+   │                                                      │ 2. LPUSH job{portfolio, user_id, seed} ─► Redis
+   │ ◄──────────────── 202 { job_id } ────────────────────┘
+   │
+   │ (poll/stream)                         Redis ──BRPOP──► worker
+   │                                                        │ 3. read bars from catalog/ (RO, streaming)
+   │                                                        │ 4. build BacktestEngine(s) — fresh, in-process
+   │                                                        │ 5. engine.run()  → per-leg results by strategy_id
+   │                                                        │ 6. write reports/<uid>/*.html + *.csv
+   │                                                        │ 7. SET status=done, result-ptr  ─► Redis
+   │ ◄── GET /api/.../jobs/{job_id} ── web replica ◄────────┘ (any replica reads status/result)
+   ▼
+ tearsheet renders
+  </pre></div>
+  <p>Steps 3–5 are pure Nautilus and pure compute — no network, no DB. That is what makes the worker pool trivially
+  scalable: add workers, drain the queue faster.</p>
+
+  <h3>5.2 — CSV ingest (the write path)</h3>
+  <div class="diagram"><pre>
+ browser ──POST /api/csv/load──► web replica
+   │                               │ classify entries: inline (fast) vs bulk (MID/ASK/BID)
+   │                               │ enqueue bulk job ─► Redis   (today: in-memory _csv_jobs — to externalize)
+   │ ◄──── { job_id } ─────────────┘
+   │
+   │                       Redis ──► ingest worker
+   │                                   │ csv_loader → wrangle_bars → Nautilus Bar objects
+   │                                   │ nautilus_loader.save_to_catalog() ─► WRITE catalog/ Parquet (append)
+   │                                   │ update_venue_session_window() ─► RMW adapter_admin/<venue>.json
+   │                                   │ SET job status ─► Redis (survives restart)
+   │ ◄── poll /api/csv/jobs/{id} ──────┘
+  </pre></div>
+  <div class="callout warn"><div class="t">Two writers, one catalog</div>The ingest path is the only writer to the
+  shared <code>catalog/</code>. Parquet files are written append-only with non-overlapping <code>start_iso_end_iso</code>
+  filenames (low collision risk), but the venue session-window update is an un-locked read-modify-write
+  (<code>core/venue_config.py</code>). <strong>Run ingest through a single serialized worker/queue</strong> (or add a
+  file lock) so two concurrent uploads can't clobber a venue config.</div>
+
+  <!-- ================= 6 ================= -->
+  <h2 class="sec" id="artifacts">6 · Concrete artifacts</h2>
+  <p>Drop-in starting points. <span class="pill amber">Proposed</span> — these are recommendations, not yet committed to the repo.</p>
+
+  <h3>6.1 — Dockerfile (one image, two roles)</h3>
+  <pre><code># Dockerfile
+FROM python:3.11-slim
+
+# system libs some wheels expect; keep slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+# gunicorn for the web role; redis client for the queue
+RUN pip install --no-cache-dir -r requirements.txt gunicorn "redis>=5"
+
+COPY . .
+
+ENV PORT=5000 \
+    CATALOG_PATH=/data/catalog \
+    REDIS_URL=redis://redis:6379/0
+
+EXPOSE 5000
+# default CMD = web role; worker overrides CMD in compose
+CMD ["gunicorn", "-w", "4", "-k", "gthread", "--threads", "8", \
+     "-b", "0.0.0.0:5000", "--timeout", "120", "server:app"]
+</code></pre>
+  <p class="meta">Notes: keep gunicorn workers modest on the web tier (it only does CRUD + enqueue now). The heavy CPU
+  lives in the worker image/role. Verify the Linux <code>pyarrow</code>/<code>numpy</code> wheels match the pinned
+  versions (§7).</p>
+
+  <h3>6.2 — docker-compose.yml</h3>
+  <pre><code># docker-compose.yml
+services:
+  redis:
+    image: redis:7-alpine
+    volumes: [ "redis-data:/data" ]
+
+  web:
+    build: .
+    environment:
+      - PORT=5000
+      - REDIS_URL=redis://redis:6379/0
+      - CATALOG_PATH=/data/catalog
+    ports: [ "5000:5000" ]
+    depends_on: [ redis ]
+    deploy: { replicas: 2 }          # N web replicas (LB in front in prod)
+    volumes:
+      - catalog:/data/catalog:ro     # read-only for the web tier
+      - userdata:/app/portfolios
+      - reports:/app/reports
+      - config:/app/config
+      - adapters:/app/adapter_admin/adapters_config
+
+  worker:
+    build: .
+    command: python -m worker.run         # the queue-consumer entrypoint (6.3)
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CATALOG_PATH=/data/catalog
+    depends_on: [ redis ]
+    deploy: { replicas: 4 }          # M backtest workers, scaled by CPU
+    volumes:
+      - catalog:/data/catalog:ro
+      - userdata:/app/portfolios
+      - reports:/app/reports
+      - config:/app/config
+      - adapters:/app/adapter_admin/adapters_config
+
+  ingest-worker:                     # single replica: serializes catalog writes
+    build: .
+    command: python -m worker.ingest
+    environment: [ "REDIS_URL=redis://redis:6379/0", "CATALOG_PATH=/data/catalog" ]
+    depends_on: [ redis ]
+    deploy: { replicas: 1 }
+    volumes:
+      - catalog:/data/catalog        # RW here only
+      - config:/app/config
+      - adapters:/app/adapter_admin/adapters_config
+
+volumes:
+  catalog: {}
+  userdata: {}
+  reports: {}
+  config: {}
+  adapters: {}
+  redis-data: {}
+</code></pre>
+
+  <h3>6.3 — The minimal code change (thin queue shim)</h3>
+  <p>The point is to <strong>reuse the existing functions unchanged</strong>. The backtest endpoint enqueues instead of
+  running inline; a worker consumes and calls the same <code>run_portfolio_backtest</code> that runs today.</p>
+  <pre><code># worker/run.py  (PROPOSED — not yet in repo)
+import os, json, redis
+from core.backtest_runner import run_portfolio_backtest   # unchanged public API
+
+r = redis.from_url(os.environ["REDIS_URL"])
+
+def main():
+    while True:
+        _, raw = r.brpop("mcube:jobs")          # block until a job arrives
+        job = json.loads(raw)
+        jid = job["job_id"]
+        r.hset(f"mcube:job:{jid}", "status", "running")
+        try:
+            result = run_portfolio_backtest(    # SAME function the Flask request calls today
+                portfolio_config=job["portfolio"],
+                catalog_path=os.environ["CATALOG_PATH"],
+                user_id=job["user_id"],
+                # random_seed=job.get("seed"),  # pin for reproducibility
+            )
+            r.hset(f"mcube:job:{jid}", mapping={"status": "done",
+                                                "result": json.dumps(result)})
+        except Exception as e:                  # crash-safe: surface the error, optionally requeue
+            r.hset(f"mcube:job:{jid}", mapping={"status": "error", "error": str(e)})
+
+if __name__ == "__main__":
+    main()
+</code></pre>
+  <pre><code># server.py  (PROPOSED edit to the backtest endpoint — sketch)
+# BEFORE: ran run_portfolio_backtest(...) inline inside the request (ProcessPoolExecutor)
+# AFTER:
+job = {"job_id": new_id(), "portfolio": cfg, "user_id": uid, "seed": seed}
+redis_client.lpush("mcube:jobs", json.dumps(job))
+return jsonify({"job_id": job["job_id"]}), 202
+# a small GET /api/portfolios/jobs/<id> reads mcube:job:<id> back
+</code></pre>
+  <div class="callout good"><div class="t">Why this is low-risk</div>The parity-tested execution paths
+  (<code>run_portfolio_backtest</code>, <code>_run_single_backtest_task</code>, the unified/per-slot/Path-B machinery)
+  are untouched — they still build the same engines and return the same result dicts. Only the <em>caller</em> moves from
+  "inside the HTTP request" to "inside a worker loop." The same <code>verify_grouping_parity.py</code> / root
+  <code>*_parity_test.py</code> scripts still validate correctness.</div>
+
+  <h3>6.4 — Kubernetes mapping (brief)</h3>
+  <p>Compose is the primary target; on K8s the shape is the same:</p>
+  <ul>
+    <li>A <strong>Deployment</strong> per role (web, worker, ingest-worker) + a Redis <strong>StatefulSet</strong> (or managed Redis).</li>
+    <li><strong>PVCs</strong> for shared data — <code>catalog</code> as <code>ReadOnlyMany</code> for runners, user-data/reports as <code>ReadWriteMany</code> (NFS/EFS/Filestore class).</li>
+    <li><strong>HPA</strong> on the worker Deployment keyed on Redis queue depth (or CPU) → autoscale M to drain the backlog.</li>
+    <li><strong>Ingress</strong> (or a gateway) terminates TLS, authenticates, and injects <code>X-User-Id</code>.</li>
+    <li>Set CPU <strong>requests/limits</strong> on workers to match the engine's profiled footprint.</li>
+  </ul>
+
+  <!-- ================= 7 ================= -->
+  <h2 class="sec" id="risks">7 · Risks, caveats &amp; gotchas</h2>
+  <table>
+    <tr><th>Risk</th><th>Why</th><th>Mitigation</th></tr>
+    <tr><td>Cross-process determinism</td><td>Docs guarantee same-<em>process</em> repro only; cross-process "expected to match"</td><td>Pin <code>random_seed</code>; reproduce audits in a fresh same-image process</td></tr>
+    <tr><td>Catalog write contention</td><td>Concurrent CSV ingests both write <code>catalog/</code> + RMW venue config (no lock, <code>core/venue_config.py</code>)</td><td>Single serialized <code>ingest-worker</code> (replicas: 1) or a file lock</td></tr>
+    <tr><td>Windows → Linux</td><td>Repo is Windows-first (<code>start.bat</code>, PowerShell); containers are Linux</td><td>Verify <code>pyarrow==23.0.1</code>/<code>numpy==2.4.3</code> Linux wheels; avoid hard-coded path separators; test the catalog filename fast-path on Linux</td></tr>
+    <tr><td>Per-worker memory</td><td>No doc-stated figure; large data + many bar types can spike RAM</td><td>Profile with <code>_PROFILE_PHASES=1</code>; enable <code>_USE_LAZY_STREAM</code>/<code>_USE_UNIFIED_STREAMING</code>; set K8s limits</td></tr>
+    <tr><td>RWX volume performance</td><td>NFS/EFS latency can slow Parquet reads vs local disk</td><td>Prefer fast shared storage; consider a per-node read cache; keep <code>catalog/</code> mount RO</td></tr>
+    <tr><td>Lost jobs on restart</td><td>Today's <code>_csv_jobs</code> is in-memory</td><td>Externalize all job state to Redis (status survives restart; un-acked jobs requeue)</td></tr>
+    <tr><td>Spoofable identity</td><td><code>X-User-Id</code> has no auth</td><td>Authenticate at the proxy; clients never set the header directly</td></tr>
+  </table>
+
+  <!-- ================= 8 ================= -->
+  <h2 class="sec" id="rollout">8 · Phased rollout</h2>
+  <div class="card">
+    <div class="kv">
+      <div>Phase 0</div><div><strong>Dockerize as-is.</strong> One image, gunicorn instead of the dev server, single container, local volumes. Goal: <em>parity</em> with today plus a production server. Run the existing pytest + <code>verify_session_changes.py</code> + parity scripts inside the container.</div>
+      <div>Phase 1</div><div><strong>Externalize state &amp; split workers.</strong> Add Redis; move CSV-ingest job state and a new backtest job queue into it; introduce the <code>worker</code> and <code>ingest-worker</code> roles (§6.3). Web tier now only enqueues.</div>
+      <div>Phase 2</div><div><strong>Scale out.</strong> N web replicas behind a proxy/LB; M autoscaled workers (queue-depth HPA); shared RWX volumes for catalog/portfolios/reports/config. Add per-user concurrency caps.</div>
+      <div>Phase 3</div><div><strong>(Future) Live trading path.</strong> Out of scope here — needs exchange adapters, the live reconciliation subsystem, and (typically) a Redis-backed Cache/MessageBus. Fundamentally a stateful service, scaled differently from the backtest pool.</div>
+    </div>
+  </div>
+
+  <!-- ================= 9 ================= -->
+  <h2 class="sec" id="sources">9 · Sources</h2>
+  <h3>NautilusTrader concept docs (via <code>ntm3</code>, <code>nautilus_trader==1.224.0</code>)</h3>
+  <ul>
+    <li><code>.claude/agents/ntm3_docs/Backtesting.txt</code> — in-process engine, fresh-engine-per-run, streaming API, reproducibility &amp; deterministic <code>TradeId</code>.</li>
+    <li><code>.claude/agents/ntm3_docs/Cache.txt</code> — "central in-memory database", optional <code>DatabaseConfig</code>/Redis, bar/tick capacities.</li>
+    <li><code>.claude/agents/ntm3_docs/MessageBus.txt</code> — optional Redis backing / external publishing on the live node.</li>
+    <li><code>.claude/agents/ntm3_docs/Live Trading.txt</code> — reconciliation is live-only; backtest↔live differences.</li>
+    <li><code>.claude/agents/ntm3_docs/DST_timezone.txt</code> — Rust DST harness; excludes the Python backtest path (not cited as backtest-determinism proof).</li>
+  </ul>
+  <h3>m-cube codebase</h3>
+  <ul>
+    <li><a class="ref" href="../server.py">server.py</a> — dev-server entrypoint, <code>_resolve_user_id</code>/<code>_get_user_or_401</code>, <code>/api/backtest/run-stream</code>, <code>/api/csv/load</code>, <code>_csv_jobs</code>, <code>_bar_type_range_from_files</code>.</li>
+    <li><a class="ref" href="../core/backtest_runner/slot_execution/__init__.py">core/backtest_runner/slot_execution/__init__.py</a> — <code>_run_single_backtest_task</code>, ProcessPoolExecutor worker.</li>
+    <li><a class="ref" href="../core/backtest_runner/orchestration/__init__.py">core/backtest_runner/orchestration/__init__.py</a> — <code>run_portfolio_backtest</code>.</li>
+    <li><a class="ref" href="../core/nautilus_loader.py">core/nautilus_loader.py</a> — <code>load_catalog</code>, <code>save_to_catalog</code>, <code>_CATALOG_CACHE</code>.</li>
+    <li><a class="ref" href="../core/users.py">core/users.py</a> &amp; <a class="ref" href="../config/users.json">config/users.json</a> — identity model.</li>
+    <li><a class="ref" href="../core/venue_config.py">core/venue_config.py</a> — venue session-window read-modify-write.</li>
+    <li><a class="ref" href="../core/runtime_history.py">core/runtime_history.py</a> — <code>.runtime_history.json</code> LPT scheduling.</li>
+    <li><a class="ref" href="../CLAUDE.md">CLAUDE.md</a> — execution paths, catalog format, runtime flags.</li>
+  </ul>
+
+  <div class="footer">
+    <span class="legend">
+      <span><span class="pill green">green</span> ready / safe</span>
+      <span><span class="pill amber">amber</span> needs change</span>
+      <span><span class="pill red">red</span> blocker / risk</span>
+      <span><span class="pill blue">blue</span> scalable unit</span>
+    </span>
+    <p>m-cube containerization &amp; scalability report · self-contained · renders offline · no application code was modified.</p>
+  </div>
+</main>
+</div>
+</body>
+</html>
