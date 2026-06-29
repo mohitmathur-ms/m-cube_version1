@@ -9,6 +9,8 @@
 #   docker run --rm -p 5000:5000 \
 #     -v "$PWD/catalog:/app/catalog" \
 #     -v "$PWD/reports:/app/reports" \
+#     -v "$PWD/portfolios:/app/portfolios" \
+#     -v "$PWD/config:/app/config" \
 #     -v "$PWD/custom_strategies:/app/custom_strategies" \
 #     mcube:latest
 #
@@ -33,7 +35,7 @@
 #     the ">= 3.11" requirement enforced by start.bat.
 FROM python:3.12-slim-bookworm AS builder
 
-# Fail fast on any pipe stage; surface real errors during apt/pip work.
+# Fail fast on any pipe stage; surface real errors during pip work.
 SHELL ["/bin/sh", "-eu", "-c"]
 
 # Build-time env:
@@ -59,16 +61,21 @@ COPY requirements.txt ./
 
 # --mount=type=cache speeds up rebuilds dramatically without persisting the
 # cache into the final image. --prefer-binary forces wheels (no surprise
-# from-source builds on a slim image with no compiler).
+# from-source builds on a slim image with no compiler). --no-compile leaves
+# .pyc generation to the runtime stage's single compileall pass.
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip setuptools wheel \
- && pip install --prefer-binary -r requirements.txt
+ && pip install --prefer-binary --no-compile -r requirements.txt
 
 
 # ===========================================================================
 # Phase 2 — Runtime: minimal image that just runs the server
 # ===========================================================================
 FROM python:3.12-slim-bookworm AS runtime
+
+LABEL org.opencontainers.image.title="m-cube" \
+      org.opencontainers.image.description="NautilusTrader FX/crypto backtesting & dashboard (Flask)" \
+      org.opencontainers.image.source="https://github.com/your-org/m-cube"
 
 # Runtime env:
 #   PYTHONUNBUFFERED       — flush stdout/stderr immediately so `docker logs`
@@ -111,24 +118,31 @@ RUN groupadd --system --gid "${APP_GID}" app \
  && useradd  --system --uid "${APP_UID}" --gid app --home /app --shell /sbin/nologin app
 
 # Copy the prebuilt venv from the builder. This is the ONLY thing that
-# survives from stage 1, so all the apt/pip scratch space is left behind.
+# survives from stage 1, so all the pip scratch space is left behind.
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
 
+# WORKDIR is created as root; hand the whole tree to `app` so the server can
+# write project-root runtime state (core/runtime_history.py → /app/.runtime_history.json)
+# and the config/tags + users CRUD endpoints.
 WORKDIR /app
+RUN chown app:app /app
 
 # Copy application source. Ordered roughly by churn (low → high) so that
 # editing strategies / server.py doesn't invalidate the heavier layers.
-# Anything listed in .dockerignore (venv/, reports/, __pycache__, etc.) is
-# excluded automatically.
+# Only the runtime surface is copied — dev/test scripts, notebooks, raw data,
+# generated output and the catalog (a runtime volume) are excluded here and
+# in .dockerignore. `scripts/` and `catalog/` are intentionally NOT copied:
+# scripts/ holds dev-only parity tools never imported by server.py, and the
+# catalog is bind-mounted at run time.
 COPY --chown=app:app config/            ./config/
-COPY --chown=app:app catalog/           ./catalog/
 COPY --chown=app:app core/              ./core/
 COPY --chown=app:app strategies/        ./strategies/
 COPY --chown=app:app custom_strategies/ ./custom_strategies/
 COPY --chown=app:app portfolios/        ./portfolios/
 COPY --chown=app:app adapter_admin/     ./adapter_admin/
-COPY --chown=app:app scripts/           ./scripts/
 COPY --chown=app:app static/            ./static/
+# Single runtime template read by core/report_generator.py (rest of docs/ skipped).
+COPY --chown=app:app docs/report_template.html ./docs/report_template.html
 COPY --chown=app:app server.py          ./server.py
 
 # Pre-create writable runtime dirs (bind-mount targets at `docker run` time).
@@ -148,8 +162,8 @@ EXPOSE 5000
 VOLUME ["/app/reports", "/app/catalog", "/app/custom_strategies"]
 
 # Lightweight HTTP healthcheck. Uses stdlib (no curl needed in the image).
-# 30s start period gives Flask + nautilus imports time to load.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+# 40s start period gives Flask + nautilus imports time to load.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request,sys; \
 sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/', timeout=3).status < 500 else 1)" \
     || exit 1

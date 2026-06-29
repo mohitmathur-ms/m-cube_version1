@@ -107,12 +107,27 @@ reports/
 # ---------------------------------------------------------------------------
 # Local catalog / market data (mounted at runtime, not baked in)
 # ---------------------------------------------------------------------------
+catalog/
 catalog/data
 catalog/**/*.parquet
 catalog/**/*.feather
 catalog/**/*.csv
 *.parquet
 *.feather
+
+# ---------------------------------------------------------------------------
+# Raw input + generated output trees (runtime/dev only, never shipped)
+# ---------------------------------------------------------------------------
+data/
+csv/
+output/
+html_reports/
+ipynb/
+reports_aggregator_demo/
+SL_TGT_Testing/
+Containerization/
+5. Logics/
+df
 
 # ---------------------------------------------------------------------------
 # Databases / local stores
@@ -125,6 +140,8 @@ catalog/**/*.csv
 # Documentation / one-off HTML notes (not needed in the runtime image)
 # ---------------------------------------------------------------------------
 docs/
+# ...except the one template core/report_generator.py reads at runtime.
+!docs/report_template.html
 *.html
 LOGICS_BACKEND_STATUS.md
 PORTFOLIO_SETUP_GUIDE.md
@@ -132,6 +149,10 @@ README*.md
 how_to_use.txt
 user_level_changes.txt
 message*.txt
+SCALABILITY.MD
+OVERNIGHT_WINDOW_FIX_REPORT.md
+*.excalidraw
+*.ipynb
 
 # ---------------------------------------------------------------------------
 # Smoke / stress / verification scripts (run locally, not shipped)
@@ -139,7 +160,17 @@ message*.txt
 smoke_test_*.py
 stress_test_*.py
 verify_*.py
+*_test.py
+parity_*.py
+parity_check.py
+check_*.py
+debug_*.py
+test_*.py
+price_selector.py
+generate_subscription_excels.py
+_split_analyze.py
 tests/
+.runtime_history.json
 
 # ---------------------------------------------------------------------------
 # Platform-specific launchers
