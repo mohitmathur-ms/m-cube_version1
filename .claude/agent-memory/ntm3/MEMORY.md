@@ -1,0 +1,17 @@
+- [Docs library populated](project_docs_library_empty.md) — ntm3_docs now has 28 .txt+.pdf; use .txt as primary (EMPTY .txt: Architecture, Actors, Startegies/Strategies)
+
+- [PDF rendering unavailable](tooling-pdf-no-poppler.md) — Read tool cannot open the ntm3_docs PDFs (no poppler/pdftoppm); fall back to package source.
+- [Bracket orders & contingency](bracket-orders-mcube.md) — order_factory.bracket() defaults OUO; m-cube does NOT use native brackets (manual market-order exit engine).
+- [OMS types & position IDs](oms-types-position-ids.md) — NETTING/HEDGING/UNSPECIFIED resolution (strategy override -> venue -> NETTING default) and how each assigns PositionIds.
+- [MARKET vs LIMIT order types](order-types-market-vs-limit.md) — fill/TIF/post_only/MARKET_TO_LIMIT/trigger mechanics; m-cube exit engine submits only MARKET/GTC.
+- [Backtest API choice matrix](backtest-api-choice-matrix.md) — official low-level vs high-level recommendation by use case + gaps the docs do NOT cover (BacktestDataConfig field schema, per-strategy P&L pattern).
+- [Live trading API + docs gap](live-trading-api-and-docs-gap.md) — TradingNode/Builder/factory + SANDBOX client locations in source; what the concept docs do NOT cover.
+- [Streaming/batched backtest](streaming-batched-backtest.md) — memory-bounded streaming is a low-level BacktestEngine loop (add_data_iterator / run(streaming=True)) that BacktestNode wraps; state persists across batches; multi-ccy combined P&L via target_currency; doc gaps.
+- [FillModel custom fill price](fillmodel-custom-fill-price.md) — YES you can force worse-than-market fills in-run via FillModel.get_orderbook_for_fill_simulation() synthetic book; no explicit per-order price setter.
+- [Per-strategy PnL in base ccy](per-strategy-pnl-base-ccy.md) — Portfolio has NO strategy-scoped PnL; sum cache.positions(strategy_id=) realized+unrealized(price), convert via cache.get_xrate (bars fallback); NETTING snapshot gotcha.
+- [BacktestEngine state isolation](backtestengine-state-isolation.md) — each engine owns Cache/MessageBus/Portfolio via its own NautilusKernel; 2 engines fully isolated, no process-global state, no DB needed.
+- [Logging process-global singleton](logging-process-global-singleton.md) — the ONLY genuine process-wide singleton is the Rust logging subsystem (init_logging once/process, LogGuard ref-count, 255 max); sequential same-process engines need a retained LogGuard. Nuances the "no process-global state" line.
+- [m-cube process model: unified vs per-slot](mcube-process-model-unified-vs-perslot.md) — default unified = 1 engine in Flask thread (NO pool); per-slot fallback = 1 worker proc/slot; what trips fallback + scalability gotchas.
+- [BacktestEngine.run() holds the GIL](backtest-engine-run-holds-gil.md) — DEFINITIVE from 1.224.0 .pyx: whole bar loop is Cython no-nogil; threads don't parallelize backtests, use processes.
+- [Live node in containers: doc coverage](live-trading-containerization-gaps.md) — what live/exec/cache/msgbus PDFs DO/DON'T cover for Docker/k8s (Redis persistence yes; TradingNode SIGTERM lifecycle + single-writer rule NOT in concept PDFs).
+- [Timestamps, timezones, sessions](timestamps-timezones-sessions.md) — internal time=UTC ns; bar ts_init MUST=close (ts_init_delta); NO tz/session/calendar concept doc (dst.pdf=Deterministic Sim Testing, not daylight); session logic is Strategy/Actor's job.

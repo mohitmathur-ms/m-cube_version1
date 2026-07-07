@@ -48,6 +48,16 @@ const Users = {
                             <th style="width:150px;">User ID</th>
                             <th>Alias</th>
                             <th style="width:100px;">Multiplier</th>
+                            <th style="width:110px;" title="Spec §3 Level 3: cumulative loss cap across all this user's portfolios. Blank = no cap.">Max Loss</th>
+                            <th style="width:110px;" title="Spec §3 Level 3: cumulative profit cap across all this user's portfolios. Blank = no cap.">Max Profit</th>
+                            <th style="width:64px;" title="Spec §6.1: enable a user-level trailing SL that ratchets the Max Loss cap tighter as combined profit grows.">Trail SL</th>
+                            <th style="width:96px;" title="Spec §6.1: for every this much combined profit gained, tighten the Max Loss cap.">Trail Every</th>
+                            <th style="width:96px;" title="Spec §6.1: amount the Max Loss cap tightens per step.">Trail By</th>
+                            <th style="width:64px;" title="Spec §6.1 (target doc): enable a user-level trailing target / profit-lock on combined profit.">Trail TGT</th>
+                            <th style="width:96px;" title="Spec §6.1: combined profit at which the profit-lock activates.">TGT Reach</th>
+                            <th style="width:96px;" title="Spec §6.1: combined-profit floor locked once the profit-lock activates.">TGT Lock</th>
+                            <th style="width:96px;" title="Spec §6.1: for every this much further combined profit, raise the locked floor.">TGT Every</th>
+                            <th style="width:96px;" title="Spec §6.1: amount the locked floor rises per step.">TGT By</th>
                             <th>Allowed Instruments</th>
                         </tr>
                     </thead>
@@ -75,6 +85,14 @@ const Users = {
         const allowed = Array.isArray(u.allowed_instruments)
             ? u.allowed_instruments.join(", ")
             : "";
+        const maxLoss = (u.max_loss === null || u.max_loss === undefined) ? "" : u.max_loss;
+        const maxProfit = (u.max_profit === null || u.max_profit === undefined) ? "" : u.max_profit;
+        const tslEvery = (u.trailing_sl_every === null || u.trailing_sl_every === undefined) ? "" : u.trailing_sl_every;
+        const tslBy = (u.trailing_sl_by === null || u.trailing_sl_by === undefined) ? "" : u.trailing_sl_by;
+        const ttgReach = (u.trailing_tgt_when_reach === null || u.trailing_tgt_when_reach === undefined) ? "" : u.trailing_tgt_when_reach;
+        const ttgLock = (u.trailing_tgt_lock === null || u.trailing_tgt_lock === undefined) ? "" : u.trailing_tgt_lock;
+        const ttgEvery = (u.trailing_tgt_every === null || u.trailing_tgt_every === undefined) ? "" : u.trailing_tgt_every;
+        const ttgBy = (u.trailing_tgt_by === null || u.trailing_tgt_by === undefined) ? "" : u.trailing_tgt_by;
         return `
             <tr data-row="${i}">
                 <td style="text-align:center;">
@@ -83,6 +101,16 @@ const Users = {
                 <td><input type="text" class="form-control" data-field="user_id" value="${this._escape(u.user_id || "")}" pattern="[a-z0-9_-]{1,32}"></td>
                 <td><input type="text" class="form-control" data-field="alias" value="${this._escape(u.alias || "")}"></td>
                 <td><input type="number" class="form-control" data-field="multiplier" value="${u.multiplier ?? 1.0}" min="0" step="any"></td>
+                <td><input type="number" class="form-control" data-field="max_loss" value="${maxLoss}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="max_profit" value="${maxProfit}" min="0" step="any" placeholder="(none)"></td>
+                <td style="text-align:center;"><input type="checkbox" data-field="trailing_sl_enabled" ${u.trailing_sl_enabled ? "checked" : ""}></td>
+                <td><input type="number" class="form-control" data-field="trailing_sl_every" value="${tslEvery}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="trailing_sl_by" value="${tslBy}" min="0" step="any" placeholder="(none)"></td>
+                <td style="text-align:center;"><input type="checkbox" data-field="trailing_tgt_enabled" ${u.trailing_tgt_enabled ? "checked" : ""}></td>
+                <td><input type="number" class="form-control" data-field="trailing_tgt_when_reach" value="${ttgReach}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="trailing_tgt_lock" value="${ttgLock}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="trailing_tgt_every" value="${ttgEvery}" min="0" step="any" placeholder="(none)"></td>
+                <td><input type="number" class="form-control" data-field="trailing_tgt_by" value="${ttgBy}" min="0" step="any" placeholder="(none)"></td>
                 <td><input type="text" class="form-control" data-field="allowed_instruments" value="${this._escape(allowed)}" placeholder="leave blank for all (e.g. EURUSD, BTCUSD)"></td>
             </tr>`;
     },
@@ -95,6 +123,16 @@ const Users = {
             user_id: `u_${Date.now().toString(36)}`,
             alias: "New User",
             multiplier: 1.0,
+            max_loss: null,
+            max_profit: null,
+            trailing_sl_enabled: false,
+            trailing_sl_every: null,
+            trailing_sl_by: null,
+            trailing_tgt_enabled: false,
+            trailing_tgt_when_reach: null,
+            trailing_tgt_lock: null,
+            trailing_tgt_every: null,
+            trailing_tgt_by: null,
             allowed_instruments: null,
         };
         this._collectFromDOM();
@@ -124,12 +162,29 @@ const Users = {
             const i = parseInt(tr.dataset.row, 10);
             if (!Number.isFinite(i) || !this.users[i]) return;
             const get = (k) => tr.querySelector(`[data-field="${k}"]`)?.value;
+            const getChecked = (k) => !!tr.querySelector(`[data-field="${k}"]`)?.checked;
             const uid = (get("user_id") || "").trim();
             const alias = (get("alias") || "").trim();
             const mraw = get("multiplier");
+            const maxLossRaw = (get("max_loss") || "").trim();
+            const maxProfitRaw = (get("max_profit") || "").trim();
+            const tslEveryRaw = (get("trailing_sl_every") || "").trim();
+            const tslByRaw = (get("trailing_sl_by") || "").trim();
+            const ttgReachRaw = (get("trailing_tgt_when_reach") || "").trim();
+            const ttgLockRaw = (get("trailing_tgt_lock") || "").trim();
+            const ttgEveryRaw = (get("trailing_tgt_every") || "").trim();
+            const ttgByRaw = (get("trailing_tgt_by") || "").trim();
             const allowedRaw = (get("allowed_instruments") || "").trim();
 
             const m = parseFloat(mraw);
+            const ml = maxLossRaw === "" ? null : parseFloat(maxLossRaw);
+            const mp = maxProfitRaw === "" ? null : parseFloat(maxProfitRaw);
+            const tslEvery = tslEveryRaw === "" ? null : parseFloat(tslEveryRaw);
+            const tslBy = tslByRaw === "" ? null : parseFloat(tslByRaw);
+            const ttgReach = ttgReachRaw === "" ? null : parseFloat(ttgReachRaw);
+            const ttgLock = ttgLockRaw === "" ? null : parseFloat(ttgLockRaw);
+            const ttgEvery = ttgEveryRaw === "" ? null : parseFloat(ttgEveryRaw);
+            const ttgBy = ttgByRaw === "" ? null : parseFloat(ttgByRaw);
             const allowed = allowedRaw
                 ? allowedRaw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
                 : null;
@@ -138,6 +193,16 @@ const Users = {
                 user_id: uid,
                 alias: alias || uid,
                 multiplier: Number.isFinite(m) && m > 0 ? m : 1.0,
+                max_loss: Number.isFinite(ml) ? ml : null,
+                max_profit: Number.isFinite(mp) ? mp : null,
+                trailing_sl_enabled: getChecked("trailing_sl_enabled"),
+                trailing_sl_every: Number.isFinite(tslEvery) ? tslEvery : null,
+                trailing_sl_by: Number.isFinite(tslBy) ? tslBy : null,
+                trailing_tgt_enabled: getChecked("trailing_tgt_enabled"),
+                trailing_tgt_when_reach: Number.isFinite(ttgReach) ? ttgReach : null,
+                trailing_tgt_lock: Number.isFinite(ttgLock) ? ttgLock : null,
+                trailing_tgt_every: Number.isFinite(ttgEvery) ? ttgEvery : null,
+                trailing_tgt_by: Number.isFinite(ttgBy) ? ttgBy : null,
                 allowed_instruments: allowed,
             };
         });

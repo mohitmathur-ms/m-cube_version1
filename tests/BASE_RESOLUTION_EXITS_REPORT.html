@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session Report — Multi-Timeframe Data, Timezones &amp; Base-Resolution Exits</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2330; --bd:#2a3340;
+    --tx:#d7dee7; --tx2:#9aa7b5; --acc:#4da3ff; --acc2:#7ee0a0;
+    --warn:#ffcf6b; --bad:#ff7b72; --code:#0b0f14; --kbd:#222b36;
+    --th:#1f2733;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f7; --bd:#d8dee4;
+    --tx:#1d2430; --tx2:#5a6675; --acc:#0969da; --acc2:#1a7f37;
+    --warn:#9a6700; --bad:#cf222e; --code:#f3f5f8; --kbd:#eaeef2; --th:#eef2f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15px/1.65 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 96px;}
+  header.hero{border:1px solid var(--bd);background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border-radius:14px;padding:26px 28px;margin-bottom:26px;}
+  h1{font-size:26px;margin:0 0 10px;line-height:1.25;}
+  h2{font-size:21px;margin:42px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--bd);scroll-margin-top:18px;}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--tx);}
+  p{margin:10px 0;}
+  a{color:var(--acc);text-decoration:none;} a:hover{text-decoration:underline;}
+  code{font-family:"SF Mono",ui-monospace,Consolas,monospace;font-size:.88em;
+    background:var(--kbd);padding:1.5px 6px;border-radius:5px;}
+  pre{background:var(--code);border:1px solid var(--bd);border-radius:10px;
+    padding:14px 16px;overflow:auto;margin:14px 0;}
+  pre code{background:none;padding:0;font-size:13px;line-height:1.55;color:var(--tx);}
+  .lead{color:var(--tx2);font-size:15px;}
+  .headline{border-left:3px solid var(--acc);background:var(--panel2);
+    border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0;}
+  blockquote{border-left:3px solid var(--warn);background:var(--panel2);
+    margin:16px 0;padding:10px 16px;border-radius:0 10px 10px 0;color:var(--tx);}
+  blockquote.bad{border-left-color:var(--bad);}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;
+    border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--bd);vertical-align:top;}
+  th{background:var(--th);font-weight:600;color:var(--tx);}
+  tr:last-child td{border-bottom:none;}
+  td code{white-space:nowrap;}
+  .ok{color:var(--acc2);font-weight:600;} .no{color:var(--bad);font-weight:600;}
+  .toc{columns:2;column-gap:34px;background:var(--panel);border:1px solid var(--bd);
+    border-radius:12px;padding:16px 20px;margin:0;}
+  .toc ol{margin:0;padding-left:22px;} .toc li{margin:5px 0;break-inside:avoid;}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;
+    background:var(--acc2);color:#06210f;vertical-align:middle;margin-left:8px;}
+  html[data-theme="dark"] .pill{background:#16361f;color:var(--acc2);border:1px solid #245232;}
+  .meta{color:var(--tx2);font-size:13px;margin-top:6px;}
+  .star{color:var(--warn);}
+  hr{border:none;border-top:1px solid var(--bd);margin:34px 0;}
+  .toggle{position:fixed;top:14px;right:16px;background:var(--panel);color:var(--tx);
+    border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;z-index:10;}
+  .back{font-size:12px;color:var(--tx2);margin-left:10px;font-weight:400;}
+  ul{margin:10px 0;padding-left:22px;} li{margin:5px 0;}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="(function(){var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';})()">◐ Theme</button>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Session Report — Multi-Timeframe Data, Timezones &amp; Base-Resolution Exits</h1>
+  <p class="lead">A complete, in-depth record of everything investigated and changed in this session,
+  ordered so you can jump straight to any topic. Five distinct pieces of work, plus the deep-dives that
+  explain <em>why</em> each was needed.</p>
+  <div class="headline"><strong>Headline change:</strong> when a strategy signals on an aggregated timeframe
+  (e.g. 5-MINUTE built from 1-SECOND base data), <strong>the signal/entries stay on the aggregated bar, but all
+  exit management — leg SL/Target/Trailing/ATR/Square-off and portfolio SL/Target — now runs on the BASE
+  bar</strong>, so exits fire at the exact base-data second instead of being snapped to the 5-minute grid.</div>
+  <p class="meta">m-cube · NautilusTrader backtesting platform · primary file: <code>core/managed_strategy.py</code></p>
+</header>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#s1">Load Data: user-selectable timeframe (incl. 1-SECOND)</a></li>
+    <li><a href="#s2">Index scanner fix: spot folder not detected</a></li>
+    <li><a href="#s3">Timezones &amp; the catalog: how timestamps are stored</a></li>
+    <li><a href="#s4">Square-off: how it resolves and how to disable it</a></li>
+    <li><a href="#s5">Custom adapter correctness for second data</a></li>
+    <li><a href="#s6">The exit engine: one evaluate→act pair</a></li>
+    <li><a href="#s7"><span class="star">★</span> Base-resolution exits (the main feature)</a></li>
+    <li><a href="#s8">"Market Exit" — what it means</a></li>
+    <li><a href="#s9">Verification &amp; test portfolios</a></li>
+    <li><a href="#s10">Files changed / added</a></li>
+  </ol>
+</nav>
+
+<hr>
+
+<h2 id="s1">1. Load Data — user-selectable timeframe <span class="back"><a href="#">▲ top</a></span></h2>
+<p><strong>Problem.</strong> Each asset class hard-coded a single timeframe in
+<code>adapter_admin/data_formats/&lt;class&gt;.json</code> (<code>"timeframe": "1-MINUTE"</code>), so the catalog
+could only ever hold 1-minute data per venue.</p>
+<p><strong>Change.</strong> The timeframe is now chosen on the <strong>Load Data</strong> page (same list as the
+Portfolio "base TF" dropdown, <strong>plus <code>1 sec</code></strong>) and flows through to the catalog write.
+The per-asset-class <code>timeframe</code> field was removed.</p>
+<table>
+  <tr><th>Area</th><th>File</th><th>What changed</th></tr>
+  <tr><td>Load Data UI</td><td><code>static/js/load_data.js</code></td><td>Added <code>TIMEFRAMES</code> list + a <strong>Timeframe</strong> dropdown (default <code>1-MINUTE</code>); <code>doLoad</code> sends <code>timeframe</code> in the <code>/api/csv/load</code> body</td></tr>
+  <tr><td>Portfolio UI</td><td><code>static/js/portfolio.js</code></td><td>Added <code>{ label:"1 sec", value:"1-SECOND" }</code> to <code>TIMEFRAMES</code>; <code>"1-SECOND": 1/60</code> in <code>TF_MINUTES</code></td></tr>
+  <tr><td>Load endpoint</td><td><code>server.py</code></td><td><code>/api/csv/load</code> reads <code>timeframe</code>, threads it through <code>load_csv_and_store</code> + the background job</td></tr>
+  <tr><td>Loader</td><td><code>core/nautilus_loader.py</code></td><td><code>load_csv_and_store(..., timeframe=None)</code>; uses the UI value (falls back to <code>"1-MINUTE"</code>)</td></tr>
+  <tr><td>Data formats</td><td><code>adapter_admin/data_formats/*.json</code> + admin UI</td><td>Removed the now-unused <code>timeframe</code> field</td></tr>
+</table>
+<p><strong>Nautilus format verified:</strong> <code>1-SECOND</code> is the correct tail —
+<code>BarType.from_str("…-1-SECOND-…-EXTERNAL")</code> parses, and the composite a strategy subscribes to
+(<code>…-5-MINUTE-…-INTERNAL@1-SECOND-EXTERNAL</code>) also parses. Unit is uppercase: <code>SECOND/MINUTE/HOUR/DAY</code>.</p>
+<p>You can now load, e.g., <code>nifty_futures_ms</code> at both 1-minute and 1-second; they coexist as separate
+bar-type folders in the catalog.</p>
+
+<h2 id="s2">2. Index scanner fix <span class="back"><a href="#">▲ top</a></span></h2>
+<p><strong>Symptom.</strong> Scanning <code>D:\MS\Dataset\Nifty_spot_yyyy</code> showed "no CSV files", while
+<code>Nifty_futures_yyyy</code> worked.</p>
+<p><strong>Root cause.</strong> Both folders are structurally identical (3-deep <code>YYYY/MM/&lt;file&gt;</code>, same columns,
+same <code>DD.MM.YYYY</code> prefix). The index scanner's filename regex hard-coded the token <code>complete_df</code>:</p>
+<pre><code># core/csv_loader/constants/__init__.py  (BEFORE)
+r"^(\d{2})\.(\d{2})\.(\d{4})_complete_df_OHLCV\.csv$"</code></pre>
+<p>Futures files are <code>01.01.2025_complete_df_OHLCV.csv</code> (match); spot files are
+<code>02.03.2026_nifty_spot_OHLCV.csv</code> (<strong>no</strong> match) → 0 entries.</p>
+<p><strong>Fix.</strong> Generalised the infix so any <code>DD.MM.YYYY_&lt;infix&gt;_OHLCV.csv</code> is accepted:</p>
+<pre><code># AFTER
+r"^(\d{2})\.(\d{2})\.(\d{4})_.+_OHLCV\.csv$"</code></pre>
+<p>Result: spot now returns 54 files, futures unchanged at 1376; both synthetic display names still pass the Index
+<code>filename_pattern</code>. Docs updated in <code>core/csv_loader/README.md</code> and
+<code>adapter_admin/data_formats/index.json</code>.</p>
+
+<h2 id="s3">3. Timezones &amp; the catalog <span class="back"><a href="#">▲ top</a></span></h2>
+<p>This explains the "exits at 11:30" puzzle and how data is physically stored.</p>
+
+<h3>How pandas parses a CSV timestamp</h3>
+<p><code>core/csv_loader/timestamp_parser/__init__.py</code> decides everything:</p>
+<table>
+  <tr><th>Incoming value</th><th>Has offset?</th><th>What pandas does</th><th>Stored value</th></tr>
+  <tr><td><code>2026-03-02 09:15:00</code> (naive, NIFTY)</td><td class="no">No</td><td><code>pd.to_datetime(s, utc=True)</code> <strong>relabels</strong> as UTC — no shift</td><td><code>09:15:00Z</code> (IST numbers, fake UTC)</td></tr>
+  <tr><td><code>…23:00:00.000 GMT+0000</code> (FX/commodity)</td><td class="ok">Yes +00:00</td><td>offset applied (zero shift)</td><td><code>23:00:00Z</code> — true UTC</td></tr>
+  <tr><td><code>…09:15:00 GMT+0530</code></td><td class="ok">Yes +05:30</td><td><strong>shifted −5:30</strong></td><td><code>03:45:00Z</code> — true UTC</td></tr>
+</table>
+<blockquote>Your statement "pandas always converts to UTC" is only half right: <strong>only if the source carries a
+timezone/offset</strong>. A naive timestamp is <em>relabeled</em> UTC, not converted — the numbers don't move.</blockquote>
+
+<h3>What the catalog physically stores</h3>
+<p>NautilusTrader stores every bar's <code>ts_event</code>/<code>ts_init</code> as <strong>int64 nanoseconds since the Unix epoch</strong>
+— UTC by definition. There is no per-bar timezone tag. For the NIFTY NSE-open bar the catalog holds the integer
+<code>1772442900000000000</code>:</p>
+<pre><code>decoded as UTC : 2026-03-02 09:15:00+00:00
+decoded as IST : 2026-03-02 14:45:00+05:30
+TRUE UTC of 09:15 IST NSE open : 2026-03-02 03:45:00+00:00   &larr; what it SHOULD be</code></pre>
+<p>So <strong>the unit is UTC, but the value is the IST wall-clock</strong> (09:15), because the +5:30 conversion was never
+applied at load (the source CSV is naive). <strong>Do not <code>tz_convert</code> NIFTY bars to IST</strong> — you'd get 14:45,
+which is wrong. Treat the stored UTC value <em>as</em> your IST clock.</p>
+
+<h3>Catalog audit (all 18 bar types)</h3>
+<table>
+  <tr><th>Group</th><th>Time-of-day (UTC)</th><th>Verdict</th></tr>
+  <tr><td>Crypto ×7 (COINBASE_MS)</td><td><code>00:00 .. 23:59</code></td><td class="ok">✅ true UTC (source is UTC, 24/7)</td></tr>
+  <tr><td>FX ×6 (EURUSD/USDJPY FOREX_MS)</td><td><code>00:00 .. 23:59</code></td><td class="ok">✅ true UTC (GMT offset applied; week opens Sun 22:00 UTC)</td></tr>
+  <tr><td>Commodity ×3 (LIGHTCMD COMMODITIES_MS)</td><td><code>00:00 .. 23:59</code></td><td class="ok">✅ true UTC (<code>GMT+0000</code>)</td></tr>
+  <tr><td><strong>NIFTY spot 1-sec</strong></td><td><code>09:15 .. 15:29</code></td><td class="no">❌ IST stored as UTC</td></tr>
+  <tr><td><strong>NIFTY futures 1-min</strong></td><td><code>09:15 .. 19:14</code></td><td class="no">❌ IST stored as UTC (+ a tail past 15:30 worth checking)</td></tr>
+</table>
+<p><strong>16/18 are genuine UTC; the 2 NIFTY datasets are IST-stored-as-UTC.</strong></p>
+
+<h3>The 11:30 square-off artifact</h3>
+<p><code>squareoff_time:"17:00"</code> + <code>squareoff_tz:"Asia/Kolkata"</code> is the <em>only</em> setting that applies a real
+tz conversion (<code>managed_strategy.py</code> converts the bar's UTC ts → Asia/Kolkata before comparing). With
+IST-as-UTC bars, <code>17:00 IST → 11:30 UTC</code>, so the square-off fired at 11:30 in the data clock — 5.5 h "early".
+The entry window, by contrast, is compared <strong>naively in UTC</strong>, so 09:30 lined up correctly by accident.</p>
+<blockquote><strong>Practical rule for NIFTY:</strong> keep <code>squareoff_tz = UTC</code> and put <strong>IST clock numbers</strong> in the time
+field (e.g. <code>15:25</code> = 15:25 IST in the data). A <code>17:00</code> square-off can never fire on NSE data anyway (the
+session ends 15:30).</blockquote>
+
+<h2 id="s4">4. Square-off resolution <span class="back"><a href="#">▲ top</a></span></h2>
+<p>Precedence is <strong>leg &gt; slot &gt; portfolio</strong> (<code>core/models/squareoff/__init__.py</code>), with a product-type
+default: explicit <code>portfolio.squareoff_time</code> wins; else if <code>product=="MIS"</code>, <code>mis_squareoff_time</code>; else
+none. <code>_parse_squareoff_minute</code> returns <strong>−1 (disabled)</strong> when the time is <code>None</code>/empty.</p>
+<p><strong>To disable square-off:</strong> clear the <strong>SqOff Time</strong> field on the Timing tab (it's two-way-linked with the
+MIS field, so both clear) → <code>squareoff_time</code> becomes <code>null</code>. Or set <code>"squareoff_time": null</code> in the JSON.</p>
+<blockquote class="bad">⚠️ With SL, Target <em>and</em> square-off all off, the only thing that closes the position is the
+end-of-backtest flatten → a single <strong>"Market Exit"</strong> (see §8).</blockquote>
+
+<h2 id="s5">5. Custom adapter for second data <span class="back"><a href="#">▲ top</a></span></h2>
+<p>The custom venue config (<code>adapter_admin/adapters_config/nifty_futures_ms.json</code>, <code>account_base_currency: INR</code>,
+session window, empty <code>fx_conversion</code>) is applied <strong>identically for 1-second and 1-minute</strong> data:</p>
+<ul>
+  <li><strong>Venue parsing is timeframe-independent</strong> — <code>venue_from_bar_type</code> splits on the instrument-id part only
+  (<code>core/venue_config.py</code>). <code>…-1-SECOND-…</code> and <code>…-1-MINUTE-…</code> resolve the same venue.</li>
+  <li><strong>FX/PnL conversion</strong> uses <code>pandas.asof()</code> — works at any resolution.</li>
+  <li><strong>Session-window derivation</strong> uses <code>HH:MM:SS</code> — second-precise.</li>
+</ul>
+<p>Two caveats (neither blocks second data):</p>
+<ul>
+  <li><strong>Entry-window &amp; square-off time matching is minute-granular</strong> (<code>_NANOS_PER_MINUTE</code> / <code>_squareoff_min</code>).
+  Whole-minute config is exact; sub-minute seconds in those <em>config fields</em> are dropped.</li>
+  <li><strong>The engine account currency is hard-coded <code>USD</code></strong> in <code>add_venue</code>, but PnL is read per-position in the
+  instrument's own currency (INR) and converted by the resolver (base INR, empty rules → identity) → reported in INR.
+  This is the same for all timeframes, so it's not a second-data issue.</li>
+</ul>
+
+<h2 id="s6">6. The exit engine <span class="back"><a href="#">▲ top</a></span></h2>
+<p>There isn't one single function for <em>every</em> exit, but exits funnel through a small, well-defined set in
+<code>core/managed_strategy.py</code>:</p>
+<pre><code>_on_primary_bar()                       per-bar orchestrator
+   ├─ square-off check ─→ _force_squareoff()      (time exit, plain close)
+   └─ _check_exits()  ─→ _handle_exit()           (price exits + actions)</code></pre>
+<ul>
+  <li><strong><code>_check_exits</code></strong> is the single evaluator for <strong>all price-based exits</strong>: highest-profit,
+  move-SL-to-cost, trailing-SL, target-lock, SL trigger, TP trigger.</li>
+  <li><strong><code>_handle_exit(exit_type, was_long, close)</code></strong> is the single dispatcher for what happens after SL/TP
+  fires: parses <code>on_sl_action</code>/<code>on_target_action</code> and runs <strong>close / re_execute / reverse / execute / re_entry</strong>.</li>
+  <li><strong>Square-off</strong> is deliberately separate (<code>_force_squareoff</code>) so it's always a plain close — it never
+  accidentally re_executes or reverses.</li>
+</ul>
+
+<h2 id="s7"><span class="star">★</span> 7. Base-resolution exits <span class="pill">main feature</span> <span class="back"><a href="#">▲ top</a></span></h2>
+<h3>The problem</h3>
+<p>In aggregating mode the old <code>on_bar</code> fed each base bar to the aggregator and only acted on the
+<strong>emitted</strong> aggregated bar:</p>
+<pre><code># BEFORE — core/managed_strategy.py
+if self._aggregating:
+    agg = self._primary_agg.on_bar(bar)
+    if agg is None:
+        return                 # &larr; every mid-window base bar bailed: no exit check
+    self._feed_indicators(agg)
+    self._on_primary_bar(agg)  # &larr; signal AND exits both on the 5-min bar</code></pre>
+<p>So SL/Target/Trailing/Square-off were only evaluated once per 5-minute window → all exit timestamps snapped to
+5-minute boundaries.</p>
+
+<h3>The fix (one file: <code>core/managed_strategy.py</code>)</h3>
+<p><code>_on_primary_bar</code> is <strong>left untouched</strong> (so the non-aggregating path is byte-for-byte identical). Two helpers
+split its responsibilities, used <strong>only</strong> by the aggregating branch:</p>
+<ul>
+  <li><strong><code>_manage_open_position(bar, bid, ask)</code></strong> — runs on <strong>every base bar</strong>: mark-price roll, square-off,
+  and SL/Target/Trailing via the <strong>unchanged</strong> <code>_check_exits</code> / <code>_force_squareoff</code>.</li>
+  <li><strong><code>_evaluate_entry(agg_bar)</code></strong> — runs only on <strong>window close</strong>: RBO, readiness gate, and the
+  <strong>unchanged</strong> <code>_check_entries</code>.</li>
+</ul>
+<pre><code># AFTER — Format B/C (ohlcv/ltp/mark)
+if self._aggregating:
+    if self._exit_fmt != "bidask":
+        self._manage_open_position(bar)          # exits on EVERY base bar
+        agg = self._primary_agg.on_bar(bar)
+        if agg is not None:
+            self._feed_indicators(agg)
+            self._evaluate_entry(agg)            # signal/entry on window close
+    else:
+        self._on_bar_aggregating_bidask(bar)     # Format A, reworked
+    return</code></pre>
+<p><strong>Format A (bid/ask)</strong> was reworked to buffer the <strong>base</strong> (primary, bid, ask) trio for exits (reusing the
+no-aggregation trio logic) and use the aggregated primary for entries — so the 5-minute bid/ask aggregators were
+removed and <code>on_start</code> simplified.</p>
+
+<h3>Why portfolio SL/TP needed no change</h3>
+<p>Portfolio SL/Target is a <strong>post-run equity-curve clip</strong> (<code>portfolio_clip</code>) keyed off each leg's
+position-close timestamps. Once leg exits are base-granular, the clip automatically becomes base-granular too.</p>
+
+<h3>Deliberate scoping / behavior notes</h3>
+<ul>
+  <li><strong>RBO stays on the aggregated (signal) bar</strong> — it's entry-side logic.</li>
+  <li><strong>Mark-price <code>_prev_close</code> now rolls per base bar</strong> (the exit-trigger reference).</li>
+  <li>On the boundary base bar an exit and a fresh entry can both occur in one <code>on_bar</code>; existing re-entry guards govern this.</li>
+  <li><strong>Performance:</strong> exit checks now run ~300× more often (per second vs per 5 min); cheap, indicators still feed only on emission.</li>
+</ul>
+
+<h3>What is explicitly NOT changed</h3>
+<p><code>_check_exits</code>, <code>_handle_exit</code>, <code>_force_squareoff</code>, <code>_check_entries</code>, every
+SL/TP/trailing/target-lock/move-to-cost/square-off parameter, the portfolio-clip code, and the entire
+non-aggregating path.</p>
+
+<h2 id="s8">8. "Market Exit" explained <span class="back"><a href="#">▲ top</a></span></h2>
+<p><code>core/report_generator.py::_determine_reason</code> derives the exit reason as <strong>tags &gt; order type</strong>. A close
+<em>with</em> a reason tag shows "Stop Loss" / "Take Profit" / "Trailing SL" / "Squareoff" / "Reverse on SL". A close
+with <strong>no tag</strong> falls back to the order type → a reduce-only <code>MARKET</code> order becomes <strong>"Market Exit"</strong>.</p>
+<table>
+  <tr><th>Close path</th><th>Tag</th></tr>
+  <tr><td>SL / Target / Trailing hit</td><td>"Stop Loss" / "Take Profit" / "Trailing SL"</td></tr>
+  <tr><td>Square-off time</td><td>"Squareoff"</td></tr>
+  <tr><td>Reverse action on SL/TP</td><td>"Reverse on SL/TP"</td></tr>
+  <tr><td><strong>End of backtest</strong> (<code>on_stop</code> flatten)</td><td><strong>(untagged → "Market Exit")</strong></td></tr>
+</table>
+<p><strong>Why Portfolio 30 still showed 5-minute exits:</strong> at the time it had <strong>no SL, no Target, no square-off</strong>, and
+the EMA Cross signal only <em>opens</em> when flat (it does not flip on the opposite cross). So the only close is the
+end-of-run flatten → a single untagged <strong>"Market Exit"</strong>. The base-resolution change moves
+<strong>SL/Target/Trailing/Square-off</strong> to the base bar — Portfolio 30 had none of those enabled, so there was nothing
+to relocate. <strong>Add an SL/Target/square-off to see 1-second exits.</strong></p>
+<blockquote>Also: the running Flask server caches the imported module — <strong>restart <code>python server.py</code></strong> to pick up the
+<code>managed_strategy.py</code> change.</blockquote>
+
+<h2 id="s9">9. Verification &amp; test portfolios <span class="back"><a href="#">▲ top</a></span></h2>
+<h3>Regression checks (all green)</h3>
+<ul>
+  <li><code>pytest tests/</code> → <strong>253 passed</strong> (aggregator, three-format engine, strategy-subscribe-tf, leg-target).</li>
+  <li><code>tests/run_agg_mis_nrml_tests.py</code> → <strong>4/4 PASS</strong> (aggregation coarseness, the reworked Format-A bid/ask path, MIS/NRML square-off).</li>
+</ul>
+<h3>Direct proof (EURUSD 5-min signal / 1-min base, tight SL/TP)</h3>
+<table>
+  <tr><th>Fill type</th><th>Count</th><th>Off the 5-min grid</th></tr>
+  <tr><td>EMA Cross BUY/SELL (entries)</td><td>428</td><td class="ok"><strong>0</strong> — on the signal grid ✓</td></tr>
+  <tr><td>Stop Loss (exits)</td><td>266</td><td class="ok"><strong>211</strong> — base resolution ✓</td></tr>
+  <tr><td>Take Profit (exits)</td><td>162</td><td class="ok"><strong>120</strong> — base resolution ✓</td></tr>
+</table>
+<h3>Base-resolution suite — <code>tests/base_exit_resolution_suite.py</code> → <span class="ok">11/11 PASS</span></h3>
+<p>Generates these runnable portfolios into <code>portfolios/_default/</code> (NIFTY 1-sec base unless noted) and asserts
+entries-on-signal-grid + exits-at-base-resolution:</p>
+<table>
+  <tr><th>Portfolio</th><th>Covers</th><th>Exits on-grid (lower better)</th></tr>
+  <tr><td><code>BXT_01_sl_tgt_5m</code></td><td>SL 0.1% + Target 0.15%</td><td>0.02</td></tr>
+  <tr><td><code>BXT_02_squareoff_5m</code></td><td>Square-off @ <strong>11:02</strong> (off the grid)</td><td>0.00</td></tr>
+  <tr><td><code>BXT_03_trailing_5m</code></td><td>Trailing SL</td><td>0.00</td></tr>
+  <tr><td><code>BXT_04_sl_reexecute_5m</code></td><td><code>on_sl_action=re_execute</code> ×3</td><td>0.09</td></tr>
+  <tr><td><code>BXT_05_sl_reverse_5m</code></td><td><code>on_sl_action=reverse</code></td><td>0.00</td></tr>
+  <tr><td><code>BXT_06_atr_sl_5m</code></td><td>ATR SL + ATR target</td><td>0.11</td></tr>
+  <tr><td><code>BXT_07_ltp_5m</code></td><td>LTP exit format (Format C)</td><td>0.02</td></tr>
+  <tr><td><code>BXT_08_agg_1hour</code></td><td>1-HOUR signal / 1-sec base</td><td>0.00</td></tr>
+  <tr><td><code>BXT_09_noagg_control</code></td><td>No aggregation (base == signal)</td><td>n/a — 95% have seconds</td></tr>
+  <tr><td><code>BXT_10_pf_sl_tgt_5m</code></td><td><strong>Portfolio</strong> SL + Target</td><td>0.02 (pf-clip fired)</td></tr>
+  <tr><td><code>BXT_11_format_a_bidask_fx</code></td><td><strong>Format-A bid/ask</strong> (EURUSD 1-min base)</td><td>0.25</td></tr>
+  <tr><td><code>Base Exit Test</code></td><td>SL + Target (hand-made)</td><td>—</td></tr>
+</table>
+<p>Sample exit timestamps (NIFTY 1-sec base, 5-min signal) — note the seconds:</p>
+<pre><code>Take Profit -> 2026-03-02 11:20:06
+Take Profit -> 2026-03-02 11:59:22
+Stop Loss   -> 2026-03-02 14:03:26
+Stop Loss   -> 2026-03-02 14:05:14</code></pre>
+<blockquote><strong>How to check in the UI:</strong> restart the server, open any <code>BXT_</code> portfolio, run it, and read the
+order-book <strong>EXIT TIME</strong> column — SL/Target/Trailing/Square-off/Reverse rows show real seconds while ENTRY TIME
+stays on the signal grid.</blockquote>
+
+<h2 id="s10">10. Files changed / added <span class="back"><a href="#">▲ top</a></span></h2>
+<p><strong>Feature — base-resolution exits</strong></p>
+<ul>
+  <li><code>core/managed_strategy.py</code> — split helpers (<code>_manage_open_position</code>, <code>_evaluate_entry</code>); rewired
+  aggregating Format B/C branch; reworked <code>_on_bar_aggregating_bidask</code>; simplified <code>on_start</code> (dropped bid/ask
+  aggregators; removed dead <code>_collect_agg</code>/<code>_drain_agg_pending</code>).</li>
+</ul>
+<p><strong>Feature — Load Data timeframe</strong></p>
+<ul>
+  <li><code>static/js/load_data.js</code>, <code>static/js/portfolio.js</code>, <code>server.py</code>, <code>core/nautilus_loader.py</code>,
+  <code>adapter_admin/data_formats/*.json</code>, <code>adapter_admin/static/js/data_formats.js</code>, <code>adapter_admin/admin_server.py</code>.</li>
+</ul>
+<p><strong>Fix — index scanner</strong></p>
+<ul>
+  <li><code>core/csv_loader/constants/__init__.py</code>, <code>core/csv_loader/README.md</code>, <code>adapter_admin/data_formats/index.json</code>.</li>
+</ul>
+<p><strong>Tests / portfolios added</strong></p>
+<ul>
+  <li><code>tests/base_exit_resolution_suite.py</code> (generator + verifier)</li>
+  <li><code>portfolios/_default/BXT_01..11_*.json</code>, <code>portfolios/_default/Base Exit Test.json</code></li>
+</ul>
+<p><strong>Known stale harnesses (pre-existing, unrelated)</strong></p>
+<ul>
+  <li><code>verify_session_changes.py</code> crashes on a missing <code>core/backtest_runner.py</code> (the runner was long ago split
+  into a package); it never reads <code>managed_strategy.py</code>.</li>
+</ul>
+
+<hr>
+<p class="meta">Generated from <code>BASE_RESOLUTION_EXITS_REPORT.md</code> · self-contained HTML, no external assets · toggle theme top-right.</p>
+
+</div>
+</body>
+</html>

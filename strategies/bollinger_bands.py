@@ -12,17 +12,23 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.trading.strategy import Strategy
 
+from core.aggregating_strategy import AggregatingStrategyMixin
+from strategies._shared.entry_tags import bollinger_reason
+
 
 class BollingerConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     trade_size: Decimal = Decimal("1")
     extra_bar_types: list[BarType] | None = None
+    # Target EXTERNAL bar type to aggregate the base stream up to (custom
+    # streaming aggregator). Empty ⇒ no aggregation (runs on base, unchanged).
+    aggregate_to_bar_type: str = ""
     bb_period: PositiveInt = 20
     bb_std: float = 2.0
 
 
-class BollingerBandsStrategy(Strategy):
+class BollingerBandsStrategy(AggregatingStrategyMixin, Strategy):
     """Buy when price touches lower band, sell when price touches upper band."""
 
     def __init__(self, config: BollingerConfig) -> None:
@@ -36,7 +42,14 @@ class BollingerBandsStrategy(Strategy):
             self.log.error(f"Could not find instrument for {self.config.instrument_id}")
             self.stop()
             return
-        self.register_indicator_for_bars(self.config.bar_type, self.bb)
+        aggregating = self._setup_aggregation(
+            self.instrument,
+            self.config.bar_type,
+            self.config.aggregate_to_bar_type,
+            [self.bb],
+        )
+        if not aggregating:
+            self.register_indicator_for_bars(self.config.bar_type, self.bb)
         self.subscribe_bars(self.config.bar_type)
         if self.config.extra_bar_types:
             for bt in self.config.extra_bar_types:
@@ -47,7 +60,10 @@ class BollingerBandsStrategy(Strategy):
         # feed indicators but must not drive order submission.
         if bar.bar_type != self.config.bar_type:
             return
-        if not self.indicators_initialized():
+        bar = self._route_bar(bar)
+        if bar is None:
+            return
+        if not self._indicators_ready():
             return
 
         close = float(bar.close)
@@ -55,14 +71,14 @@ class BollingerBandsStrategy(Strategy):
         p = int(self.config.bb_period)
         sd = float(self.config.bb_std)
         if close <= self.bb.lower:
-            reason = f"Bollinger BUY: close={close:.4f} ≤ lower({sd}σ,p{p})={self.bb.lower:.4f}"
+            reason = bollinger_reason(OrderSide.BUY, close, self.bb.lower, sd, p)
             if self.portfolio.is_flat(self.config.instrument_id):
                 self._submit_order(OrderSide.BUY, reason)
             elif self.portfolio.is_net_short(self.config.instrument_id):
                 self.close_all_positions(self.config.instrument_id)
                 self._submit_order(OrderSide.BUY, reason)
         elif close >= self.bb.upper:
-            reason = f"Bollinger SELL: close={close:.4f} ≥ upper({sd}σ,p{p})={self.bb.upper:.4f}"
+            reason = bollinger_reason(OrderSide.SELL, close, self.bb.upper, sd, p)
             if self.portfolio.is_flat(self.config.instrument_id):
                 self._submit_order(OrderSide.SELL, reason)
             elif self.portfolio.is_net_long(self.config.instrument_id):
@@ -82,6 +98,7 @@ class BollingerBandsStrategy(Strategy):
         self.submit_order(order)
 
     def on_stop(self) -> None:
+        self._flush_aggregator()
         self.cancel_all_orders(self.config.instrument_id)
         self.close_all_positions(self.config.instrument_id)
 

@@ -675,18 +675,19 @@ class TestLoadAllCustomStrategies:
 class TestGetMergedRegistry:
     def test_no_custom_strategies(self, tmp_path: Path):
         merged, warnings = get_merged_registry(tmp_path)
-        # Should have the 4 built-in strategies
+        # Should have the 5 built-in strategies
         assert "EMA Cross" in merged
         assert "RSI Mean Reversion" in merged
         assert "Bollinger Bands" in merged
         assert "4 Moving Averages" in merged
-        assert len(merged) == 4
+        assert "Range Breakout" in merged
+        assert len(merged) == 5
 
     def test_with_custom_strategies(self, tmp_path: Path):
         _write(tmp_path, VALID_STRATEGY_SRC, "custom.py")
         merged, warnings = get_merged_registry(tmp_path)
         assert "Good Strategy" in merged
-        assert len(merged) == 5  # 4 built-in + 1 custom
+        assert len(merged) == 6  # 5 built-in + 1 custom
 
     def test_name_collision_with_builtin(self, tmp_path: Path):
         code = VALID_STRATEGY_SRC.replace('STRATEGY_NAME = "Good Strategy"', 'STRATEGY_NAME = "EMA Cross"')
@@ -698,7 +699,7 @@ class TestGetMergedRegistry:
 
     def test_custom_strategies_dir_missing(self, tmp_path: Path):
         merged, warnings = get_merged_registry(tmp_path / "nonexistent")
-        assert len(merged) == 4  # just built-ins
+        assert len(merged) == 5  # just built-ins
 
 
 # ===========================================================================

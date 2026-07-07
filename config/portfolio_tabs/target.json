@@ -11,7 +11,7 @@
         { "key": "target_enabled", "label": "Enable Target", "type": "checkbox", "default": false, "html_id": "pf-m-tgt-enabled", "backend_enabled": false },
         { "key": "target_type", "label": "Target Type", "type": "select", "default": "Combined Profit", "options": ["Combined Profit","Combined Premium","Absolute Combined Premium","Underlying Movement"], "html_id": "pf-m-tgt-type", "backend_enabled": false },
         { "key": "target_value", "label": "Target Value", "type": "number", "default": 0, "min": 0, "step": 0.01, "html_id": "pf-m-tgt-value", "backend_enabled": false },
-        { "key": "on_target", "label": "On Target", "type": "select", "default": "SqOff", "options": ["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute SameStrike at EntryPrice"], "html_id": "pf-m-tgt-action", "backend_enabled": false },
+        { "key": "on_target", "label": "On Target", "type": "select", "default": "SqOff", "options": ["SqOff","SqOff Other Portfolio","Execute Other Portfolio","Start Other Portfolio","ReExecute","ReExecute at Entry Price","ReExecute Same Contract at EntryPrice"], "html_id": "pf-m-tgt-action", "backend_enabled": false },
         { "key": "target_delay", "label": "Delay (sec)", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-tgt-delay", "backend_enabled": false },
         { "key": "target_reexecute_count", "label": "ReExecute Count (0 = Unlimited)", "type": "number", "default": 0, "min": 0, "step": 1, "html_id": "pf-m-tgt-reexcount", "backend_enabled": false }
       ]

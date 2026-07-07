@@ -1,0 +1,50 @@
+[33m101bdaf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mPath_A_LowAPI[m[33m)[m Merged
+[33mace1bc5[m SL commit
+[33mea4dcd4[m[33m ([m[1;31morigin/Path_A_LowAPI[m[33m)[m SL updates
+[33m6054002[m Fixed report generation
+[33mda2fb56[m Moving to Test A branch , other than that everything is same
+[33m64c22e5[m[33m ([m[1;31morigin/test_path_B[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Add Path B extreme stress test, expand reports, and refine strategy/portfolio configs
+[33me48e7cc[m Add multi-user identity layer, audit/stress test harnesses, and portfolio reorg
+[33m1b443af[m Fix RBO phase transition to allow entry on breakout bar
+[33m6ecbc5d[m Add Range Breakout gate, weekday/entry-window filters, defensive portfolio loader, and decisive win-rate metric
+[33m2919eaa[m Spread-aware FX fills via MID auto-pair, fiat precision overrides, and venue filter UI
+[33mc68e3a5[m Add orderbook page with API endpoints, UI table, and nav integration
+[33m98fc629[m Add day-based win metrics, portfolio tab configs, logic docs, and UI enhancements
+[33mc644bfb[m UI light-theme overhaul, trader_id portfolio filtering, and report download endpoint
+[33m4150ab1[m Speed up tab switching and preserve selections across nav
+[33ma3a3ee7[m Update .claude/settings.local.json with new Bash allow-list entries
+[33m24b63b3[m Simplify start.bat: drop Python auto-install, poll server before browser open
+[33m9767b00[m Fix start.bat flash-and-close for testers
+[33m1977817[m Add start.bat one-click setup-and-run for testers
+[33m82cf8b4[m Speed up FX CSV ingest 2.4x via PyArrow read + timestamp parse
+[33m4a04e65[m Clean up FX ingest: drop dead code, dedupe CSV loader
+[33m4571586[m Pin markdown==3.10.2 for render_report_html.py
+[33ma059e42[m Add profiling/parity scripts, BTSoftware design doc, runtime usage notes
+[33mdd0c7be[m Add perf-optimisation behaviour-equivalence safety net
+[33mc51fb7c[m Switch benchmark FX portfolios + adapter to MID bars
+[33m8556be5[m Background CSV ingest jobs + portfolio squareoff UI
+[33mddd17ae[m Update strategy on_bar guards to reflect MID-only primary path
+[33mfaabb35[m Refactor backtest engine: slot grouping, phase profiling, faster reports
+[33m236113a[m Gitignore scratch/session outputs and in-progress artifacts; add portfolio setup guide
+[33m5f74e37[m Add adapter admin UI, custom web frontend, strategy library, and new core modules
+[33m756cf85[m Refactor core modules; remove deprecated Streamlit UI, HTML app, and old crypto parquet data
+[33m877eed3[m Add README and MIT LICENSE for public release
+[33m4634114[m Engine-level perf tuning + worker-local bar cache + LPT scheduling
+[33mcd1d913[m Add decade-wide (2015-2024) benchmark portfolio
+[33ma156961[m Honor data_format.price_precision / size_precision in ingest pipeline
+[33m07f568d[m gitignore benchmark scratch catalogs and large sample outputs
+[33mec38adb[m Parallelize FX bulk ingest at the (instrument, side) level
+[33m5d5e4de[m Parallelize backtests with ProcessPoolExecutor and fix FX price precision
+[33mf6f4efc[m Update project: add HTML frontend, new catalog data, and cleanup old files
+[33m7b6718c[m Update backtest system with new reports and custom strategy
+[33meeab2f5[m Add reports, catalog data, and claude settings to repo
+[33mec8efec[m Add auto-save CSV reports and update gitignore
+[33m6ae80fa[m Remove nautilus_trader source directory from repo
+[33m00d2245[m Merge remote mohit/main with allow-unrelated-histories
+[33mb3bea1e[m Add custom strategy upload for dynamic backtesting
+[33mb1d39a5[m Add HTML backtest report generation and fix trade counting
+[33m4c79872[m Add new dependencies to requirements.txt
+[33m17d5b31[m Initial commit: crypto data app with nautilus trader
+[33m270236a[m Add 4 Moving Averages strategy and fix bool param rendering
+[33m2f8e57d[m Update backtest runner, CSV loader, and UI pages
+[33m2c7f65c[m Initial commit: NautilusTrader Crypto Data Dashboard

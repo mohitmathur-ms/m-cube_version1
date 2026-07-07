@@ -1,0 +1,2 @@
+- [Catalog persistence](catalog-persistence.md) — how /app/catalog resolves in-container and how to persist it (bind vs named volume)
+- [dckr docs index](dckr-docs-index.md) — KB location + topic→doc map; no compose file in repo yet, Dockerfile is multi-stage

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Target Execution Logic — Three-Format Engine</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+    --fmtA-bg: #e6f7ff; --fmtA-border: #0969da;
+    --fmtB-bg: #fff4e6; --fmtB-border: #9a6700;
+    --fmtC-bg: #fbefff; --fmtC-border: #8250df;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #1a7f37 0%, #0969da 100%); color: white; padding: 40px; margin: -32px -40px 32px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 28px; }
+  header.cover .subtitle { margin: 0; font-size: 15px; opacity: 0.9; }
+  h2 { font-size: 22px; margin-top: 40px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 17px; margin-top: 24px; }
+  h4 { font-size: 14px; margin-top: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f6f8fa; }
+  td.center, th.center { text-align: center; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; color: #d63384; }
+  pre { background: #f6f8fa; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; overflow-x: auto; font-size: 13px; }
+  pre code { background: none; color: var(--text); padding: 0; }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout strong { color: var(--accent); }
+  .fmt-block { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 12px 0; }
+  .fmt-block.fmtA { border-left: 4px solid var(--fmtA-border); background: var(--fmtA-bg); }
+  .fmt-block.fmtB { border-left: 4px solid var(--fmtB-border); background: var(--fmtB-bg); }
+  .fmt-block.fmtC { border-left: 4px solid var(--fmtC-border); background: var(--fmtC-bg); }
+  .fmt-block.shared { border-left: 4px solid var(--green); background: var(--green-bg); }
+  .fmt-block h4 { margin: 0 0 8px; color: var(--text); }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; line-height: 1.4; }
+  .badge-A { background: var(--fmtA-bg); color: var(--fmtA-border); border: 1px solid var(--fmtA-border); }
+  .badge-B { background: var(--fmtB-bg); color: var(--fmtB-border); border: 1px solid var(--fmtB-border); }
+  .badge-C { background: var(--fmtC-bg); color: var(--fmtC-border); border: 1px solid var(--fmtC-border); }
+  .badge-shared { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+  .level-card { background: var(--panel); border: 2px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 8px 0; }
+  .level-card h4 { margin: 0 0 4px; color: var(--accent); font-size: 14px; text-transform: none; letter-spacing: 0; }
+  .level-card .level-desc { font-size: 13px; color: var(--muted); }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Target Execution Logic — Three-Format Engine</h1>
+  <p class="subtitle">Execution rules for the Target side. Parallel to execution_logic.md (SL).</p>
+</header>
+
+<div class="callout">
+  <strong>Three formats supported:</strong>
+  <span class="badge badge-A">A — Bid/Ask</span>
+  <span class="badge badge-B">B — OHLCV</span>
+  <span class="badge badge-C">C — LTP</span>
+</div>
+
+<h2 id="hierarchy">1. Hierarchy Structure</h2>
+<div class="level-card"><h4>Level 1 — Leg</h4></div>
+<div class="level-card"><h4>Level 2 — Portfolio</h4></div>
+<div class="level-card"><h4>Level 3 — User</h4></div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#hierarchy">1. Hierarchy Structure</a></li>
+    <li><a href="#conv">2. Conventions</a></li>
+    <li><a href="#adapter">3. Adapter Contract</a></li>
+    <li><a href="#leg">4. Leg-Level Target Execution</a></li>
+    <li><a href="#portfolio">5. Portfolio-Level Target Execution</a></li>
+    <li><a href="#user">6. User-Level Target Execution</a></li>
+    <li><a href="#reexec">7. ReExecute Gating Flags</a></li>
+    <li><a href="#exit">8. Exit Mechanics</a></li>
+    <li><a href="#timing">9. Timing Gates</a></li>
+    <li><a href="#xref">10. Format Cross-Reference</a></li>
+    <li><a href="#tags">11. Portfolio Tags — Feature Request</a></li>
+    <li><a href="#sl-xref">Cross-reference to SL doc</a></li>
+  </ol>
+</nav>
+
+<h2 id="conv">2. Conventions</h2>
+<table>
+  <thead><tr><th>Item</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Bar granularity</td><td>1-minute (default)</td></tr>
+    <tr><td>Asset classes</td><td>NIFTY-FUT · BANKNIFTY-FUT · US Index Spot · Stocks · Crypto · Commodity · Currency</td></tr>
+    <tr><td>Currency</td><td>Binary INR/USD current; multi-currency proposed via TBD-3</td></tr>
+    <tr><td>Threshold inputs</td><td>Accept absolute or % input (per-field notes in the applicability tables)</td></tr>
+    <tr><td>Underlying</td><td>Defaults to self; spot parked per TBD-5</td></tr>
+  </tbody>
+</table>
+
+<h2 id="adapter">3. Adapter Contract</h2>
+<p>Identical to SL doc §3 — same Format A / B / C adapters. See <code>execution_logic.html</code> §3 for full field tables and VWAP definition.</p>
+
+<h3>Key fields summary</h3>
+<div class="fmt-block fmtA">
+  <h4><span class="badge badge-A">Format A — Bid/Ask</span></h4>
+  <p>Exposes: bid OHLC, ask OHLC, <code>bid_v</code>, <code>ask_v</code>, <code>bid_vwap</code>, <code>ask_vwap</code>, <code>mid_vwap</code>, <code>mark_price</code> (crypto only).</p>
+</div>
+<div class="fmt-block fmtB">
+  <h4><span class="badge badge-B">Format B — OHLCV</span></h4>
+  <p>Exposes: <code>open/high/low/close</code>, <code>volume</code>, <code>vwap</code>, <code>ltp = close</code>, <code>mark_price</code> (crypto only).</p>
+</div>
+<div class="fmt-block fmtC">
+  <h4><span class="badge badge-C">Format C — LTP</span></h4>
+  <p>Exposes: <code>ltp</code> (Last Traded Price), <code>timestamp</code>, <code>mark_price</code> (crypto only).</p>
+</div>
+
+<h3>VWAP (Formats A &amp; B)</h3>
+<pre><code>VWAP = (H + L + C) / 3 × candle_weight
+candle_weight = volume of that candle / total aggregate volume for that day till that point in time</code></pre>
+
+<h3>Mark Price (crypto only)</h3>
+<p>Exchange-published fair-value reference. Filters out manipulation via single-venue wicks. When adapter exposes <code>mark_price</code>, user may configure trigger/fill to reference it instead of bid/ask/LTP.</p>
+
+<div class="callout"><strong>Volume caveat (default — currency &amp; commodity):</strong> Volume is broker-dependent. VWAP still computes, but weights quote depth rather than executed flow for these asset classes.</div>
+
+<h2 id="leg">4. Leg-Level Target Execution</h2>
+
+<h3>4.1 Target Trigger</h3>
+<div class="fmt-block fmtA">
+  <h4><span class="badge badge-A">Format A</span></h4>
+  <table><thead><tr><th>Direction</th><th>Target trigger</th></tr></thead>
+  <tbody>
+    <tr><td>SELL</td><td><code>bid_low &lt;= tgt_val</code></td></tr>
+    <tr><td>BUY</td><td><code>ask_high &gt;= tgt_val</code></td></tr>
+  </tbody></table>
+</div>
+<div class="fmt-block fmtB">
+  <h4><span class="badge badge-B">Format B</span></h4>
+  <table><thead><tr><th>Direction</th><th>Target trigger</th></tr></thead>
+  <tbody>
+    <tr><td>SELL</td><td><code>low &lt;= tgt_val</code></td></tr>
+    <tr><td>BUY</td><td><code>high &gt;= tgt_val</code></td></tr>
+  </tbody></table>
+</div>
+<div class="fmt-block fmtC">
+  <h4><span class="badge badge-C">Format C — LTP</span></h4>
+  <table><thead><tr><th>Direction</th><th>Target trigger</th></tr></thead>
+  <tbody>
+    <tr><td>SELL</td><td><code>ltp &lt;= tgt_val</code></td></tr>
+    <tr><td>BUY</td><td><code>ltp &gt;= tgt_val</code></td></tr>
+  </tbody></table>
+</div>
+
+<h3>4.2 Target Fill-Price Formula</h3>
+<div class="callout"><strong>Rule:</strong> SELL exits MAX(vwap, hit) — conservative; BUY exits MIN(vwap, hit) — conservative.</div>
+<div class="fmt-block fmtA">
+  <h4><span class="badge badge-A">Format A</span></h4>
+<pre><code>TGT — SELL:  exit = ask_vwap if ask_vwap &gt; bid_low   else bid_low
+TGT — BUY:   exit = bid_vwap if bid_vwap &lt; ask_high  else ask_high</code></pre>
+</div>
+<div class="fmt-block fmtB">
+  <h4><span class="badge badge-B">Format B</span></h4>
+<pre><code>TGT — SELL:  exit = vwap if vwap &gt; low   else low
+TGT — BUY:   exit = vwap if vwap &lt; high  else high</code></pre>
+</div>
+<div class="fmt-block fmtC">
+  <h4><span class="badge badge-C">Format C</span></h4>
+<pre><code>TGT — SELL:  exit = ltp
+TGT — BUY:   exit = ltp</code></pre>
+</div>
+
+<h3>4.3 Target Wait / Delay</h3>
+<p>Same as SL doc §4.3. Shares <code>delay_pending</code> state with SL Wait.</p>
+
+<h3>4.4 Target Value Parsing</h3>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same in all three formats</span></h4>
+<pre><code>SELL leg:
+    Premium with %:    tgt = entry × (1 - pct/100)
+    Premium absolute:  tgt = entry - value
+
+BUY leg:
+    Premium with %:    tgt = entry × (1 + pct/100)
+    Premium absolute:  tgt = entry + value</code></pre>
+  <p>Type variants: <code>None</code>, <code>Premium</code> (alias: <code>PremiumBased</code>), <code>AbsolutePremium</code>, <code>Underlying</code> (not implemented at leg level — use portfolio level).</p>
+</div>
+
+<h3>4.5 Leg-Level Actions on Target Hit (5 types)</h3>
+<p>Same 5 actions as SL: SqOff · Re-Execute · Execute · ReEntry · KeepLegRunning. Configured under <code>On Target Actions</code>.</p>
+
+<h3>4.6 Leg Action Combination Rules</h3>
+<p>Max 3 actions. Same valid + invalid combos as SL side.</p>
+
+<h3>4.7 Leg-Level Trailing Target (NEW)</h3>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same in all three formats</span> — PnL-based profit-lock ratchet at leg level</h4>
+<pre><code># Activation:
+if leg_pnl &gt;= when_profit_reach:
+    active = True
+    current_stop = lock_min_profit
+    anchor_pnl = when_profit_reach
+    # log: LEG_TRAIL_TARGET_ACTIVATED
+
+# Active phase (each bar):
+if leg_pnl &lt;= current_stop:
+    exit leg (TARGET_TRAIL)
+else:
+    gain = leg_pnl - anchor_pnl
+    if gain &gt;= trail_every:
+        steps = int(gain / trail_every)
+        current_stop += steps × trail_by
+        anchor_pnl += steps × trail_every
+        # log: LEG_TRAIL_TARGET_UPDATED</code></pre>
+  <p>Fields: <code>enabled</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code>. All accept absolute or % input.</p>
+  <p>This is the <strong>single leg-level profit-lock</strong> — it lives on the profit side; the SL side keeps loss-limit + Move-SL-to-Cost + 2-param trailing (no duplicate profit-lock, per the clean design).</p>
+</div>
+
+<h2 id="portfolio">5. Portfolio-Level Target Execution</h2>
+
+<h3>5.1 Portfolio Target Types</h3>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same in all three formats</span></h4>
+  <table>
+    <thead><tr><th>Type</th><th>Trigger condition</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Combined Profit</td><td><code>curr_pnl &gt;= tgt_val</code></td><td>Universal</td></tr>
+      <tr><td>Underlying Movement</td><td><code>(prev_underlying ≤ tgt_val ≤ curr_underlying)</code> or reverse</td><td>Underlying defaults to self → universal</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><strong>Asymmetry vs SL:</strong> No "Profit and Underlying Range" type — exists only on SL side.</div>
+  <p><strong>Purpose:</strong> safety guard for multi-leg strategies where individual leg targets may be tighter than the portfolio target.</p>
+</div>
+
+<h3>5.2 Portfolio Target Actions (7 actions)</h3>
+<p>Same 7 as Portfolio SL. <strong>Trailing override:</strong> <code>TARGET_TRAIL</code> exits always use SqOff.</p>
+
+<h3>5.3 Portfolio Delay</h3>
+<p>Same structure as SL Wait.</p>
+
+<h3>5.4 Trailing Target / Profit Lock (Portfolio)</h3>
+<div class="fmt-block shared">
+<pre><code># Activation:
+if curr_pnl &gt;= when_profit_reach:
+    active = True
+    current_stop = lock_min_profit
+    anchor_pnl = when_profit_reach
+
+# Active phase (each bar):
+if curr_pnl &lt;= current_stop:
+    p_hit = True                              # reason = TARGET_TRAIL
+else:
+    gain = curr_pnl - anchor_pnl
+    if gain &gt;= trail_every:
+        steps = int(gain / trail_every)
+        current_stop += steps × trail_by
+        anchor_pnl += steps × trail_every</code></pre>
+  <p>Lock only ratchets up. Fixed target check guarded by <code>and not p_hit</code> while trailing active.</p>
+</div>
+
+<h2 id="user">6. User-Level Target Execution</h2>
+<div class="fmt-block shared">
+<pre><code>combined_pnl = Σ state["pnl"]["combined"] for state owned by uid
+
+# Max Profit
+if max_profit != 0 and combined_pnl &gt;= max_profit:
+    force_sqoff all user portfolios
+    gst["hit"] = True       # GLOBAL_MAX_PROFIT_HIT</code></pre>
+  <p>Order: Max Loss checked first (SL doc §6), then Max Profit. <code>gst["hit"]</code> sticky for the rest of the day.</p>
+
+  <h3>6.1 User-Level Trailing Target / Profit Lock</h3>
+<pre><code># Activation:
+if combined_pnl &gt;= when_profit_reach:
+    user_trail_active = True
+    user_current_stop = lock_min_profit
+    user_anchor_pnl = when_profit_reach
+    # log: USER_TRAIL_TARGET_ACTIVATED
+
+# Active phase:
+if combined_pnl &lt;= user_current_stop:
+    force_sqoff all user portfolios            # USER_TRAIL_TARGET_HIT
+else:
+    gain = combined_pnl - user_anchor_pnl
+    if gain &gt;= user_trail_every:
+        steps = int(gain / user_trail_every)
+        user_current_stop += steps × user_trail_by
+        user_anchor_pnl += steps × user_trail_every
+        # log: USER_TRAIL_TARGET_UPDATED</code></pre>
+  <p><code>max_profit</code>, <code>when_profit_reach</code>, <code>lock_min_profit</code>, <code>trail_every</code>, <code>trail_by</code> accept <strong>absolute or % of allocation</strong> (engine-defined base; raw % not supported at user level — see <code>sl_features.html</code> Level 3 + TBD-6).</p>
+</div>
+
+<h2 id="reexec">7. ReExecute Gating Flags</h2>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same four flags as SL doc §7</span></h4>
+  <p>The flags apply to Target re-executions identically — they don't distinguish whether the underlying hit was SL or Target.</p>
+  <table>
+    <thead><tr><th>Flag</th><th>Default</th><th>Blocks</th></tr></thead>
+    <tbody>
+      <tr><td><code>no_reexec_sl_cost</code></td><td>OFF</td><td>Re-Execute action when <code>leg["sl_moved_to_cost"] == True</code></td></tr>
+      <tr><td><code>no_wait_trade_reexec</code></td><td>OFF</td><td>Per-leg Wait &amp; Trade delay on re-executions (detected via <code>exec_count &gt;= 1</code>)</td></tr>
+      <tr><td><code>no_reentry_after_end</code></td><td>OFF</td><td>Both Re-Execute and ReEntry past Portfolio End Time</td></tr>
+      <tr><td><code>no_reentry_sl_cost</code></td><td><strong>ON</strong></td><td>ReEntry action when <code>leg["sl_moved_to_cost"] == True</code></td></tr>
+    </tbody>
+  </table>
+</div>
+<p>Even though the flag names reference "SL cost" (the <code>sl_moved_to_cost</code> flag set by Move SL to Cost), the gating applies to <strong>any re-execution attempt</strong> on that leg regardless of which event fires it (SL hit or Target hit). See SL doc §7 for full dispatch logic and flag interactions.</p>
+
+<h2 id="exit">8. Exit Mechanics</h2>
+<p>Same as SL doc §8 — same MARKET-only support, same fallback chains, same VWAP enhancement rule on Portfolio SqOff. This section restates the Target-relevant subset.</p>
+
+<h3>8.1 Exit Order Type</h3>
+<table>
+  <thead><tr><th>Option</th><th>Backtest engine status</th></tr></thead>
+  <tbody>
+    <tr><td><code>MARKET</code></td><td><strong>Active.</strong> Default. Used by all SL/Target exits.</td></tr>
+    <tr><td><code>Limit</code></td><td>Not implemented in backtest. Portfolio save blocked if selected.</td></tr>
+    <tr><td><code>SL_Limit</code></td><td>Not implemented in backtest. Portfolio save blocked if selected.</td></tr>
+  </tbody>
+</table>
+<p>Under MARKET, exit fill uses the <strong>directional close</strong> as the base price:</p>
+
+<div class="fmt-block fmtA">
+  <h4><span class="badge badge-A">Format A — Bid/Ask</span></h4>
+  <table>
+    <thead><tr><th>Direction</th><th>Action</th><th>Base price</th><th>Fallback chain</th></tr></thead>
+    <tbody>
+      <tr><td>SELL leg</td><td>Buy back (close short)</td><td><code>ask_close</code></td><td><code>ask_close → close → last_mtm_price → entry_price</code></td></tr>
+      <tr><td>BUY leg</td><td>Sell out (close long)</td><td><code>bid_close</code></td><td><code>bid_close → close → last_mtm_price → entry_price</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="fmt-block fmtB">
+  <h4><span class="badge badge-B">Format B — OHLCV</span></h4>
+  <table>
+    <thead><tr><th>Direction</th><th>Action</th><th>Base price</th></tr></thead>
+    <tbody>
+      <tr><td>SELL leg</td><td>Buy back</td><td><code>close</code></td></tr>
+      <tr><td>BUY leg</td><td>Sell out</td><td><code>close</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="fmt-block fmtC">
+  <h4><span class="badge badge-C">Format C — LTP</span></h4>
+  <table>
+    <thead><tr><th>Direction</th><th>Action</th><th>Base price</th></tr></thead>
+    <tbody>
+      <tr><td>SELL leg</td><td>Buy back</td><td><code>ltp</code></td></tr>
+      <tr><td>BUY leg</td><td>Sell out</td><td><code>ltp</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>VWAP enhancement on Portfolio Target SqOff only</h3>
+<p>Applies in <code>process_portfolio_sqoff()</code> when the trigger is <strong>Portfolio Target</strong> — <strong>not</strong> in time-based <code>_close_active_legs()</code>. Trailing-target exits (<code>TARGET_TRAIL</code>) also pass through this path.</p>
+
+<div class="fmt-block fmtA">
+  <h4><span class="badge badge-A">Format A</span></h4>
+<pre><code>SELL exit:  fill = ask_vwap if ask_vwap &gt; ask_close else ask_close   (max — pay more)
+BUY  exit:  fill = bid_vwap if bid_vwap &lt; bid_close else bid_close   (min — receive less)</code></pre>
+</div>
+
+<div class="fmt-block fmtB">
+  <h4><span class="badge badge-B">Format B</span></h4>
+<pre><code>SELL exit:  fill = vwap if vwap &gt; close else close
+BUY  exit:  fill = vwap if vwap &lt; close else close</code></pre>
+</div>
+
+<div class="fmt-block fmtC">
+  <h4><span class="badge badge-C">Format C</span></h4>
+<pre><code>SELL exit:  fill = ltp     # no VWAP available in LTP format
+BUY  exit:  fill = ltp</code></pre>
+</div>
+
+<p>Same conservative direction-aware rule as §4.2.</p>
+
+<h3>8.2 Exit Sell Legs First</h3>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same in all three formats</span></h4>
+  <p>Default ON. SELL legs closed first, then BUY legs, in batch exit events triggered by Portfolio Target hits. Detailed scope table in SL doc §8.2.</p>
+</div>
+
+<h2 id="timing">9. Timing Gates</h2>
+<div class="fmt-block shared">
+  <h4><span class="badge badge-shared">Same in all three formats</span></h4>
+  <p>Three time fields control when Target-related entries and exits are permitted.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>Start Time</code></td><td>Earliest bar for any leg entry</td></tr>
+      <tr><td><code>End Time</code></td><td>Cutoff for <strong>new entries</strong> (including Target-triggered re-executions if <code>no_reentry_after_end</code> is ON). Open positions continue under SL/Target monitoring until <code>SqOff Time</code>.</td></tr>
+      <tr><td><code>SqOff Time</code></td><td><strong>Forced exit</strong> of all remaining ACTIVE legs at last known price</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<pre><code>if end_blocked and not _triggered_manual:
+    skip — block IDLE leg entries</code></pre>
+
+<h3>Winter Time Adjustment</h3>
+<p>Applies for US-listed instruments where the data source and strategy configuration may straddle DST boundaries.</p>
+<table>
+  <thead><tr><th>Asset</th><th>Winter adjustment applies</th></tr></thead>
+  <tbody>
+    <tr><td>NIFTY-FUT (NSE), BANKNIFTY-FUT, NSE stocks</td><td>❌ No — India doesn't observe DST</td></tr>
+    <tr><td>US Index Spot (SPY), US stocks</td><td>✅ Yes</td></tr>
+    <tr><td>Commodity futures, FX futures, Crypto futures (US-listed)</td><td>✅ Yes</td></tr>
+    <tr><td>Crypto spot (24/7)</td><td>⚠️ Depends on user's configured-time timezone</td></tr>
+  </tbody>
+</table>
+<p>When <code>is_winter = True</code>, the engine shifts raw configured times by <code>+1 hour</code> via <code>add_one_hour()</code> before applying:</p>
+<pre><code>_raw_ls = parse_time_str(leg["conf"].get("Start Time"))
+if _raw_ls and timing.get("is_winter"):
+    _raw_ls = add_one_hour(_raw_ls)
+leg_start = _raw_ls or timing["start"]</code></pre>
+<p>For Indian-market instruments the flag should be a no-op (set <code>is_winter = False</code> in adapter init).</p>
+
+<h3>Validation rule</h3>
+<p><code>Portfolio Start ≤ Leg Start ≤ Portfolio End ≤ SqOff Time</code> (enforced on save).</p>
+
+<h2 id="xref">10. Format Cross-Reference</h2>
+<table>
+  <thead><tr><th>Section</th><th class="center">A</th><th class="center">B</th><th class="center">C</th><th class="center">All same</th></tr></thead>
+  <tbody>
+    <tr><td>4.1 Target Trigger</td><td class="center">✓</td><td class="center">✓</td><td class="center">✓</td><td class="center">—</td></tr>
+    <tr><td>4.2 Target Fill</td><td class="center">✓</td><td class="center">✓</td><td class="center">✓</td><td class="center">—</td></tr>
+    <tr><td>4.3 Target Wait</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>4.4 Value Parsing</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>4.5 Leg Actions</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>4.6 Action Combination Rules</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td><strong>4.7 Leg-Level Trailing Target (NEW)</strong></td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>5.1 Portfolio Target Types</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>5.2 Portfolio Target Actions</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>5.3 Portfolio Delay</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>5.4 Trailing Target / Profit Lock</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>6 User (Max Profit + Trailing)</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>7 ReExecute Gating Flags</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>8.1 Exit Order Type</td><td class="center">✓</td><td class="center">✓</td><td class="center">✓</td><td class="center">—</td></tr>
+    <tr><td>8.2 Exit Sell Legs First</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+    <tr><td>9 Timing Gates (incl. Winter Adj)</td><td class="center">—</td><td class="center">—</td><td class="center">—</td><td class="center">✓</td></tr>
+  </tbody>
+</table>
+<p>Only <strong>Target trigger</strong> (4.1), <strong>Target fill</strong> (4.2), and <strong>exit base price</strong> (8.1) need format-specific definitions.</p>
+
+<h2 id="sl-xref">Cross-reference to SL doc</h2>
+<table>
+  <thead><tr><th>Concept</th><th>SL doc</th><th>This doc</th></tr></thead>
+  <tbody>
+    <tr><td>Trigger</td><td>§4.1</td><td>§4.1</td></tr>
+    <tr><td>Fill</td><td>§4.2</td><td>§4.2</td></tr>
+    <tr><td>Wait</td><td>§4.3</td><td>§4.3</td></tr>
+    <tr><td>Value Parsing</td><td>§4.4</td><td>§4.4</td></tr>
+    <tr><td>Move SL to Cost (leg)</td><td>§4.5</td><td>— (no target equivalent)</td></tr>
+    <tr><td>Trail After Move SL</td><td>§4.6</td><td>— (SL-only)</td></tr>
+    <tr><td>Leg-Level Trailing Target</td><td>—</td><td>§4.7</td></tr>
+    <tr><td>Leg Actions</td><td>§4.7</td><td>§4.5</td></tr>
+    <tr><td>Action Combination Rules</td><td>§4.8</td><td>§4.6</td></tr>
+    <tr><td>Portfolio Types</td><td>§5.1 (3)</td><td>§5.1 (2 — no Profit-and-Range)</td></tr>
+    <tr><td>Portfolio Actions</td><td>§5.2</td><td>§5.2</td></tr>
+    <tr><td>Portfolio Delay</td><td>§5.3</td><td>§5.3</td></tr>
+    <tr><td>Trailing SL / Trailing Target</td><td>§5.4</td><td>§5.4</td></tr>
+    <tr><td>Move SL to Cost (portfolio)</td><td>§5.5</td><td>—</td></tr>
+    <tr><td>User-Level</td><td>§6</td><td>§6</td></tr>
+    <tr><td>ReExecute Gating Flags</td><td>§7</td><td>§7 (same flags, apply to both)</td></tr>
+    <tr><td>Exit Mechanics</td><td>§8</td><td>§8</td></tr>
+    <tr><td>Timing Gates</td><td>§9</td><td>§9 (this doc adds Winter Time Adjustment)</td></tr>
+    <tr><td>Format Cross-Reference</td><td>§10</td><td>§10</td></tr>
+    <tr><td>Portfolio Tags Feature Request</td><td>§11</td><td>§11</td></tr>
+  </tbody>
+</table>
+
+<h2 id="tags">11. Portfolio Tags — Feature Request (To Be Added)</h2>
+
+<h3>Hierarchy clarification</h3>
+<p>Different <strong>legs</strong> make up a <strong>strategy</strong> → strategies combine into a <strong>portfolio</strong> → portfolios belong to a <strong>user (algo)</strong>.</p>
+<p>Target is currently defined at three levels:</p>
+<ul>
+  <li><strong>Leg level</strong> (§4)</li>
+  <li><strong>Portfolio level</strong> (§5)</li>
+  <li><strong>User level</strong> (§6)</li>
+</ul>
+
+<h3>Request</h3>
+<p>Add <strong>Portfolio Tags</strong> (also called Strategy Tags) as a way to <strong>group portfolios</strong> so that SL/Target can be assigned to a <em>subset</em> of strategies — between Portfolio and User in the evaluation hierarchy.</p>
+<p>A portfolio tag groups multiple portfolios sharing a common characteristic (e.g., strategy type, market regime, time-of-day window). Each tag has its own SL/Target. When a tag's Target fires, all portfolios in that tag are force-sqoff'd; portfolios in other tags continue unaffected. User-level Target remains the ultimate ceiling.</p>
+
+<h3>Tag-level controls (when implemented) <span class="badge badge-shared">Added this revision</span></h3>
+<p>Each strategy tag carries the <strong>same Target control set as a portfolio</strong>, evaluated on the tag's combined PnL across its portfolios:</p>
+<table>
+  <thead><tr><th>Control</th><th>Parameters</th></tr></thead>
+  <tbody>
+    <tr><td>Combined Profit</td><td><code>tag_tgt_val</code> — exit the tag when tag combined profit ≥ <code>tag_tgt_val</code></td></tr>
+    <tr><td>Profit Lock</td><td><code>when_profit_reach</code> (Reach) · <code>lock_min_profit</code> (Lock) · <code>trail_every</code> (Every) · <code>trail_by</code> (By) — lock a profit floor for the tag and ratchet it up</td></tr>
+  </tbody>
+</table>
+<p><strong>Input mode:</strong> absolute or <strong>% of allocation</strong> (engine-defined base; raw % not supported — same rule as the user level).</p>
+<div class="callout"><strong>Profit Lock now exists at every level on the profit side:</strong> leg (§4.7), portfolio (§5.4), strategy tag (here), user (§6.1). The SL side keeps loss-limit + 2-param trailing at each level — <strong>no duplicate profit-lock</strong> (per the "clean" design decision).</div>
+
+<h3>Example</h3>
+<pre><code>User runs 100 strategies (= 1 algo)
+User-level SL  = ₹1,00,000
+
+Divide the 100 strategies into 5 strategy tags of 20 each:
+    Tag 1: 20 strategies — SL = ₹30,000
+    Tag 2: 20 strategies — SL = ₹30,000
+    Tag 3: 20 strategies — SL = ₹30,000
+    Tag 4: 20 strategies — SL = ₹30,000
+    Tag 5: 20 strategies — SL = ₹30,000
+
+Concrete grouping example:
+    Of the 100 strategies, 10 are of type "non-trending".
+    To limit/fix loss on that type specifically, define a
+    "non-trending" strategy tag and assign it its own SL
+    (e.g., ₹30,000). When the tag SL fires, only those 10
+    strategies are squared off — the other 90 keep running.</code></pre>
+<p>The same grouping mechanism applies for Target — each tag has its own target, fires when reached, closes only its own portfolios.</p>
+
+<h3>Validation rule (required when implemented)</h3>
+<p>When SL/Target is defined at the <strong>leg level</strong>, the engine must verify it does <strong>not breach</strong> the SL/Target assigned at higher levels:</p>
+<ul>
+  <li>Sum of leg-level SLs within a portfolio ≤ portfolio SL</li>
+  <li>Sum of portfolio SLs within a tag ≤ tag SL</li>
+  <li>Sum of tag SLs ≤ user SL</li>
+</ul>
+<p>If a leg-level SL/Target would violate the parent strategy / portfolio / tag / user limit, the engine should flag this on config save and prevent the run (or warn and clip the leg-level limit to fit). Same check applies for Target on the upper side.</p>
+
+</div>
+</body>
+</html>

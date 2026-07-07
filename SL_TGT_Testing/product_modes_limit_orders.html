@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Modes (MIS / CNC / NRML) + Limit-Order Fill</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1080px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#9a6700 0%,#0969da 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:23px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:19px; margin-top:30px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13.5px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12.5px; background:#f6f8fa; padding:2px 6px; border-radius:3px; color:#d63384; }
+  .callout { padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout.blue { background:var(--blue-bg); border-left:4px solid var(--accent); } .callout.blue strong { color:var(--accent); }
+  .callout.warn { background:var(--amber-bg); border-left:4px solid var(--amber); } .callout.warn strong { color:var(--amber); }
+  .case { background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:5px; padding:9px 13px; margin:9px 0; font-size:13.5px; }
+  .case b.id { color:var(--accent); }
+  .case .pass { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Product Modes (MIS / CNC / NRML) + Limit-Order Fill</h1>
+  <p>Backtester using limit orders (no market orders). Limit fill model · three product modes · test coverage. Equity (cash) now in scope (CNC).</p>
+</header>
+
+<h2>1. Limit-order fill model (backtest)</h2>
+<p>SL/Target exits are <strong>limit orders placed at the level</strong> (tick-snapped — a limit must sit on a valid tick).</p>
+<table>
+  <thead><tr><th>Leg / side</th><th>Limit sits</th><th>Fills when</th><th>Fill price</th></tr></thead>
+  <tbody>
+    <tr><td>Long — SL (below)</td><td>sell limit at SL</td><td><code>bar_low ≤ SL</code></td><td>SL</td></tr>
+    <tr><td>Long — Target (above)</td><td>sell limit at Target</td><td><code>bar_high ≥ Target</code></td><td>Target</td></tr>
+    <tr><td>Short — SL (above)</td><td>buy limit at SL</td><td><code>bar_high ≥ SL</code></td><td>SL</td></tr>
+    <tr><td>Short — Target (below)</td><td>buy limit at Target</td><td><code>bar_low ≤ Target</code></td><td>Target</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><strong>Reached → fill at the limit price</strong> (no slippage in the base model).</li>
+  <li><strong>Not reached → no exit that bar</strong>; the position <strong>carries</strong>, the limit still resting.</li>
+  <li><strong>Per format:</strong> the "reached" check uses the format's price — A: bid/ask, B: bar high/low, C: ltp.</li>
+</ul>
+<div class="callout warn"><strong>Gap caveat (known limitation):</strong> if a bar <strong>opens beyond</strong> the limit (gaps through), the base backtest still assumes a fill <strong>at the limit</strong> — optimistic. A gap-aware variant fills at the <strong>bar open</strong>. Decide which the engine uses; test both (PM-6).</div>
+
+<h2>2. Product modes</h2>
+<p>The SL/Target <strong>limit logic is identical</strong> across modes. The mode governs the <strong>position lifecycle / forced exit</strong>, not the SL math.</p>
+<table>
+  <thead><tr><th>Mode</th><th>Lifecycle</th><th>Forced exit</th><th>Resting limits</th><th>Instruments</th></tr></thead>
+  <tbody>
+    <tr><td><strong>MIS</strong></td><td>intraday</td><td><strong>Yes — force-flat at the intraday cutoff</strong> (e.g. NSE ~15:20)</td><td>cancelled at cutoff if unfilled</td><td>futures, equity intraday</td></tr>
+    <tr><td><strong>NRML</strong></td><td>carryforward</td><td>No</td><td>persist across sessions to expiry</td><td>futures (F&amp;O)</td></tr>
+    <tr><td><strong>CNC</strong></td><td>delivery</td><td>No</td><td>persist to delivery</td><td><strong>equity (cash)</strong></td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><strong>MIS cutoff</strong> overrides any unfilled limit: at the cutoff the engine squares off the open position at the cutoff bar's price (reason <code>MIS_CUTOFF</code>).</li>
+  <li><strong>NRML / CNC</strong> never force intraday: an unfilled SL/Target limit simply carries.</li>
+</ul>
+
+<h2>3. Equity now in scope (CNC)</h2>
+<table>
+  <thead><tr><th>Asset</th><th>Example</th><th>Tick</th><th>Lot / unit</th><th>Currency</th><th>Mode</th></tr></thead>
+  <tbody>
+    <tr><td>NSE equity (cash)</td><td>RELIANCE</td><td>0.05</td><td>1 share</td><td>INR</td><td>CNC (delivery) / MIS (intraday)</td></tr>
+    <tr><td>US equity (cash)</td><td>AAPL</td><td>0.01</td><td>1 share</td><td>USD</td><td>CNC / MIS</td></tr>
+  </tbody>
+</table>
+<p>(Futures stay NRML / MIS as before.)</p>
+
+<h2>4. Test cases — product modes</h2>
+<p>Base: long NIFTY-FUT, entry 22000, SL limit at <strong>21560</strong> (2%), unless noted.</p>
+<div class="case"><b class="id">PM-1 · MIS — SL limit unfilled by cutoff.</b> Price never drops to 21560 by 15:20. At 15:20 → <strong>force square-off</strong> at the cutoff bar's price (e.g. 21900), reason <code>MIS_CUTOFF</code>; resting limit cancelled. <span class="pass">Pass: exit at the cutoff, not at 21560.</span></div>
+<div class="case"><b class="id">PM-2 · MIS — SL limit fills before cutoff.</b> At 13:00 <code>bar_low 21555 ≤ 21560</code> → SL limit <strong>fills at 21560</strong>, reason <code>SL</code>. Cutoff never reached. <span class="pass">Pass: normal SL exit at 13:00.</span></div>
+<div class="case"><b class="id">PM-3 · NRML — SL unfilled.</b> Price doesn't reach 21560 by EOD → <strong>no forced exit</strong>; position carries to the next session; SL limit still resting at 21560. <span class="pass">Pass: no intraday square-off; limit persists.</span></div>
+<div class="case"><b class="id">PM-4 · CNC (equity) — SL unfilled.</b> RELIANCE long, SL limit; unfilled by EOD → carries to next session (delivery); no auto-square-off. <span class="pass">Pass: equity position carries; limit persists.</span></div>
+<div class="case"><b class="id">PM-5 · Cross-mode equivalence.</b> Same SL config + same data, run MIS / NRML / CNC: intraday, if the limit is reached the <strong>fill is identical</strong> across all three (same price, same bar); at EOD, <strong>MIS squares off</strong>, <strong>NRML / CNC carry</strong>. <span class="pass">Pass: SL fill identical intraday; only EOD handling differs.</span></div>
+<div class="case"><b class="id">PM-6 · Gap / non-fill.</b> Bar gaps 21600 → opens 21500 (through the 21560 limit). Base model fills <strong>at 21560</strong> (optimistic); gap-aware variant fills <strong>at 21500</strong> (the open). <span class="pass">Pass: matches the chosen convention; flag the difference.</span></div>
+
+<h2>5. Spec reconciliation needed (limit orders + equity)</h2>
+<p>The limit-order reality and equity scope <strong>contradict several finalised docs</strong> — these need updating before the test fill-values are trusted:</p>
+<table>
+  <thead><tr><th>Doc / item</th><th>Was</th><th>Should be</th></tr></thead>
+  <tbody>
+    <tr><td><code>execution_logic</code> §8.1 Exit Order Type</td><td>MARKET active; Limit "not implemented"</td><td><strong>Limit is the live path</strong>; MARKET unsupported (or N/A in backtest)</td></tr>
+    <tr><td><code>sl_features</code> TBD-2 (tick)</td><td>"Don't snap — broker aligns at market fill"</td><td><strong>Snapping required</strong> — a limit must sit on a valid tick <em>(this is why the implementation's <code>_snap_to_tick</code> was correct)</em></td></tr>
+    <tr><td><code>execution_logic</code> §4.2 Fill model</td><td>Conservative <code>MAX/MIN(vwap, hit)</code></td><td><strong>Fill at the limit price</strong> when reached; carry if not; gap caveat</td></tr>
+    <tr><td><code>sl_features</code> Asset classes</td><td>IF · FX · CF · XF (futures)</td><td><strong>Add equity (cash)</strong> — NSE + US — for CNC</td></tr>
+    <tr><td>Test docs (test plan, leg scenarios, portfolios)</td><td>fills assumed market/VWAP</td><td><strong>fills at the limit level</strong>; add equity to the matrix; un-block MIS (PM-1)</td></tr>
+    <tr><td><code>sl_features</code> TBD-7 (product type)</td><td>parked (CNC parked)</td><td><strong>Active</strong> — MIS / NRML / CNC all in scope</td></tr>
+  </tbody>
+</table>
+
+<div class="callout blue">
+  <strong>What I'd do next (confirm before touching the finalised docs):</strong>
+  <ol style="margin:6px 0 0 18px;">
+    <li>Update the order model in <code>execution_logic</code> (§8.1 + §4.2) to limit-order fill, and flip <strong>TBD-2</strong> to "snap required."</li>
+    <li>Add equity to <code>sl_features</code> asset classes; activate <strong>TBD-7</strong> (MIS/NRML/CNC).</li>
+    <li>Update the test docs' fill expectations to limit fills, add equity to the coverage matrix, and un-block the MIS cutoff case (PM-1).</li>
+  </ol>
+  Say the word and I'll apply 1–3 across the docs. Otherwise this doc stands alone as the product-mode + limit-order spec/tests.
+</div>
+
+</div>
+</body>
+</html>

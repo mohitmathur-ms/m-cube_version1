@@ -170,19 +170,6 @@ const DataFormats = {
                         <option value="2" ${inst.currency_type === 2 ? "selected" : ""}>CRYPTO (2)</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Timeframe</label>
-                    <select id="df-timeframe" class="form-control">
-                        <option value="">— Not set —</option>
-                        <option value="1-MINUTE" ${inst.timeframe === "1-MINUTE" ? "selected" : ""}>1-MINUTE</option>
-                        <option value="5-MINUTE" ${inst.timeframe === "5-MINUTE" ? "selected" : ""}>5-MINUTE</option>
-                        <option value="15-MINUTE" ${inst.timeframe === "15-MINUTE" ? "selected" : ""}>15-MINUTE</option>
-                        <option value="1-HOUR" ${inst.timeframe === "1-HOUR" ? "selected" : ""}>1-HOUR</option>
-                        <option value="4-HOUR" ${inst.timeframe === "4-HOUR" ? "selected" : ""}>4-HOUR</option>
-                        <option value="1-DAY" ${inst.timeframe === "1-DAY" ? "selected" : ""}>1-DAY</option>
-                        <option value="1-WEEK" ${inst.timeframe === "1-WEEK" ? "selected" : ""}>1-WEEK</option>
-                    </select>
-                </div>
             </div>
 
             <h2 class="section-title" style="margin-top:24px;">Trading Settings</h2>
@@ -254,7 +241,6 @@ const DataFormats = {
                 price_precision: getNum("df-price-precision"),
                 size_precision: getNum("df-size-precision"),
                 currency_type: getNum("df-currency-type"),
-                timeframe: getVal("df-timeframe"),
             },
             trading: {
                 maker_fee: getVal("df-maker-fee"),

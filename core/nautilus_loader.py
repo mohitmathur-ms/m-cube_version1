@@ -21,7 +21,9 @@ from core.csv_loader import QUANTITY_MAX
 from core.csv_loader import concat_side
 from core.csv_loader import load_csv
 from core.csv_loader import load_pair_mid
+from core.csv_loader import session_window_from_df
 from core.instrument_factory import create_instrument
+from core.venue_config import update_venue_session_window
 
 
 DEFAULT_CATALOG_PATH = "./catalog"
@@ -168,6 +170,7 @@ def load_csv_and_store(
     catalog_path: str = DEFAULT_CATALOG_PATH,
     venue: str = "BINANCE",
     data_format: dict | None = None,
+    timeframe: str | None = None,
 ) -> dict:
     """
     Full pipeline: load local CSV → wrangle → store in catalog.
@@ -183,6 +186,11 @@ def load_csv_and_store(
     data_format : dict | None
         Data format config from data_formats/<asset_class>.json.
         Contains csv, instrument, and trading sections.
+    timeframe : str | None
+        Nautilus "<step>-<aggregation>" bar size (e.g. "1-SECOND", "1-MINUTE",
+        "5-MINUTE") selected on the Load Data page. This is the bar size the
+        CSV rows are stored as in the catalog. When None, falls back to the
+        data-format's legacy default and finally "1-MINUTE".
 
     Returns
     -------
@@ -199,6 +207,7 @@ def load_csv_and_store(
     # or a single `path`.
     ts_col = csv_config.get("timestamp_column") or "ts"
     req_cols = csv_config.get("required_columns") or None
+    opt_cols = csv_config.get("optional_columns") or None
     delimiter = csv_config.get("delimiter") or ","
 
     side = csv_entry.get("side")
@@ -206,22 +215,27 @@ def load_csv_and_store(
     bid_files = csv_entry.get("bid_files") or []
 
     if side == "MID" and ask_files and bid_files:
-        df = load_pair_mid(csv_entry, timestamp_column=ts_col, 
-                           required_columns=req_cols, delimiter=delimiter)
+        df = load_pair_mid(csv_entry, timestamp_column=ts_col,
+                           required_columns=req_cols, optional_columns=opt_cols,
+                           delimiter=delimiter)
     elif side == "ASK" and ask_files:
         df = concat_side(ask_files, timestamp_column=ts_col,
-                         required_columns=req_cols, delimiter=delimiter)
+                         required_columns=req_cols, optional_columns=opt_cols,
+                         delimiter=delimiter)
     elif side == "BID" and bid_files:
         df = concat_side(bid_files, timestamp_column=ts_col,
-                         required_columns=req_cols, delimiter=delimiter)
+                         required_columns=req_cols, optional_columns=opt_cols,
+                         delimiter=delimiter)
     else:
         file_list = csv_entry.get("files")
         if file_list:
             df = concat_side(file_list, timestamp_column=ts_col,
-                             required_columns=req_cols, delimiter=delimiter)
+                             required_columns=req_cols, optional_columns=opt_cols,
+                             delimiter=delimiter)
         else:
             df = load_csv(csv_entry["path"], timestamp_column=ts_col,
-                          required_columns=req_cols, delimiter=delimiter)
+                          required_columns=req_cols, optional_columns=opt_cols,
+                          delimiter=delimiter)
 
     # Step 2: Create instrument
     quote = inst_config.get("quote_currency") or "USD"
@@ -239,8 +253,11 @@ def load_csv_and_store(
         size_precision=inst_config.get("size_precision"),
     )
 
-    # Step 3: Wrangle into Nautilus Bar objects
-    timeframe = inst_config.get("timeframe") or "1-DAY"
+    # Step 3: Wrangle into Nautilus Bar objects.
+    # The timeframe is chosen on the Load Data page (UI) and passed in; the
+    # data-format config no longer carries a fixed per-asset-class timeframe.
+    # Keep the legacy fallback so any caller that omits it still works.
+    timeframe = timeframe or inst_config.get("timeframe") or "1-MINUTE"
 
     # FX entries carry an explicit side ("ASK" | "BID" | "MID");
     # everything else (e.g. crypto) defaults to LAST.
@@ -250,6 +267,17 @@ def load_csv_and_store(
 
     # Step 4: Save to catalog
     save_to_catalog(bars, instrument, catalog_path)
+
+    # Step 4b: Derive the venue's daily session window (UTC time-of-day extremes)
+    # from this data and union it into the venue's adapter config. Best-effort:
+    # update_venue_session_window swallows its own errors, but guard the
+    # derivation too so a malformed frame can never break a successful ingest.
+    try:
+        window = session_window_from_df(df)
+        if window is not None:
+            update_venue_session_window(venue, window[0], window[1])
+    except Exception:  # pragma: no cover - defensive; ingest already succeeded
+        pass
 
     bar_type_str = make_bar_type_str(instrument, timeframe=timeframe, price_type=price_type)
 

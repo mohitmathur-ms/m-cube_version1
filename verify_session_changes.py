@@ -527,10 +527,26 @@ check(".pf-live-only is visually distinct from .pf-ui-only",
 # ─────────────────────────────────────────────────────────────────────────────
 section("16. portfolio.js -- Execution tab field marking")
 
-# Live-only fields should have pf-live-only class
-check("Product field marked pf-live-only",
+# Product is now wired (MIS supplies a default squareoff_time when no
+# explicit value is set on portfolio/slot/leg). The row must NOT carry
+# pf-live-only, the MIS time/tz inputs must exist, the toggler must be
+# hooked up, and the values must be mirrored to backend-shaped fields on save.
+check("Product field NOT marked pf-live-only (now backtest-wired via MIS default)",
       'id="pf-m-product"' in js_src
-      and re.search(r"pf-live-only.{0,200}id=\"pf-m-product\"", js_src, re.DOTALL))
+      and not re.search(r"pf-live-only[^>]{0,200}id=\"pf-m-product\"", js_src, re.DOTALL))
+check("MIS SqOff Time input exists (pf-m-mis-sqoff)",
+      'id="pf-m-mis-sqoff"' in js_src)
+check("MIS SqOff Tz input exists (pf-m-mis-sqofftz)",
+      'id="pf-m-mis-sqofftz"' in js_src)
+check("Product dropdown wired to _onProductChange toggler",
+      re.search(r'id="pf-m-product"[^>]*onchange="Portfolio\._onProductChange', js_src) is not None)
+check("_onProductChange handler exists in portfolio.js",
+      "_onProductChange()" in js_src)
+check("Product fields mirrored to backend on save (pf.product / pf.mis_squareoff_*)",
+      "pf.product = pf._ui.product" in js_src
+      and "pf.mis_squareoff_time = pf._ui.mis_squareoff_time" in js_src
+      and "pf.mis_squareoff_tz = pf._ui.mis_squareoff_tz" in js_src)
+# Live-only fields should still have pf-live-only class
 check("Strategy Tag marked pf-live-only",
       'id="pf-m-strattag"' in js_src
       and re.search(r"pf-live-only.{0,200}id=\"pf-m-strattag\"", js_src, re.DOTALL))

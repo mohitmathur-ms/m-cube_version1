@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remove legacy csv_loader monolith, add CI and MARKET-vs-LIMIT reference docs, clean stale reports — f6bbc39</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2230;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --orange: #f0883e;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 64px; }
+  code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+  code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; font-size: 0.88em; }
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5;
+  }
+  .chip {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  }
+  .chip.branch { color: var(--purple); border-color: #3b2d52; background: #1d1530; }
+  .chip.ai { color: var(--green); border-color: #1f3d28; background: #11261a; }
+  .chip.warn { color: var(--orange); border-color: #4a3416; background: #2a1e0e; }
+
+  /* ---- Guide-style component kit, ported to the GitHub-dark palette ---- */
+
+  /* Gradient cover header (mirrors the aggregation guide, dark accents). */
+  header.cover {
+    background: linear-gradient(135deg, #16304d 0%, #2a1d4a 100%);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px; margin-bottom: 22px;
+  }
+  header.cover h1 { margin: 10px 0 8px; font-size: 1.6rem; line-height: 1.25; }
+  header.cover .subtitle { margin: 0; color: var(--text); opacity: 0.9; font-size: 0.9rem; }
+
+  /* Table of contents. */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 20px; margin: 18px 0;
+  }
+  nav.toc h3 { margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc ol li { padding: 3px 0; break-inside: avoid; }
+
+  /* Callouts: a left-bordered tinted box per intent. */
+  .simple, .callout, .callout-tech, .callout-ok, .callout-warn {
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+    border-left: 4px solid var(--muted); background: var(--surface2);
+  }
+  .simple { border-left-color: var(--muted); }
+  .simple::before { content: "Plain English: "; font-weight: 700; color: var(--muted);
+                     font-size: 0.7rem; letter-spacing: .05em; text-transform: uppercase; }
+  .callout { border-left-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .callout-tech { border-left-color: var(--purple); background: rgba(188,140,255,0.08); }
+  .callout-tech strong { color: var(--purple); }
+  .callout-ok { border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  .callout-warn { border-left-color: var(--orange); background: rgba(240,136,62,0.10); }
+
+  /* Badges. */
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
+            border-radius: 5px; line-height: 1.4; white-space: nowrap; }
+  .badge-ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-warn { background: rgba(240,136,62,0.15); color: var(--orange); }
+  .badge-info { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  /* Filename label that sits above a code block / table. */
+  .filebox {
+    background: #010409; color: var(--muted); border: 1px solid var(--border);
+    border-bottom: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.74rem; margin-top: 12px;
+  }
+  .filebox + pre, .filebox + table { margin-top: 0; border-radius: 0 0 8px 8px; border-top: none; }
+
+  /* General tables (dependency adjacency + worked examples). */
+  table.dep, table.example {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0;
+  }
+  table.dep th, table.dep td, table.example th, table.example td {
+    text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.dep th, table.example th {
+    background: var(--surface2); color: var(--muted); font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.dep tr:last-child td, table.example tr:last-child td { border-bottom: none; }
+
+  /* Dependency-graph SVG container. */
+  .depgraph {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; margin: 8px 0 16px; overflow-x: auto;
+  }
+  .depgraph svg text { paint-order: stroke; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+              color: var(--muted); font-size: 0.85rem; }
+  .meta-row .sep { color: var(--border); }
+  .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+           padding: 20px 22px; margin: 18px 0; scroll-margin-top: 16px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 14px; }
+  .panel.plain { border-left: 4px solid var(--blue); }
+  .panel.tech  { border-left: 4px solid var(--purple); }
+  .panel.example-p { border-left: 4px solid var(--green); }
+  .panel.graph-p { border-left: 4px solid var(--blue); }
+  .panel.files-p { border-left: 4px solid var(--green); }
+  .panel.risks-p { border-left: 4px solid var(--orange); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.blue { background: var(--blue); } .dot.purple { background: var(--purple); }
+  .dot.green { background: var(--green); } .dot.orange { background: var(--orange); }
+  .muted { color: var(--muted); }
+  table.files { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.files th, table.files td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.files th { color: var(--muted); font-weight: 600; }
+  ul.risks { margin: 0; padding-left: 20px; } ul.risks li { margin: 4px 0; }
+  .banner { border: 1px solid #4a3416; background: #2a1e0e; color: var(--orange);
+            border-radius: 12px; padding: 12px 16px; margin: 14px 0; font-size: 0.88rem; }
+  footer { margin-top: 34px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head><body>
+<div class="wrap">
+  <header class="cover">
+    <div class="meta-row">
+      <span class="chip branch">Path_A_LowAPI</span>
+      <span class='chip ai'>AI summary</span>
+      <span class="sep">|</span>
+      <span><a href='https://github.com/mohitmathur-ms/m-cube_version1/commit/f6bbc39f45233aaa35b11c37c20b3b5d60e501bf'><code>f6bbc39</code></a></span>
+      <span class="sep">|</span>
+      <span>Saksham Verma</span>
+    </div>
+    <h1>Remove legacy csv_loader monolith, add CI and MARKET-vs-LIMIT reference docs, clean stale reports</h1>
+    <p class="subtitle">Push change report &middot; generated 2026-05-25 11:28 UTC</p>
+  </header>
+
+  
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-plain">Plain English</a></li>
+      <li><a href="#sec-tech">Technical / Engineering</a></li>
+      <li><a href="#sec-example">Worked Example</a></li>
+      <li><a href="#sec-graph">Dependency / Knowledge Graph</a></li>
+      <li><a href="#sec-files">Changed Files</a></li>
+      <li><a href="#sec-risks">Risks &amp; Follow-ups</a></li>
+      <li><a href="#sec-diff">Diff stat</a></li>
+    </ol>
+  </nav>
+
+  <section id="sec-plain" class="panel plain">
+    <h2><span class="dot blue"></span> Plain English</h2>
+    <p class="sub">What this change does, for a non-technical reader.</p>
+    <div class="simple"><p>The team deleted a large, outdated Python file that had already been replaced by a newer, better-organised version in a prior commit. The old file was still sitting in the repository doing nothing; removing it eliminates confusion about which copy is authoritative.</p><p>Two new educational HTML pages were added to the html_reports folder. These are not backtest results — they are permanent reference documents that explain how the platform handles trade execution: one covers the tradeoff between market and limit orders, the other explains exactly how stop-loss and take-profit orders interact with market-order execution in the backtesting engine. They serve as always-available, self-contained reading material for anyone trying to understand system behavior.</p><p>A detailed README was added inside the .github folder. It explains, in plain language, what the two automated CI workflows do every time code is pushed: one checks that the code is healthy (lint and tests), the other generates an AI-written HTML summary of what changed. New contributors can now understand the automation without reading workflow YAML.</p><p>Several old, auto-generated HTML report files that had accumulated in html_reports were also deleted as housekeeping. These were stale outputs from previous GitHub Actions runs and carried no lasting value.</p></div>
+  </section>
+
+  <section id="sec-tech" class="panel tech">
+    <h2><span class="dot purple"></span> Technical / Engineering</h2>
+    <p class="sub">Implementation detail and impact, for engineers.</p>
+    <div class="callout-tech"><p>The dominant structural change is the deletion of `core/csv_loader.py` (752 lines). That monolith had already been decomposed into the `core/csv_loader/` package (sub-modules: `fx_daily_scanner/`, `commodity_daily_scanner/`, `index_daily_scanner/`, `crypto_nested_scanner/`, `fx_consolidated_scanner/`, `folder_scanner/`, `csv_reader/`, `side_concat/`, `mid_merge/`, `timestamp_parser/`, `scan_cache/`, `constants/`). This push removes the now-dead source file, completing the migration. Public symbols (`scan_csv_folder`, `load_csv`, `concat_side`, `_merge_ask_bid_to_mid`, `load_pair_mid`, `clear_fx_scan_cache`) continue to be re-exported from the package `__init__.py`, so no call-site changes are needed.</p><p>`core/csv_loader/README.md` gains 104 lines: a structured table listing every hardcoded literal across all submodules — thread-pool ceiling (`_CONCAT_SIDE_MAX_WORKERS = 16`), volume cap (`QUANTITY_MAX = 16_000_000_000.0`), all five filename regexes, scan-cache TTL (`600.0 s` per layout type), the scanner fallback order (consolidated → flat → FX-daily → commodity → index → crypto), MID formula (`(ask + bid) * 0.5`), duplicate policy (`keep=&quot;first&quot;`), etc. — each tagged with an override-path label (None / kwarg / data_format JSON / UI folder field).</p><p>`.github/README.md` (265 lines, new) documents `python-app.yml` (flake8 pass-1/pass-2 + pytest) and `push-report.yml` (collect_meta → generate_report → commit-back with retry-rebase loop), the AI-backend fallback chain (`CLAUDE_CODE_OAUTH_TOKEN` → `ANTHROPIC_API_KEY` → metadata-only banner), loop-prevention via `paths-ignore: html_reports/**` + `[skip ci]`, and all marketplace actions, runtimes, and secrets involved.</p><p>`html_reports/mkt_limit_order_tradeoff.html` (460 lines) and `html_reports/sl_tp_with_market_orders_explained.html` (434 lines) are self-contained, dark-themed static HTML pages committed as permanent reference documentation — not generated tearsheets. They explain MARKET vs. LIMIT execution semantics and how SL/TP orders interact with NautilusTrader&#x27;s simulated fill model. `html_reports/report.md` (300 lines) is a Markdown companion.</p><p>Eight stale auto-generated report pairs (`index.html` + `index.json`) deleted from `html_reports/manshitverma-crypto/`, `html_reports/sakshamVerma1000/`, and the `2026-05-23/` dated subdirectories.</p><p>`.claude/settings.json` adds seven PowerShell command allowlist entries (`Select-Object -ExpandProperty Name`, `Get-ChildItem` filter variants, `Format-List`) reflecting interactive file-system exploration performed during the session.</p><p>`portfolios/_default/FX_9_Slot_2024.json` has 8 lines changed; the unified diff is truncated so the specific field edits are not visible.</p><p>`core/models/serialization/__init__.py`: one blank line added inside the module docstring — cosmetic only.</p></div>
+  </section>
+
+  <section id="sec-example" class="panel example-p">
+    <h2><span class="dot green"></span> Worked Example</h2>
+    <p class="sub">A concrete illustration of the most significant change.</p>
+    <div class="callout-ok"><p>Most significant change — completing the csv_loader package migration:</p><p>Before this push, both of these paths existed:
+  core/csv_loader.py          ← 752-line monolith (live code)
+  core/csv_loader/            ← refactored package (also live)</p><p>Any `from core.csv_loader import scan_csv_folder` was ambiguous at the filesystem level (Python would prefer the package directory over the .py file, but the dead file was a maintenance hazard).</p><p>After this push:
+  core/csv_loader/            ← only copy; __init__.py re-exports the full public API</p><p>The call-site in `core/nautilus_loader.py` — `from core.csv_loader import scan_csv_folder, load_csv, concat_side` — continues to work unchanged. No import path changed; only the dead file is gone.</p></div>
+  </section>
+
+  <section id="sec-graph" class="panel graph-p">
+    <h2><span class="dot blue"></span> Dependency / Knowledge Graph</h2>
+    <p class="sub">Which files depend on the files changed in this push (1-hop, first-party imports).</p>
+    <p class='sub'>Arrows point <strong>importer &rarr; imported</strong> (&ldquo;depends on&rdquo;). Middle column = files changed in this push; left = files that import them; right = files they import.</p><div class='depgraph'><svg viewBox="0 0 940 282" width="100%" role="img" aria-label="dependency graph" style="max-width:940px"><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/></marker></defs><text x="150" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depended on by</text><text x="470" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Changed files</text><text x="790" y="38" text-anchor="middle" font-size="12" fill="var(--muted)" font-weight="600">Depends on</text><line x1="275" y1="87" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="275" y1="135" x2="345" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="87" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="135" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="183" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><line x1="595" y1="87" x2="665" y2="231" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.75"/><g><title>core/models/__init__.py</title><rect x="25" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">models/__init__.py</text></g><g><title>core/models/persistence/__init__.py</title><rect x="25" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--blue)" stroke-width="1.5"/><text x="150" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">persistence/__init__.py</text></g><g><title>core/models/serialization/__init__.py</title><rect x="345" y="70" width="250" height="34" rx="7" fill="var(--surface2)" stroke="var(--orange)" stroke-width="1.5"/><text x="470" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">serialization/__init__.py</text></g><g><title>core/models/exit_config/__init__.py</title><rect x="665" y="70" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="91" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">exit_config/__init__.py</text></g><g><title>core/models/portfolio_config/__init__.py</title><rect x="665" y="118" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="139" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">portfolio_config/__init__.py</text></g><g><title>core/models/strategy_slot_config/__init__.py</title><rect x="665" y="166" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="187" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">strategy_slot_config/__init__…</text></g><g><title>core/venue_config.py</title><rect x="665" y="214" width="250" height="34" rx="7" fill="var(--surface)" stroke="var(--green)" stroke-width="1.5"/><text x="790" y="235" text-anchor="middle" font-size="12.5" fill="var(--text)" font-family="SFMono-Regular,Consolas,monospace">core/venue_config.py</text></g></svg></div><table class='dep'><thead><tr><th>Changed file</th><th>Depended on by &larr;</th><th>Depends on &rarr;</th></tr></thead><tbody><tr><td><code>core/models/serialization/__init__.py</code></td><td><code>core/models/__init__.py</code><br><code>core/models/persistence/__init__.py</code></td><td><code>core/models/exit_config/__init__.py</code><br><code>core/models/portfolio_config/__init__.py</code><br><code>core/models/strategy_slot_config/__init__.py</code><br><code>core/venue_config.py</code></td></tr></tbody></table><p class='sub' style='margin-top:14px'>Changed files not in the Python import graph (config, docs, workflows, JSON, etc.):</p><ul class='risks'><li><code>.claude/settings.json</code></li><li><code>.github/README.md</code></li><li><code>core/csv_loader.py</code></li><li><code>core/csv_loader/README.md</code></li><li><code>html_reports/manshitverma-crypto/6926cd3/index.html</code></li><li><code>html_reports/manshitverma-crypto/6926cd3/index.json</code></li><li><code>html_reports/mkt_limit_order_tradeoff.html</code></li><li><code>html_reports/report.md</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/15-49-19/aa8df02/index.html</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/15-49-19/aa8df02/index.json</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/16-24-26/9259aba/index.html</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/16-24-26/9259aba/index.json</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/18-47-14/c63350b/index.html</code></li><li><code>html_reports/sakshamVerma1000/2026-05-23/18-47-14/c63350b/index.json</code></li><li><code>html_reports/sakshamVerma1000/79cb83d/index.html</code></li><li><code>html_reports/sakshamVerma1000/79cb83d/index.json</code></li><li><code>html_reports/sakshamVerma1000/c4f5014/index.html</code></li><li><code>html_reports/sakshamVerma1000/c4f5014/index.json</code></li><li><code>html_reports/sl_tp_with_market_orders_explained.html</code></li><li><code>portfolios/_default/FX_9_Slot_2024.json</code></li></ul>
+  </section>
+
+  <section id="sec-files" class="panel files-p">
+    <h2><span class="dot green"></span> Changed Files</h2>
+    <table class='files'><thead><tr><th>File</th><th>What changed</th></tr></thead><tbody><tr><td><code>.claude/settings.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>.github/README.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>core/csv_loader.py</code></td><td>DELETED (752 lines); monolithic flat file superseded by core/csv_loader/ package in a prior commit. | core/csv_loader/README.md — +104 lines cataloguing every hardcoded literal in each submodule with override-path labels. | .github/README.md — NEW (265 lines); human-readable guide to python-app.yml (CI) and push-report.yml (AI report generator) for contributors unfamiliar with GitHub Actions. | html_reports/mkt_limit_order_tradeoff.html — NEW (460 lines); self-contained reference HTML explaining MARKET vs LIMIT order execution tradeoffs. | html_reports/sl_tp_with_market_orders_explained.html — NEW (434 lines); self-contained reference HTML explaining SL/TP interaction with market-order fills. | html_reports/report.md — NEW (300 lines); Markdown companion to the two HTML reference docs. | html_reports/*/index.html + index.json (×8 pairs) — DELETED; stale auto-generated GitHub Actions change-report outputs with no lasting value. | .claude/settings.json — +7 PowerShell allowlist entries (Select-Object, Get-ChildItem filter forms, Format-List). | portfolios/_default/FX_9_Slot_2024.json — 8 lines changed (diff truncated; specific field edits not visible). | core/models/serialization/__init__.py — cosmetic blank line in module docstring.</td></tr><tr><td><code>core/csv_loader/README.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>core/models/serialization/__init__.py</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/manshitverma-crypto/6926cd3/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/manshitverma-crypto/6926cd3/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/mkt_limit_order_tradeoff.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/report.md</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/15-49-19/aa8df02/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/15-49-19/aa8df02/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/16-24-26/9259aba/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/16-24-26/9259aba/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/18-47-14/c63350b/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/2026-05-23/18-47-14/c63350b/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/79cb83d/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/79cb83d/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/c4f5014/index.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sakshamVerma1000/c4f5014/index.json</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>html_reports/sl_tp_with_market_orders_explained.html</code></td><td><span class=muted>&mdash;</span></td></tr><tr><td><code>portfolios/_default/FX_9_Slot_2024.json</code></td><td><span class=muted>&mdash;</span></td></tr></tbody></table>
+  </section>
+
+  <section id="sec-risks" class="panel risks-p">
+    <h2><span class="dot orange"></span> Risks &amp; Follow-ups</h2>
+    <ul class='risks'><li>portfolios/_default/FX_9_Slot_2024.json changes are not visible in the truncated diff — verify that no squareoff times, lot sizes, or allocation_pct values were accidentally altered.</li><li>core/csv_loader.py deletion is irreversible; confirm that no branch or in-flight PR still imports from the flat-file path before this lands on main.</li><li>The educational HTML files in html_reports/ will be picked up by the push-report workflow&#x27;s paths-ignore exclusion, but verify the html_reports/report.md file does not accidentally trigger a CI lint run (it is not Python, but the paths-ignore only covers html_reports/**).</li><li>core/csv_loader/README.md documents a synthetic date range &#x27;01JAN2015_31DEC2025&#x27; baked into fx_daily_scanner and commodity_daily_scanner synthetic filenames — this will silently become stale after 31 Dec 2025 (already past); source edit required to extend it.</li><li>Seven new PowerShell commands added to .claude/settings.json allowlist reflect session-specific exploration; review whether all seven should persist in project settings or belong in a personal/local settings file.</li></ul>
+  </section>
+
+  <section id="sec-diff" class="panel">
+    <h2>Diff stat <span class='chip warn'>truncated</span></h2>
+    <pre>.claude/settings.json                              |   9 +-
+ .github/README.md                                  | 265 ++++++++
+ core/csv_loader.py                                 | 752 ---------------------
+ core/csv_loader/README.md                          | 104 +++
+ core/models/serialization/__init__.py              |   1 +
+ .../manshitverma-crypto/6926cd3/index.html         | 114 ----
+ .../manshitverma-crypto/6926cd3/index.json         |  11 -
+ html_reports/mkt_limit_order_tradeoff.html         | 460 +++++++++++++
+ html_reports/report.md                             | 300 ++++++++
+ .../2026-05-23/15-49-19/aa8df02/index.html         | 140 ----
+ .../2026-05-23/15-49-19/aa8df02/index.json         |  11 -
+ .../2026-05-23/16-24-26/9259aba/index.html         | 230 -------
+ .../2026-05-23/16-24-26/9259aba/index.json         |  11 -
+ .../2026-05-23/18-47-14/c63350b/index.html         | 222 ------
+ .../2026-05-23/18-47-14/c63350b/index.json         |  11 -
+ html_reports/sakshamVerma1000/79cb83d/index.html   | 118 ----
+ html_reports/sakshamVerma1000/79cb83d/index.json   |  11 -
+ html_reports/sakshamVerma1000/c4f5014/index.html   | 114 ----
+ html_reports/sakshamVerma1000/c4f5014/index.json   |  11 -
+ .../sl_tp_with_market_orders_explained.html        | 434 ++++++++++++
+ portfolios/_default/FX_9_Slot_2024.json            |   8 +-
+ 21 files changed, 1576 insertions(+), 1761 deletions(-)</pre>
+  </section>
+
+  <footer>
+    Commit f6bbc39f45233aaa35b11c37c20b3b5d60e501bf on <strong>Path_A_LowAPI</strong> &middot; m-cube change report &middot; model: claude-sonnet-4-6
+  </footer>
+</div>
+</body></html>

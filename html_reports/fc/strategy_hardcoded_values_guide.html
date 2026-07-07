@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strategy Hardcoded Values Guide — m-cube_version1</title>
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --panel: #fff;
+      --border: #e1e4e8;
+      --text: #1f2328;
+      --muted: #57606a;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --green-bg: #dafbe1;
+      --red: #cf222e;
+      --red-bg: #ffebe9;
+      --amber: #9a6700;
+      --amber-bg: #fff8c5;
+      --purple: #8250df;
+      --purple-bg: #fbefff;
+      --blue-bg: #ddf4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 32px 40px 80px;
+    }
+
+    header.cover {
+      background: linear-gradient(135deg, #0969da 0%, #8250df 100%);
+      color: white;
+      padding: 36px;
+      margin: -32px -40px 28px;
+      border-radius: 0 0 12px 12px;
+    }
+
+    header.cover h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    header.cover .subtitle {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.92;
+    }
+
+    header.cover .meta {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    h2 {
+      font-size: 21px;
+      margin-top: 36px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-top: 22px;
+    }
+
+    h4 {
+      font-size: 14px;
+      margin-top: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f6f8fa;
+      font-weight: 600;
+      font-size: 11.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    td.center,
+    th.center {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    td.mono {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    code {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      background: #f6f8fa;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #d63384;
+    }
+
+    pre {
+      background: #f6f8fa;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .badge-ok {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .badge-warn {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .badge-info {
+      background: var(--blue-bg);
+      color: var(--accent);
+    }
+
+    .badge-purple {
+      background: var(--purple-bg);
+      color: var(--purple);
+    }
+
+    .badge-red {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .callout {
+      background: var(--blue-bg);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-warn {
+      background: var(--amber-bg);
+      border-left: 4px solid var(--amber);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-ok {
+      background: var(--green-bg);
+      border-left: 4px solid var(--green);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech {
+      background: var(--purple-bg);
+      border-left: 4px solid var(--purple);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech strong {
+      color: var(--purple);
+    }
+
+    .simple {
+      background: #f6f8fa;
+      border-left: 4px solid #57606a;
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14.5px;
+    }
+
+    .simple::before {
+      content: "Plain English: ";
+      font-weight: 700;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 20px 0;
+    }
+
+    nav.toc h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    nav.toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    nav.toc ol li {
+      padding: 3px 0;
+      break-inside: avoid;
+    }
+
+    nav.toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    nav.toc a:hover {
+      text-decoration: underline;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .filebox {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 8px 14px;
+      border-radius: 6px 6px 0 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12px;
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
+
+    .filebox+pre,
+    .filebox+table {
+      margin-top: 0;
+      border-radius: 0 0 6px 6px;
+      border-top: none;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <header class="cover">
+      <h1>Strategy Hardcoded Values Guide</h1>
+      <p class="subtitle">Every <em>truly</em> hardcoded value in <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">strategies/</code> — the literals baked into the trading
+        logic that no UI field or portfolio JSON can override — and exactly how each one touches your backtest.</p>
+      <p class="meta">Scope: strategies/bollinger_bands.py · ema_cross.py · four_ma.py · rsi_mean_reversion.py ·
+        range_breakout.py · _shared/time_windows. Line numbers verified against the current source.</p>
+    </header>
+
+    <div class="callout">
+      <strong>What this document shows.</strong> It answers one question: <em>"When I run a backtest, is there a
+        value baked into the strategy code that I can't see or change, and could it harm my results?"</em>
+      <ol style="margin: 8px 0 0 18px;">
+        <li>A precise definition of <strong>"truly hardcoded"</strong> vs. an overridable <strong>config default</strong>
+          — so you know which values this report covers and which it deliberately ignores.</li>
+        <li>A summary table of every true hardcoded value across all five strategies.</li>
+        <li>One detailed section per value: the exact <em>syntax</em>, a <em>plain-English</em> description, a
+          <em>technical</em> description, and a clear note on its <em>impact on your backtest</em>.</li>
+      </ol>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-0">0. What counts as "truly hardcoded"?</h2>
+
+    <div class="simple">
+      Most numbers you see in a strategy file (RSI period 14, Bollinger 20/2.0, the Range-Breakout 09:30 start time) are
+      just <em>starting suggestions</em>. The moment you run a backtest, the values from the screen are pasted over them,
+      so they are <strong>not</strong> hardcoded — you control them. A <em>truly</em> hardcoded value is different: it's
+      written straight into the trading logic, there is no box for it on the screen, and it is used on every single run
+      no matter what you type.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the runner builds each strategy's config with
+      <code>config_class(**config_kwargs)</code> in <code>core/backtest_runner.py</code>, unpacking the UI/portfolio
+      params over the dataclass. A field only falls back to its declared default when the request omits that key — and
+      the UI form never omits a key it renders. So any field that appears in a strategy's <code>PARAMS</code> dict (and
+      <code>trade_size</code>, which the runner always computes from <code>lots × lot_size</code>) is <em>overridable</em>
+      and out of scope here. A value is "truly hardcoded" only if it is a literal inside a method body or a module-level
+      constant with <strong>no corresponding <code>PARAMS</code> entry</strong>. Those are what follows.
+    </div>
+
+    <div class="callout-warn">
+      <strong>Explicitly out of scope (these are NOT hardcoded — you can change them).</strong>
+      Indicator params (<code>bb_period</code>, <code>bb_std</code>, <code>rsi_period</code>, <code>overbought</code>,
+      <code>oversold</code>, EMA/MA periods); all Range-Breakout config fields including the equity-style session
+      defaults <code>range_start_hhmm=930</code> / <code>squareoff_hhmm=1515</code> and <code>timezone_offset_min=0</code>;
+      and <code>trade_size</code>. They have UI fields (or are runner-computed) and are overridden on every real run.
+      <em>Caveat:</em> the RBO session-time <em>defaults</em> are equity-oriented — harmless once you set them, but worth
+      knowing if you ever drive the strategy programmatically and forget to pass them.
+    </div>
+
+    <nav class="toc">
+      <h3>Table of Contents</h3>
+      <ol>
+        <li><a href="#sec-0">What counts as "truly hardcoded"?</a></li>
+        <li><a href="#sec-summary">Summary — all true hardcoded values</a></li>
+        <li><a href="#sec-1">Order time-in-force = <code>GTC</code></a></li>
+        <li><a href="#sec-2">Order type = <code>market</code></a></li>
+        <li><a href="#sec-3"><code>MAX_LEGS = 10</code></a></li>
+        <li><a href="#sec-4">RBO modeling entry-fill clamp</a></li>
+        <li><a href="#sec-5">RBO degenerate-range sentinels (<code>±inf</code>)</a></li>
+        <li><a href="#sec-6">RBO percent→fraction <code>/ 100.0</code></a></li>
+        <li><a href="#sec-7">Time-helper constants (<code>1e9</code>, HHMM math)</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-summary">1. Summary — all true hardcoded values</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Hardcoded value</th>
+          <th>Where</th>
+          <th class="center">Overridable?</th>
+          <th>Impact on backtest</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="center">1</td>
+          <td class="mono">TimeInForce.GTC</td>
+          <td>all 5 strategies</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Every order stays alive until filled/cancelled. Benign for market orders.</td>
+        </tr>
+        <tr>
+          <td class="center">2</td>
+          <td class="mono">order_factory.market(...)</td>
+          <td>all 5 strategies</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Every entry &amp; exit fills at market — you cannot model limit/stop entries.</td>
+        </tr>
+        <tr>
+          <td class="center">3</td>
+          <td class="mono">MAX_LEGS = 10</td>
+          <td>range_breakout.py</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td><code>num_legs</code> silently clamped to ≤10. Harmless unless you wanted more.</td>
+        </tr>
+        <tr>
+          <td class="center">4</td>
+          <td class="mono">entry_fill = max(trigger, open)</td>
+          <td>range_breakout.py</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Fixes the <em>modeling</em> entry price that drives each leg's target/stop math.</td>
+        </tr>
+        <tr>
+          <td class="center">5</td>
+          <td class="mono">float("inf") / float("-inf")</td>
+          <td>range_breakout.py</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Silently disables a leg for the day on a zero-width range (basis = range size).</td>
+        </tr>
+        <tr>
+          <td class="center">6</td>
+          <td class="mono">pct / 100.0</td>
+          <td>range_breakout.py</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Defines that buffer/target/stop inputs are read as <em>percent</em>, not fractions.</td>
+        </tr>
+        <tr>
+          <td class="center">7</td>
+          <td class="mono">1e9 ns; HHMM // 100, % 100</td>
+          <td>_shared/time_windows</td>
+          <td class="center"><span class="badge badge-red">No</span></td>
+          <td>Unit constants for the intraday clock. Correct, but assume integer-HHMM input.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="small">"Overridable? = No" means there is no UI field or portfolio key for this value; it applies on every
+      run regardless of what you configure.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-1">2. Order time-in-force = <code>TimeInForce.GTC</code></h2>
+
+    <div class="filebox">strategies/bollinger_bands.py · ema_cross.py · four_ma.py · rsi_mean_reversion.py ·
+      range_breakout.py (order-submission helpers)</div>
+    <pre><code># bollinger_bands.py:88-98  (every strategy's _submit_order/_submit_market is identical in spirit)
+def _submit_order(self, side: OrderSide, reason: str | None = None) -&gt; None:
+    kwargs = dict(
+        instrument_id=self.config.instrument_id,
+        order_side=side,
+        quantity=self.instrument.make_qty(self.config.trade_size),
+        time_in_force=TimeInForce.GTC,          # &lt;-- hardcoded, no config field
+    )
+    ...
+    order = self.order_factory.market(**kwargs)
+    self.submit_order(order)</code></pre>
+
+    <div class="simple">
+      Every order the strategy sends is marked "keep this order working until it either fills or I cancel it." There is
+      no setting anywhere to change this to, say, "cancel it instantly if it can't fill right now."
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>time_in_force=TimeInForce.GTC</code> (Good-Till-Cancelled) is passed as a
+      literal in every order builder — <a
+        href="../strategies/bollinger_bands.py#L93">bollinger_bands.py:93</a>, <a
+        href="../strategies/ema_cross.py#L109">ema_cross.py:109</a>, <a
+        href="../strategies/four_ma.py#L101">four_ma.py:101</a>, <a
+        href="../strategies/rsi_mean_reversion.py#L95">rsi_mean_reversion.py:95</a>, <a
+        href="../strategies/range_breakout.py#L454">range_breakout.py:454</a>. No <code>PARAMS</code> entry exposes it,
+      so it is fixed for the lifetime of the codebase unless edited. The alternatives Nautilus offers
+      (<code>IOC</code>, <code>FOK</code>, <code>GTD</code>, <code>DAY</code>) are never reachable from a config.
+    </div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Low. Because every order is also a <em>market</em> order (see §3), it is matched on the very next tick/bar
+      regardless of time-in-force, so GTC vs. IOC produces the same fill in practice. The value matters only if the code
+      were ever changed to emit limit orders — then GTC would let a resting limit order survive across bars instead of
+      expiring. Worth knowing, not worth worrying about for the current market-order strategies.
+    </p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-2">3. Order type = <code>order_factory.market(...)</code></h2>
+
+    <div class="filebox">strategies/*.py — every entry and every exit</div>
+    <pre><code># ema_cross.py:105-112
+order = self.order_factory.market(            # &lt;-- always a MARKET order
+    instrument_id=self.config.instrument_id,
+    order_side=side,
+    quantity=self.instrument.make_qty(self.config.trade_size),
+    time_in_force=TimeInForce.GTC,
+    tags=[reason],
+)
+self.submit_order(order)
+
+# range_breakout.py:484-485  (exits, including stop/target and squareoff)
+opposite = OrderSide.SELL if side == OrderSide.BUY else OrderSide.BUY
+self._submit_market(opposite, self._leg_qty[idx])</code></pre>
+
+    <div class="simple">
+      The strategy only ever knows how to do one thing when it wants in or out of a trade: "buy/sell right now at whatever
+      the going price is." It never places a resting order to buy at a specific better price.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> all submissions go through <code>self.order_factory.market(...)</code>; there is no
+      <code>limit()</code>, <code>stop_market()</code>, or bracket-order path anywhere in <code>strategies/</code>. Exits
+      from the Range-Breakout target/stop logic are <em>also</em> market orders — the strategy decides intrabar that a
+      target or stop level was touched, then fires a market order to flatten, rather than resting a protective
+      stop/limit with the venue.
+    </div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Moderate and structural. Two consequences worth internalising:
+    </p>
+    <ul>
+      <li><strong>Fills follow the engine's market-fill model.</strong> Your slippage/fill realism comes entirely from
+        NautilusTrader's fill model + the venue config, not from the strategy. You cannot test "enter only if price
+        pulls back to X" — there is no limit entry.</li>
+      <li><strong>Range-Breakout target/stop are modeled, then market-filled.</strong> The strategy detects the
+        touch using bar high/low and the modeled entry price (§5), then sends a market order. Realised P&amp;L is the
+        engine's actual market fill, which can differ from the exact target/stop price the strategy "saw." This is by
+        design (the file's docstring calls it the "modeling entry"), but it means RBO P&amp;L is not a clean fill at the
+        printed target/stop level.</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-3">4. <code>MAX_LEGS = 10</code></h2>
+
+    <div class="filebox">strategies/range_breakout.py:83 (constant) · :152-153 (clamp)</div>
+    <pre><code>MAX_LEGS = 10                          # range_breakout.py:83 — module-level cap
+
+# range_breakout.py:149-154 — num_legs is silently clamped into [1, MAX_LEGS]
+n = int(config.num_legs)
+if n &lt; 1:
+    n = 1
+if n &gt; MAX_LEGS:
+    n = MAX_LEGS                       # &lt;-- request for 11+ legs is silently reduced to 10</code></pre>
+
+    <div class="simple">
+      The Range-Breakout strategy supports at most 10 pyramid legs. If you ask for more, it quietly gives you 10 and
+      doesn't warn you. Asking for zero or a negative number quietly becomes 1.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>MAX_LEGS</code> is a module constant used both to clamp <code>num_legs</code>
+      in <code>__init__</code> (<a href="../strategies/range_breakout.py#L152">range_breakout.py:152-153</a>) and to
+      bound the auto-generated <code>legN_lots</code> / <code>legN_range_end_hhmm</code> params in the
+      <code>PARAMS</code> loop (<a href="../strategies/range_breakout.py#L545">range_breakout.py:545-554</a>). The UI's
+      <code>num_legs</code> field also advertises <code>"max": MAX_LEGS</code>, so a UI user is fenced in before the
+      clamp ever fires — the clamp is a defensive backstop for programmatic callers.</div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Low. The only way this surprises you is a non-UI call (script/API) requesting more than 10 legs: legs 11+ are
+      dropped with no error, so the backtest runs a smaller pyramid than you intended. Within the UI you cannot exceed
+      the cap, so results are never silently truncated there.
+    </p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-4">5. Range-Breakout modeling entry-fill clamp</h2>
+
+    <div class="filebox">strategies/range_breakout.py:403-412 (inside _process_side entry pass)</div>
+    <pre><code># Long side (range_breakout.py:403-407)
+trig_src = bar_close if minute_close else bar_high
+if trig_src &lt; up_trig:
+    continue
+entry_fill = up_trig if bar_open &lt; up_trig else bar_open   # &lt;-- max(up_trig, bar_open)
+
+# Short side (range_breakout.py:408-412)
+trig_src = bar_close if minute_close else bar_low
+if trig_src &gt; dn_trig:
+    continue
+entry_fill = dn_trig if bar_open &gt; dn_trig else bar_open   # &lt;-- min(dn_trig, bar_open)</code></pre>
+
+    <div class="simple">
+      When a breakout triggers, the strategy assumes you got in at the breakout level — unless the bar already opened
+      past that level (a gap), in which case it assumes you got in at the open. It never assumes a fill better than the
+      breakout line. This assumed price is then used to compute where the target and stop sit.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the modeling entry is <code>max(upper_trigger, bar.open)</code> for longs and
+      <code>min(lower_trigger, bar.open)</code> for shorts — a hardcoded clamp with no config knob. It feeds
+      <code>leg.entry_price</code> (<a href="../strategies/range_breakout.py#L474">range_breakout.py:474</a>), which is
+      the basis for <code>_target_price</code> / <code>_stop_price</code> under <code>target_stop_basis = 0</code> (percent
+      of entry) and the reference for the range-size deltas under basis = 1. Note this is a <em>modeling</em> price for
+      the strategy's own target/stop arithmetic; the engine still computes realised P&amp;L from its independent
+      market-order fill.</div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Moderate, and easy to misread. The conservative clamp means the strategy never credits itself an optimistic
+      sub-trigger entry, but on gap-through bars it books the (worse) open price as the entry — which shifts where the
+      modeled target/stop levels land and therefore which subsequent bars count as target/stop hits. If your RBO
+      tearsheet shows exits that don't line up with the "clean" trigger ± target%, this clamp (combined with §3's
+      market exit) is why. It is intended behaviour, documented in the file's module docstring, but it is not
+      adjustable.
+    </p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-5">6. Range-Breakout degenerate-range sentinels (<code>±inf</code>)</h2>
+
+    <div class="filebox">strategies/range_breakout.py:331-341 (inside _finalize_leg_triggers)</div>
+    <pre><code>if self._basis == 1:
+    rng = rh - rl
+    if rng &lt;= 0.0:
+        # Degenerate range: block entries on this leg for the day.
+        self._leg_upper_trigger[i] = float("inf")     # &lt;-- range_breakout.py:335
+        self._leg_lower_trigger[i] = float("-inf")    # &lt;-- range_breakout.py:336
+    else:
+        self._leg_upper_trigger[i] = up_trig
+        self._leg_lower_trigger[i] = dn_trig
+    self._leg_tgt_delta[i]  = rng * (self._tgt_pct  / 100.0)
+    self._leg_stop_delta[i] = rng * (self._stop_pct / 100.0)</code></pre>
+
+    <div class="simple">
+      When the strategy uses "range size" to size its target and stop, but the recorded range has zero width (the high
+      and low of the range window were identical), it deliberately makes that leg impossible to trigger for the rest of
+      the day — because a zero-width range would otherwise produce a zero-distance target and stop, and every trade would
+      instantly round-trip.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> under <code>target_stop_basis = 1</code> (range size), a zero or negative range
+      (<code>range_high == range_low</code>) sets the upper trigger to <code>+inf</code> and the lower to
+      <code>-inf</code>. Since the entry pass requires <code>bar_high ≥ up_trig</code> (long) or
+      <code>bar_low ≤ dn_trig</code> (short), no real price can ever satisfy <code>≥ +inf</code> / <code>≤ -inf</code>,
+      so the leg never enters that day. This guard only applies on basis = 1; under basis = 0 (percent of entry price) a
+      flat range does not disable the leg.</div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Low but silent. On instruments/timeframes where a range window can be perfectly flat (illiquid sessions, tiny
+      tick movement, or a too-short range window), affected legs simply produce no trades that day with no log message.
+      If an RBO backtest shows fewer trades than expected on quiet days, this sentinel is a likely cause. It is correct
+      behaviour (it prevents a degenerate zero-distance round-trip), just invisible.
+    </p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-6">7. Range-Breakout percent→fraction <code>/ 100.0</code></h2>
+
+    <div class="filebox">strategies/range_breakout.py:328, 340-341, 429, 442</div>
+    <pre><code>buf = self._buf_pct / 100.0                       # :328  breakout buffer (percent mode)
+up_trig = rh * (1.0 + buf); dn_trig = rl * (1.0 - buf)
+
+self._leg_tgt_delta[i]  = rng * (self._tgt_pct  / 100.0)   # :340  target delta (basis=range)
+self._leg_stop_delta[i] = rng * (self._stop_pct / 100.0)   # :341  stop delta   (basis=range)
+
+# _target_price / _stop_price under basis=0 (percent of entry price)
+delta = entry * (self._tgt_pct  / 100.0)         # :429
+delta = entry * (self._stop_pct / 100.0)         # :442</code></pre>
+
+    <div class="simple">
+      The breakout-buffer, target, and stop boxes are read as <em>percentages</em>. Typing "10" into the target box means
+      10%, not 10×. The "divide by 100" that turns "10" into "0.10" is fixed in the code — you can change the number you
+      type, but not the fact that it's treated as a percent.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the <code>/ 100.0</code> divisor is the hardcoded contract between the UI's
+      percent-labelled fields (<code>breakout_buffer_pct</code>, <code>target_pct</code>, <code>stop_pct</code>) and the
+      strategy's internal fractional math. The <em>inputs</em> are configurable; the <em>unit interpretation</em> is
+      not. Note the buffer has a separate non-percent path — <code>breakout_buffer_mode = 1</code> switches to absolute
+      points (<code>breakout_buffer_pts</code>) and bypasses the <code>/ 100.0</code> entirely (<a
+        href="../strategies/range_breakout.py#L324">range_breakout.py:324-330</a>).</div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      None if you remember the fields are percentages; potentially large if you assume fractions. Entering
+      <code>0.1</code> expecting "10%" actually yields 0.1% — a target/stop 100× tighter than intended, which would make
+      trades round-trip almost immediately. This is a units gotcha rather than a bug: the divisor is correct, but it
+      fixes the meaning of every value you type into those three boxes.
+    </p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-7">8. Time-helper constants (<code>1e9</code>, HHMM math)</h2>
+
+    <div class="filebox">strategies/_shared/time_windows/__init__.py:18-37</div>
+    <pre><code>def hhmm_to_min(hhmm: int) -&gt; int:
+    return (hhmm // 100) * 60 + (hhmm % 100)          # :24  930 -&gt; 570, 1515 -&gt; 915
+
+def bar_to_local(ts_event_ns: int, tz_offset_min: int) -&gt; tuple[int, date]:
+    local_dt = datetime.fromtimestamp(ts_event_ns / 1e9, tz=timezone.utc) + timedelta(
+        minutes=tz_offset_min
+    )                                                  # :34  ns -&gt; seconds via 1e9
+    return local_dt.hour * 60 + local_dt.minute, local_dt.date()</code></pre>
+
+    <div class="simple">
+      These are the plumbing constants the Range-Breakout clock uses: how to turn a time like "1515" into "minutes since
+      midnight," and how to turn the bar's nanosecond timestamp into a normal time. They are unit conversions, not
+      trading choices.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>hhmm_to_min</code> bakes in the integer-HHMM encoding (<code>// 100</code> for
+      hours, <code>% 100</code> for minutes) used by all the RBO time fields; it does no validation and assumes the
+      caller passes UI-bounded values in <code>0..2359</code>. <code>bar_to_local</code> bakes in the
+      <code>ts_event_ns / 1e9</code> nanosecond→second divisor and uses UTC + a <code>tz_offset_min</code> shift (the
+      offset itself is your configurable <code>timezone_offset_min</code>). These constants are physical-unit facts, not
+      tunables.</div>
+
+    <h4>Impact on your backtest</h4>
+    <p>
+      Negligible for normal use — the constants are simply correct. The only practical caveat: because
+      <code>hhmm_to_min</code> assumes valid integer-HHMM input and skips validation, a malformed time fed through a
+      non-UI path (e.g. <code>970</code>, which isn't a real clock time) would be misinterpreted rather than rejected.
+      Within the UI's <code>0..2359</code> bounds this never happens.
+    </p>
+
+    <!-- ============================================================ -->
+    <hr>
+
+    <div class="callout-ok">
+      <strong>Bottom line.</strong> Your <em>signal</em> parameters are safe — every indicator setting and Range-Breakout
+      session field is overridden from the UI on each run, so nothing about your chosen strategy logic is silently
+      hardcoded. The genuinely fixed-in-code values are narrow and mostly benign: every order is a <strong>GTC market
+      order</strong> (so fills follow the engine's market model, never a limit), Range-Breakout caps at <strong>10
+      legs</strong>, models entries with a <strong>max(trigger, open) clamp</strong>, disables zero-width-range legs via
+      <strong>±inf sentinels</strong>, and reads buffer/target/stop as <strong>percent</strong>. None of these will
+      corrupt a correctly-configured backtest — but the RBO entry-fill clamp (§5) and the percent units (§7) are the two
+      that most often explain "why don't my exits land exactly on the target/stop price?"
+    </div>
+
+  </div>
+</body>
+
+</html>

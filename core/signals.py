@@ -125,6 +125,18 @@ SIGNAL_REGISTRY = {
             "period": params.get("rsi_period", 14),
         },
     },
+    "RSI Mean Reversion (BID/ASK/MID)": {
+        "signal_fn": rsi_signal,
+        "indicators": {
+            "rsi": {"class": RelativeStrengthIndex, "param_key": "rsi_period", "default": 14},
+        },
+        "extract_args": lambda indicators, params, close: {
+            "rsi_value": indicators["rsi"].value,
+            "overbought": params.get("overbought", 70.0),
+            "oversold": params.get("oversold", 30.0),
+            "period": params.get("rsi_period", 14),
+        },
+    },
     "Bollinger Bands": {
         "signal_fn": bollinger_signal,
         "indicators": {

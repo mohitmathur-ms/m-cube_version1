@@ -32,12 +32,20 @@ def _parse_nautilus_value(value) -> float:
         return 0.0
 
 
+# Catalog timestamps are UTC; reports are displayed in IST (Asia/Kolkata,
+# UTC+5:30, no DST). This is a DISPLAY-only shift applied when formatting report
+# timestamps for output — it never touches the raw ts used by any backtest
+# computation (sorting/grouping/clipping read the raw nanosecond ts, and a
+# uniform +5:30 on the display string preserves chronological order).
+_IST_OFFSET = pd.Timedelta(hours=5, minutes=30)
+
+
 def _format_timestamp(ts) -> str:
-    """Convert a NautilusTrader timestamp to DD-MM-YYYY HH:MM:SS format."""
+    """Convert a NautilusTrader (UTC) timestamp to DD-MM-YYYY HH:MM:SS in IST."""
     if ts is None:
         return ""
     try:
-        dt = pd.to_datetime(ts, utc=True)
+        dt = pd.to_datetime(ts, utc=True) + _IST_OFFSET
         return dt.strftime("%d-%m-%Y %H:%M:%S")
     except Exception:
         return str(ts)
@@ -50,7 +58,7 @@ def _format_timestamp_series(series: pd.Series) -> list[str]:
     parsing can't handle, so string-like fallbacks ("str(ts)" for unparseable
     values) are preserved exactly.
     """
-    parsed = pd.to_datetime(series, utc=True, errors="coerce")
+    parsed = pd.to_datetime(series, utc=True, errors="coerce") + _IST_OFFSET  # UTC -> IST display
     formatted = parsed.dt.strftime("%d-%m-%Y %H:%M:%S")
     # NaN entries in formatted line up with NaT in parsed; fill them from the
     # original slow path so we keep the "return str(ts)" fallback verbatim.
@@ -113,22 +121,30 @@ def _determine_reason(
 def _build_fills_lookup(fills_report) -> dict:
     """Build lookups mapping a fill to its reason fields.
 
-    Returns a dict with two views:
+    Returns a dict with three views:
 
     - ``"by_oid"`` — keyed by venue_order_id (the existing path; works when
       the positions_report's opening_order_id happens to match the venue id,
       which is rare under NautilusTrader's default reports because positions
       use the *client* order id format).
-    - ``"by_pos_ts"`` — keyed by ``(trader_id, strategy_id, instrument_id,
-      ts_int_ns)`` where ``ts_int_ns`` is the fill's ``ts_init`` rounded to
-      the nearest second. This is the practical bridge from a position row's
-      ``ts_opened`` / ``ts_closed`` to the matching fill's tags, since the
-      two reports don't share an order-id key but DO share timestamps and
-      identity columns.
+    - ``"by_pos_ts_open"`` / ``"by_pos_ts_close"`` — keyed by
+      ``(trader_id, strategy_id, instrument_id, ts_int_ns)`` where
+      ``ts_int_ns`` is the fill's ``ts_init`` rounded to the nearest second.
+      Splitting open vs. close fills (by ``is_reduce_only``) is required
+      because ``on_sl_action="reverse"`` / ``on_target_action="reverse"``
+      emits a close fill (with the structured tag) and immediately
+      submits an opposite-side open fill on the *same bar* — the two
+      fills share an identical timestamp, so a single dict would let the
+      tag-less open fill overwrite the tagged close fill, and the
+      orderbook EXIT REASON would lose the "Reverse on SL"/"Reverse on
+      TP" label.
+    - ``"by_pos_ts"`` — combined fallback (whichever fill landed last)
+      for fills_reports that don't carry an ``is_reduce_only`` column.
 
     Each entry contains ``{type, contingency_type, tags}``.
     """
-    out = {"by_oid": {}, "by_pos_ts": {}}
+    out = {"by_oid": {}, "by_pos_ts": {},
+           "by_pos_ts_open": {}, "by_pos_ts_close": {}}
     if fills_report is None or fills_report.empty:
         return out
 
@@ -141,6 +157,14 @@ def _build_fills_lookup(fills_report) -> dict:
     col_strategy = _resolve_column(df, ["strategy_id", "StrategyId"])
     col_instrument = _resolve_column(df, ["instrument_id", "InstrumentId"])
     col_ts = _resolve_column(df, ["ts_init", "TsInit", "ts_event", "ts_last"])
+    # Fill EXECUTION time. A resting order (e.g. a ReExecute-at-Entry-Price limit
+    # that waits for price to return) is submitted at ts_init but FILLS later at
+    # ts_last — and the position's ts_opened equals the fill time. So we key fills
+    # by BOTH ts_init and ts_last; otherwise the position lookup (which uses
+    # ts_opened) misses the fill and its tag is lost (orderbook shows the generic
+    # "Strategy Signal" with an empty detailed reason).
+    col_ts_last = _resolve_column(df, ["ts_last", "TsLast"])
+    col_reduce = _resolve_column(df, ["is_reduce_only", "IsReduceOnly", "reduce_only"])
 
     def _normalize_tags(tg):
         # Nautilus stores tags as ``['EMA Cross BUY: …']``; unwrap to the
@@ -184,23 +208,51 @@ def _build_fills_lookup(fills_report) -> dict:
             if oid:
                 out["by_oid"][oid] = info
         if col_trader and col_strategy and col_instrument and col_ts:
-            sec = _ts_to_seconds(rec.get(col_ts))
-            if sec is not None:
+            # Index by both the submit time (ts_init) and the fill/execution time
+            # (ts_last) so a resting order is found whether the position keys off
+            # one or the other. For instant fills the two coincide.
+            _secs = []
+            _s_init = _ts_to_seconds(rec.get(col_ts))
+            if _s_init is not None:
+                _secs.append(_s_init)
+            if col_ts_last:
+                _s_last = _ts_to_seconds(rec.get(col_ts_last))
+                if _s_last is not None and _s_last != _s_init:
+                    _secs.append(_s_last)
+            for sec in _secs:
                 key = (str(rec.get(col_trader)),
                        str(rec.get(col_strategy)),
                        str(rec.get(col_instrument)),
                        sec)
+                # Combined view kept for back-compat / no-reduce-col fallback.
                 out["by_pos_ts"][key] = info
+                # Role-split views — disambiguate close from open when
+                # both fire on the same bar (reverse-on-SL/TP path).
+                if col_reduce:
+                    is_close = bool(rec.get(col_reduce))
+                    if is_close:
+                        out["by_pos_ts_close"][key] = info
+                    else:
+                        out["by_pos_ts_open"][key] = info
     return out
 
 
-def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict]:
+def _build_orderbook(all_results: dict, user_id: str | None = None,
+                     exit_sell_first: bool = True, portfolio_name: str = "") -> list[dict]:
     """Build the ORDERBOOK trade list from all strategy results.
 
     Each closed position becomes one trade record in the template's format.
     When ``user_id`` is provided, the USERID, MULTIPLIER, and LOTS columns
     reflect the user's per-trade multiplier (from ``config/users.json``);
     otherwise legacy defaults are used (USERID="UID001", MULTIPLIER=1.0).
+
+    ``exit_sell_first`` (spec execution_logic.html §8.2, default ON) controls the
+    log order of BATCH-exit closes: within a batch close (Squareoff / Portfolio
+    SqOff, same entry-time group) SELL-leg closes are listed before BUY-leg
+    closes. This is **log order only** — the engine has no intra-bar leg-exit
+    delay, so fills and PnL are identical regardless (per §8.2). It is a no-op
+    for independent (different-entry-time) FX/crypto legs; it surfaces for
+    multi-leg groups that enter together (e.g. an options-style straddle).
     """
     if user_id:
         # Local import — avoid coupling report generation to the user
@@ -219,6 +271,7 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
         if positions_report is None or positions_report.empty:
             continue
 
+        slot_id = results.get("slot_id", "")
         fills_lookup = _build_fills_lookup(results.get("fills_report"))
 
         df = positions_report.reset_index()
@@ -299,14 +352,19 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
             entry_fill = fills_lookup["by_oid"].get(opening_oid, {})
             exit_fill = fills_lookup["by_oid"].get(closing_oid, {})
             # Fall back to (trader, strategy, instrument, ts_opened/closed).
-            # This is the bridge that actually matches under default Nautilus
-            # output — both reports carry these four fields.
+            # Use the role-split lookups (open vs close) so a reverse-on-SL/TP
+            # close fill on the same bar as its follow-up open fill keeps
+            # its structured tag (e.g. "Reverse on SL: …") instead of
+            # being overwritten by the tag-less open fill. Combined view
+            # remains the fallback when fills_report has no reduce-only column.
             if not entry_fill and col_trader and col_strategy and col_instrument:
                 key = (str(trader_v), str(strat_v), raw_instrument, entry_ts_secs[i])
-                entry_fill = fills_lookup["by_pos_ts"].get(key, {})
+                entry_fill = (fills_lookup["by_pos_ts_open"].get(key)
+                              or fills_lookup["by_pos_ts"].get(key, {}))
             if not exit_fill and col_trader and col_strategy and col_instrument:
                 key = (str(trader_v), str(strat_v), raw_instrument, exit_ts_secs[i])
-                exit_fill = fills_lookup["by_pos_ts"].get(key, {})
+                exit_fill = (fills_lookup["by_pos_ts_close"].get(key)
+                             or fills_lookup["by_pos_ts"].get(key, {}))
 
             # ENTRY REASON keeps the order-type-derived taxonomy
             # (Market Order / Limit Order). Indicator string lives in
@@ -325,7 +383,20 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
             # there's no tag at all (legacy paths), fall back to
             # _determine_reason's order-type taxonomy ("Market Exit" / "Stop
             # Loss" via order_type / "OCO Exit" / "Take Profit" / etc.).
-            exit_tags_raw = (exit_fill.get("tags") or "").strip()
+            # Portfolio SL/Target closes are applied post-run (truncation/clip)
+            # and carry no engine fill tag — the runner stamps the reason on the
+            # position's ``exit_reason_tag`` column. Prefer it when present so the
+            # orderbook shows "Portfolio Stoploss: combined <value> hit -> …"
+            # instead of the generic "Market Exit".
+            _pf_exit_tag = ""
+            if "exit_reason_tag" in df.columns:
+                try:
+                    _v = df["exit_reason_tag"].iloc[i]
+                    if _v is not None and str(_v).strip() and str(_v).strip().lower() != "nan":
+                        _pf_exit_tag = str(_v).strip()
+                except Exception:  # noqa: BLE001 — best effort, fall back to fill tag
+                    _pf_exit_tag = ""
+            exit_tags_raw = _pf_exit_tag or (exit_fill.get("tags") or "").strip()
             if exit_tags_raw:
                 exit_reason = exit_tags_raw.split(":", 1)[0].strip()
             else:
@@ -337,6 +408,24 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
                 )
             entry_detailed_reason = (entry_fill.get("tags") or "").strip()
             exit_detailed_reason = exit_tags_raw
+
+            # Stamp WHICH portfolio (and strategy/leg) this row belongs to into the
+            # detailed reasons, so a "Portfolio Target/Stoploss hit" or a leg-level
+            # "Stop Loss"/"Take Profit" is self-describing in a combined multi-portfolio
+            # orderbook. Per-leg ``portfolio_name`` (set on each entry by the combined
+            # SESSION builder) wins; else the function-level one (single/per-pf run).
+            _leg_pf = results.get("portfolio_name") or portfolio_name
+            if _leg_pf:
+                _strat_disp = strategy_name
+                _tail = strategy_name.rsplit("__", 1)
+                if len(_tail) == 2 and len(_tail[1]) == 8 and all(c in "0123456789abcdef" for c in _tail[1]):
+                    _strat_disp = _tail[0]   # drop the helper's 8-hex disambiguation token
+                _strat_disp = _strat_disp.rstrip("_")
+                _ctx = f" — Portfolio: {_leg_pf} · Strategy: {_strat_disp}"
+                if exit_detailed_reason:
+                    exit_detailed_reason += _ctx
+                if entry_detailed_reason:
+                    entry_detailed_reason += _ctx
 
             # qty from the positions report is post-multiplier (the user's
             # multiplier is applied at order placement in backtest_runner).
@@ -358,8 +447,9 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
                 "ENTRY DETAILED REASON": entry_detailed_reason,
                 "OPTION TYPE": "",
                 "STRIKE": "",
-                "PORTFOLIO NAME": strategy_name,
+                "PORTFOLIO NAME": _leg_pf or strategy_name,
                 "STRATEGY": strategy_name,
+                "SLOT_ID": slot_id,
                 "EXIT TIME": exit_time,
                 "AVG EXIT PRICE": _parse_nautilus_value(avg_close_v) if col_avg_close else 0.0,
                 "EXIT REASON": exit_reason,
@@ -370,12 +460,47 @@ def _build_orderbook(all_results: dict, user_id: str | None = None) -> list[dict
             }
             trades.append(trade)
 
-    # Sort by entry time
-    trades.sort(key=lambda t: t["ENTRY TIME"])
+    # Base order: chronological by EXIT time (the close event). ENTRY/EXIT TIME
+    # are DD-MM-YYYY strings, so parse to a real datetime first (a plain string
+    # sort would order by day-of-month); rows with a missing/unparseable exit
+    # time sort to the top.
+    _BATCH_EXIT_PREFIXES = ("Squareoff", "Portfolio")
+
+    def _entry_ts(t):
+        ts = pd.to_datetime(t.get("ENTRY TIME") or "",
+                            format="%d-%m-%Y %H:%M:%S", errors="coerce")
+        return ts if pd.notna(ts) else pd.Timestamp.min
+
+    def _exit_ts(t):
+        ts = pd.to_datetime(t.get("EXIT TIME") or "",
+                            format="%d-%m-%Y %H:%M:%S", errors="coerce")
+        return ts if pd.notna(ts) else pd.Timestamp.min
+
+    def _is_batch(t):
+        return str(t.get("EXIT REASON", "")).startswith(_BATCH_EXIT_PREFIXES)
+
+    # Rows are ordered primarily by EXIT TIME (the close event). §8.2 "Exit Sell
+    # Legs First" (default ON): within a batch close (rows sharing one EXIT TIME
+    # with a Squareoff/Portfolio reason) the SELL-leg closes are listed before the
+    # BUY-leg closes; batch rows sit before non-batch rows at the same exit time;
+    # ties broken by each leg's own entry time for a stable order. OFF reproduces
+    # pure exit-time order. fills/PnL are unaffected (log order only).
+    def _sort_key(t):
+        xts = _exit_ts(t)
+        ets = _entry_ts(t)
+        if exit_sell_first and _is_batch(t):
+            side_rank = 0 if str(t.get("TRANSACTION", "")).upper() == "SELL" else 1
+            # (exit time, 0 = batch block before same-time non-batch, SELL legs
+            #  first, then each leg's own entry time for a stable order)
+            return (xts, 0, side_rank, ets)
+        # Non-batch rows: position 1 (after batch blocks at the same exit time).
+        return (xts, 1, 0, ets)
+    trades.sort(key=_sort_key)
     return trades
 
 
-def build_orderbook_dataframe(all_results: dict, user_id: str | None = None) -> pd.DataFrame:
+def build_orderbook_dataframe(all_results: dict, user_id: str | None = None,
+                              exit_sell_first: bool = True, portfolio_name: str = "") -> pd.DataFrame:
     """Build an order book DataFrame matching the full CSV schema.
 
     Parameters
@@ -385,13 +510,17 @@ def build_orderbook_dataframe(all_results: dict, user_id: str | None = None) -> 
     user_id : str, optional
         Identity that produced the run. Used to populate USERID and to
         scale the MULTIPLIER/LOTS columns from ``config/users.json``.
+    exit_sell_first : bool, default True
+        Spec §8.2 — order batch-exit SELL-leg closes before BUY-leg closes
+        in the log (see ``_build_orderbook``).
 
     Returns
     -------
     pd.DataFrame
         DataFrame with columns matching the order book CSV spec.
     """
-    trades = _build_orderbook(all_results, user_id=user_id)
+    trades = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first,
+                              portfolio_name=portfolio_name)
     if not trades:
         return pd.DataFrame()
 
@@ -399,7 +528,7 @@ def build_orderbook_dataframe(all_results: dict, user_id: str | None = None) -> 
         "USERID", "SYMBOL", "EXCHANGE", "TRANSACTION", "QUANTITY", "LOTS",
         "MULTIPLIER", "OrderID", "ENTRY TIME", "ENTRY PRICE",
         "ENTRY REASON", "ENTRY DETAILED REASON",
-        "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY",
+        "OPTION TYPE", "STRIKE", "PORTFOLIO NAME", "STRATEGY", "SLOT_ID",
         "EXIT TIME", "AVG EXIT PRICE",
         "EXIT REASON", "EXIT DETAILED REASON",
         "PNL",
@@ -514,7 +643,13 @@ def build_logs_dataframe(
         return pd.DataFrame()
 
     result = pd.DataFrame(logs)
-    result.sort_values("Backtest_Timestamp", inplace=True, ignore_index=True)
+    # Backtest_Timestamp is a DD-MM-YYYY string; sort by the parsed datetime so
+    # the log is chronological (a plain string sort orders by day-of-month).
+    result.sort_values(
+        "Backtest_Timestamp",
+        key=lambda s: pd.to_datetime(s, format="%d-%m-%Y %H:%M:%S", errors="coerce"),
+        inplace=True, ignore_index=True,
+    )
     return result
 
 
@@ -548,10 +683,13 @@ def _build_summary(orderbook: list[dict]) -> dict:
         max_idx = cumulative.index(max_cum)
         min_idx = cumulative.index(min_cum)
 
-        # Build per-portfolio leg stats for Min/Max PNL column
+        # Build per-leg stats for the Min/Max PNL column. Keyed by STRATEGY (the
+        # per-leg identity) — NOT PORTFOLIO NAME, which now holds the real portfolio
+        # name (shared by all legs of a portfolio). Identical values pre-change
+        # (PORTFOLIO NAME == STRATEGY then), so the daily breakdown is unchanged.
         portfolio_stats: dict = {}
         for trade in day_trades:
-            pf = trade.get("PORTFOLIO NAME", "")
+            pf = trade.get("STRATEGY", "") or trade.get("PORTFOLIO NAME", "")
             if pf not in portfolio_stats:
                 portfolio_stats[pf] = {"max_pnl": 0.0, "leg_stats": {}}
             pnl = float(trade["PNL"])
@@ -564,7 +702,7 @@ def _build_summary(orderbook: list[dict]) -> dict:
                     "min_pnl_time": entry_time,
                     "max_pnl_time": entry_time,
                 }
-            pf_pnls = [float(t["PNL"]) for t in day_trades if t.get("PORTFOLIO NAME") == pf]
+            pf_pnls = [float(t["PNL"]) for t in day_trades if (t.get("STRATEGY", "") or t.get("PORTFOLIO NAME")) == pf]
             portfolio_stats[pf]["max_pnl"] = sum(pf_pnls)
 
         summary[date_str] = {
@@ -583,6 +721,9 @@ def generate_report(
     backtest_name: str = "Backtest",
     template_path: str | None = None,
     user_id: str | None = None,
+    date_range: dict | None = None,
+    exit_sell_first: bool = True,
+    portfolio_name: str = "",
 ) -> str:
     """Generate a self-contained HTML backtest report.
 
@@ -597,6 +738,11 @@ def generate_report(
     user_id : str, optional
         Identity that produced the run; populates USERID/MULTIPLIER columns
         in the embedded orderbook (see ``_build_orderbook``).
+    date_range : dict, optional
+        Configured engine range as ``{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}``.
+        Drives the report's "Date range:" header and the initial values of the
+        date-range filter inputs. Falls back to trade-derived min/max in the
+        template when omitted or when either field is empty.
 
     Returns
     -------
@@ -608,13 +754,15 @@ def generate_report(
 
     template = Path(template_path).read_text(encoding="utf-8")
 
-    orderbook = _build_orderbook(all_results, user_id=user_id)
+    orderbook = _build_orderbook(all_results, user_id=user_id, exit_sell_first=exit_sell_first,
+                                 portfolio_name=portfolio_name)
     summary = _build_summary(orderbook)
     logs: list = []
 
     html = template.replace("{{ ORDERBOOK_JSON }}", json.dumps(orderbook, default=str))
     html = html.replace("{{ SUMMARY_JSON }}", json.dumps(summary, default=str))
     html = html.replace("{{ LOGS_JSON }}", json.dumps(logs, default=str))
+    html = html.replace("{{ DATE_RANGE_JSON }}", json.dumps(date_range or {}, default=str))
     html = html.replace("{{BACKTEST_NAME}}", backtest_name)
 
     return html

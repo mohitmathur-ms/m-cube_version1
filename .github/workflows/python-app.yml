@@ -1,0 +1,49 @@
+name: Python application
+
+# Build and test the Python code on every push to ANY branch.
+on:
+  push:
+    # Don't trigger on the bot commits that push-report.yml writes under html_reports/**,
+    # which would otherwise burn a CI run for no code change.
+    paths-ignore:
+      - "html_reports/**"
+  workflow_dispatch:   # also allow manual runs from the Actions tab
+
+permissions:
+  contents: read       # this workflow only reads the repo; no commit-back needed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Pull the repo onto the runner.
+      - uses: actions/checkout@v4
+
+      # 2. Install the requested interpreter and enable pip's download cache,
+      #    keyed off requirements.txt so unchanged deps restore from cache.
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # 3. Install tooling + project dependencies.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # 4. Lint (verbatim from the GitHub tutorial).
+      - name: Lint with flake8
+        run: |
+          # Stop the build on real errors: undefined names, syntax errors, etc.
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Everything else is advisory only (exit-zero), treated as warnings.
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      # 5. Run the test suite.
+      - name: Test with pytest
+        run: pytest tests/

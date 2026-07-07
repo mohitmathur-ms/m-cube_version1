@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Strategies — EMA-Cross Harness Catalog</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1080px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#8250df 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:24px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:19px; margin-top:30px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  p { margin:8px 0; }
+  ul { margin:6px 0; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12.5px; background:#f6f8fa; padding:2px 6px; border-radius:3px; color:#d63384; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .ts { background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:6px; padding:12px 16px 14px; margin:14px 0; }
+  .ts.blocked { border-left-color:var(--amber); background:#fffdf5; }
+  .ts h3 { margin:0 0 8px; font-size:16px; }
+  .ts .meta { font-size:13.5px; margin:5px 0; }
+  .ts .label { display:inline-block; min-width:96px; font-weight:600; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.3px; vertical-align:top; }
+  .pass { color:var(--green); font-weight:600; }
+  ol li { margin:6px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Test Strategies — EMA-Cross Harness Catalog (TS-1 … TS-10)</h1>
+  <p>Runnable strategies that exercise each SL/Target feature end-to-end on real data. EMA-cross = deterministic entry; checks verified relative to the realised fill.</p>
+</header>
+
+<div class="callout">
+  Full "ask the dev team / verify yourself" recipe: <code>leg_sl_test_scenarios</code> §7. This doc is the strategy list + per-trade assertions.<br>
+  <strong>Shared entry trigger:</strong> EMA(fast)/EMA(slow) crossover — long on bullish cross, short on bearish — one entry per cross. SL/Target verified as <code>expected = formula(fill, config)</code>, tick-snapped, vs the engine's logged value.
+</div>
+
+<h2>Catalog</h2>
+
+<div class="ts">
+  <h3>TS-1 · Leg fixed SL (percentage) — single leg</h3>
+  <p class="meta"><span class="label">Goal</span> leg SL trigger + fill, end-to-end.</p>
+  <p class="meta"><span class="label">Setup</span> NIFTY-FUT · 1-min · EMA(9/21) · long · 1 leg · <code>stop_loss_type=percentage, value=2</code> · no target.</p>
+  <p class="meta"><span class="label">Per-trade</span> <code>expected_sl = fill × (1 − 2/100)</code>, snapped; SL exit fires on the first bar with <code>low ≤ expected_sl</code>, fills at the SL level.</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">every trade's engine <code>current_sl</code> == expected_sl; every SL exit matches trigger bar + fill.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-2 · Leg Target + SL — single leg, short</h3>
+  <p class="meta"><span class="label">Goal</span> leg Target and SL on the short side.</p>
+  <p class="meta"><span class="label">Setup</span> 6E · 1-min · EMA(9/21) · short · 1 leg · Target <code>Premium 1%</code>, SL <code>Premium 1%</code>.</p>
+  <p class="meta"><span class="label">Per-trade</span> short → <code>tgt = fill × (1 − 1/100)</code> (below), <code>sl = fill × (1 + 1/100)</code> (above); exit on whichever the bar hits first (<code>high ≥ sl</code> or <code>low ≤ tgt</code>).</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">computed tgt/sl match; correct side fires; never both on the same trade.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-3 · Leg SL Wait (delay)</h3>
+  <p class="meta"><span class="label">Goal</span> the SL-Wait confirmation gate.</p>
+  <p class="meta"><span class="label">Setup</span> NIFTY-FUT · 1-min · long · SL <code>percentage 2</code> · <code>SL Wait = 2 bars</code>.</p>
+  <p class="meta"><span class="label">Per-trade</span> on SL trigger, exit only after the level holds 2 bars; if price recovers above the SL within the wait, <strong>no exit</strong> (DELAY_CLEARED).</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">delayed exits fire exactly 2 bars after trigger; recovered ones don't exit.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-4 · ATR SL</h3>
+  <p class="meta"><span class="label">Goal</span> ATR-based SL sizing per trade (volatility-adaptive).</p>
+  <p class="meta"><span class="label">Setup</span> BTC · 1-min · long · <code>stop_loss_type=atr, sl_atr_period=14, sl_atr_multiplier=1.5</code>.</p>
+  <p class="meta"><span class="label">Per-trade</span> read ATR(14) at the entry bar → <code>expected_sl = fill − 1.5×ATR</code>, snapped.</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">engine <code>current_sl</code> == expected_sl using logged ATR-at-entry; warm-up legs arm no SL.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-5 · Move SL to Cost + Trail After — multi-leg</h3>
+  <p class="meta"><span class="label">Goal</span> Move-SL-to-Cost (triggered by a sibling leg) + Trail-After ratchet (<strong>anchor = curr_leg_pnl</strong>).</p>
+  <p class="meta"><span class="label">Setup</span> GC · 1-min · EMA · 2 legs entered together · <code>move_sl_to_cost.enabled</code>, <code>trail_after_move_sl=True</code>, <code>sl_trail every=X, by=Y</code>.</p>
+  <p class="meta"><span class="label">Per-trade</span> when leg A hits SL/Target, leg B's <code>sl == leg-B entry_price</code> (breakeven); thereafter leg B ratchets — for every <code>every</code> of <strong>leg-B PnL gain</strong> (anchor = leg-B PnL at the move), <code>sl ± by</code>. <strong>Confirm anchor is PnL</strong> (must ratchet on GC's ~2000 price, not freeze).</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">move-to-cost fires on the sibling event; trail ratchets per spec; no freeze.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-6 · Portfolio Combined Loss + leg-breach validation — multi-leg</h3>
+  <p class="meta"><span class="label">Goal</span> portfolio Combined Loss SL + the "Σ leg SLs ≤ portfolio SL" validation.</p>
+  <p class="meta"><span class="label">Setup</span> BANKNIFTY-FUT · 1-min · 3 legs whose individual SLs <strong>sum to more than</strong> the portfolio Combined Loss SL.</p>
+  <p class="meta"><span class="label">Per-run</span> on config save the engine <strong>flags the breach</strong>; at run, the portfolio force-sqoffs all legs when <code>combined_pnl ≤ −sl_val</code> (before the individual leg SLs would).</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">breach flagged on save; portfolio exit precedes leg exits; all legs close same bar.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-7 · Portfolio Trailing SL + Profit-Lock Target</h3>
+  <p class="meta"><span class="label">Goal</span> the finalised portfolio trailing — step Trailing SL + Profit-Lock.</p>
+  <p class="meta"><span class="label">Setup</span> NIFTY-FUT · 1-min · 1 portfolio · Trailing SL <code>every/by</code>, Trailing Target <code>when_profit_reach / lock_min_profit / every / by</code>.</p>
+  <p class="meta"><span class="label">Per-run</span> Trailing SL tightens <code>current_sl -= steps×by</code> per <code>every</code> of combined profit (<code>anchor_pnl=0</code>); Profit-Lock activates at <code>when_profit_reach</code>, floor ratchets up, exits on <code>curr_pnl ≤ current_stop</code>.</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">both ratchets match spec; SL only tightens; lock only rises; fixed target suppressed while lock active.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-8 · User Max Loss / Max Profit — 2 portfolios</h3>
+  <p class="meta"><span class="label">Goal</span> user-level aggregation + cascade square-off.</p>
+  <p class="meta"><span class="label">Setup</span> 1 user · 2 portfolios (NIFTY-FUT + 6E) · <code>max_loss</code>, <code>max_profit</code> (absolute or % of allocation).</p>
+  <p class="meta"><span class="label">Per-run</span> when combined <strong>user</strong> PnL ≤ <code>max_loss</code> (or ≥ <code>max_profit</code>), <strong>all</strong> portfolios force-sqoff same bar; <code>gst["hit"]</code> sticky for the day; Max Loss checked before Max Profit.</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">cascade closes both books simultaneously; no further entries after the hit.</span></p>
+</div>
+
+<div class="ts">
+  <h3>TS-9 · Leg actions — Re-Execute / ReEntry</h3>
+  <p class="meta"><span class="label">Goal</span> On-SL-Action dispatch + count limits.</p>
+  <p class="meta"><span class="label">Setup</span> NIFTY-FUT · 1-min · long · SL <code>percentage 2</code> · On SL Action = Re-Execute (count 2).</p>
+  <p class="meta"><span class="label">Per-trade</span> after the SL, leg → IDLE → re-enters at market next bar; max 3 entries total; the 4th attempt suppressed (<code>LEG_REEXEC_LIMIT_REACHED</code>).</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">re-entries occur at market on the next bar; the count is respected.</span></p>
+</div>
+
+<div class="ts blocked">
+  <h3>TS-10 · MIS intraday auto-square-off  <em>(pending TBD-7)</em></h3>
+  <p class="meta"><span class="label">Goal</span> MIS cutoff forced exit vs NRML carry.</p>
+  <p class="meta"><span class="label">Setup</span> NIFTY-FUT · 1-min · product = MIS · cutoff 15:20 (run the same config as NRML for contrast).</p>
+  <p class="meta"><span class="label">Per-run</span> any position still open at 15:20 → forced <code>cutoff</code> exit; positions that hit SL earlier exit normally; under NRML the position carries.</p>
+  <p class="meta"><span class="label">Pass</span> <span class="pass">open positions flat at cutoff under MIS; carry under NRML.</span> <strong>Blocked until product-type/cutoff (TBD-7) is built.</strong></p>
+</div>
+
+<h2>Coverage note</h2>
+<p>Run <strong>TS-1</strong> and <strong>TS-4</strong> across the asset × timeframe matrix (NIFTY-FUT · BANKNIFTY-FUT · US index futures · 6E · GC · BTC × 1m · 3m · 5m · 2h · 1d · 1w · 1M) to confirm tick-snapping, PnL multiplier, currency, and the ATR-by-timeframe effect. The rest are single-asset feature-isolation runs.</p>
+
+<h2>Verify-yourself loop (every TS)</h2>
+<ol>
+  <li>Run the strategy; export the <strong>orderbook</strong> (CSV/JSON) — fills, exits, reasons, the engine's SL/level values.</li>
+  <li>For each <strong>entry</strong>, recompute the SL/Target/level from the <strong>logged fill</strong> + config; compare to the engine — must match to the tick.</li>
+  <li>For each <strong>exit</strong>, confirm the trigger condition (bar low/high vs level) and the fill.</li>
+  <li>Record green / red; each red row carries the offending trade for the dev team.</li>
+</ol>
+
+</div>
+</body>
+</html>

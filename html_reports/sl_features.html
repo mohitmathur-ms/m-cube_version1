@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL &amp; Target — Unified Multi-Asset-Class Spec</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #8250df 100%); color: white; padding: 40px; margin: -32px -40px 32px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 28px; }
+  header.cover .subtitle { margin: 0; font-size: 15px; opacity: 0.9; }
+  header.cover .meta { margin-top: 12px; font-size: 12px; opacity: 0.8; }
+  h2 { font-size: 22px; margin-top: 40px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 17px; margin-top: 24px; }
+  h4 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 16px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f6f8fa; }
+  td.center, th.center { text-align: center; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.ccy { text-align: center; font-weight: 600; font-size: 13px; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; color: #d63384; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 13px; font-weight: 600; border-radius: 4px; line-height: 1.4; }
+  .badge-yes { background: var(--green-bg); color: var(--green); }
+  .badge-no  { background: var(--red-bg);   color: var(--red); }
+  .badge-adapt { background: var(--amber-bg); color: var(--amber); }
+  .badge-locked { background: var(--green-bg); color: var(--green); }
+  .badge-tbd { background: var(--purple-bg); color: var(--purple); }
+  .badge-resolved { background: var(--green-bg); color: var(--green); }
+  .badge-inr { background: #fff4e5; color: #b15e00; }
+  .badge-usd { background: #e6f4ff; color: #0353a4; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 20px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout strong { color: var(--accent); }
+  .tbd-card { background: var(--purple-bg); border-left: 4px solid var(--purple); padding: 14px 18px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+  .tbd-card h3 { margin-top: 0; color: var(--purple); }
+  .tbd-card.resolved { background: var(--green-bg); border-left-color: var(--green); }
+  .tbd-card.resolved h3 { color: var(--green); }
+  .locked-card { background: var(--green-bg); border-left: 4px solid var(--green); padding: 10px 18px; margin: 10px 0; border-radius: 0 6px 6px 0; }
+  .locked-card h4 { margin: 0 0 4px; color: var(--green); font-size: 15px; text-transform: none; letter-spacing: 0; }
+  .level-card { background: var(--panel); border: 2px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+  .level-card h4 { margin: 0 0 6px; color: var(--accent); font-size: 14px; text-transform: none; letter-spacing: 0; }
+  .level-card .level-desc { font-size: 13px; color: var(--muted); }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>SL &amp; Target — Unified Multi-Asset-Class Spec</h1>
+  <p class="subtitle">Leg · Portfolio · User — features and applicability across IF, FX, CF, XF</p>
+  <p class="meta">Supersedes <code>sl_tgt_feature_applicability.md</code> and <code>sl_tgt_complete_spec.md</code></p>
+</header>
+
+<div class="callout">
+  <strong>Currency rule (current):</strong>
+  <span class="badge badge-inr">INR ₹</span> for Indian Index Futures only.
+  <span class="badge badge-usd">USD $</span> for everything else (US Index Futures, FX, Commodity, Crypto). See <strong>TBD-3</strong> for the proposed flexible multi-currency model.
+</div>
+
+<div class="callout">
+  <strong>Per-asset-class customization:</strong> Most features now run uniformly across IF, FX, CF, XF. With the underlying-defaults-to-self model (see Underlying Definition below), even Underlying-based SL/Target apply universally. The applicability matrix in each section shows where each feature applies.
+</div>
+
+<div class="callout">
+  <strong>Data formats supported (all apply to both SL and Target):</strong>
+  <ul style="margin: 6px 0 0 20px;">
+    <li><strong>Format A — Bid/Ask</strong> (bid OHLC + ask OHLC; <code>bid_vwap</code>, <code>ask_vwap</code>, <code>mid_vwap</code>; <code>mark_price</code> for crypto)</li>
+    <li><strong>Format B — OHLCV</strong> (OHLC + volume; running volume-weighted <code>vwap</code>; <code>ltp = close</code>; <code>mark_price</code> for crypto)</li>
+    <li><strong>Format C — LTP (Last Traded Price)</strong> (single last-trade price per bar; <code>mark_price</code> for crypto)</li>
+  </ul>
+  See <code>execution_logic.html</code> and <code>execution_logic_target.html</code> for per-format trigger/fill formulas.
+</div>
+
+<h2 id="hierarchy">Hierarchy structure</h2>
+<p>The engine evaluates SL/Target across four nested levels every bar. A higher-level limit that fires force-squares all lower-level entities under it in the same bar.</p>
+
+<div class="level-card">
+  <h4>Level 1 — Leg</h4>
+</div>
+<div class="level-card">
+  <h4>Level 2 — Portfolio</h4>
+</div>
+<div class="level-card">
+  <h4>Level 3 — User</h4>
+</div>
+
+<div class="callout">
+  <strong>Evaluation order per bar:</strong> User → Portfolio → Leg. Higher level fires first; force-squares everything below.
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#hierarchy">Hierarchy structure</a></li>
+    <li><a href="#asset-classes">Asset classes</a></li>
+    <li><a href="#underlying-def">Underlying Definition</a></li>
+    <li><a href="#level-1">Level 1 — Leg</a></li>
+    <li><a href="#level-2">Level 2 — Portfolio</a></li>
+    <li><a href="#level-3">Level 3 — User</a></li>
+    <li><a href="#lots">Per-instrument lot sizes</a></li>
+    <li><a href="#decisions-locked">Decisions Locked</a></li>
+    <li><a href="#open-decisions">Open Decisions (TBD)</a></li>
+  </ol>
+</nav>
+
+<h2 id="asset-classes">Asset classes</h2>
+<table>
+  <thead><tr><th>Code</th><th>Asset Class</th><th>Examples</th><th>Currency (current)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>IF</strong></td><td>Index Futures</td><td>Indian Index Futures (NIFTY-FUT, BANKNIFTY-FUT) · US Index Futures</td><td><span class="badge badge-inr">₹ Indian</span> <span class="badge badge-usd">$ US</span></td></tr>
+    <tr><td><strong>FX</strong></td><td>FX Futures</td><td>6E, 6B, 6J, 6A, M6E</td><td><span class="badge badge-usd">$</span></td></tr>
+    <tr><td><strong>CF</strong></td><td>Commodity Futures</td><td>GC, SI, CL</td><td><span class="badge badge-usd">$</span></td></tr>
+    <tr><td><strong>XF</strong></td><td>Crypto (Futures + Spot)</td><td>BTC, ETH — spot and futures</td><td><span class="badge badge-usd">$</span></td></tr>
+  </tbody>
+</table>
+
+<div class="legend">
+  <span><span class="badge badge-yes">✅</span> Works</span>
+  <span><span class="badge badge-no">❌</span> N/A</span>
+  <span><span class="badge badge-adapt">⚙️</span> Works with config adaptation</span>
+  <span><span class="badge badge-tbd">⏳ TBD</span> Decision pending</span>
+  <span><span class="badge badge-resolved">✓ Resolved</span> Was TBD, now resolved</span>
+</div>
+
+<h2 id="underlying-def">Underlying Definition</h2>
+<div class="callout">
+  <strong>Underlying-based SL/Target — one-line explanation:</strong> Portfolio-level safety guard that fires on the underlying instrument's price movement rather than aggregate PnL. Intended as a fail-safe for multi-leg strategies where sum of individual leg SLs may exceed the portfolio SL, OR individual leg targets may be tighter than the portfolio target. The underlying guard catches that by exiting on a price-level basis regardless of how the PnL is aggregating.
+</div>
+
+<h3>Default — self-referential</h3>
+<p>Underlying price = the instrument's own price. The futures contract is its own underlying; the spot symbol is its own underlying. Makes Underlying-based features universally available without requiring separate data feeds.</p>
+
+<h3>Optional — separate spot data (parked, see TBD-5)</h3>
+<p>When spot data is available for an instrument, the user may pin the underlying to a separate spot reference:</p>
+<table>
+  <thead><tr><th>Asset / Instrument</th><th>Default underlying</th><th>Optional spot reference (parked)</th></tr></thead>
+  <tbody>
+    <tr><td>IF — NIFTY-FUT</td><td>NIFTY-FUT itself</td><td>NIFTY spot index</td></tr>
+    <tr><td>IF — ES, NQ</td><td>The futures contract itself</td><td>S&amp;P 500 / Nasdaq-100 spot index</td></tr>
+    <tr><td>FX — 6E, 6B, 6J, etc.</td><td>The futures contract itself</td><td>EUR/USD, GBP/USD, JPY/USD spot rates</td></tr>
+    <tr><td>CF — GC, SI, CL</td><td>The futures contract itself</td><td>XAU/USD, XAG/USD, WTI spot</td></tr>
+    <tr><td>XF — BTC, ETH futures</td><td>The futures contract itself</td><td>BTC/USD, ETH/USD spot</td></tr>
+    <tr><td>XF — BTC, ETH spot</td><td>The spot symbol itself</td><td>(already spot)</td></tr>
+  </tbody>
+</table>
+
+<!-- LEVEL 1 -->
+<h2 id="level-1">Level 1 — Leg</h2>
+
+<h3>1.1 Leg SL / Target Parameters</h3>
+<table>
+  <thead><tr><th>Field</th><th>Config Key</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>SL Type / Target Type</td><td><code>Stoploss Type</code> / <code>Target Type</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>SL Value / Target Value</td><td><code>Stoploss Value</code> / <code>Target Value</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
+    <tr><td>SL Wait (sec)</td><td><code>SL Wait (sec)</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Actions / On Target Actions</td><td><code>On SL Actions</code> / <code>On Target Actions</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>ATR (Average True Range) — <strong>SL</strong> <sup>⁴</sup></td><td><code>sl_atr_period</code> / <code>sl_atr_multiplier</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Volatility-adaptive SL sizing for ML-framework backtests. <br><code>SELL leg: sl = entry + k·ATR</code> &nbsp;·&nbsp; <code>BUY leg: sl = entry − k·ATR</code></td></tr>
+    <tr><td>ATR (Average True Range) — <strong>Target</strong> <sup>⁴</sup></td><td><code>tgt_atr_period</code> / <code>tgt_atr_multiplier</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Volatility-adaptive Target sizing for ML-framework backtests. <br><code>SELL leg: tgt = entry − k·ATR</code> &nbsp;·&nbsp; <code>BUY leg: tgt = entry + k·ATR</code></td></tr>
+  </tbody>
+</table>
+<p class="footnote"><sup>⁴</sup> ATR added to enable ML-framework backtests where SL/Target sizing is volatility-adaptive rather than fixed-distance. Engine computes ATR per leg from the bar series at entry and uses it as the reference value. Applies symmetrically — both SL <em>and</em> Target can be ATR-defined per leg, independently.</p>
+
+<h3>1.2 Leg Actions</h3>
+<table>
+  <thead><tr><th>Action</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>SqOff</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Re-Execute</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Execute (other leg by <code>leg_id</code>)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>ReEntry (price-wait re-entry)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>KeepLegRunning</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+
+<h3>1.3 Move SL to Cost (leg-level)</h3>
+<table>
+  <thead><tr><th>Field</th><th>Config Key</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>Enabled</td><td><code>enabled</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Safety Seconds <sup>¹</sup></td><td><code>safety_seconds</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Action (3 variants)</td><td><code>action</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail After Move SL</td><td><code>trail_after_move_sl</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>No Move Buy Legs</td><td><code>no_move_buy_legs</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Hit On Leg SL</td><td><code>hit_on_leg</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Hit On Leg Target</td><td><code>tgt_hit_on_leg</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+<p class="footnote"><sup>¹</sup> Safety Seconds now anchored to trigger-event time — see resolved <a href="#tbd-1">TBD-1</a>.</p>
+
+<h3>1.4 Leg-Level Trail After Move SL</h3>
+<p><code>sl_trail</code> config (<code>every</code> / <code>by</code>) — applies to all four asset classes.</p>
+
+<h3>1.5 Leg-Level Trailing Target (NEW)</h3>
+<p>Profit-lock ratchet at the leg level. Parallel to leg-level Trail After Move SL but on the target side — fires when the leg's PnL crosses the locked floor after activation.</p>
+<table>
+  <thead><tr><th>Field</th><th>Config Key</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>Enabled</td><td><code>enabled</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>When Profit Reach</td><td><code>when_profit_reach</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Lock Minimum Profit</td><td><code>lock_min_profit</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail Every</td><td><code>trail_every</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail By</td><td><code>trail_by</code></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+
+<!-- LEVEL 2 -->
+<h2 id="level-2">Level 2 — Portfolio</h2>
+
+<h3>2.1 Stoploss Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th><th>Reason</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Stoploss</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Type — Combined Loss</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Type — Underlying Movement <sup>²</sup></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Default: underlying = self</td></tr>
+    <tr><td>Type — Loss and Underlying Range <sup>²</sup></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Default: underlying = self</td></tr>
+    <tr><td>Stoploss Value</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
+    <tr><td>On SL Action — SqOff</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — SqOff Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — Execute Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — Start Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute at Entry Price</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On SL Action — ReExecute <strong>Same Contract</strong> at EntryPrice <sup>³</sup></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td>Renamed from "SameStrike"</td></tr>
+    <tr><td>Target Portfolio (cross-pf name)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Delay (sec)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>ReExecute Count</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Underlying Below / Above <sup>²</sup></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Tied to Loss-and-Range; default underlying = self</td></tr>
+    <tr><td>SqOff Only Loss Making Legs</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>SqOff Only Profit Making Legs</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+  </tbody>
+</table>
+<p class="footnote"><sup>²</sup> Underlying-based features now universal (default underlying = self). See <a href="#underlying-def">Underlying Definition</a> and <a href="#tbd-5">TBD-5</a>. &nbsp; <sup>³</sup> See <a href="#decisions-locked">D2</a>.</p>
+
+<h3>2.2 Trailing SL Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Trailing SL</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>For Every Profit of</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Tighten SL By</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 Move SL to Cost (portfolio-driven)</h3>
+<p>Same fields as section 1.3.</p>
+
+<h3>2.4 Target Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th><th>Reason</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Target</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Type — Combined Profit</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>PnL-based, universal</td></tr>
+    <tr><td>Type — Underlying Movement <sup>²</sup></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Default: underlying = self</td></tr>
+    <tr><td>Target Value</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Accepts absolute or % input</td></tr>
+    <tr><td>On Target Action — SqOff</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — ReExecute</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — SqOff Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — Execute Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — Start Other Portfolio</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — ReExecute at Entry Price</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>On Target Action — ReExecute <strong>Same Contract</strong> at EntryPrice <sup>³</sup></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td class="center"><span class="badge badge-adapt">⚙️</span></td><td>Renamed from "SameStrike"</td></tr>
+    <tr><td>Target Portfolio (cross-pf name)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>Delay (sec)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>ReExecute Count</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td></td></tr>
+    <tr><td>SqOff Only Loss Making Legs</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Partial-exit filter</td></tr>
+    <tr><td>SqOff Only Profit Making Legs</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Partial-exit filter</td></tr>
+  </tbody>
+</table>
+<div class="callout"><strong>Asymmetry vs SL §2.1:</strong> Target side has no <strong>"Profit and Underlying Range"</strong> type — the hybrid PnL+range condition exists only on the SL side.</div>
+
+<h3>2.5 Trailing Target Settings</h3>
+<table>
+  <thead><tr><th>Field</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th></tr></thead>
+  <tbody>
+    <tr><td>Enable Trailing</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Lock Minimum Profit</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>When Profit Reach</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>For Every Increase By</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+    <tr><td>Trail Profit By</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td></tr>
+  </tbody>
+</table>
+
+<!-- LEVEL 3 — USER -->
+<h2 id="level-3">Level 3 — User <span class="badge badge-resolved">Updated</span></h2>
+<p>Top-level limits across all portfolios for this user.</p>
+<table>
+  <thead><tr><th>Field</th><th>Format</th><th class="center">IF</th><th class="center">FX</th><th class="center">CF</th><th class="center">XF</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Max Loss</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Absolute or <strong>% of allocation</strong> (engine-defined base; raw % not supported) — see note</td></tr>
+    <tr><td>Max Profit</td><td>Numeric (reporting currency)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Absolute or <strong>% of allocation</strong> (engine-defined base; raw % not supported) — see note</td></tr>
+    <tr><td>Enable Trailing SL</td><td>Bool</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Re-added</td></tr>
+    <tr><td>Trailing SL — For Every Profit of / Tighten SL By</td><td>Numeric (×2)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Absolute or <strong>% of allocation</strong> (raw % not supported) — see note</td></tr>
+    <tr><td>Enable Trailing Target (Profit Lock)</td><td>Bool</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Re-added</td></tr>
+    <tr><td>Trailing Target — Reach / Lock / Every / By</td><td>Numeric (×4)</td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td class="center"><span class="badge badge-yes">✅</span></td><td>Absolute or <strong>% of allocation</strong> (raw % not supported) — see note</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <strong>Updated — user-level inputs: absolute or % of allocation (raw % removed):</strong> All user-level fields — Max Loss, Max Profit, Trailing SL (every / by), and Trailing Target (reach / lock / every / by) — accept an <strong>absolute value</strong> or a <strong>% of allocation</strong>. Raw % (against live margin / funding / exchange leverage) is <strong>not supported</strong> here: a misread could take e.g. <strong>1% as $0.01</strong>, breach the user limit on the first bar, and force-exit <strong>all trades running under that user</strong> (causing us to miss all running trades).<br>
+  <strong>"% of allocation"</strong> = a percentage of an <strong>engine-defined allocation constant</strong>, fixed at strategy start and <strong>not</strong> affected by user fund add / withdraw, exchange margin / leverage changes, or intraday PnL — so the base is stable and auditable. <em>(Leg- and portfolio-level fields still accept raw % — that broader question stays open under <a href="#tbd-6">TBD-6</a>.)</em>
+</div>
+
+<!-- LOTS -->
+<h2 id="lots">Per-instrument lot sizes (reference)</h2>
+<table>
+  <thead><tr><th>Asset</th><th>Symbol</th><th class="num">Lot / Multiplier</th><th class="num">Tick Size</th><th class="ccy">Currency</th></tr></thead>
+  <tbody>
+    <tr><td>Index Futures (Indian)</td><td>NIFTY-FUT</td><td class="num">65 × index</td><td class="num">0.05</td><td class="ccy"><span class="badge badge-inr">₹</span></td></tr>
+    <tr><td>Index Futures (Indian)</td><td>BANKNIFTY-FUT</td><td class="num">25 × index</td><td class="num">0.05</td><td class="ccy"><span class="badge badge-inr">₹</span></td></tr>
+    <tr><td>Index Futures (US)</td><td>E-mini S&amp;P</td><td class="num">$50 × index</td><td class="num">0.25</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Index Futures (US)</td><td>Micro S&amp;P</td><td class="num">$5 × index</td><td class="num">0.25</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Index Futures (US)</td><td>E-mini Nasdaq</td><td class="num">$20 × index</td><td class="num">0.25</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>FX Futures</td><td>6E (EUR/USD)</td><td class="num">125,000 EUR</td><td class="num">0.00005</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>FX Futures</td><td>6B (GBP/USD)</td><td class="num">62,500 GBP</td><td class="num">0.0001</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>FX Futures</td><td>6J (JPY/USD)</td><td class="num">12,500,000 JPY</td><td class="num">0.0000005</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>FX Futures</td><td>6A (AUD/USD)</td><td class="num">100,000 AUD</td><td class="num">0.0001</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>FX Futures</td><td>M6E (Micro EUR/USD)</td><td class="num">12,500 EUR</td><td class="num">0.0001</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>GC (Gold)</td><td class="num">100 troy oz</td><td class="num">0.10</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>MGC (Micro Gold)</td><td class="num">10 troy oz</td><td class="num">0.10</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>SI (Silver)</td><td class="num">5,000 troy oz</td><td class="num">0.005</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>SIL (Mini Silver)</td><td class="num">1,000 troy oz</td><td class="num">0.005</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>CL (Crude WTI)</td><td class="num">1,000 barrels</td><td class="num">0.01</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Commodity</td><td>MCL (Micro Crude)</td><td class="num">100 barrels</td><td class="num">0.01</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Crypto Futures</td><td>BTC</td><td class="num">5 BTC</td><td class="num">5</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Crypto Futures</td><td>MBT (Micro Bitcoin)</td><td class="num">0.1 BTC</td><td class="num">5</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Crypto Futures</td><td>ETH</td><td class="num">50 ETH</td><td class="num">0.25</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Crypto Futures</td><td>MET (Micro Ether)</td><td class="num">0.1 ETH</td><td class="num">0.25</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+    <tr><td>Crypto Spot</td><td>BTC, ETH</td><td class="num">exchange-defined minimum</td><td class="num">varies</td><td class="ccy"><span class="badge badge-usd">$</span></td></tr>
+  </tbody>
+</table>
+<p class="footnote"><strong>MCX commodities (GOLDM, CRUDEOIL):</strong> parked — not in current backtesting scope. Data not yet procured. See Summary for re-introduction conditions.</p>
+<p class="footnote"><strong>Lot sizes change over time</strong> (especially NSE F&amp;O). See <a href="#tbd-4">TBD-4</a> for the proposed update mechanism.</p>
+
+<!-- DECISIONS -->
+<h2 id="decisions-locked">Decisions Locked</h2>
+
+<div class="locked-card"><h4>D1 · Currency rule (current binary) <span class="badge badge-locked">Locked</span></h4>
+  <p>INR (₹) for Indian Index Futures, USD ($) for everything else. Pending flexibility expansion — see <a href="#tbd-3">TBD-3</a>.</p></div>
+<div class="locked-card"><h4>D2 · "SameStrike" → "Same Contract" <span class="badge badge-locked">Locked</span></h4>
+  <p>Engine + UI rename. Futures use contract month, not strike.</p></div>
+<div class="locked-card"><h4>D3 · Testing default n_lots = 1 <span class="badge badge-locked">Locked</span></h4>
+  <p><code>lot_size</code> sourced from per-instrument metadata.</p></div>
+<div class="locked-card"><h4>D4 · Four-level structure <span class="badge badge-locked">Locked</span></h4>
+  <p>Leg → Portfolio → User. Higher level force-squares lower in same bar.</p></div>
+<div class="locked-card"><h4>D5 · Underlying defaults to self <span class="badge badge-locked">Locked</span></h4>
+  <p>For all asset classes the underlying reference defaults to the instrument itself. Separate spot data is optional and parked — see <a href="#tbd-5">TBD-5</a>.</p></div>
+
+<!-- TBD -->
+<h2 id="open-decisions">Open Decisions — TBD</h2>
+
+<div class="tbd-card resolved" id="tbd-1">
+  <h3>TBD-1 · Safety Seconds semantics <span class="badge badge-resolved">✓ Resolved</span></h3>
+  <p><strong>Anchor:</strong> the time of the triggering decision event itself, NOT market open. Example: when Move SL to Cost fires at 11:43:00 and Safety Seconds = 60, the move actually applies at 11:44:00.</p>
+  <p>This generalizes Safety Seconds beyond the original NSE-09:15 model and applies uniformly to all asset classes — FX, Commodity, Crypto included, because events can happen anytime of day (24/7 markets, US/CME session boundaries).</p>
+  <p><strong>Engine requirements:</strong></p>
+  <ul>
+    <li>Log timestamps of every decision/trigger event with sub-second precision (or matching the data resolution being used).</li>
+    <li>Safety Seconds is measured between <code>event_time</code> and <code>now</code>.</li>
+  </ul>
+  <p><strong>Data resolution requirement:</strong> Works correctly only with 1-second or finer resolution data. On 1-minute bars, <code>Safety Seconds &lt; 60</code> effectively rounds up to the next bar — sub-minute resolution is unenforceable. Adapter must surface a <code>data_resolution</code> field; engine refuses to enforce Safety Seconds &lt; bar size and logs a warning.</p>
+</div>
+
+<div class="tbd-card resolved" id="tbd-2">
+  <h3>TBD-2 · Tick-size enforcement for SL / Target trigger prices <span class="badge badge-resolved">✓ Resolved</span></h3>
+  <p><strong>Decision:</strong> option (a) — accept the calculated SL/Target value as-is. Do NOT snap to the instrument tick at monitoring time.</p>
+  <p><strong>Rationale:</strong></p>
+  <ul>
+    <li>The engine fires MARKET orders for SL/Target exits (Exit Order Type = MARKET; Limit/SL_Limit not implemented).</li>
+    <li>For market orders, the broker handles tick alignment at fill time — engine-side tick enforcement is unnecessary.</li>
+    <li>For monitoring/trigger, an SL stored at 108.54 vs the nearest tick 108.55 practically fires together — price has to cross both anyway. Snapping adds no precision benefit.</li>
+    <li>Snapping WOULD matter if the engine fired Limit / SL_Limit orders. If those order types are added later, revisit.</li>
+  </ul>
+  <p><strong>Worked example:</strong></p>
+  <pre style="background:#f6f8fa; padding:10px; border-radius:4px; font-size:13px;">entry_price = 100.5
+Stoploss Type = Premium, Value = 8%
+→ sl_pending_val = 100.5 × 1.08 = 108.54 (kept as-is)
+→ trigger checks against 108.54 directly
+→ exit fires market order; broker fills at next valid tick</pre>
+  <p>Tick metadata remains in the per-instrument table for UI display, future limit-order support, and slippage modeling.</p>
+</div>
+
+<div class="tbd-card" id="tbd-3">
+  <h3>TBD-3 · Multi-currency support <span class="badge badge-tbd">Parked</span></h3>
+  <p><strong>Current rule:</strong> binary INR (Indian Index Futures only) / USD (everything else).</p>
+  <p><strong>Proposed:</strong> three-layer flexible currency model.</p>
+  <ul>
+    <li><strong>(i) Exchange-derived default</strong> — each instrument's settlement currency from per-instrument metadata. Examples: NSE → INR, CME → USD, EUREX → EUR, JPX → JPY, KRX → KRW, HKEX → HKD, SSE → CNY. Indian crypto exchanges → INR; offshore crypto → USD/USDT.</li>
+    <li><strong>(ii) Per-portfolio override</strong> — user can pin a portfolio to a custom currency. Engine applies FX conversion at exit.</li>
+    <li><strong>(iii) User-level reporting currency</strong> — required for aggregating cross-currency PnL into a single Max Loss / Max Profit.</li>
+  </ul>
+  <p><strong>Open sub-decisions:</strong></p>
+  <ul>
+    <li>FX conversion source — live rate / start-of-day / entry-time</li>
+    <li>UI symbol — becomes per-instrument (₹ / $ / € / ¥ / £ / ₩ / HK$ / CNY) once flexible currency is implemented.</li>
+  </ul>
+  <p><strong>Status:</strong> parked.</p>
+</div>
+
+<div class="tbd-card" id="tbd-4">
+  <h3>TBD-4 · Lot size update mechanism <span class="badge badge-tbd">Parked</span></h3>
+  <p>Indian index F&amp;O lot sizes are revised periodically by NSE based on contract-value bands. NIFTY-FUT and BANKNIFTY-FUT are the most commonly affected. Static hardcoded lot sizes drift out of date and silently break PnL calculations.</p>
+  <p><strong>Proposed approaches:</strong></p>
+  <ul>
+    <li><strong>(i) Automated script</strong> — pulls lot sizes from NSE F&amp;O master file (publicly available CSV / API) on a daily schedule. Updates per-instrument metadata automatically.</li>
+    <li><strong>(ii) Manual override</strong> — admin UI to update lot sizes when notified by exchange. Audit-logged.</li>
+    <li><strong>(iii) Hybrid (recommended)</strong> — script runs daily, detects changes, sends notification to admin who confirms before applying.</li>
+  </ul>
+  <p><strong>Additional consideration:</strong> Backtests over periods spanning a lot-size change need a lot-size <strong>history</strong> (effective dates), not just current values. Live trading needs current lot size only.</p>
+  <p><strong>Status:</strong> parked.</p>
+</div>
+
+<div class="tbd-card" id="tbd-5">
+  <h3>TBD-5 · User-selectable underlying reference (self / spot) <span class="badge badge-tbd">Parked</span></h3>
+  <p><strong>Default:</strong> underlying = the instrument itself (works for all asset classes without external data — see Underlying Definition).</p>
+  <p><strong>Proposed extension:</strong> when spot data is available for an instrument, the user can configure the portfolio to track the spot reference instead (e.g., NIFTY spot for NIFTY-FUT, BTC spot for BTC futures).</p>
+  <p><strong>Blocker:</strong> spot data not yet procured for all instruments under scope. Procurement is feasible (NIFTY spot is free; BTC spot via crypto exchange APIs; commodity spot via XAU/USD vendors) but deferred until data layer is in place.</p>
+  <p><strong>Status:</strong> parked.</p>
+</div>
+
+<div class="tbd-card" id="tbd-6">
+  <h3>TBD-6 · Threshold input mode — absolute vs % <span class="badge badge-tbd">Open</span></h3>
+  <p><strong>Applies symmetrically to SL and Target.</strong> All threshold fields on both sides are affected:</p>
+  <table style="margin: 8px 0;">
+    <thead><tr><th>Side</th><th>Threshold fields currently accepting absolute or %</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SL</strong></td><td>SL Value (leg + portfolio), Trailing SL <code>every</code> / <code>by</code> (portfolio + user), Move SL to Cost trail <code>every</code> / <code>by</code>, Max Loss (user)</td></tr>
+      <tr><td><strong>Target</strong></td><td>Target Value (leg + portfolio), Trailing Target <code>when_profit_reach</code> / <code>lock_min_profit</code> / <code>trail_every</code> / <code>trail_by</code> (leg + portfolio + user), Max Profit (user)</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Concern:</strong> % is risky in a multi-asset, multi-broker setting because it's ambiguous what the percentage references — available margin, strategy allocation, current funding state, exchange-side margin/leverage changes, etc. If the engine resolves the reference wrong, a small misinterpretation can cause silent failures.</p>
+  <p><strong>Worked failure mode — SL side:</strong> User enters <code>SL = 1%</code> intending "1% of strategy allocation". Engine parses it against the wrong base (e.g., 1% of $1 = $0.01). User-level SL is breached on the first bar → engine force-squares <strong>all</strong> portfolios for that user → all running trades exit immediately, including unrelated profitable ones. Silent until the cascade exits.</p>
+  <p><strong>Worked failure mode — Target side:</strong> User enters <code>Target = 5%</code> intending "5% of allocation". Engine parses against a tiny base → target is hit on the first bar at near-zero profit → portfolio force-sqoffs, then ReExecutes (if configured) → re-enters and exits again the next bar → loop burns the ReExecute count and racks up slippage/commission while the user thinks the strategy is "scalping". Silent — no obvious error, just degraded PnL.</p>
+  <p><strong>Proposed resolution (preferred):</strong> Lock <strong>all SL and Target threshold fields</strong> (and Trailing SL, Trailing Target, MaxLoss, MaxProfit) to <strong>absolute values only</strong>. Drop % support entirely on both sides.</p>
+  <p><strong>Alternative (if % is retained):</strong> Define % strictly as <strong>% of allocation</strong>, where "allocation" is an <strong>engine-defined constant</strong> set at strategy start and <strong>NOT</strong> affected by:</p>
+  <ul>
+    <li>User actions (fund add / withdraw mid-day)</li>
+    <li>Exchange-side margin or leverage changes</li>
+    <li>Realized PnL accumulating during the session</li>
+    <li>Broker-specific available-margin reporting</li>
+  </ul>
+  <p>Same base for SL and Target so the two sides remain comparable. Any change to the allocation base requires explicit reconfiguration, not silent rebasing.</p>
+  <p><strong>Status:</strong> <span class="badge badge-resolved">User level resolved</span> — all user-level fields (Max Loss, Max Profit, Trailing SL, Trailing Target) now accept <strong>absolute or % of allocation</strong>; raw % removed (see Level 3). <strong>Leg + portfolio levels still open</strong> — pending decision; default direction = absolute or % of allocation, no raw %.</p>
+</div>
+
+<div class="tbd-card" id="tbd-7">
+  <h3>TBD-7 · Product type (MIS / NRML / CNC) <span class="badge badge-tbd">Open (MIS, NRML) · Parked (CNC)</span></h3>
+  <p>The spec currently defines only <strong>Exit Order Type</strong> (<code>MARKET</code> active; Limit / SL_Limit blocked — see <code>execution_logic</code> §8.1). It does <strong>not</strong> yet model <strong>product type</strong>, which changes the position lifecycle and therefore the SL/Target outcome.</p>
+  <ul>
+    <li><strong>MIS (intraday)</strong> — needs an <strong>auto-square-off cutoff</strong>: open positions force-flat at the session/broker cutoff (e.g., ~15:20 IST for NSE; CME maps to session close), regardless of SL/Target. <em>Open — required for intraday strategies.</em></li>
+    <li><strong>NRML (futures carryforward)</strong> — position carries overnight to expiry; no intraday forced exit; settled at expiry/rollover. <em>Open — default for the in-scope futures.</em></li>
+    <li><strong>CNC (equity delivery)</strong> — <strong>Parked.</strong> Equity-delivery product, out of the current futures-first scope. Revisit when NSE equity (cash) is brought into scope.</li>
+  </ul>
+  <p><strong>Engine requirement (when implemented):</strong> a per-position <code>product_type</code> field; MIS cutoff handling that interacts with <code>SqOff Time</code> (whichever is earlier force-closes); carryforward handling for NRML across sessions/expiry.</p>
+  <p><strong>Status:</strong> MIS &amp; NRML open (needed); CNC parked.</p>
+</div>
+
+</div>
+</body>
+</html>

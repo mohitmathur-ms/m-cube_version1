@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL/Target Test Portfolios — Full Feature Coverage</title>
+<style>
+  :root { --bg:#fafbfc; --panel:#fff; --border:#e1e4e8; --text:#1f2328; --muted:#57606a; --accent:#0969da; --green:#1a7f37; --green-bg:#dafbe1; --amber:#9a6700; --amber-bg:#fff8c5; --blue-bg:#ddf4ff; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; color:var(--text); background:var(--bg); margin:0; }
+  .container { max-width:1180px; margin:0 auto; padding:32px 40px 72px; }
+  header.cover { background:linear-gradient(135deg,#0969da 0%,#8250df 100%); color:#fff; padding:32px 40px; margin:-32px -40px 26px; border-radius:0 0 12px 12px; }
+  header.cover h1 { margin:0 0 6px; font-size:24px; }
+  header.cover p { margin:0; font-size:14px; opacity:.92; }
+  h2 { font-size:19px; margin-top:32px; padding-bottom:6px; border-bottom:2px solid var(--border); }
+  h3 { font-size:15px; margin-top:18px; color:var(--muted); }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:11px 0; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f6f8fa; font-weight:600; font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover { background:#f6f8fa; }
+  code { font-family:"SF Mono",Monaco,Consolas,monospace; font-size:12px; background:#f6f8fa; padding:1px 5px; border-radius:3px; color:#d63384; }
+  .case { background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:5px; padding:9px 13px; margin:9px 0; font-size:13.5px; }
+  .case b.id { color:var(--accent); }
+  .case .pass { color:var(--green); font-weight:600; }
+  .callout { background:var(--blue-bg); border-left:4px solid var(--accent); padding:10px 14px; margin:12px 0; border-radius:0 6px 6px 0; font-size:14px; }
+  .callout strong { color:var(--accent); }
+  .mini { font-size:12px; }
+  .mini th, .mini td { padding:5px 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>SL/Target Test Portfolios — Full Feature Coverage</h1>
+  <p>Every SL/Target feature — leg, portfolio, user — as runnable test portfolios with distinct parameters and a manual logic-execution trace per case.</p>
+</header>
+
+<div class="callout">
+  <strong>How to use:</strong> run the portfolio → export the orderbook → walk the manual trace → confirm the engine matches at each step. Verify <em>relative to the realised fill</em> (entry price isn't controlled).
+</div>
+
+<h2>1. Test portfolios (reusable structures)</h2>
+<table>
+  <thead><tr><th>ID</th><th>Structure</th><th>Instrument</th><th>Entry</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><b>PF-1L</b></td><td>1 long leg</td><td>NIFTY-FUT</td><td>EMA(9/21) bull cross</td><td>leg SL/Target/Wait/ATR/actions</td></tr>
+    <tr><td><b>PF-1S</b></td><td>1 short leg</td><td>6E</td><td>EMA bear cross</td><td>short-side SL/Target</td></tr>
+    <tr><td><b>PF-2</b></td><td>2 legs (same instr.)</td><td>GC</td><td>both on cross</td><td>Move-SL-to-Cost + Trail-After</td></tr>
+    <tr><td><b>PF-3</b></td><td>3 legs</td><td>BANKNIFTY-FUT</td><td>all on cross</td><td>portfolio SL types, filters, breach</td></tr>
+    <tr><td><b>PF-U</b></td><td>2 portfolios, 1 user (NIFTY-FUT + 6E)</td><td>mixed</td><td>per-portfolio cross</td><td>user Max Loss/Profit, cascade</td></tr>
+    <tr><td><b>PF-X</b></td><td>1 leg as A/B/C feeds + MIS/NRML</td><td>NIFTY-FUT</td><td>cross</td><td>cross-format, product type</td></tr>
+  </tbody>
+</table>
+
+<h2>2. Coverage matrix</h2>
+<table>
+  <thead><tr><th>Feature</th><th>Level</th><th>Case</th><th>PF</th><th>Key params (distinct)</th></tr></thead>
+  <tbody>
+    <tr><td>SL percentage</td><td>Leg</td><td>TL-1</td><td>PF-1L</td><td>2%</td></tr>
+    <tr><td>SL points (absolute)</td><td>Leg</td><td>TL-2</td><td>PF-1S</td><td>0.0050</td></tr>
+    <tr><td>SL ATR</td><td>Leg</td><td>TL-3</td><td>PF-1L (BTC)</td><td>period 14, mult 2.0</td></tr>
+    <tr><td>Target percentage</td><td>Leg</td><td>TL-4</td><td>PF-1L (GC)</td><td>3%</td></tr>
+    <tr><td>Target points</td><td>Leg</td><td>TL-5</td><td>PF-1S</td><td>0.0080</td></tr>
+    <tr><td>SL Wait / delay</td><td>Leg</td><td>TL-6</td><td>PF-1L</td><td>SL 2%, wait 3 bars</td></tr>
+    <tr><td>Move SL to Cost — profitable-only</td><td>Leg</td><td>TL-7</td><td>PF-2</td><td>—</td></tr>
+    <tr><td>Move SL to Cost — all legs</td><td>Leg</td><td>TL-8</td><td>PF-2</td><td>—</td></tr>
+    <tr><td>Move SL to Cost — LTP+buffer (losers)</td><td>Leg</td><td>TL-9</td><td>PF-3</td><td>±0.05%</td></tr>
+    <tr><td>Trail After Move SL</td><td>Leg</td><td>TL-10</td><td>PF-2</td><td>every 4, by 2</td></tr>
+    <tr><td>Leg action — SqOff</td><td>Leg</td><td>TL-11</td><td>PF-1L</td><td>—</td></tr>
+    <tr><td>Leg action — Re-Execute</td><td>Leg</td><td>TL-12</td><td>PF-1L</td><td>count 2</td></tr>
+    <tr><td>Leg action — ReEntry</td><td>Leg</td><td>TL-13</td><td>PF-1L</td><td>count 1</td></tr>
+    <tr><td>Leg action — KeepLegRunning</td><td>Leg</td><td>TL-14</td><td>PF-2</td><td>—</td></tr>
+    <tr><td>Leg action — Execute (other leg)</td><td>Leg</td><td>TL-15</td><td>PF-2</td><td>—</td></tr>
+    <tr><td>Action combination rules</td><td>Leg</td><td>TL-16</td><td>PF-1L</td><td>valid + invalid</td></tr>
+    <tr><td>Combined Loss</td><td>Portfolio</td><td>TP-1</td><td>PF-3</td><td>5000</td></tr>
+    <tr><td>Underlying Movement (SL)</td><td>Portfolio</td><td>TP-2</td><td>PF-3</td><td>level 48000</td></tr>
+    <tr><td>Loss and Underlying Range</td><td>Portfolio</td><td>TP-3</td><td>PF-3</td><td>5000, [47800, 48200]</td></tr>
+    <tr><td>Combined Profit</td><td>Portfolio</td><td>TP-4</td><td>PF-3</td><td>6000</td></tr>
+    <tr><td>Underlying Movement (Target)</td><td>Portfolio</td><td>TP-5</td><td>PF-3</td><td>level 48500</td></tr>
+    <tr><td>Trailing SL (step)</td><td>Portfolio</td><td>TP-6</td><td>PF-3</td><td>every 1000, by 500</td></tr>
+    <tr><td>Trailing Target / Profit Lock</td><td>Portfolio</td><td>TP-7</td><td>PF-3</td><td>reach 1000, lock 600, every 500, by 300</td></tr>
+    <tr><td>Move SL to Cost (portfolio-driven)</td><td>Portfolio</td><td>TP-8</td><td>PF-3</td><td>—</td></tr>
+    <tr><td>Portfolio Delay</td><td>Portfolio</td><td>TP-9</td><td>PF-3</td><td>3 bars</td></tr>
+    <tr><td>SqOff filters (loss / profit only)</td><td>Portfolio</td><td>TP-10</td><td>PF-3</td><td>—</td></tr>
+    <tr><td>Cross-portfolio actions (7)</td><td>Portfolio</td><td>TP-11</td><td>PF-U</td><td>—</td></tr>
+    <tr><td>Leg-breach validation</td><td>Portfolio</td><td>TP-12</td><td>PF-3</td><td>Σ leg SL &gt; pf SL</td></tr>
+    <tr><td>Max Loss (absolute)</td><td>User</td><td>TU-1</td><td>PF-U</td><td>10000</td></tr>
+    <tr><td>Max Profit (absolute)</td><td>User</td><td>TU-2</td><td>PF-U</td><td>15000</td></tr>
+    <tr><td>Max Loss (% of allocation)</td><td>User</td><td>TU-3</td><td>PF-U</td><td>5% of 200000</td></tr>
+    <tr><td>User Trailing SL</td><td>User</td><td>TU-4</td><td>PF-U</td><td>every 2000, by 1000</td></tr>
+    <tr><td>User Trailing Target</td><td>User</td><td>TU-5</td><td>PF-U</td><td>reach 5000, lock 3000, every 1000, by 500</td></tr>
+    <tr><td>Three-format equivalence (A/B/C)</td><td>X</td><td>TX-1</td><td>PF-X</td><td>—</td></tr>
+    <tr><td>MIS cutoff <em>(TBD-7)</em></td><td>X</td><td>TX-2</td><td>PF-X</td><td>15:20</td></tr>
+    <tr><td>NRML carry</td><td>X</td><td>TX-3</td><td>PF-X</td><td>—</td></tr>
+    <tr><td>Asset × timeframe</td><td>X</td><td>TX-4</td><td>PF-1L</td><td>all assets × 7 TFs (1m…1M)</td></tr>
+    <tr><td>Tick snapping</td><td>X</td><td>TX-5</td><td>PF-1L</td><td>per-instrument tick</td></tr>
+    <tr><td>Safety Seconds</td><td>X</td><td>TX-6</td><td>PF-1L</td><td>30s vs a 1m bar</td></tr>
+  </tbody>
+</table>
+
+<h2>3. Leg-level cases — config + manual trace</h2>
+<div class="case"><b class="id">TL-1 · SL percentage (long)</b> — PF-1L NIFTY-FUT, 2%. Fill 22000 → <code>SL = 22000×0.98 = 21560.00</code> (tick 0.05). Bar low 21558 → <strong>exit 21560</strong>. <span class="pass">Pass: SL = 21560.00; exit that bar.</span></div>
+<div class="case"><b class="id">TL-2 · SL points (short)</b> — PF-1S 6E, 0.0050. Fill 1.10000 short → <code>SL = 1.10500</code>. Bar high 1.10520 → <strong>exit 1.10500</strong>. <span class="pass">Pass: SL = 1.10500.</span></div>
+<div class="case"><b class="id">TL-3 · SL ATR (long)</b> — BTC, period 14, mult 2.0; ATR@entry 300. Fill 60000 → <code>dist 600 → SL 59400</code>. <span class="pass">Pass: SL = fill − 600 (logged ATR); warm-up → no SL.</span></div>
+<div class="case"><b class="id">TL-4 · Target percentage (long)</b> — GC, 3%. Fill 2000 → <code>tgt = 2060</code>. Bar high 2061 → <strong>exit 2060</strong>. <span class="pass">Pass: tgt = 2060.</span></div>
+<div class="case"><b class="id">TL-5 · Target points (short)</b> — 6E, 0.0080. Fill 1.10000 short → <code>tgt = 1.09200</code>. <span class="pass">Pass: tgt = 1.09200.</span></div>
+<div class="case"><b class="id">TL-6 · SL Wait</b> — PF-1L, SL 2%, wait 3 bars. Fill 22000 → SL 21560.
+<table class="mini"><thead><tr><th>bar</th><th>low</th><th>≤21560?</th><th>elapsed</th><th>action</th></tr></thead><tbody>
+<tr><td>t</td><td>21558</td><td>yes</td><td>0</td><td>trigger; delay start</td></tr>
+<tr><td>t+1</td><td>21555</td><td>yes</td><td>1&lt;3</td><td>hold</td></tr>
+<tr><td>t+2</td><td>21556</td><td>yes</td><td>2&lt;3</td><td>hold</td></tr>
+<tr><td>t+3</td><td>21557</td><td>yes</td><td>3≥3</td><td><strong>exit</strong></td></tr>
+</tbody></table>
+<span class="pass">Pass: exit only at t+3; if t+1 recovers above SL → DELAY_CLEARED, no exit.</span></div>
+<div class="case"><b class="id">TL-7 · Move SL to Cost — profitable-only</b> — PF-2 GC (A,B), entry 2000. Leg A SL hit → B price 2012 (pnl +12) → <code>sl_B = 2000</code>. <span class="pass">Pass: B SL = 2000; loss leg untouched.</span></div>
+<div class="case"><b class="id">TL-8 · Move SL to Cost — all legs</b> — PF-2. Same trigger; B at −5 pnl → <code>sl_B = 2000</code> anyway. <span class="pass">Pass: SL = 2000 regardless of profit (may trigger immediately if price past 2000).</span></div>
+<div class="case"><b class="id">TL-9 · Move SL to Cost — LTP+buffer (losers)</b> — PF-3, ±0.05%. Loss SELL ltp 48030 → <code>sl = 48030×1.0005 = 48054.015</code>; loss BUY → <code>×0.9995</code>; profitable → entry. <span class="pass">Pass: each variant per formula.</span></div>
+<div class="case"><b class="id">TL-10 · Trail After Move SL</b> — PF-2, every 4, by 2 (<strong>anchor = curr_leg_pnl</strong>). Long entry 100; move fired at price 102 → anchor 2, sl 100.
+<table class="mini"><thead><tr><th>price</th><th>pnl</th><th>gain</th><th>step</th><th>sl</th><th>anchor</th></tr></thead><tbody>
+<tr><td>106</td><td>6</td><td>4</td><td>+2</td><td><strong>102</strong></td><td>6</td></tr>
+<tr><td>110</td><td>10</td><td>4</td><td>+2</td><td><strong>104</strong></td><td>10</td></tr>
+<tr><td>111</td><td>11</td><td>1</td><td>no</td><td>104</td><td>10</td></tr>
+</tbody></table>
+<span class="pass">Pass: SL ratchets 100→102→104; anchor is PnL (same on a 22000-priced leg).</span></div>
+<div class="case"><b class="id">TL-11 · SqOff</b> — SL hit → leg CLOSED, PnL realised. <span class="pass">Pass: single clean exit.</span></div>
+<div class="case"><b class="id">TL-12 · Re-Execute (count 2)</b> — SL hit → IDLE → re-enter market next bar; max 3 entries; 4th suppressed. <span class="pass">Pass: exactly 3 entries.</span></div>
+<div class="case"><b class="id">TL-13 · ReEntry (count 1)</b> — SL hit → REENTRY_WAITING → re-enter when price returns to entry. <span class="pass">Pass: re-entry on price return; count-limited.</span></div>
+<div class="case"><b class="id">TL-14 · KeepLegRunning</b> — PF-2. SL hit → <code>sl_pending_val</code> cleared, leg stays ACTIVE. <span class="pass">Pass: not closed; SL disarmed.</span></div>
+<div class="case"><b class="id">TL-15 · Execute (other leg)</b> — PF-2. Leg A SL → <code>execute_trigger</code> on B (B enters); A closes. <span class="pass">Pass: B enters, A closes.</span></div>
+<div class="case"><b class="id">TL-16 · Action combination rules</b> — PF-1L. Valid: SqOff+Re-Execute. Invalid: KLR+ReEntry, KLR+SqOff, Re-Execute+ReEntry, &gt;3 actions. <span class="pass">Pass: valid run; invalid rejected on save.</span></div>
+
+<h2>4. Portfolio-level cases — config + manual trace</h2>
+<div class="case"><b class="id">TP-1 · Combined Loss</b> — PF-3, sl 5000. combined −4800 no; −5100 ≤ −5000 → <strong>force-sqoff all</strong>. <span class="pass">Pass: exit at ≤ −5000.</span></div>
+<div class="case"><b class="id">TP-2 · Underlying Movement (SL)</b> — PF-3, level 48000 (underlying = self). prev 47960, curr 48040 → crosses → <strong>fires once</strong>. <span class="pass">Pass: fires on crossing bar, once.</span></div>
+<div class="case"><b class="id">TP-3 · Loss and Underlying Range</b> — PF-3, sl 5000, range [47800, 48200]. −5100 AND underlying 47750 → <strong>fires</strong>; −5100 AND 48000 (in range) → no. <span class="pass">Pass: both conditions required.</span></div>
+<div class="case"><b class="id">TP-4 · Combined Profit</b> — PF-3, tgt 6000. 5900 no; 6100 ≥ 6000 → <strong>sqoff all</strong>. <span class="pass">Pass: exit at ≥ 6000.</span></div>
+<div class="case"><b class="id">TP-5 · Underlying Movement (Target)</b> — PF-3, level 48500. crossing → fires once (no Profit-and-Range type). <span class="pass">Pass: crossing fires.</span></div>
+<div class="case"><b class="id">TP-6 · Trailing SL (step)</b> — PF-3, sl 5000, every 1000, by 500. <code>anchor_pnl=0</code>.
+<table class="mini"><thead><tr><th>curr_pnl</th><th>gain</th><th>steps</th><th>current_sl</th><th>anchor</th></tr></thead><tbody>
+<tr><td>2000</td><td>2000</td><td>2</td><td><strong>4000</strong></td><td>2000</td></tr>
+<tr><td>4500</td><td>2500</td><td>2</td><td><strong>3000</strong></td><td>4000</td></tr>
+<tr><td>4200</td><td>200</td><td>0</td><td>3000</td><td>4000</td></tr>
+</tbody></table>
+<span class="pass">Pass: loss-limit tightens 5000→4000→3000; only tightens; SL-hit vs current_sl.</span></div>
+<div class="case"><b class="id">TP-7 · Trailing Target / Profit Lock</b> — PF-3, reach 1000, lock 600, every 500, by 300.
+<table class="mini"><thead><tr><th>curr_pnl</th><th>action</th><th>current_stop</th><th>anchor</th></tr></thead><tbody>
+<tr><td>1000</td><td>activate</td><td>600</td><td>1000</td></tr>
+<tr><td>1500</td><td>step</td><td>900</td><td>1500</td></tr>
+<tr><td>2000</td><td>step</td><td>1200</td><td>2000</td></tr>
+<tr><td>1100</td><td>1100 ≤ 1200</td><td><strong>exit TARGET_TRAIL</strong></td><td>—</td></tr>
+</tbody></table>
+<span class="pass">Pass: floor ratchets up only; exit on floor breach; fixed target suppressed while active.</span></div>
+<div class="case"><b class="id">TP-8 · Move SL to Cost (portfolio-driven)</b> — PF-3. Triggered by aggregate portfolio profit; same 3 variants as leg. <span class="pass">Pass: per-variant repositioning across the book.</span></div>
+<div class="case"><b class="id">TP-9 · Portfolio Delay</b> — PF-3, 3 bars. Trigger → wait 3 bars before dispatch; reversal clears. <span class="pass">Pass: dispatch delayed; reversal clears.</span></div>
+<div class="case"><b class="id">TP-10 · SqOff filters</b> — PF-3. "Only Loss-Making" → only loss legs close; "Only Profit-Making" → inverse. <span class="pass">Pass: only the filtered subset exits.</span></div>
+<div class="case"><b class="id">TP-11 · Cross-portfolio actions</b> — PF-U. Test each: SqOff/Execute/Start Other Portfolio, ReExecute, ReExecute at Entry Price, ReExecute Same Contract. <span class="pass">Pass: each dispatches to target portfolio correctly.</span></div>
+<div class="case"><b class="id">TP-12 · Leg-breach validation</b> — PF-3. 3 legs SLs sum 7000; portfolio SL 5000. Save → <strong>flag breach</strong>; run → portfolio fires at −5000 before legs. <span class="pass">Pass: save-time flag + portfolio precedence.</span></div>
+
+<h2>5. User-level cases — config + manual trace</h2>
+<div class="case"><b class="id">TU-1 · Max Loss (absolute)</b> — PF-U, 10000. user pnl −9000 no; −10200 ≤ −10000 → <strong>force-sqoff ALL portfolios</strong>, gst sticky. <span class="pass">Pass: both books close same bar; no further entries.</span></div>
+<div class="case"><b class="id">TU-2 · Max Profit (absolute)</b> — PF-U, 15000. 15300 ≥ 15000 → sqoff all. Max Loss checked before Max Profit. <span class="pass">Pass: one fires/bar; cascade closes all.</span></div>
+<div class="case"><b class="id">TU-3 · Max Loss (% of allocation)</b> — PF-U, 5% of 200000 = 10000. Engine-defined allocation base (not live margin). <span class="pass">Pass: same as TU-1; raw % rejected.</span></div>
+<div class="case"><b class="id">TU-4 · User Trailing SL</b> — PF-U, every 2000, by 1000. combined profit 6000 → 3 steps → user SL tightens 3000. <span class="pass">Pass: tightens with combined profit; only tightens.</span></div>
+<div class="case"><b class="id">TU-5 · User Trailing Target</b> — PF-U, reach 5000, lock 3000, every 1000, by 500. 5000 → floor 3000; 6000 → floor 3500; falls to 3400 → exit all. <span class="pass">Pass: user-wide profit-lock ratchets + cascades.</span></div>
+
+<h2>6. Cross-cutting cases</h2>
+<div class="case"><b class="id">TX-1 · Three-format equivalence</b> — PF-X. Same path as A/B/C; identical config. <span class="pass">Pass: trigger bar, delay, move-to-cost, action dispatch identical across A/B/C; only fill price may differ.</span></div>
+<div class="case"><b class="id">TX-2 · MIS cutoff (TBD-7)</b> — PF-X, 15:20. Open at 15:20 → forced <code>cutoff</code> exit. <span class="pass">Pass: flat at cutoff. Blocked until product-type built.</span></div>
+<div class="case"><b class="id">TX-3 · NRML carry</b> — PF-X. SL not hit → carries to next session. <span class="pass">Pass: no intraday forced exit.</span></div>
+<div class="case"><b class="id">TX-4 · Asset × timeframe</b> — PF-1L. Run TL-1/TL-3 across NIFTY-FUT · BANKNIFTY-FUT · US index fut · 6E · GC · BTC × 1m · 3m · 5m · 2h · 1d · 1w · 1M. <span class="pass">Pass: tick-snap, multiplier, currency, ATR-by-timeframe correct per cell.</span></div>
+<div class="case"><b class="id">TX-5 · Tick snapping</b> — PF-1L. 21560.98 → tick 0.05 → 21561.00. <span class="pass">Pass: every SL on the tick grid.</span></div>
+<div class="case"><b class="id">TX-6 · Safety Seconds</b> — PF-1L, 60s. Move-SL at t → applies t+60s. A 30s safety on a 1m bar (sub-bar) → refuse + warn. <span class="pass">Pass: anchored to trigger-event time; sub-bar refused.</span></div>
+
+<h3>Combination &amp; odd-type cases (the tricky ones)</h3>
+<p>Single-feature cases (TL/TP/TU) prove each rule in isolation; these deliberately <strong>stack features and hit corners</strong> to prove the rules still hold when they collide. They layer on the existing PFs, so they're not in the §2 one-feature matrix.</p>
+<div class="case"><b class="id">TC-1 · Same-bar level race (precedence)</b> — PF-U. One bar makes a leg SL, the portfolio Combined Loss, <em>and</em> the user Max Loss all true together. <strong>Expected:</strong> User→Portfolio→Leg — <code>USER_SQOFF</code> fires and force-flats both books; leg/portfolio hits subsumed under the user reason, not three independent exits. <span class="pass">Pass: one USER_MAX_LOSS exit per leg, same bar; no double-count; no re-entry.</span></div>
+<div class="case"><b class="id">TC-2 · Trail-step + breach same bar</b> — PF-3. A bar ratchets the Trailing SL up <em>then</em> trades back through the <strong>new</strong> stop in the same bar. <strong>Expected:</strong> tighten <code>current_sl</code> first, then test the hit against the new level → exit same bar. <span class="pass">Pass: TRAIL_SL at the ratcheted level, not the old one (guards stale-level).</span></div>
+<div class="case"><b class="id">TC-3 · Move-to-Cost then gap-through</b> — PF-2. Move-SL-to-Cost sets SL = entry; the next bar <strong>opens past entry</strong>. <strong>Expected:</strong> fill per the gap rule — at the level or the worse open? <span class="pass">Pass: behaviour explicit + matches the agreed rule — the concrete trade that settles the parked gap question (Q2).</span></div>
+<div class="case"><b class="id">TC-4 · Re-Execute into an instant re-stop</b> — PF-1L (SqOff+Re-Execute, count 2). SL hit → re-enter next bar → fresh SL hit on that <strong>same re-entry bar</strong>. <strong>Expected:</strong> re-exec counter increments, 2nd exit attributed to the re-executed leg (<code>_2</code>), limit still caps entries. <span class="pass">Pass: exactly the allowed entries; no loop; counts right.</span></div>
+<div class="case"><b class="id">TC-5 · Trailing SL vs fixed Combined Loss</b> — PF-3. Both a fixed Combined Loss (5000) and a Trailing SL ratcheted <strong>tighter than 5000</strong>. <strong>Expected:</strong> the tighter stop governs; the fixed value is the floor, never loosens the trail. <span class="pass">Pass: exit at the tighter level; compose by min-distance, no double-fire.</span></div>
+<div class="case"><b class="id">TC-6 · Cross-PF start racing a self-entry</b> — PF-XPF. PF-A fires "Start Other (PF-B)" with a 2 s delay; within the delay PF-B's own EMA entry also triggers. <strong>Expected:</strong> PF-B enters <strong>once</strong>; external Start + self-entry don't stack; delay honoured. <span class="pass">Pass: single PF-B entry; one entry reason.</span></div>
+<div class="case"><b class="id">TC-7 · Boundary — exactly at the threshold</b> — PF-3. A bar lands combined PnL at <strong>exactly −5000.00</strong> (post tick-snap + FX). <strong>Expected:</strong> the <code>≤</code>/<code>&lt;</code> convention is explicit (we use <code>≤</code> → fires at the level). <span class="pass">Pass: fires at exactly −5000; equality not skipped.</span></div>
+
+<h2>7. Run matrix — assets × timeframes by level</h2>
+<p>§6's <strong>TX-4</strong> already sweeps the <em>leg</em> cases across the full asset × timeframe grid. The same discipline runs upward — but sweep a dimension only where the logic interacts with it (a full level × asset × timeframe cross is thousands of runs that re-prove nothing). Run each level's listed cells across these cells only:</p>
+<table>
+  <thead><tr><th>Level</th><th>Cells</th><th>Assets</th><th>Timeframes</th><th>Rationale</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Leg</strong></td><td>TL-1, TL-2, TL-3 (SL types) + TL-6 (wait)</td><td>all 7</td><td>all 7 (1m…1M) + tick/1-sec for intrabar ordering</td><td>tick-snap, lot-mult, currency, ATR-in-bars bite at the SL itself; wait-units scale with bar size (extends <strong>TX-4</strong>)</td></tr>
+    <tr><td><strong>Portfolio — dynamic</strong></td><td>TP-6, TP-7, TP-8, TP-9</td><td>1 INR (BANKNIFTY-FUT) + 1 USD (GC)</td><td>all 7 (1m…1M)</td><td>step ratchet, profit-lock floor and move-to-cost fire on bar boundaries → the step/trigger bar shifts per timeframe; Combined PnL must aggregate the correct multiplier + currency</td></tr>
+    <tr><td><strong>Portfolio — static</strong></td><td>TP-1, TP-3, TP-4</td><td>1 INR + 1 USD</td><td>1m + a coarse-TF spot-check (e.g. 1d)</td><td>only the <em>trigger bar</em> moves with timeframe; the threshold level itself doesn't</td></tr>
+    <tr><td><strong>User</strong></td><td>TU-1, TU-4, TU-5</td><td>cross-currency (NIFTY-FUT INR + 6E USD) once + an all-INR pair</td><td>1m + a coarse-TF spot-check on TU-4/TU-5</td><td>the user roll-up normalises both books to a base currency; same-bar User→Portfolio→Leg precedence depends on which bar the breach lands</td></tr>
+    <tr><td><strong>Cross-PF</strong></td><td>TP-11</td><td>the dispatch pair as configured</td><td>1m + a coarse TF for the cross-PF delay (2 s/3 s)</td><td>the cross-PF delay is wall-clock → re-verify against bar size</td></tr>
+    <tr><td><strong>Product mode</strong></td><td>TX-2 (MIS), TX-3 (NRML)</td><td>PF-X (NIFTY-FUT); CNC equity → <code>product_modes_limit_orders</code></td><td>any one TF (e.g. 1m)</td><td>the MIS cutoff and CNC carry are clock/calendar events, not bar-size sensitive</td></tr>
+  </tbody>
+</table>
+<div class="callout"><strong>Per cell, re-verify</strong> (never assume cross-cell equality): ATR distance (in bars → differs per timeframe), tick-snap (per instrument), <code>PnL = move × lot_mult × n_lots</code>, currency (INR vs USD), and that wall-clock timers (SL-Wait seconds, Safety Seconds, cross-PF delay) stay fixed while bar-count timers scale with bar size. Every non-leg cell still gets the full <strong>Time / Logic / Price</strong> check from §8.</div>
+
+<h2>8. How to check manually (the verify loop)</h2>
+<ol>
+  <li>Run the portfolio → export the <strong>orderbook</strong> (fills, exits, reasons, per-bar <code>current_sl</code>/levels).</li>
+  <li>For each <strong>entry</strong>: logged fill → apply the case formula → tick-snap → compare to the engine. Match to the tick.</li>
+  <li>For each <strong>dynamic feature</strong> (move-to-cost, trailing, profit-lock, user cascade): walk the manual trace <strong>row by row</strong> against the engine's per-bar log — level must change on the same bar, by the same amount.</li>
+  <li>For each <strong>exit</strong>: confirm trigger condition (bar low/high / pnl vs level) and the fill.</li>
+  <li>Record green/red; red rows carry the offending trade/bar.</li>
+</ol>
+
+</div>
+</body>
+</html>

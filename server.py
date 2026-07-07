@@ -7,6 +7,7 @@ for data loading, visualization, backtesting, and report generation.
 Run with: python server.py
 """
 
+import hashlib
 import json
 import sys
 import threading
@@ -18,6 +19,7 @@ from pathlib import Path
 import time as _time
 
 from flask import Flask, jsonify, request, send_from_directory, Response, stream_with_context
+from werkzeug.exceptions import HTTPException
 from flask_cors import CORS
 import pandas as pd
 
@@ -27,6 +29,7 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 from core.csv_loader import DEFAULT_CSV_FOLDER, scan_csv_folder, get_display_label
 from core.nautilus_loader import load_csv_and_store, load_catalog
+from core.session_windows import refresh_all_venue_session_windows
 from core.backtest_runner import run_backtest, run_portfolio_backtest, _run_single_backtest_task
 from core.report_generator import generate_report, build_orderbook_dataframe, build_logs_dataframe
 from core.custom_strategy_loader import (
@@ -41,7 +44,14 @@ CORS(app)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    """Return JSON for any unhandled server error."""
+    """Return JSON for any unhandled server error.
+
+    HTTPExceptions (a 404 from a missing report file, 400/401 from validation,
+    etc.) already carry the right status code and must pass through unchanged —
+    otherwise e.g. a missing-file 404 gets masked as a confusing 500.
+    """
+    if isinstance(e, HTTPException):
+        return e
     return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 # Default paths
@@ -53,6 +63,29 @@ REPORTS_DIR = PROJECT_DIR / "reports"
 # custom strategy file on each upload. Invalidates by mtime, so external edits
 # still get picked up.
 _STRATEGY_NAME_CACHE: dict[str, tuple[float, str | None]] = {}
+
+
+def _chrono_csv_sort(df: "pd.DataFrame", candidates: list[str]) -> "pd.DataFrame":
+    """Return a copy of ``df`` sorted chronologically by the first available
+    timestamp column in ``candidates`` (stable; unparseable rows last).
+
+    Used only when writing the position/fill CSVs so the on-disk file reads in
+    time order across slots, without mutating the in-memory report the engine
+    logic (clip/splice) reuses. Best-effort: returns ``df`` unchanged on any
+    issue or when no timestamp column is present.
+    """
+    try:
+        if df is None or df.empty:
+            return df
+        col = next((c for c in candidates if c in df.columns), None)
+        if not col:
+            return df
+        ts = pd.to_datetime(df[col], errors="coerce", utc=True)
+        return (df.assign(_k=ts.values)
+                  .sort_values("_k", kind="stable", na_position="last")
+                  .drop(columns="_k"))
+    except Exception:
+        return df
 
 
 def _read_strategy_name(py_path: Path) -> str | None:
@@ -129,6 +162,122 @@ def api_orderbook_load():
     return jsonify({"data": records})
 
 
+@app.route("/api/visual-verification/analyze", methods=["POST"])
+def visual_verification_analyze():
+    """Bar-driven Time/Logic/Price verification of a backtest's exits.
+
+    Accepts either a saved order book (form/query ``file=order_book_*.csv``) or an
+    uploaded CSV / HTML report (multipart ``file``). Re-derives each exit against
+    the catalog's 1-second feed and returns per-trade verdicts (no bars — the UI
+    draws charts via the existing ``/api/data/bars``). ``feed_in_catalog=false``
+    means the matching feed isn't loaded, so charts/level checks are unavailable.
+    """
+    import io
+    import re
+    from core.visual_verification import analyze as _vv_analyze, guess_feed_bar_type, orderbook_rows_from_html
+
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    uid = user_or_resp["user_id"]
+
+    catalog_path = request.form.get("catalog_path") or request.args.get("path") or CATALOG_PATH
+    bar_type = (request.form.get("bar_type") or request.args.get("bar_type") or "").strip()
+
+    rows, source = None, None
+    upload = request.files.get("file")
+    if upload is not None and upload.filename:
+        name = upload.filename.lower()
+        content = upload.read()
+        try:
+            if name.endswith((".html", ".htm")):
+                rows = orderbook_rows_from_html(content.decode("utf-8", "replace"))
+            else:
+                rows = pd.read_csv(io.BytesIO(content)).fillna("").to_dict(orient="records")
+        except Exception as e:
+            return jsonify({"error": f"Could not parse uploaded file: {e}"}), 400
+        source = upload.filename
+    else:
+        fname = (request.form.get("file") or request.args.get("file") or "").strip()
+        safe_name = Path(fname).name  # prevent directory traversal
+        if not safe_name.startswith("order_book_") or not safe_name.endswith(".csv"):
+            return jsonify({"error": "Provide a saved order_book_*.csv (file=) or upload a CSV/HTML report."}), 400
+        filepath = _user_reports_dir(uid) / safe_name
+        if not filepath.exists():
+            return jsonify({"error": "File not found"}), 404
+        rows = pd.read_csv(filepath).fillna("").to_dict(orient="records")
+        source = safe_name
+
+    if not rows:
+        return jsonify({"error": "No trades found in the provided order book."}), 400
+
+    sym = str(rows[0].get("SYMBOL", "")).strip()
+    exch = str(rows[0].get("EXCHANGE", "")).strip()
+    instrument = f"{sym}.{exch}" if sym and exch else sym
+    if not bar_type:
+        bar_type = guess_feed_bar_type(catalog_path, instrument)
+
+    # Per-feature verdict parity: for a SAVED portfolio order book, load its JSON
+    # config so analyze() can apply the SL-Wait gate the way the RESULTS report
+    # does. The portfolio name is encoded in the saved filename
+    # (order_book_portfolio_<name>_<DD>_<month>_<YYYY>.csv). Uploaded CSVs have no
+    # config -> generic (stricter) check + a UI note. Best-effort; never fatal.
+    config, config_loaded = None, False
+    if not (upload is not None and upload.filename):
+        m = re.match(r"^order_book_portfolio_(.+?)_\d{1,2}_[A-Za-z]+_\d{4}\.csv$", source or "")
+        if m:
+            pjson = Path(_user_portfolios_dir(uid)) / f"{m.group(1)}.json"
+            if pjson.exists():
+                try:
+                    config = json.loads(pjson.read_text(encoding="utf-8"))
+                    config_loaded = True
+                except Exception:
+                    config = None
+
+    try:
+        trades, have_bars = _vv_analyze(rows, catalog_path, bar_type, config=config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    n = len(trades)
+    npass = sum(1 for t in trades if t["verdict"] == "PASS")
+    nfail = sum(1 for t in trades if t["verdict"] == "FAIL")
+    # Check 1 (Config -> level) roll-up: how many level exits had a statically
+    # recomputable config level, and how many of those matched the logged level.
+    config_checked = sum(1 for t in trades if t.get("config_ok") is not None)
+    config_pass = sum(1 for t in trades if t.get("config_ok") is True)
+
+    # Execution-realism roll-up (diagnostic — independent of the PASS/FAIL verdict).
+    rl = [t["realism"] for t in trades if t.get("realism")]
+    entry_chk = [t for t in trades if t.get("entry_ok") is not None]
+
+    def _fin(xs):
+        return sum(x for x in xs if x is not None and x == x)
+    realism = {
+        "n_level": len(rl),
+        "favorable": sum(1 for r in rl if r["favorable"]),
+        "adverse": sum(1 for r in rl if r["adverse"]),
+        "at_level": sum(1 for r in rl if not r["favorable"] and not r["adverse"]),
+        "gap": sum(1 for r in rl if r["gap"]),
+        "cross_session": sum(1 for r in rl if r["cross_session"]),
+        "infl_sum": _fin(r["infl"] for r in rl),
+        "fav_sum": _fin(r["infl"] for r in rl if r["infl"] is not None and r["infl"] > 0),
+        "adv_sum": _fin(r["infl"] for r in rl if r["infl"] is not None and r["infl"] < 0),
+        "slip_haircut": _fin(r["slip"] for r in rl),
+        "entry_n": len(entry_chk),
+        "entry_ok": sum(1 for t in entry_chk if t["entry_ok"]),
+    }
+    return jsonify({
+        "trades": trades,
+        "summary": {"n": n, "pass": npass, "fail": nfail, "na": n - npass - nfail,
+                    "config_checked": config_checked, "config_pass": config_pass},
+        "realism": realism,
+        "bar_type": bar_type, "instrument": instrument,
+        "feed_in_catalog": bool(have_bars), "source": source,
+        "config_loaded": config_loaded,
+    })
+
+
 # ─── Catalog API ─────────────────────────────────────────────────────────────
 
 @app.route("/api/catalog/status")
@@ -137,6 +286,14 @@ def catalog_status():
     catalog_path = request.args.get("path", CATALOG_PATH)
     if not Path(catalog_path).exists():
         return jsonify({"exists": False, "data_types": []})
+    # The dashboard hits this on every page load, so it doubles as the
+    # "refresh venue session windows from the catalog" trigger — picks up
+    # parquet files dropped in out-of-band. Per-file caching keeps it cheap
+    # (only new/changed files are re-read). Best-effort: never block status.
+    try:
+        refresh_all_venue_session_windows(catalog_path)
+    except Exception as e:
+        app.logger.warning("session window refresh failed: %s", e)
     try:
         catalog = load_catalog(catalog_path)
         data_types = catalog.list_data_types()
@@ -178,6 +335,7 @@ def get_configured_adapters():
     """Read saved adapter configs and return venues grouped by asset class."""
     config_dir = PROJECT_DIR / "adapter_admin" / "adapters_config"
     adapters_by_class = {}
+    venue_names = {}  # raw venue token -> human-friendly config "name"
     if config_dir.exists():
         for f in sorted(config_dir.glob("*.json")):
             try:
@@ -186,9 +344,14 @@ def get_configured_adapters():
                 venue = config.get("venue", "")
                 if venue:
                     adapters_by_class.setdefault(asset_class, []).append(venue)
-            except Exception:
+                    venue_names[venue] = config.get("name") or venue
+            except Exception as exc:
+                # Don't let one malformed config silently hide every venue for
+                # its asset class (e.g. an unresolved git merge conflict in the
+                # JSON). Skip the bad file but make the failure visible.
+                print(f"[configured-adapters] skipping {f.name}: {exc}")
                 continue
-    return jsonify({"adapters": adapters_by_class})
+    return jsonify({"adapters": adapters_by_class, "venue_names": venue_names})
 
 
 # ─── CSV Scan / Load API ────────────────────────────────────────────────────
@@ -247,7 +410,7 @@ def _build_load_row(entry: dict, result: dict, asset_class: str) -> dict:
 
 def _run_csv_load_job(job_id: str, entry: dict, catalog_path: str,
                       venue: str, data_format: dict | None,
-                      asset_class: str) -> None:
+                      asset_class: str, timeframe: str | None = None) -> None:
     """Worker target for background MID ingest. Always lands the job in a
     terminal state (success or error) so the polling client can stop."""
     with _csv_jobs_lock:
@@ -255,7 +418,8 @@ def _run_csv_load_job(job_id: str, entry: dict, catalog_path: str,
         _csv_jobs[job_id]["started_at"] = _time.time()
     try:
         result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
-                                    venue=venue, data_format=data_format)
+                                    venue=venue, data_format=data_format,
+                                    timeframe=timeframe)
         row = _build_load_row(entry, result, asset_class)
         with _csv_jobs_lock:
             _csv_jobs[job_id]["status"] = "success"
@@ -281,6 +445,9 @@ def csv_load():
     catalog_path = data.get("catalog_path", CATALOG_PATH)
     venue = (data.get("venue", "BINANCE") or "BINANCE").upper().strip()
     asset_class = data.get("asset_class", "")
+    # Bar size chosen on the Load Data page (e.g. "1-SECOND", "1-MINUTE").
+    # The same instrument/venue can hold several timeframes in the catalog.
+    timeframe = (data.get("timeframe") or "1-MINUTE").strip()
 
     # Load data format config for this asset class
     data_format = None
@@ -307,7 +474,8 @@ def csv_load():
     for entry in inline_entries:
         try:
             result = load_csv_and_store(csv_entry=entry, catalog_path=catalog_path,
-                                        venue=venue, data_format=data_format)
+                                        venue=venue, data_format=data_format,
+                                        timeframe=timeframe)
             results.append(_build_load_row(entry, result, asset_class))
         except Exception as e:
             errors.append({"symbol": entry.get("symbol", "?"),
@@ -326,7 +494,8 @@ def csv_load():
             }
         thread = threading.Thread(
             target=_run_csv_load_job,
-            args=(job_id, entry, catalog_path, venue, data_format, asset_class),
+            args=(job_id, entry, catalog_path, venue, data_format, asset_class,
+                  timeframe),
             daemon=True,
         )
         thread.start()
@@ -464,14 +633,24 @@ def get_bars():
     except ValueError:
         limit = 5000
     limit = max(100, min(limit, 100_000))
+    # The View Data page displays times in IST, so the From/To it sends are IST
+    # calendar days. tz_offset (minutes east of UTC, e.g. 330 for IST) shifts the
+    # UTC day-boundary filter so the fetched range matches the IST day the user
+    # picked — otherwise "Mar 9" would filter UTC Mar 9 (= 05:30 IST Mar 9) and
+    # silently drop the early-IST-morning bars. Default 0 = UTC (back-compat).
+    try:
+        tz_offset_min = int(request.args.get("tz_offset", 0))
+    except ValueError:
+        tz_offset_min = 0
 
     if not bar_type_str:
         return jsonify({"error": "bar_type parameter required"}), 400
 
     try:
         catalog = load_catalog(catalog_path)
-        start_arg = pd.Timestamp(start_str, tz="UTC") if start_str else None
-        end_arg = (pd.Timestamp(end_str, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)) if end_str else None
+        _tz_off = pd.Timedelta(minutes=tz_offset_min)
+        start_arg = (pd.Timestamp(start_str, tz="UTC") - _tz_off) if start_str else None
+        end_arg = (pd.Timestamp(end_str, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1) - _tz_off) if end_str else None
         bars = catalog.bars(bar_types=[bar_type_str], start=start_arg, end=end_arg)
 
         if not bars:
@@ -694,10 +873,22 @@ def _serialize_backtest_result(results: dict, strategy_name: str,
     # apply — instead, convert to records first and stringify non-primitive values
     # per cell (same net effect, one pass, no column-wise Series allocation).
     _primitive = (int, float, str, bool, type(None))
+    # Report timestamps are stored UTC; display them in IST. reset_index() below
+    # returns a COPY, so converting its time columns is output-only and never
+    # touches the raw reports the orderbook/clip logic reads.
+    from core.report_generator import _format_timestamp_series as _fmt_ist
+    _TS_NAME_COLS = {"ts_init", "ts_last", "ts_opened", "ts_closed"}
     for report_key in ["fills_report", "positions_report", "account_report"]:
         report = results.get(report_key)
         if report is not None and not report.empty:
-            records = report.reset_index().fillna("").to_dict(orient="records")
+            _df = report.reset_index()
+            for _c in _df.columns:
+                if _c in _TS_NAME_COLS or str(_df[_c].dtype).startswith("datetime"):
+                    try:
+                        _df[_c] = list(_fmt_ist(_df[_c]))
+                    except Exception:
+                        pass
+            records = _df.fillna("").to_dict(orient="records")
             for rec in records:
                 for k, v in rec.items():
                     if not isinstance(v, _primitive):
@@ -899,7 +1090,11 @@ def run_backtest_stream():
                         report_name = sanitize_filename(raw_name)
                         try:
                             report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
-                                                          user_id=user_id_for_run)
+                                                          user_id=user_id_for_run,
+                                                          date_range={
+                                                              "start": meta["start_date"] or "",
+                                                              "end": meta["end_date"] or "",
+                                                          })
                             report_path = user_dir / f"{report_name}_report.html"
                             report_path.write_text(report_html, encoding="utf-8")
                         except Exception as e:
@@ -910,10 +1105,12 @@ def run_backtest_stream():
                             safe_strat = sanitize_filename(strat_name)
                             prefix = f"{inst_label}_{safe_strat}_{timestamp}"
                             if strat_results.get("positions_report"):
-                                pd.DataFrame(strat_results["positions_report"]).to_csv(
+                                _chrono_csv_sort(pd.DataFrame(strat_results["positions_report"]),
+                                                 ["ts_opened", "ts_init"]).to_csv(
                                     user_dir / f"position_report_{prefix}.csv", index=False)
                             if strat_results.get("fills_report"):
-                                pd.DataFrame(strat_results["fills_report"]).to_csv(
+                                _chrono_csv_sort(pd.DataFrame(strat_results["fills_report"]),
+                                                 ["ts_init", "ts_event"]).to_csv(
                                     user_dir / f"order_fill_report_{prefix}.csv", index=False)
                             if strat_results.get("account_report"):
                                 pd.DataFrame(strat_results["account_report"]).to_csv(
@@ -1046,7 +1243,11 @@ def run_backtest_api():
             report_name = sanitize_filename(raw_name)
             try:
                 report_html = generate_report(inst_strategies_raw, backtest_name=report_name,
-                                              user_id=user_id_for_run)
+                                              user_id=user_id_for_run,
+                                              date_range={
+                                                  "start": start_date or "",
+                                                  "end": end_date or "",
+                                              })
                 report_path = user_dir / f"{report_name}_report.html"
                 report_path.write_text(report_html, encoding="utf-8")
             except Exception as e:
@@ -1059,10 +1260,12 @@ def run_backtest_api():
                 prefix = f"{inst_label}_{safe_strat}_{timestamp}"
 
                 if strat_results.get("positions_report"):
-                    pd.DataFrame(strat_results["positions_report"]).to_csv(
+                    _chrono_csv_sort(pd.DataFrame(strat_results["positions_report"]),
+                                     ["ts_opened", "ts_init"]).to_csv(
                         user_dir / f"position_report_{prefix}.csv", index=False)
                 if strat_results.get("fills_report"):
-                    pd.DataFrame(strat_results["fills_report"]).to_csv(
+                    _chrono_csv_sort(pd.DataFrame(strat_results["fills_report"]),
+                                     ["ts_init", "ts_event"]).to_csv(
                         user_dir / f"order_fill_report_{prefix}.csv", index=False)
                 if strat_results.get("account_report"):
                     pd.DataFrame(strat_results["account_report"]).to_csv(
@@ -1095,6 +1298,7 @@ from core.models import (
     PortfolioConfig, StrategySlotConfig, ExitConfig,
     portfolio_to_dict, portfolio_from_dict,
     save_portfolio, load_portfolio, list_portfolios, delete_portfolio,
+    validate_leg_actions, effective_portfolio_squareoff,
 )
 from core.templates import get_templates, build_template
 
@@ -1110,7 +1314,10 @@ from core.users import (
     get_user as _get_user,
     list_users as _list_users,
     is_instrument_allowed as _is_instrument_allowed,
+    get_user_max_loss as _get_user_max_loss,
+    get_user_max_profit as _get_user_max_profit,
 )
+from core import tags as _tags
 from core.venue_config import symbol_from_bar_type as _symbol_from_bar_type
 
 
@@ -1123,7 +1330,13 @@ def _resolve_user_id() -> str:
     pre-migration portfolios. To enforce a strict-401 policy later, swap
     this for ``_get_user_or_401``.
     """
-    uid = (request.headers.get("X-User-Id") or "").strip() or DEFAULT_USER_ID
+    # Header wins (normal fetch() calls). Browser-initiated downloads
+    # (<a download> / link.click()) cannot set the X-User-Id header, so we
+    # also accept a ?user= query param as a fallback for those URLs.
+    uid = (request.headers.get("X-User-Id") or "").strip()
+    if not uid:
+        uid = (request.args.get("user") or "").strip()
+    uid = uid or DEFAULT_USER_ID
     user = _get_user(uid)
     return user["user_id"] if user else DEFAULT_USER_ID
 
@@ -1190,6 +1403,187 @@ def _check_portfolio_allowlist(portfolio_config, user) -> tuple[bool, str]:
     return True, ""
 
 
+def _parse_hhmm_minute(value) -> "int | None":
+    """Parse an "HH:MM" / "HH:MM:SS" string to minute-of-day, or None.
+
+    Tolerates None / empty / malformed input by returning None (the caller
+    treats None as "unset", so a typo silently disables that one check rather
+    than blocking the save — the field-format itself is validated elsewhere).
+    """
+    if not value:
+        return None
+    try:
+        parts = str(value).split(":")
+        return int(parts[0]) * 60 + int(parts[1])
+    except (ValueError, IndexError):
+        return None
+
+
+def _validate_portfolio_times(portfolio_config) -> tuple[bool, str]:
+    """Enforce the spec §9 timing-ordering rule on save.
+
+    Spec: ``Portfolio Start ≤ Leg Start ≤ Portfolio End ≤ SqOff Time``. This
+    engine has no per-leg intraday Start Time — the entry window is
+    portfolio-level (``entry_start_time`` / ``entry_end_time``) — so the rule
+    maps to:
+
+        entry_start_time ≤ entry_end_time ≤ effective squareoff_time
+
+    Plus general calendar sanity: ``start_date ≤ end_date`` at portfolio level
+    and on every slot. All times are HH:MM UTC / local; dates are ISO
+    ``YYYY-MM-DD`` (lexicographic compare is correct for that format). Each
+    bound is only checked when both endpoints are present, so partially-
+    configured portfolios still save.
+    """
+    pf = portfolio_config
+
+    # Calendar date ordering (portfolio + per slot).
+    if pf.start_date and pf.end_date and pf.start_date > pf.end_date:
+        return False, (
+            f"Portfolio start date {pf.start_date} is after end date {pf.end_date}."
+        )
+    for slot in pf.slots:
+        if slot.start_date and slot.end_date and slot.start_date > slot.end_date:
+            return False, (
+                f"Slot '{slot.strategy_name}' start date {slot.start_date} is "
+                f"after its end date {slot.end_date}."
+            )
+
+    # Intraday window ordering (spec §9): Start ≤ End ≤ SqOff.
+    #
+    # Default: same-day window, so a numerically-decreasing sequence (e.g.
+    # End 23:30 < SqOff 01:30) is a typo and is rejected. When the portfolio
+    # opts into an overnight window via ``entry_window_overnight`` (NRML carry /
+    # 24h FX/crypto), End and SqOff may roll past midnight: each endpoint that
+    # lands at/before the previous one in the Start→End→SqOff chain is
+    # interpreted as +1 day, and the ordering is checked in elapsed minutes.
+    # The runtime already supports this (bar_filters._filter_bars_by_time_of_day
+    # wraps the window; square-off is a per-calendar-day trigger).
+    overnight = bool(getattr(pf, "entry_window_overnight", False))
+    es = _parse_hhmm_minute(pf.entry_start_time)
+    ee = _parse_hhmm_minute(pf.entry_end_time)
+    sq_time, _ = effective_portfolio_squareoff(pf)
+    sq = _parse_hhmm_minute(sq_time)
+
+    _DAY = 24 * 60
+    # Roll later endpoints into the next day (overnight only), relative to the
+    # previous endpoint in the chain, so a missing Start or End still anchors.
+    ee_cmp = ee
+    if overnight and es is not None and ee is not None and ee_cmp < es:
+        ee_cmp += _DAY
+    sq_cmp = sq
+    if overnight and sq is not None:
+        ref = ee_cmp if ee_cmp is not None else es
+        if ref is not None and sq_cmp < ref:
+            sq_cmp += _DAY
+
+    if es is not None and ee_cmp is not None and es > ee_cmp:
+        return False, (
+            f"Entry Start Time {pf.entry_start_time} is after Entry End Time "
+            f"{pf.entry_end_time} (spec §9: Start ≤ End)."
+        )
+    if ee_cmp is not None and sq_cmp is not None and ee_cmp > sq_cmp:
+        return False, (
+            f"Entry End Time {pf.entry_end_time} is after Square-off Time "
+            f"{sq_time} (spec §9: End ≤ SqOff Time)."
+        )
+    if es is not None and sq_cmp is not None and es > sq_cmp:
+        return False, (
+            f"Entry Start Time {pf.entry_start_time} is after Square-off Time "
+            f"{sq_time} (spec §9: Start ≤ SqOff Time)."
+        )
+    return True, ""
+
+
+def _validate_portfolio_hierarchy(portfolio_config, user_id) -> tuple[bool, str]:
+    """Hierarchical risk-limit validation (spec §11).
+
+    A child-level cap must not exceed its parent: ``portfolio SL ≤ tag SL ≤
+    user SL`` (and the same on the Target/profit side). All three are absolute
+    amounts in the reporting currency, so they are directly comparable. (Leg
+    SL is a price-distance % / points trigger — not a currency budget — so it
+    can't be summed against the portfolio cap in this engine; that part of the
+    spec rule is N/A here.)
+
+    Only blocks when both endpoints of a comparison are set, so partially-
+    configured portfolios still save. Returns ``(ok, error_message)``.
+    """
+    pf = portfolio_config
+    tag = (getattr(pf, "portfolio_tag", None) or "").strip() or None
+
+    tag_max_loss = _tags.get_tag_max_loss(tag) if tag else None
+    tag_max_profit = _tags.get_tag_max_profit(tag) if tag else None
+    user_max_loss = _get_user_max_loss(user_id) if user_id else None
+    user_max_profit = _get_user_max_profit(user_id) if user_id else None
+
+    pf_sl = abs(float(getattr(pf, "pf_sl_value", 0.0) or 0.0)) if getattr(pf, "pf_sl_enabled", False) else None
+    pf_tgt = abs(float(getattr(pf, "pf_tgt_value", 0.0) or 0.0)) if getattr(pf, "pf_tgt_enabled", False) else None
+
+    # SL side: portfolio ≤ tag ≤ user.
+    if pf_sl and tag_max_loss is not None and pf_sl > tag_max_loss:
+        return False, (
+            f"Portfolio Stoploss {pf_sl:g} exceeds the '{tag}' tag's Max Loss "
+            f"{tag_max_loss:g} (spec §11: portfolio SL ≤ tag SL)."
+        )
+    if pf_sl and user_max_loss is not None and pf_sl > user_max_loss:
+        return False, (
+            f"Portfolio Stoploss {pf_sl:g} exceeds the user's Max Loss "
+            f"{user_max_loss:g} (spec §11: portfolio SL ≤ user SL)."
+        )
+    if tag_max_loss is not None and user_max_loss is not None and tag_max_loss > user_max_loss:
+        return False, (
+            f"Tag '{tag}' Max Loss {tag_max_loss:g} exceeds the user's Max Loss "
+            f"{user_max_loss:g} (spec §11: tag SL ≤ user SL)."
+        )
+
+    # Target side: portfolio ≤ tag ≤ user.
+    if pf_tgt and tag_max_profit is not None and pf_tgt > tag_max_profit:
+        return False, (
+            f"Portfolio Target {pf_tgt:g} exceeds the '{tag}' tag's Max Profit "
+            f"{tag_max_profit:g} (spec §11: portfolio Target ≤ tag Target)."
+        )
+    if pf_tgt and user_max_profit is not None and pf_tgt > user_max_profit:
+        return False, (
+            f"Portfolio Target {pf_tgt:g} exceeds the user's Max Profit "
+            f"{user_max_profit:g} (spec §11: portfolio Target ≤ user Target)."
+        )
+    if tag_max_profit is not None and user_max_profit is not None and tag_max_profit > user_max_profit:
+        return False, (
+            f"Tag '{tag}' Max Profit {tag_max_profit:g} exceeds the user's Max "
+            f"Profit {user_max_profit:g} (spec §11: tag Target ≤ user Target)."
+        )
+    return True, ""
+
+
+def _validate_portfolio_sl(portfolio_config) -> tuple[bool, str]:
+    """Validate SL-related config before a portfolio is saved.
+
+    Returns ``(ok, error_message)``. Blocks:
+      • Exit Order Type = Limit / SL_Limit — not implemented in the backtest
+        engine (spec execution_logic.html §8.1; only MARKET is wired).
+      • Invalid leg-level On SL / On Target action combinations
+        (spec §4.8 — see ``core.models.validate_leg_actions``).
+      • Out-of-order timing fields (spec §9 — see ``_validate_portfolio_times``).
+    """
+    order_type = str(getattr(portfolio_config, "exit_order_type", "MARKET") or "MARKET")
+    if order_type.upper() != "MARKET":
+        return False, (
+            f"Exit Order Type '{order_type}' is not implemented in the backtest "
+            f"engine — only MARKET exits are supported (spec §8.1)."
+        )
+    for slot in portfolio_config.slots:
+        ec = slot.exit_config
+        has_target = bool(getattr(ec, "execute_target_leg_id", "") or "")
+        for label, action in (("On SL", ec.on_sl_action), ("On Target", ec.on_target_action)):
+            ok, err = validate_leg_actions(action, has_execute_target=has_target)
+            if not ok:
+                return False, f"Slot '{slot.strategy_name}' {label} action: {err}"
+    ok, err = _validate_portfolio_times(portfolio_config)
+    if not ok:
+        return False, err
+    return True, ""
+
+
 @app.route("/api/users/list")
 def api_users_list():
     """Public-safe user list for the frontend picker.
@@ -1223,6 +1617,70 @@ def api_users_me():
         "multiplier": user.get("multiplier", 1.0),
         "allowed_instruments": user.get("allowed_instruments"),
     })
+
+
+# ─── Portfolio Tags (spec §11) ───────────────────────────────────────────────
+# A tag groups portfolios that share a risk cap between the portfolio and user
+# levels. Definitions live in config/tags.json; the runner clips a tag's whole
+# group when its cumulative combined PnL breaches the cap (see core/tags.py).
+
+@app.route("/api/tags/list")
+def api_tags_list():
+    """Return all portfolio-tag definitions (name + limits)."""
+    return jsonify({"tags": _tags.list_tags()})
+
+
+@app.route("/api/tags/save", methods=["POST"])
+def api_tags_save():
+    """Create or update a portfolio-tag definition.
+
+    Body: ``{tag, max_loss?, max_profit?, trailing_sl_enabled?, ...}``. The
+    tag name must be a safe slug. Limits are absolute amounts in the reporting
+    currency. Mutating endpoint — requires a known user.
+    """
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    data = request.json or {}
+    name = str(data.get("tag", "")).strip()
+    if not _tags.validate_tag(name):
+        return jsonify({"error": f"Invalid tag name '{name}'. Use letters, digits, _ or - (1-48 chars)."}), 400
+
+    def _num(key):
+        raw = data.get(key)
+        if raw in (None, ""):
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    tag_def = {"tag": name}
+    for k in ("max_loss", "max_profit", "trailing_sl_every", "trailing_sl_by",
+              "trailing_tgt_when_reach", "trailing_tgt_lock",
+              "trailing_tgt_every", "trailing_tgt_by"):
+        v = _num(k)
+        if v is not None:
+            tag_def[k] = v
+    for k in ("trailing_sl_enabled", "trailing_tgt_enabled"):
+        tag_def[k] = bool(data.get(k))
+    try:
+        _tags.upsert_tag(tag_def)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"success": True, "tag": tag_def})
+
+
+@app.route("/api/tags/delete", methods=["POST"])
+def api_tags_delete():
+    """Delete a portfolio-tag definition by name."""
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    name = str((request.json or {}).get("tag", "")).strip()
+    if _tags.delete_tag(name):
+        return jsonify({"success": True, "message": f"Tag '{name}' deleted."})
+    return jsonify({"error": "Tag not found"}), 404
 
 
 @app.route("/api/portfolios/list")
@@ -1263,6 +1721,12 @@ def api_save_portfolio():
         ok, err = _check_portfolio_allowlist(config, user_or_resp)
         if not ok:
             return jsonify({"error": err}), 403
+        ok, err = _validate_portfolio_sl(config)
+        if not ok:
+            return jsonify({"error": err}), 400
+        ok, err = _validate_portfolio_hierarchy(config, user_or_resp["user_id"])
+        if not ok:
+            return jsonify({"error": err}), 400
         path = save_portfolio(config, _user_portfolios_dir(user_or_resp["user_id"]))
         return jsonify({"success": True, "message": f"Portfolio '{config.name}' saved.", "path": str(path)})
     except Exception as e:
@@ -1390,10 +1854,30 @@ def api_portfolio_backtest():
                               "message": f"Running {total_slots} strategies in parallel...",
                               "slots_completed": 0}) + "\n"
 
+            # Day-wise data progress (unified engine): the PortfolioMonitorStrategy
+            # publishes the latest processed day to an in-process bus keyed by the
+            # portfolio name (== the monitor's portfolio_id). We re-fetch the bus
+            # each poll because the runner pops/recreates it at run start, so a held
+            # reference would go stale.
+            from core.managed_strategy import get_pf_progress_bus
+            _last_day = None
+
             while True:
                 try:
                     msg = progress_queue.get(timeout=0.5)
                 except queue.Empty:
+                    # No slot finished this tick — surface how far through the data
+                    # the engine has streamed (e.g. "Processed up to 2021-01-04").
+                    _pb = get_pf_progress_bus(config.name)
+                    if _pb:
+                        _day = _pb[-1].get("day")
+                        if _day and _day != _last_day:
+                            _last_day = _day
+                            yield json.dumps({"event": "progress", "phase": "engine",
+                                              "completed": slots_completed, "total": total_steps,
+                                              "data_ts_day": _day,
+                                              "message": f"Processed up to {_day}",
+                                              "slots_completed": slots_completed}) + "\n"
                     continue
 
                 if msg["type"] == "slot_done":
@@ -1428,90 +1912,10 @@ def api_portfolio_backtest():
                               "message": f"All slots finished in {elapsed:.1f}s. Generating reports...",
                               "slots_completed": total_slots}) + "\n"
 
-            # Save CSV reports under the user's reports directory.
-            user_dir = _user_reports_dir(user_id_for_run)
-            timestamp = datetime.now().strftime("%d_%B_%Y").lower()
-            portfolio_label = sanitize_filename(config.name)
-            prefix = f"portfolio_{portfolio_label}_{timestamp}"
-
-            for report_key, report_name in [
-                ("positions_report", "position_report"),
-                ("fills_report", "order_fill_report"),
-            ]:
-                report = results.get(report_key)
-                if report is not None and not report.empty:
-                    report.to_csv(user_dir / f"{report_name}_{prefix}.csv", index=False)
-
-            # Build per-strategy reports for order book and logs
-            per_strat = results.get("per_strategy", {})
-            pos_report = results.get("positions_report")
-            fills_rep = results.get("fills_report")
-            slot_to_tid = results.get("slot_to_trader_id", {})
-            slot_to_sid = results.get("slot_to_strategy_id", {})
-
-            all_results_for_reports = {}
-            for slot_id, sr in per_strat.items():
-                strat_label = sanitize_filename(sr["display_name"])
-                # Prefer trader_id for filtering — it is unique per slot even
-                # when multiple slots share the same strategy_id.
-                actual_tid = slot_to_tid.get(slot_id, "")
-                actual_sid = slot_to_sid.get(slot_id, "")
-                slot_pos = pd.DataFrame()
-                slot_fills = pd.DataFrame()
-                if actual_tid:
-                    if pos_report is not None and not pos_report.empty and "trader_id" in pos_report.columns:
-                        slot_pos = pos_report[pos_report["trader_id"] == actual_tid]
-                    if fills_rep is not None and not fills_rep.empty and "trader_id" in fills_rep.columns:
-                        slot_fills = fills_rep[fills_rep["trader_id"] == actual_tid]
-                elif actual_sid:
-                    if pos_report is not None and not pos_report.empty and "strategy_id" in pos_report.columns:
-                        slot_pos = pos_report[pos_report["strategy_id"] == actual_sid]
-                    if fills_rep is not None and not fills_rep.empty and "strategy_id" in fills_rep.columns:
-                        slot_fills = fills_rep[fills_rep["strategy_id"] == actual_sid]
-                all_results_for_reports[strat_label] = {
-                    "positions_report": slot_pos, "fills_report": slot_fills,
-                    "starting_capital": results["starting_capital"],
-                    "final_balance": results["final_balance"],
-                    "total_pnl": sr["pnl"], "total_return_pct": results["total_return_pct"],
-                    "total_orders": 0, "total_trades": sr["trades"],
-                    "wins": sr["wins"], "losses": sr["losses"], "win_rate": sr["win_rate"],
-                }
-
-            ob_df = build_orderbook_dataframe(all_results_for_reports, user_id=user_id_for_run)
-            if not ob_df.empty:
-                ob_df.to_csv(user_dir / f"order_book_{prefix}.csv", index=False)
-                results["order_book"] = ob_df.fillna("").to_dict(orient="records")
-            else:
-                results["order_book"] = []
-
-            logs_df = build_logs_dataframe(all_results_for_reports)
-            if not logs_df.empty:
-                logs_df.to_csv(user_dir / f"backtest_{prefix}_logs.csv", index=False)
-
-            report_html = ""
-            try:
-                report_html = generate_report(all_results_for_reports,
-                                              backtest_name=f"Portfolio: {config.name}",
-                                              user_id=user_id_for_run)
-                report_path = user_dir / f"{prefix}_report.html"
-                report_path.write_text(report_html, encoding="utf-8")
-            except Exception as e:
-                print(f"[Portfolio] HTML report generation failed: {e}")
-
-            results["report_file"] = f"{prefix}_report.html"
-            results["report_name"] = prefix
-
-            # Clean up non-serializable / internal-only data
-            for key in ["fills_report", "positions_report", "account_report",
-                         "slot_to_strategy_id", "slot_to_trader_id", "errors",
-                         "daily_pnl"]:
-                results.pop(key, None)
-            # Also remove daily_pnl from per-strategy entries
-            for sr in results.get("per_strategy", {}).values():
-                sr.pop("daily_pnl", None)
-            results["equity_curve"] = [float(v) for v in results["equity_curve"]]
-            for pt in results.get("equity_curve_ts", []):
-                pt["balance"] = float(pt["balance"])
+            # Generate all CSV + HTML reports (position / order-fill / order-book /
+            # logs / account / tearsheet). Shared with the multi-portfolio session
+            # path so both emit identical, non-approximated reports.
+            results = _generate_portfolio_reports(results, config, user_id_for_run)
 
             # Send final complete event with full results
             yield json.dumps({"event": "complete", "completed": total_steps,
@@ -1530,11 +1934,433 @@ def api_portfolio_backtest():
     )
 
 
+def _generate_portfolio_reports(results, config, user_id_for_run):
+    """Write a portfolio's CSV + HTML reports (position report, order fill report,
+    order book, logs, account report, tearsheet HTML) under the user's reports dir,
+    and return the same ``results`` dict cleaned for JSON (order_book + account_report
+    as IST records, report_file/report_name set, raw DataFrames dropped).
+
+    SHARED by the single-portfolio run AND each portfolio of a multi-portfolio
+    SESSION run, so both paths emit IDENTICAL, non-approximated reports built from the
+    engine's own positions_report / fills_report / account_report (no re-derivation)."""
+    user_dir = _user_reports_dir(user_id_for_run)
+    timestamp = datetime.now().strftime("%d_%B_%Y").lower()
+    portfolio_label = sanitize_filename(config.name)
+    prefix = f"portfolio_{portfolio_label}_{timestamp}"
+
+    from core.report_generator import _format_timestamp_series as _fmt_ist_csv
+    _ts_cols_csv = {"ts_init", "ts_last", "ts_opened", "ts_closed"}
+    for report_key, report_name in [
+        ("positions_report", "position_report"),
+        ("fills_report", "order_fill_report"),
+    ]:
+        report = results.get(report_key)
+        if report is not None and not report.empty:
+            _df = report.copy()
+            for _c in _df.columns:
+                if _c in _ts_cols_csv or str(_df[_c].dtype).startswith("datetime"):
+                    try:
+                        _df[_c] = list(_fmt_ist_csv(_df[_c]))
+                    except Exception:
+                        pass
+            _df.to_csv(user_dir / f"{report_name}_{prefix}.csv", index=False)
+
+    # Per-strategy reports for order book + logs (filter the merged reports per leg).
+    per_strat = results.get("per_strategy", {})
+    pos_report = results.get("positions_report")
+    fills_rep = results.get("fills_report")
+    slot_to_tid = results.get("slot_to_trader_id", {})
+    slot_to_sid = results.get("slot_to_strategy_id", {})
+
+    all_results_for_reports = {}
+    for slot_id, sr in per_strat.items():
+        base_label = sanitize_filename(sr["display_name"])
+        token = hashlib.md5(str(slot_id).encode("utf-8")).hexdigest()[:8]
+        strat_label = f"{base_label}__{token}"
+        if strat_label in all_results_for_reports:
+            strat_label = f"{strat_label}_{len(all_results_for_reports)}"
+        actual_tid = slot_to_tid.get(slot_id, "")
+        actual_sid = slot_to_sid.get(slot_id, "")
+
+        def _filter_leg(df):
+            if df is None or df.empty:
+                return pd.DataFrame()
+            has_t = "trader_id" in df.columns
+            has_s = "strategy_id" in df.columns
+            if actual_tid and actual_sid and has_t and has_s:
+                return df[(df["trader_id"] == actual_tid) & (df["strategy_id"] == actual_sid)]
+            if actual_tid and has_t:
+                return df[df["trader_id"] == actual_tid]
+            if actual_sid and has_s:
+                return df[df["strategy_id"] == actual_sid]
+            return pd.DataFrame()
+
+        slot_pos = _filter_leg(pos_report)
+        slot_fills = _filter_leg(fills_rep)
+        all_results_for_reports[strat_label] = {
+            "slot_id": token,
+            "positions_report": slot_pos, "fills_report": slot_fills,
+            "starting_capital": results["starting_capital"],
+            "final_balance": results["final_balance"],
+            "total_pnl": sr["pnl"], "total_return_pct": results["total_return_pct"],
+            "total_orders": 0, "total_trades": sr["trades"],
+            "wins": sr["wins"], "losses": sr["losses"], "win_rate": sr["win_rate"],
+        }
+
+    ob_df = build_orderbook_dataframe(all_results_for_reports, user_id=user_id_for_run,
+                                      exit_sell_first=getattr(config, "exit_sell_first", True),
+                                      portfolio_name=config.name)
+    if not ob_df.empty:
+        ob_df.to_csv(user_dir / f"order_book_{prefix}.csv", index=False)
+        results["order_book"] = ob_df.fillna("").to_dict(orient="records")
+    else:
+        results["order_book"] = []
+
+    logs_df = build_logs_dataframe(all_results_for_reports)
+    if not logs_df.empty:
+        logs_df.to_csv(user_dir / f"backtest_{prefix}_logs.csv", index=False)
+
+    try:
+        report_html = generate_report(all_results_for_reports,
+                                      backtest_name=f"Portfolio: {config.name}",
+                                      user_id=user_id_for_run,
+                                      date_range={
+                                          "start": config.start_date or "",
+                                          "end": config.end_date or "",
+                                      },
+                                      exit_sell_first=getattr(config, "exit_sell_first", True),
+                                      portfolio_name=config.name)
+        report_path = user_dir / f"{prefix}_report.html"
+        report_path.write_text(report_html, encoding="utf-8")
+    except Exception as e:
+        print(f"[Portfolio] HTML report generation failed: {e}")
+
+    results["report_file"] = f"{prefix}_report.html"
+    results["report_name"] = prefix
+
+    # Account report → IST records + CSV.
+    from core.report_generator import _format_timestamp_series as _fmt_ist_ar
+    _ar = results.get("account_report")
+    _ar_records = []
+    if _ar is not None and not getattr(_ar, "empty", True):
+        _ardf = _ar.reset_index()
+        for _c in _ardf.columns:
+            if _c in {"ts_init", "ts_last", "ts_opened", "ts_closed"} or str(_ardf[_c].dtype).startswith("datetime"):
+                try:
+                    _ardf[_c] = list(_fmt_ist_ar(_ardf[_c]))
+                except Exception:
+                    pass
+        try:
+            _ardf.to_csv(user_dir / f"account_report_{prefix}.csv", index=False)
+        except Exception:
+            pass
+        _ar_records = _ardf.fillna("").to_dict(orient="records")
+
+    # Clean up non-serializable / internal-only data.
+    for key in ["fills_report", "positions_report", "account_report",
+                 "slot_to_strategy_id", "slot_to_trader_id", "errors",
+                 "daily_pnl"]:
+        results.pop(key, None)
+    results["account_report"] = _ar_records
+    for sr in results.get("per_strategy", {}).values():
+        sr.pop("daily_pnl", None)
+    if "equity_curve" in results:
+        results["equity_curve"] = [float(v) for v in results["equity_curve"]]
+    for pt in results.get("equity_curve_ts", []):
+        pt["balance"] = float(pt["balance"])
+    return results
+
+
+def _generate_session_reports(results, pfs, user_id, account_report=None):
+    """Generate ONE combined report set for a multi-portfolio session — a single
+    position report, order-fill report, order book, logs, account report and
+    tearsheet HTML covering ALL portfolios at once (each row tagged with its own
+    PORTFOLIO NAME). Returns ``(order_book_records, report_file_name)``.
+
+    Correct, not approximated: positions / fills / order-book / logs are built from
+    each portfolio's own engine output (concatenated), and the account report is the
+    shared engine's REAL account ledger (one engine → one account)."""
+    user_dir = _user_reports_dir(user_id)
+    timestamp = datetime.now().strftime("%d_%B_%Y").lower()
+    prefix = f"portfolio_SESSION_{timestamp}"
+    from core.report_generator import _format_timestamp_series as _fmt_ist
+    _ts_cols = {"ts_init", "ts_last", "ts_opened", "ts_closed"}
+
+    def _ist(df):
+        _d = df.copy()
+        for _c in _d.columns:
+            if _c in _ts_cols or str(_d[_c].dtype).startswith("datetime"):
+                try:
+                    _d[_c] = list(_fmt_ist(_d[_c]))
+                except Exception:
+                    pass
+        return _d
+
+    pos_frames, fills_frames = [], []
+    all_results_for_reports = {}
+    for pf in pfs:
+        r = results.get(pf.name) or {}
+        pos = r.get("positions_report")
+        fills = r.get("fills_report")
+        if pos is not None and not pos.empty:
+            pos_frames.append(pos)
+        if fills is not None and not fills.empty:
+            fills_frames.append(fills)
+        per_strat = r.get("per_strategy", {})
+        slot_to_tid = r.get("slot_to_trader_id", {})
+        slot_to_sid = r.get("slot_to_strategy_id", {})
+        for slot_id, sr in per_strat.items():
+            base_label = sanitize_filename(sr["display_name"])
+            token = hashlib.md5(str(slot_id).encode("utf-8")).hexdigest()[:8]
+            strat_label = f"{base_label}__{token}"
+            if strat_label in all_results_for_reports:
+                strat_label = f"{strat_label}_{len(all_results_for_reports)}"
+            actual_tid = slot_to_tid.get(slot_id, "")
+            actual_sid = slot_to_sid.get(slot_id, "")
+
+            def _filter_leg(df, _tid=actual_tid, _sid=actual_sid):
+                if df is None or df.empty:
+                    return pd.DataFrame()
+                has_t = "trader_id" in df.columns
+                has_s = "strategy_id" in df.columns
+                if _tid and _sid and has_t and has_s:
+                    return df[(df["trader_id"] == _tid) & (df["strategy_id"] == _sid)]
+                if _tid and has_t:
+                    return df[df["trader_id"] == _tid]
+                if _sid and has_s:
+                    return df[df["strategy_id"] == _sid]
+                return pd.DataFrame()
+
+            all_results_for_reports[strat_label] = {
+                "slot_id": token, "portfolio_name": pf.name,
+                "positions_report": _filter_leg(pos), "fills_report": _filter_leg(fills),
+                "starting_capital": r.get("starting_capital", 0.0),
+                "final_balance": r.get("final_balance", 0.0),
+                "total_pnl": sr["pnl"], "total_return_pct": r.get("total_return_pct", 0.0),
+                "total_orders": 0, "total_trades": sr["trades"],
+                "wins": sr["wins"], "losses": sr["losses"], "win_rate": sr["win_rate"],
+            }
+
+    if pos_frames:
+        _ist(pd.concat(pos_frames, ignore_index=True)).to_csv(
+            user_dir / f"position_report_{prefix}.csv", index=False)
+    if fills_frames:
+        _ist(pd.concat(fills_frames, ignore_index=True)).to_csv(
+            user_dir / f"order_fill_report_{prefix}.csv", index=False)
+
+    ob_df = build_orderbook_dataframe(all_results_for_reports, user_id=user_id, exit_sell_first=True)
+    ob_records = []
+    if not ob_df.empty:
+        ob_df.to_csv(user_dir / f"order_book_{prefix}.csv", index=False)
+        ob_records = ob_df.fillna("").to_dict(orient="records")
+
+    logs_df = build_logs_dataframe(all_results_for_reports)
+    if not logs_df.empty:
+        logs_df.to_csv(user_dir / f"backtest_{prefix}_logs.csv", index=False)
+
+    if account_report is not None and not getattr(account_report, "empty", True):
+        try:
+            _ar = account_report.reset_index()
+            for _c in _ar.columns:
+                if _c in _ts_cols or str(_ar[_c].dtype).startswith("datetime"):
+                    try:
+                        _ar[_c] = list(_fmt_ist(_ar[_c]))
+                    except Exception:
+                        pass
+            _ar.to_csv(user_dir / f"account_report_{prefix}.csv", index=False)
+        except Exception as _e:
+            print(f"[Session] account report write failed: {_e}")
+
+    _names = " · ".join(p.name for p in pfs)
+    try:
+        html = generate_report(all_results_for_reports, backtest_name=f"Session: {_names}",
+                               user_id=user_id, exit_sell_first=True)
+        (user_dir / f"{prefix}_report.html").write_text(html, encoding="utf-8")
+    except Exception as _e:
+        print(f"[Session] HTML report generation failed: {_e}")
+
+    return ob_records, f"{prefix}_report.html"
+
+
+def _session_result_json(r: dict) -> dict:
+    """JSON-safe per-portfolio session result: scalar metrics + scalar per-strategy
+    fields (drops DataFrames / non-serializable report objects)."""
+    keep = ("portfolio_name", "starting_capital", "final_balance", "total_pnl",
+            "total_trades", "wins", "losses", "flat_trades", "decisive_win_rate",
+            "win_rate", "max_loss_hit", "max_profit_hit", "pf_monitor_enforced",
+            "cross_portfolio_dispatch", "report_file", "report_name", "total_return_pct",
+            "max_drawdown", "order_book")
+    out = {k: r.get(k) for k in keep if k in r}
+    ps = r.get("per_strategy", {}) or {}
+    out["per_strategy"] = {
+        sid: {k: v for k, v in (s or {}).items()
+              if isinstance(v, (int, float, str, bool)) or v is None}
+        for sid, s in ps.items()
+    }
+    return out
+
+
+@app.route("/api/portfolios/session-backtest", methods=["POST"])
+def api_portfolio_session_backtest():
+    """Run SEVERAL of the user's portfolios together in ONE session engine, with
+    real-time day-wise progress streaming (newline-delimited JSON).
+
+    Body: either ``{"portfolios": [<config>, ...]}`` (full configs, e.g. from the
+    UI — reflects unsaved edits) OR ``{"portfolio_names": ["A","B",...]}`` (load the
+    user's saved files). Optional ``catalog_path``. The portfolios run in a single
+    unified engine so cross-portfolio actions (SqOff/Execute/Start Other Portfolio)
+    AND tag/user combined caps fire LIVE, same-bar, between them.
+
+    Streams NDJSON events: ``start`` (portfolio names + union date range), repeated
+    ``progress`` (``data_ts_day`` = latest day processed, against the union range),
+    then ``complete`` (``{"results": {portfolio_name: {metrics...}}}``) or ``error``.
+    Config/permission errors return a normal JSON status BEFORE the stream begins.
+    Names must be unique.
+    """
+    user_or_resp = _get_user_or_401()
+    if not isinstance(user_or_resp, dict):
+        return user_or_resp
+    uid = user_or_resp["user_id"]
+    data = request.json or {}
+    configs = data.get("portfolios")
+    names_in = data.get("portfolio_names") or []
+    if not (isinstance(configs, list) and configs) and not (isinstance(names_in, list) and names_in):
+        return jsonify({"error": "portfolios (configs) or portfolio_names (non-empty list) required"}), 400
+    catalog_path = data.get("catalog_path", CATALOG_PATH)
+
+    from core.backtest_runner.session import run_session_backtest
+    # Resolve to PortfolioConfig objects up front so config / permission errors
+    # return a clean JSON status (not mid-stream).
+    try:
+        pfs, seen = [], set()
+        _src = configs if (isinstance(configs, list) and configs) else names_in
+        for item in _src:
+            cfg = portfolio_from_dict(item) if isinstance(item, dict) else load_portfolio(item, _user_portfolios_dir(uid))
+            ok, err = _check_portfolio_allowlist(cfg, user_or_resp)
+            if not ok:
+                return jsonify({"error": f"{cfg.name}: {err}"}), 403
+            if cfg.name in seen:
+                return jsonify({"error": f"Duplicate portfolio name in session: {cfg.name}"}), 400
+            seen.add(cfg.name)
+            pfs.append(cfg)
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    if len(pfs) < 2:
+        return jsonify({"error": "Select at least 2 portfolios for a session run"}), 400
+    CUSTOM_STRATEGIES_DIR.mkdir(exist_ok=True)
+
+    names = [p.name for p in pfs]
+    # Union date range = [earliest start, latest end]; the session loads bars over
+    # this union (so every portfolio's legs get their data), while each leg still
+    # trades only within its OWN start/end. The progress bar is measured against it.
+    _starts = [p.start_date for p in pfs if getattr(p, "start_date", None)]
+    _ends = [p.end_date for p in pfs if getattr(p, "end_date", None)]
+    union_start = min(_starts) if _starts else None
+    union_end = max(_ends) if _ends else None
+
+    def _day_index(day: str) -> int:
+        try:
+            return max(0, (datetime.fromisoformat(day) - datetime.fromisoformat(union_start)).days)
+        except Exception:  # noqa: BLE001
+            return 0
+
+    total_days = _day_index(union_end) if (union_start and union_end) else 0
+
+    def generate():
+        from core.managed_strategy import get_pf_progress_bus
+        yield json.dumps({"event": "start", "portfolios": names,
+                          "union_start": union_start, "union_end": union_end,
+                          "total_days": total_days}) + "\n"
+        result_holder, error_holder = [None], [None]
+
+        def _run():
+            try:
+                result_holder[0] = run_session_backtest(
+                    catalog_path, pfs, str(CUSTOM_STRATEGIES_DIR), uid)
+            except Exception as e:  # noqa: BLE001
+                error_holder[0] = e
+
+        t0 = _time.time()
+        thread = threading.Thread(target=_run)
+        thread.start()
+        yield json.dumps({"event": "progress", "phase": "engine", "completed": 0,
+                          "total": total_days,
+                          "message": f"Running {len(pfs)} portfolios in one engine..."}) + "\n"
+
+        # DAY-WISE: emit EVERY completed day in order. All portfolios share ONE
+        # engine over the union timeline, so the union of their per-portfolio day
+        # streams IS the session's day sequence (ISO date strings sort chronologically).
+        # We DRAIN the buses each poll — so even if many days complete within one poll
+        # window, each one is reported "Processed up to {day}" in order, none skipped.
+        # The done-flag is captured BEFORE the drain so the final pass (after the run
+        # thread exits) flushes any trailing days. Re-fetch the bus each poll (the
+        # runner recreates it at run start).
+        last_day = None
+        done = False
+        while not done:
+            done = not thread.is_alive()
+            days = set()
+            for nm in names:
+                for e in get_pf_progress_bus(nm):
+                    d = e.get("day")
+                    if d:
+                        days.add(d)
+            for d in sorted(x for x in days if last_day is None or x > last_day):
+                last_day = d
+                yield json.dumps({"event": "progress", "phase": "engine",
+                                  "completed": _day_index(d), "total": total_days,
+                                  "data_ts_day": d,
+                                  "message": f"Processed up to {d}"}) + "\n"
+            if not done:
+                thread.join(timeout=0.25)
+        elapsed = _time.time() - t0
+
+        if error_holder[0] is not None:
+            import traceback as _tb
+            yield json.dumps({"event": "error", "error": str(error_holder[0]),
+                              "traceback": _tb.format_exc()}) + "\n"
+            return
+        results = result_holder[0] or {}
+        # ONE combined report set for the whole session (single position / order-fill /
+        # order-book / logs / account CSV + tearsheet HTML covering ALL portfolios; each
+        # row carries its own PORTFOLIO NAME). The account report is the shared engine's
+        # real account ledger.
+        yield json.dumps({"event": "progress", "phase": "reports", "completed": total_days,
+                          "total": total_days, "message": "Generating combined report…"}) + "\n"
+        from core.backtest_runner.unified import get_session_engine_reports
+        _eng = get_session_engine_reports("SESSION")
+        _ob_records, _report_file = [], ""
+        try:
+            _ob_records, _report_file = _generate_session_reports(
+                results, pfs, uid, account_report=_eng.get("account_report"))
+        except Exception as _e:  # noqa: BLE001 — report failure must not sink the run
+            print(f"[Session] combined report generation failed: {_e}")
+        out = {nm: _session_result_json(r) for nm, r in results.items()}
+        yield json.dumps({"event": "complete", "elapsed": elapsed, "results": out,
+                          "order_book": _ob_records, "report_file": _report_file}) + "\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="application/x-ndjson",
+        headers={"X-Content-Type-Options": "nosniff",
+                 "Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("  M_Cube Crypto Dashboard (HTML/CSS/JS)")
     print("  Open http://localhost:5000 in your browser")
     print("=" * 60)
+    # Sync venue session windows with whatever is currently in the catalog
+    # (covers parquet files dropped in out-of-band before this run).
+    try:
+        _sw = refresh_all_venue_session_windows(CATALOG_PATH)
+        if _sw:
+            print(f"  Session windows refreshed for {len(_sw)} venue(s): "
+                  + ", ".join(f"{v} {s}..{e}" for v, (s, e) in _sw.items()))
+    except Exception as _e:
+        print(f"  [warn] session window refresh failed: {_e}")
     # threaded=True so concurrent tab switches don't queue behind each other on
     # the dev server's single Werkzeug worker. The catalog read paths are
     # I/O-bound and safe to run from threads.

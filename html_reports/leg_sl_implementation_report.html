@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leg-Level Stop-Loss — Backend Implementation</title>
+<style>
+  :root {
+    --bg: #fafbfc; --panel: #fff; --border: #e1e4e8;
+    --text: #1f2328; --muted: #57606a;
+    --accent: #0969da;
+    --green: #1a7f37; --green-bg: #dafbe1;
+    --red: #cf222e; --red-bg: #ffebe9;
+    --amber: #9a6700; --amber-bg: #fff8c5;
+    --purple: #8250df; --purple-bg: #fbefff;
+    --blue-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; color: var(--text); background: var(--bg); margin: 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px 80px; }
+  header.cover { background: linear-gradient(135deg, #0969da 0%, #8250df 100%); color: white; padding: 40px; margin: -32px -40px 32px; border-radius: 0 0 12px 12px; }
+  header.cover h1 { margin: 0 0 8px; font-size: 28px; }
+  header.cover .subtitle { margin: 0; font-size: 15px; opacity: 0.9; }
+  header.cover .meta { margin-top: 12px; font-size: 12px; opacity: 0.8; }
+  header.cover .meta code { background: rgba(255,255,255,0.18); color: #fff; }
+  h2 { font-size: 22px; margin-top: 40px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 17px; margin-top: 24px; }
+  h4 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 16px; }
+  p { margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f6f8fa; }
+  td.center, th.center { text-align: center; }
+  td.mono, th.mono { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; white-space: nowrap; }
+  code { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; color: #d63384; }
+  pre { background: #f6f8fa; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; overflow-x: auto; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.5; margin: 10px 0; }
+  pre code { background: none; padding: 0; color: var(--text); font-size: 12.5px; }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 13px; font-weight: 600; border-radius: 4px; line-height: 1.4; }
+  .badge-wired { background: var(--green-bg); color: var(--green); }
+  .badge-once { background: var(--amber-bg); color: var(--amber); }
+  .badge-bar { background: var(--blue-bg); color: var(--accent); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 20px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .callout { background: var(--blue-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .callout strong { color: var(--accent); }
+  .callout.warn { background: var(--amber-bg); border-left-color: var(--amber); }
+  .callout.warn strong { color: var(--amber); }
+  .level-card { background: var(--panel); border: 2px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .level-card h3 { margin: 0 0 6px; color: var(--accent); font-size: 17px; }
+  .level-card .formula { background: var(--blue-bg); border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 13px; }
+  .level-card .formula b { color: var(--accent); }
+  .example { background: var(--green-bg); border-left: 4px solid var(--green); border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 14px 0 4px; font-size: 13.5px; }
+  .example h4 { margin: 0 0 8px; color: var(--green); font-size: 12px; }
+  .example .calc { font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.8; background: rgba(255,255,255,0.65); border-radius: 4px; padding: 8px 12px; margin: 8px 0; }
+  .example .given { font-size: 13px; margin: 4px 0 2px; }
+  .example table { font-size: 12px; margin: 8px 0; }
+  .example table th { background: rgba(255,255,255,0.6); }
+  .example table td, .example table th { padding: 6px 9px; }
+  .example .res { color: var(--green); font-weight: 600; }
+  .example ol, .example ul { margin: 8px 0; padding-left: 22px; }
+  .example li { margin: 7px 0; }
+  .example p { margin: 8px 0; }
+  .ref { font-size: 12px; color: var(--muted); font-family: "SF Mono", Monaco, Consolas, monospace; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin: 20px 0; }
+  nav.toc h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="cover">
+  <h1>Leg-Level Stop-Loss — Backend Implementation</h1>
+  <p class="subtitle">Where the four leg SL types (percentage · points · ATR · trailing) live, and how each level is computed and triggered</p>
+  <p class="meta">Source of truth: <code>core/models.py</code> (schema) &middot; <code>core/managed_strategy.py</code> (engine) &middot; <code>core/backtest_runner.py</code> (orchestrator). Line references verified against current source.</p>
+</header>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#files">1. File map — where it lives</a></li>
+    <li><a href="#schema">2. Configuration schema (ExitConfig)</a></li>
+    <li><a href="#lifecycle">3. Lifecycle &amp; data flow</a></li>
+    <li><a href="#percentage">4. Percentage SL</a></li>
+    <li><a href="#points">5. Points SL</a></li>
+    <li><a href="#atr">6. ATR SL</a></li>
+    <li><a href="#trailing">7. Trailing SL</a></li>
+    <li><a href="#mechanics">8. Common mechanics</a></li>
+    <li><a href="#summary">9. Summary table</a></li>
+  </ol>
+</nav>
+
+<div class="legend">
+  <span><span class="badge badge-wired">end-to-end wired</span> implemented in backtest</span>
+  <span><span class="badge badge-once">computed once</span> fixed at entry fill</span>
+  <span><span class="badge badge-bar">per-bar</span> re-evaluated every bar</span>
+</div>
+
+<h2 id="files">1. File map — where it lives</h2>
+<p>Leg-level stop-loss spans three backend layers. The schema declares the
+fields, the L2 engine computes and tests the level, and the L3 runner threads the
+per-leg <code>ExitConfig</code> into each portfolio slot.</p>
+<table>
+  <thead>
+    <tr><th>Layer</th><th>File</th><th>Role for stop-loss</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="center">Schema</td>
+      <td class="mono">core/models.py</td>
+      <td><code>ExitConfig</code> dataclass — declares <code>stop_loss_type</code>, <code>stop_loss_value</code>, the trailing knobs, and the ATR knobs.</td>
+    </tr>
+    <tr>
+      <td class="center">L2 engine</td>
+      <td class="mono">core/managed_strategy.py</td>
+      <td><code>ManagedExitStrategy</code> — computes <code>current_sl</code> at entry fill (<code>on_order_filled</code>), updates trailing and tests the trigger every bar (<code>_check_exits</code>).</td>
+    </tr>
+    <tr>
+      <td class="center">L3 runner</td>
+      <td class="mono">core/backtest_runner.py</td>
+      <td>Builds each slot's <code>ManagedExitStrategy</code> from the leg's <code>ExitConfig</code> and runs it inside the <code>BacktestEngine</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="schema">2. Configuration schema (ExitConfig)</h2>
+<p>All leg SL inputs are fields on the <code>ExitConfig</code> dataclass. The same
+<code>stop_loss_value</code> field is reused across types; its <em>meaning</em>
+depends on <code>stop_loss_type</code> (percent for <code>percentage</code>/<code>trailing</code>, absolute price distance for <code>points</code>).</p>
+<table>
+  <thead>
+    <tr><th>Field</th><th>Type / default</th><th>Used by</th><th class="mono">Ref</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">stop_loss_type</td><td>str = "none"</td><td>selector: none / percentage / points / trailing / atr</td><td class="mono">models.py:34</td></tr>
+    <tr><td class="mono">stop_loss_value</td><td>float = 0.0</td><td>percentage (%), points (price distance), trailing (initial %)</td><td class="mono">models.py:35</td></tr>
+    <tr><td class="mono">trailing_sl_step</td><td>float = 0.0</td><td>trailing — profit-% threshold per ratchet step</td><td class="mono">models.py:36</td></tr>
+    <tr><td class="mono">trailing_sl_offset</td><td>float = 0.0</td><td>trailing — % the SL tightens per step</td><td class="mono">models.py:37</td></tr>
+    <tr><td class="mono">sl_atr_period</td><td>int = 0</td><td>atr — ATR lookback in bars (0 → off)</td><td class="mono">models.py:45</td></tr>
+    <tr><td class="mono">sl_atr_multiplier</td><td>float = 0.0</td><td>atr — distance = multiplier &times; ATR</td><td class="mono">models.py:46</td></tr>
+  </tbody>
+</table>
+
+<h2 id="lifecycle">3. Lifecycle &amp; data flow</h2>
+<div class="callout">
+  <strong>Two moments matter.</strong> (1) <b>At entry fill</b> &mdash;
+  <code>on_order_filled</code> computes the initial <code>current_sl</code> price once
+  from the entry price (<span class="ref">managed_strategy.py:1592-1613</span>).
+  (2) <b>Every bar</b> &mdash; <code>_check_exits</code> first updates the trailing
+  SL (if any), then tests whether the bar pierced <code>current_sl</code>
+  (<span class="ref">managed_strategy.py:1208-1248</span>).
+</div>
+<p>So percentage, points and ATR fix the level at entry and never move it; only
+<b>trailing</b> (and target-lock / move-to-cost, out of scope here) mutate
+<code>current_sl</code> on later bars. The trigger test itself is identical for all
+four types.</p>
+
+<h2 id="percentage">4. Percentage SL <span class="badge badge-wired">wired</span> <span class="badge badge-once">computed once</span></h2>
+<div class="level-card">
+  <h3>Percentage</h3>
+  <p>The SL is placed a fixed percentage away from entry. Computed via the shared
+  helper <code>_compute_sl_price</code>.</p>
+  <div class="formula">
+    BUY&nbsp;&nbsp;: SL = entry_price &times; (1 &minus; <b>value</b>/100)<br>
+    SELL : SL = entry_price &times; (1 + <b>value</b>/100)
+  </div>
+  <p class="ref">Set at managed_strategy.py:1593-1594 &middot; helper at managed_strategy.py:1641-1645</p>
+<pre><code>if self.config.stop_loss_type in ("percentage", "trailing"):
+    self.current_sl = self._compute_sl_price(is_buy, self.config.stop_loss_value)
+
+def _compute_sl_price(self, is_long: bool, pct: float) -> float:
+    if is_long:
+        return self._snap_to_tick(self.entry_price * (1 - pct / 100))
+    else:
+        return self._snap_to_tick(self.entry_price * (1 + pct / 100))</code></pre>
+  <div class="example">
+    <h4>Worked example — step by step</h4>
+    <p class="given"><b>The trade.</b> You enter a <b>LONG</b> position at <code>entry_price = 100.00</code>
+    and configure <code>stop_loss_type = "percentage"</code> with <code>stop_loss_value = 2</code>
+    (you want to risk 2%). The instrument's tick size is <code>0.01</code>.</p>
+    <ol>
+      <li><b>Pick the branch.</b> <code>stop_loss_type</code> is <code>"percentage"</code>, so on the
+      entry-fill bar the engine calls <code>_compute_sl_price(is_long=True, pct=2)</code>.</li>
+      <li><b>Apply the long formula</b> <code>entry &times; (1 &minus; pct/100)</code> — substitute the numbers:
+        <div class="calc">SL = 100.00 &times; (1 &minus; 2/100)<br>
+        &nbsp;&nbsp;&nbsp;= 100.00 &times; (1 &minus; 0.02)<br>
+        &nbsp;&nbsp;&nbsp;= 100.00 &times; 0.98<br>
+        &nbsp;&nbsp;&nbsp;= 98.00</div></li>
+      <li><b>Snap to the tick grid.</b> 98.00 is already a multiple of 0.01, so it is unchanged:
+      <code>current_sl = <span class="res">98.00</span></code>. The stop sits 2.00 below entry — exactly the 2% of 100.00 you chose to risk.</li>
+      <li><b>Arm the trigger.</b> From now on, every bar tests one condition for a long:
+      <code>bar_low &le; 98.00</code> (see <a href="#mechanics">§8</a> — the trigger looks at the bar <em>low</em>, not the close).</li>
+      <li><b>A bar fires it.</b> Three bars later a candle prints <code>low = 97.96</code>. Because
+      <code>97.96 &le; 98.00</code>, <code>sl_hit = True</code> and <code>_handle_exit("sl")</code> closes the leg at the stop.
+        <div class="calc">Realised move &asymp; 98.00 &minus; 100.00 = <span class="res">&minus;2.00</span> per unit  (the 2% loss you sized for)</div></li>
+    </ol>
+    <p><b>Same trade as a SHORT (SELL at 100.00).</b> The formula flips to <code>entry &times; (1 + pct/100)</code>:
+    <code>SL = 100.00 &times; 1.02 = <span class="res">102.00</span></code>, armed as <code>bar_high &ge; 102.00</code>. A later
+    bar with <code>high = 102.05</code> would trigger it for the same 2.00 (2%) loss.</p>
+  </div>
+</div>
+
+<h2 id="points">5. Points SL <span class="badge badge-wired">wired</span> <span class="badge badge-once">computed once</span></h2>
+<div class="level-card">
+  <h3>Points</h3>
+  <p>The SL is placed a fixed absolute price distance from entry (<code>stop_loss_value</code> is the distance in price units, not percent).</p>
+  <div class="formula">
+    BUY&nbsp;&nbsp;: SL = entry_price &minus; <b>value</b><br>
+    SELL : SL = entry_price + <b>value</b>
+  </div>
+  <p class="ref">managed_strategy.py:1595-1599</p>
+<pre><code>elif self.config.stop_loss_type == "points":
+    if is_buy:
+        self.current_sl = self._snap_to_tick(self.entry_price - self.config.stop_loss_value)
+    else:
+        self.current_sl = self._snap_to_tick(self.entry_price + self.config.stop_loss_value)</code></pre>
+  <div class="example">
+    <h4>Worked example — step by step</h4>
+    <p class="given"><b>The trade.</b> You go <b>LONG</b> EURUSD at <code>entry_price = 1.10000</code> with
+    <code>stop_loss_type = "points"</code> and <code>stop_loss_value = 0.00500</code>. For EURUSD one pip
+    is 0.00010, so 0.00500 is a fixed <b>50-pip</b> stop distance. Tick = 0.00001.</p>
+    <ol>
+      <li><b>Pick the branch.</b> <code>stop_loss_type == "points"</code>, so the engine does <em>no</em>
+      percentage maths — it subtracts the raw distance straight off the entry price.</li>
+      <li><b>Apply the long formula</b> <code>entry &minus; value</code>:
+        <div class="calc">SL = 1.10000 &minus; 0.00500 = 1.09500</div></li>
+      <li><b>Snap to tick.</b> 1.09500 already lands on the 0.00001 grid →
+      <code>current_sl = <span class="res">1.09500</span></code>.</li>
+      <li><b>Arm the trigger.</b> Each bar tests <code>bar_low &le; 1.09500</code>.</li>
+      <li><b>A bar fires it.</b> A later candle dips to <code>low = 1.09480</code>. Since
+      <code>1.09480 &le; 1.09500</code> the stop fires.
+        <div class="calc">Realised move = 1.09500 &minus; 1.10000 = <span class="res">&minus;0.00500</span> = 50 pips — exactly the configured distance</div></li>
+    </ol>
+    <p><b>Points vs. percentage — why it matters.</b> Because the distance is absolute, the same
+    <code>0.00500</code> stop is always 50 pips, whether price is at 1.10000 or 1.50000. A 2%
+    <em>percentage</em> stop, by contrast, would be 0.02200 (220 pips) at 1.10 but 0.03000 (300 pips)
+    at 1.50 — it scales with price. Use points when you think in pips/ticks rather than % of price.</p>
+    <p><b>Same trade as a SHORT (SELL at 1.10000).</b> The sign flips:
+    <code>SL = 1.10000 + 0.00500 = <span class="res">1.10500</span></code>, armed as <code>bar_high &ge; 1.10500</code>.</p>
+  </div>
+</div>
+
+<h2 id="atr">6. ATR SL <span class="badge badge-wired">wired</span> <span class="badge badge-once">computed once</span></h2>
+<div class="level-card">
+  <h3>ATR (volatility-adaptive)</h3>
+  <p>The SL distance scales with market volatility: <code>distance = multiplier &times; ATR</code>.
+  ATR comes from Nautilus's built-in <code>AverageTrueRange(period)</code> indicator,
+  registered in <code>on_start</code> so it warms up alongside the signal indicators
+  &mdash; the leg won't enter until ATR has a valid value.</p>
+  <div class="formula">
+    dist = ATR &times; <b>sl_atr_multiplier</b><br>
+    BUY&nbsp;&nbsp;: SL = entry_price &minus; dist<br>
+    SELL : SL = entry_price + dist
+  </div>
+  <p class="ref">Indicator registered at on_start (managed_strategy.py ~634-640) &middot; level computed at managed_strategy.py:1600-1611</p>
+<pre><code># on_start — register the ATR indicator so it warms up
+if self.config.stop_loss_type == "atr" and self.config.sl_atr_period > 0:
+    self._atr = AverageTrueRange(int(self.config.sl_atr_period))
+    if not self._aggregating:
+        self.register_indicator_for_bars(self.config.bar_type, self._atr)
+
+# on_order_filled — size the SL from ATR at entry
+elif self.config.stop_loss_type == "atr":
+    atr_val = float(self._atr.value) if self._atr is not None and self._atr.initialized else 0.0
+    dist = atr_val * float(self.config.sl_atr_multiplier)
+    if dist > 0:
+        if is_buy:
+            self.current_sl = self._snap_to_tick(self.entry_price - dist)
+        else:
+            self.current_sl = self._snap_to_tick(self.entry_price + dist)
+    else:
+        self.current_sl = 0.0</code></pre>
+  <div class="example">
+    <h4>Worked example — step by step</h4>
+    <p class="given"><b>The trade.</b> You go <b>LONG</b> at <code>entry_price = 100.00</code> with
+    <code>stop_loss_type = "atr"</code>, <code>sl_atr_period = 14</code>, and
+    <code>sl_atr_multiplier = 1.5</code>. Tick = 0.01.</p>
+    <ol>
+      <li><b>Warm-up (before any entry).</b> At <code>on_start</code> the engine creates an
+      <code>AverageTrueRange(14)</code> indicator and feeds every bar into it. ATR is a measure of how
+      far price typically travels in one bar (the average "true range"). The leg is <em>blocked from
+      entering</em> until this indicator is initialized, so a valid ATR reading always exists by the time
+      a fill happens.</li>
+      <li><b>Read ATR at the entry bar.</b> Say the 14-bar ATR at the fill is <code>atr_val = 0.80</code>
+      — the instrument has been swinging about 0.80 per bar.</li>
+      <li><b>Size the stop distance</b> <code>dist = atr_val &times; multiplier</code>:
+        <div class="calc">dist = 0.80 &times; 1.5 = 1.20&nbsp;&nbsp;(&gt; 0, so a stop is armed)</div></li>
+      <li><b>Place the stop</b> one <code>dist</code> below entry (long), then snap to tick:
+        <div class="calc">SL = 100.00 &minus; 1.20 = <span class="res">98.80</span></div></li>
+      <li><b>Arm &amp; trigger.</b> Each bar tests <code>bar_low &le; 98.80</code>. A later bar with
+      <code>low = 98.75</code> fires it, for a 1.20 loss per unit.</li>
+    </ol>
+    <p><b>Why ATR-size at all? Compare three volatility regimes.</b> The multiplier stays fixed at 1.5, but
+    the stop width automatically follows how choppy the market is at entry — wider in volatile conditions
+    (so normal noise doesn't stop you out), tighter when calm:</p>
+    <table>
+      <thead><tr><th>Regime</th><th class="center">ATR(14) at entry</th><th class="center">dist = ATR &times; 1.5</th><th class="center">LONG SL = 100 &minus; dist</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Calm</td><td class="center">0.40</td><td class="center">0.60</td><td class="center"><span class="res">99.40</span></td><td>tight stop — small expected swings, so risk little</td></tr>
+        <tr><td>Normal</td><td class="center">0.80</td><td class="center">1.20</td><td class="center"><span class="res">98.80</span></td><td>the baseline case above</td></tr>
+        <tr><td>Volatile</td><td class="center">1.60</td><td class="center">2.40</td><td class="center"><span class="res">97.60</span></td><td>wide stop — avoids being shaken out by noise</td></tr>
+      </tbody>
+    </table>
+    <p><b>Two things to remember.</b> (1) ATR is read <em>once</em>, at the entry bar — if ATR later doubles
+    the stop does <em>not</em> re-widen. (2) <b>Edge case:</b> if ATR somehow hasn't warmed up so
+    <code>dist</code> works out to 0, the code sets <code>current_sl = 0.0</code> and <em>no</em> stop is armed
+    for that leg.</p>
+    <p><b>Same trade as a SHORT (SELL at 100.00, ATR 0.80).</b>
+    <code>SL = 100.00 + 1.20 = <span class="res">101.20</span></code>, armed as <code>bar_high &ge; 101.20</code>.</p>
+  </div>
+  <div class="callout warn"><strong>Note:</strong> ATR is read <em>once</em> at the
+  entry-fill bar to size the SL distance; the resulting level is then fixed for the
+  life of the position (it does not re-size as ATR evolves).</div>
+</div>
+
+<h2 id="trailing">7. Trailing SL <span class="badge badge-wired">wired</span> <span class="badge badge-bar">per-bar</span></h2>
+<div class="level-card">
+  <h3>Trailing (ratcheting)</h3>
+  <p>Starts as a percentage SL (initial level from <code>stop_loss_value</code> via
+  <code>_compute_sl_price</code>). Every bar, the engine counts how many
+  <code>trailing_sl_step</code> profit increments <code>highest_profit</code> has cleared,
+  then builds a candidate stop a distance of <code>steps &times; trailing_sl_offset</code>
+  percent <em>below entry</em>. A guard adopts the candidate only when it is tighter than
+  the current stop (<code>trail_sl &gt; current_sl</code> for a long), so the SL is only
+  ever moved in the tightening direction, never loosened.</p>
+  <div class="formula">
+    steps = int(highest_profit / <b>trailing_sl_step</b>)<br>
+    trail_offset = steps &times; <b>trailing_sl_offset</b><br>
+    trail_sl = _compute_sl_price(is_long, trail_offset)<br>
+    LONG&nbsp;: adopt trail_sl only if trail_sl &gt; current_sl<br>
+    SHORT : adopt trail_sl only if trail_sl &lt; current_sl (or current_sl == 0)
+  </div>
+  <p class="ref">Initial level at managed_strategy.py:1593-1594 &middot; ratchet at managed_strategy.py:1208-1218</p>
+<pre><code>elif self.config.stop_loss_type == "trailing" and self.config.trailing_sl_step > 0:
+    steps = int(self.highest_profit / self.config.trailing_sl_step)
+    if steps > 0:
+        trail_offset = steps * self.config.trailing_sl_offset
+        trail_sl = self._compute_sl_price(is_long, trail_offset)
+        if is_long and trail_sl > self.current_sl:
+            self.current_sl = trail_sl
+            self._was_trailed = True
+        elif is_short and (self.current_sl == 0 or trail_sl < self.current_sl):
+            self.current_sl = trail_sl
+            self._was_trailed = True</code></pre>
+  <p class="footnote"><code>highest_profit</code> is the running max profit-% (the
+  anchor for the ratchet); <code>_was_trailed</code> flags that trailing fired, which
+  the exit-action filter later consults.</p>
+  <div class="example">
+    <h4>Worked example — LONG, walked bar by bar</h4>
+    <p class="given"><b>The trade.</b> LONG at <code>entry_price = 100.00</code> with
+    <code>stop_loss_type = "trailing"</code>. The three knobs mean:</p>
+    <ul>
+      <li><code>stop_loss_value = 1.0</code> (%) — the <b>initial</b> stop, placed exactly like a percentage SL.</li>
+      <li><code>trailing_sl_step = 0.5</code> (%) — how much <b>profit</b> must build up to earn one "step".</li>
+      <li><code>trailing_sl_offset = 0.2</code> (%) — the distance-below-entry used to build each step's candidate stop.</li>
+      <li>tick = 0.01.</li>
+    </ul>
+    <p><b>Step 0 — the initial stop at fill</b> (identical maths to the percentage type):</p>
+    <div class="calc">current_sl = 100.00 &times; (1 &minus; 1.0/100) = <b>99.00</b></div>
+    <p>After that, <b>every bar</b> runs three little steps before the trigger check:</p>
+    <ol>
+      <li>update <code>highest_profit</code> (the best profit-% seen so far — it never goes down);</li>
+      <li>count steps earned: <code>steps = int(highest_profit / 0.5)</code>;</li>
+      <li>build a candidate stop <code>trail_sl = 100 &times; (1 &minus; (steps &times; 0.2)/100)</code> and
+      adopt it <em>only if it is higher</em> than the current stop.</li>
+    </ol>
+    <p>Here is how that plays out over four bars:</p>
+    <table>
+      <thead>
+        <tr><th>Bar</th><th class="center">close</th><th class="center">profit&nbsp;%</th><th class="center">highest_profit</th><th class="center">steps</th><th class="center">trail_offset</th><th>trail_sl = 100&times;(1&minus;off/100)</th><th>guard: trail_sl &gt; current_sl?</th><th class="center">current_sl</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A</td><td class="center">100.30</td><td class="center">0.30</td><td class="center">0.30</td><td class="center">int(0.30/0.5)=0</td><td class="center">&mdash;</td><td>&mdash; (steps not &gt; 0)</td><td>no change</td><td class="center">99.00</td></tr>
+        <tr><td>B</td><td class="center">100.60</td><td class="center">0.60</td><td class="center">0.60</td><td class="center">int(0.60/0.5)=1</td><td class="center">1&times;0.2=0.2</td><td>100&times;0.998 = 99.80</td><td>99.80 &gt; 99.00 &rarr; <b>yes</b></td><td class="center"><span class="res">99.80</span></td></tr>
+        <tr><td>C</td><td class="center">101.20</td><td class="center">1.20</td><td class="center">1.20</td><td class="center">int(1.20/0.5)=2</td><td class="center">2&times;0.2=0.4</td><td>100&times;0.996 = 99.60</td><td>99.60 &gt; 99.80 &rarr; <b>no</b></td><td class="center">99.80 (held)</td></tr>
+        <tr><td>D</td><td class="center">99.78</td><td class="center">&minus;0.22</td><td class="center">1.20</td><td class="center">&mdash;</td><td class="center">&mdash;</td><td colspan="2">bar_low 99.78 &le; current_sl 99.80 &rarr; <b>SL hit, leg exits</b></td><td class="center">&mdash;</td></tr>
+      </tbody>
+    </table>
+    <p><b>The same four bars, in plain words:</b></p>
+    <ol>
+      <li><b>Bar A — close 100.30 (+0.30%).</b> Only 0.30% profit so far. <code>int(0.30/0.5) = 0</code>
+      steps, so the trailing block does nothing this bar. The stop stays at its initial 99.00.</li>
+      <li><b>Bar B — close 100.60 (+0.60%).</b> Profit now clears one step: <code>int(0.60/0.5) = 1</code>.
+      Candidate = <code>100 &times; (1 &minus; 0.2/100) = 99.80</code>. Since <code>99.80 &gt; 99.00</code>, the guard
+      adopts it and the stop <b>jumps up to 99.80</b> — your risk has shrunk from 1.00 to just 0.20 below entry.</li>
+      <li><b>Bar C — close 101.20 (+1.20%).</b> Profit is now worth two steps. Candidate =
+      <code>100 &times; (1 &minus; 0.4/100) = 99.60</code>. But <code>99.60 &gt; 99.80</code> is <b>false</b>, so the guard
+      <b>rejects</b> it and the stop holds at 99.80. (This is the key quirk — more profit produces a
+      <em>lower</em> candidate here; see the note below.)</li>
+      <li><b>Bar D — low 99.78.</b> The bar's low pierces the stop: <code>99.78 &le; 99.80</code> → SL hit.
+      The leg exits right around 99.80 — a near-scratch — instead of giving back the full 1.00 it had risked
+      at entry. That is the protection the trailing stop bought you.</li>
+    </ol>
+    <p class="footnote">SELL legs mirror this: the candidate is <code>100&times;(1+off/100)</code> (above
+    entry) and the guard adopts it only when <code>trail_sl &lt; current_sl</code>, with the
+    trigger on <code>bar_high &ge; current_sl</code>.</p>
+  </div>
+  <div class="callout warn"><strong>Read the guard carefully.</strong> The candidate stop is a
+  fixed distance <em>below entry</em> of <code>steps &times; offset</code> %. The first profit
+  step that clears the threshold yields the highest (tightest) candidate and is adopted; as
+  <code>highest_profit</code> climbs and <code>steps</code> grows, later candidates sit
+  <em>lower</em> and are rejected by <code>trail_sl &gt; current_sl</code>. So this leg-trailing
+  branch tightens to its first-qualifying-step level and then holds &mdash; it does not keep
+  tracking price upward. (The separate "Trail After Move SL" branch at
+  <span class="ref">managed_strategy.py:1192-1206</span> uses <code>&minus;steps&times;offset</code>,
+  placing the stop on the profit side of entry, and <em>does</em> ratchet up with profit.)</div>
+</div>
+
+<h2 id="mechanics">8. Common mechanics</h2>
+<p>These apply to every SL type regardless of how the level was computed.</p>
+
+<h4>Tick snapping</h4>
+<p>All computed SL prices are rounded to the instrument's tick grid via
+<code>_snap_to_tick</code> so triggers match cleanly at fill time
+(<span class="ref">managed_strategy.py:1647-1663</span>).</p>
+<pre><code>tick = float(self.instrument.price_increment)
+return round(price / tick) * tick   # falls back to raw value if instrument unbound</code></pre>
+
+<h4>Intrabar trigger test</h4>
+<p>The SL fires when the bar <em>pierces</em> the level &mdash; a LONG leg on the bar
+<b>low</b>, a SHORT leg on the bar <b>high</b>
+(<span class="ref">managed_strategy.py:1220-1227</span>).</p>
+<pre><code>sl_hit = False
+if self.current_sl > 0:
+    if is_long and bar_low <= self.current_sl:
+        sl_hit = True
+    elif is_short and bar_high >= self.current_sl:
+        sl_hit = True</code></pre>
+
+<h4>SL-wait gate</h4>
+<p>An optional confirmation delay can suppress the exit until the level has held for
+<code>sl_wait_sec</code> wall-clock seconds (preferred) or <code>sl_wait_bars</code>
+bars; once confirmed, <code>_handle_exit("sl", ...)</code> closes the leg
+(<span class="ref">managed_strategy.py:1229-1248</span>).</p>
+
+<h4>Profit tracking</h4>
+<p>Each bar updates the current profit-% from entry and the running
+<code>highest_profit</code> &mdash; the latter is what the trailing ratchet reads.</p>
+
+<h2 id="summary">9. Summary table</h2>
+<table>
+  <thead>
+    <tr><th>Type</th><th>Config fields</th><th>SL level formula</th><th>When set</th><th class="mono">Compute ref</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>percentage</b></td>
+      <td class="mono">stop_loss_value</td>
+      <td>entry &times; (1 &#8723; value/100)</td>
+      <td><span class="badge badge-once">at fill</span></td>
+      <td class="mono">managed_strategy.py:1593-1594, 1641-1645</td>
+    </tr>
+    <tr>
+      <td><b>points</b></td>
+      <td class="mono">stop_loss_value</td>
+      <td>entry &#8723; value</td>
+      <td><span class="badge badge-once">at fill</span></td>
+      <td class="mono">managed_strategy.py:1595-1599</td>
+    </tr>
+    <tr>
+      <td><b>atr</b></td>
+      <td class="mono">sl_atr_period, sl_atr_multiplier</td>
+      <td>entry &#8723; (multiplier &times; ATR)</td>
+      <td><span class="badge badge-once">at fill</span></td>
+      <td class="mono">managed_strategy.py:634-640, 1600-1611</td>
+    </tr>
+    <tr>
+      <td><b>trailing</b></td>
+      <td class="mono">stop_loss_value, trailing_sl_step, trailing_sl_offset</td>
+      <td>initial = % SL; ratchets by steps &times; offset</td>
+      <td><span class="badge badge-bar">every bar</span></td>
+      <td class="mono">managed_strategy.py:1593-1594, 1208-1218</td>
+    </tr>
+  </tbody>
+</table>
+<p class="footnote">"&#8723;" denotes &minus; for BUY / + for SELL (i.e. SL sits below a long entry and above a short entry). The trigger test for every type is at managed_strategy.py:1220-1227.</p>
+
+</div>
+</body>
+</html>

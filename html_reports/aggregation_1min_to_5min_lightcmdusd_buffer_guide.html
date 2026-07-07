@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1-MIN → 5-MIN Aggregation Guide (LIGHTCMDUSD, Buffer System) — m-cube_version1</title>
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --panel: #fff;
+      --border: #e1e4e8;
+      --text: #1f2328;
+      --muted: #57606a;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --green-bg: #dafbe1;
+      --red: #cf222e;
+      --red-bg: #ffebe9;
+      --amber: #9a6700;
+      --amber-bg: #fff8c5;
+      --purple: #8250df;
+      --purple-bg: #fbefff;
+      --blue-bg: #ddf4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 32px 40px 80px;
+    }
+
+    header.cover {
+      background: linear-gradient(135deg, #1a7f37 0%, #0969da 100%);
+      color: white;
+      padding: 36px;
+      margin: -32px -40px 28px;
+      border-radius: 0 0 12px 12px;
+    }
+
+    header.cover h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    header.cover .subtitle {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.92;
+    }
+
+    header.cover .meta {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    h2 {
+      font-size: 21px;
+      margin-top: 36px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-top: 22px;
+    }
+
+    h4 {
+      font-size: 14px;
+      margin-top: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f6f8fa;
+      font-weight: 600;
+      font-size: 11.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    td.center,
+    th.center {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    td.mono {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+    }
+
+    code {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      background: #f6f8fa;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #d63384;
+    }
+
+    pre {
+      background: #f6f8fa;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .badge-ok {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .badge-warn {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    .badge-info {
+      background: var(--blue-bg);
+      color: var(--accent);
+    }
+
+    .badge-purple {
+      background: var(--purple-bg);
+      color: var(--purple);
+    }
+
+    .callout {
+      background: var(--blue-bg);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-warn {
+      background: var(--amber-bg);
+      border-left: 4px solid var(--amber);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-ok {
+      background: var(--green-bg);
+      border-left: 4px solid var(--green);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech {
+      background: var(--purple-bg);
+      border-left: 4px solid var(--purple);
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .callout-tech strong {
+      color: var(--purple);
+    }
+
+    .simple {
+      background: #f6f8fa;
+      border-left: 4px solid #57606a;
+      padding: 12px 16px;
+      margin: 12px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 14.5px;
+    }
+
+    .simple::before {
+      content: "Plain English: ";
+      font-weight: 700;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 20px 0;
+    }
+
+    nav.toc h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    nav.toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    nav.toc ol li {
+      padding: 3px 0;
+      break-inside: avoid;
+    }
+
+    nav.toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    nav.toc a:hover {
+      text-decoration: underline;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .filebox {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 8px 14px;
+      border-radius: 6px 6px 0 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12px;
+      margin-top: 12px;
+      margin-bottom: 0;
+    }
+
+    .filebox+pre,
+    .filebox+table {
+      margin-top: 0;
+      border-radius: 0 0 6px 6px;
+      border-top: none;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bracket-diagram {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin: 14px 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .open-bracket {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .close-paren {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .ts {
+      color: var(--accent);
+    }
+
+    .agg-row td {
+      background: #fffbea;
+      font-weight: 600;
+    }
+
+    .kg {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin: 14px 0;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <header class="cover">
+      <h1>1-MIN → 5-MIN Aggregation Guide — LIGHTCMDUSD (Buffer System)</h1>
+      <p class="subtitle">How m-cube's in-process <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">BarAggregator</code> buffer turns <code
+          style="background:rgba(255,255,255,0.18); color:#fff;">1-MINUTE-{BID,ASK}-EXTERNAL</code> bars into
+        <code style="background:rgba(255,255,255,0.18); color:#fff;">5-MINUTE-{BID,ASK}-EXTERNAL</code> bars for
+        <code style="background:rgba(255,255,255,0.18); color:#fff;">LIGHTCMDUSD.COMMODITIES_MS</code> — replacing
+        Nautilus' built-in <code style="background:rgba(255,255,255,0.18); color:#fff;">TimeBarAggregator</code>.</p>
+      <p class="meta">Worked from April&nbsp;2020 LIGHTCMDUSD (WTI crude, ~$20/barrel) 1-minute bars — every OHLCV
+        number below is reproducible by hand.</p>
+    </header>
+
+    <div class="callout">
+      <strong>What this document shows.</strong> Five things, end-to-end:
+      <ol style="margin: 8px 0 0 18px;">
+        <li>A <em>plain-English</em> account of how a strategy subscribed to 5-MIN bars actually receives them when only
+          1-MIN bars exist in the engine.</li>
+        <li>The <em>internal nature of Nautilus aggregation</em> (the native <code>TimeBarAggregator</code> and its
+          <code>INTERNAL@</code> composite bar types) and <em>why we replaced it</em>.</li>
+        <li>What <em>we</em> do instead — the streaming <strong>buffer system</strong>
+          (<code>core/aggregator.py:BarAggregator</code>), including its floor-bucketing
+          <code>[T&minus;N, T)</code> bracket.</li>
+        <li>The <em>files involved</em> in the aggregation pipeline, drawn as a knowledge graph.</li>
+        <li>A worked <strong>LIGHTCMDUSD</strong> sample: five 1-min source bars aggregated into the single 5-min bar
+          they produce, with the arithmetic checked.</li>
+      </ol>
+    </div>
+
+    <nav class="toc">
+      <h3>Table of Contents</h3>
+      <ol>
+        <li><a href="#sec-1">Plain English: how aggregation happens</a></li>
+        <li><a href="#sec-2">Two ways: Nautilus native vs our buffer</a></li>
+        <li><a href="#sec-3">The bracket: <code>[T&minus;N, T)</code> floor-bucketing</a></li>
+        <li><a href="#sec-4">The buffer system internals</a></li>
+        <li><a href="#sec-5">Files involved &amp; knowledge graph</a></li>
+        <li><a href="#sec-6">LIGHTCMDUSD instrument &amp; bar types</a></li>
+        <li><a href="#sec-7">Sample CSV — 1-min source</a></li>
+        <li><a href="#sec-8">Worked window — first 5-min bar (T=00:05)</a></li>
+        <li><a href="#sec-9">Edge cases — partial window &amp; the aligned open</a></li>
+        <li><a href="#sec-10">How to verify</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-1">1. Plain English: how aggregation happens</h2>
+
+    <div class="simple">
+      A strategy says &ldquo;trade me on 5-minute LIGHTCMDUSD bars.&rdquo; But the engine was only fed 1-minute bars.
+      So something has to collect five 1-minute bars and hand the strategy a single 5-minute bar. That collector keeps a
+      small <strong>buffer</strong>: it drops each arriving 1-minute bar into the buffer, and the moment a bar arrives
+      that belongs to the <em>next</em> 5-minute window, it seals the buffer into one finished 5-minute bar — open of
+      the first bar, the highest high, the lowest low, the close of the last bar, and the volumes added up — then starts
+      a fresh buffer.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> each bar is a NautilusTrader <code>Bar</code> object carrying a <code>BarType</code>,
+      OHLCV <code>Price</code>/<code>Quantity</code> values, and nanosecond <code>ts_event</code>/<code>ts_init</code>
+      timestamps. The aggregated bar is built with the instrument's own factories
+      (<code>instrument.make_price(...)</code>, <code>instrument.make_qty(...)</code>) so its prices honour
+      LIGHTCMDUSD's 3-decimal precision and its volume is clipped to <code>QUANTITY_MAX</code>. The output carries the
+      target <code>BarType</code> (<code>…-5-MINUTE-BID-EXTERNAL</code>) and is stamped at the window
+      <em>close</em>.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-2">2. Two ways to aggregate: Nautilus native vs our buffer</h2>
+
+    <div class="simple">
+      NautilusTrader can build higher-timeframe bars for you with a built-in component called the
+      <code>TimeBarAggregator</code>. We used to rely on it, but it caused phantom bars whenever we filtered the input
+      stream, so we now do the aggregation ourselves inside the strategy with a tiny buffer. Both produce the same
+      OHLCV; they differ in <em>who</em> buffers the bars and <em>which</em> source bars land in each window.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically — the native path.</strong> Nautilus' <code>TimeBarAggregator</code> is wired by subscribing
+      to a <em>composite</em> bar type of the form
+      <code>LIGHTCMDUSD.COMMODITIES_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL</code>. The
+      <code>INTERNAL</code> half names the bar Nautilus assembles; the <code>@1-MINUTE-EXTERNAL</code> half names the
+      feed it listens to. It labels each emitted bar with its close timestamp using a <code>(left, right]</code>
+      bracket (the convention documented in the sibling
+      <code>aggregation_1min_to_15min_guide.html</code> for FX).
+    </div>
+
+    <div class="callout-warn">
+      <strong>Why we replaced it.</strong> The portfolio runner filters the 1-minute stream (e.g.
+      <code>run_on_days</code>, intraday <code>entry_start_time/end_time</code> windows). When bars are dropped from the
+      feed, Nautilus' internal aggregator sees gaps and can emit synthetic stale-close bars across them, which fire
+      phantom signals. The fix (see the docstring of <code>core/aggregating_strategy.py</code>) is to aggregate
+      <em>inside</em> the strategy, on exactly the stream the strategy sees — no gaps, no synthetic bars, and no
+      composite <code>INTERNAL@</code> bar types at runtime.
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Nautilus native <code>TimeBarAggregator</code> (old)</th>
+          <th>Custom <code>BarAggregator</code> buffer (current)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Where it runs</strong></td>
+          <td>Inside the engine's <code>DataEngine</code></td>
+          <td>Inside the strategy, via <code>AggregatingStrategyMixin</code></td>
+        </tr>
+        <tr>
+          <td><strong>Bar type seen</strong></td>
+          <td class="mono">…-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL</td>
+          <td class="mono">subscribe …-1-MINUTE-BID-EXTERNAL; emit …-5-MINUTE-BID-EXTERNAL</td>
+        </tr>
+        <tr>
+          <td><strong>Bracket</strong></td>
+          <td class="mono">(T&minus;5, T] &nbsp;left-open, right-closed</td>
+          <td class="mono">[T&minus;5, T) &nbsp;left-closed, right-open, labelled at T</td>
+        </tr>
+        <tr>
+          <td><strong>Window for label 00:05</strong></td>
+          <td class="mono">source 00:01 .. 00:05</td>
+          <td class="mono">source 00:00 .. 00:04</td>
+        </tr>
+        <tr>
+          <td><strong>Aligned opening bar</strong></td>
+          <td>first window is <em>partial</em> (a lone bar)</td>
+          <td>aligned open groups with the next four — <em>no</em> lone first bar</td>
+        </tr>
+        <tr>
+          <td><strong>Partial window</strong></td>
+          <td>at the start of the data</td>
+          <td>at the end — drained by <code>flush()</code> on stop</td>
+        </tr>
+        <tr>
+          <td><strong>Behaviour under stream filters</strong></td>
+          <td>can emit synthetic stale bars across gaps</td>
+          <td>aggregates the exact stream the strategy sees</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="small">The UI/models still serialise the composite <code>INTERNAL@</code> string as a convenient carrier
+      of the target timeframe. <code>external_from_composite()</code>
+      (<code>core/aggregator.py:333&ndash;352</code>) strips the <code>@…</code> tail and flips
+      <code>INTERNAL → EXTERNAL</code>, so <code>…-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL</code> becomes the plain
+      target <code>…-5-MINUTE-BID-EXTERNAL</code> our buffer emits — no UI change was needed.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-3">3. The bracket: <code>[T&minus;N, T)</code> floor-bucketing</h2>
+
+    <div class="simple">
+      Our buffer decides which window a 1-minute bar belongs to by <strong>flooring</strong> its timestamp down to the
+      nearest 5-minute mark. A bar at 00:00, 00:01, 00:02, 00:03 or 00:04 all floor to 00:00, so they share one window;
+      the bar at 00:05 floors to 00:05 and opens the next one. That window is then <em>labelled</em> with its close
+      time, 00:05. So the left edge is included and the right edge is excluded — the opposite end-points to the native
+      Nautilus aggregator, even though both stamp the result at the close.
+    </div>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> <code>_floor_to_interval(ts, interval)</code> computes
+      <code>n = (ts &minus; epoch) // interval</code> and returns <code>epoch + n&middot;interval</code> — an
+      epoch-aligned floor valid for any fixed-width interval (5-MIN, 1-HOUR, 1-DAY, 1-WEEK; <em>not</em> 1-MONTH, which
+      has no fixed width). A bar joins the window whose floor key it shares. When a bar with a <em>different</em> floor
+      key arrives, the previous window is sealed and stamped at <code>window_start + interval</code> (the close /
+      right-edge label). In set notation the window labelled <code>T</code> is
+      <span style="font-family:monospace;">{x : T&minus;5&nbsp;min &le; x &lt; T}</span>.
+    </div>
+
+    <h3>Visual</h3>
+
+    <div class="bracket-diagram"><span class="open-bracket">[</span>━━━━━━━━━━━━━━━━━━━ window for 5-min bar @ <span class="ts">T=00:05</span> ━━━━━━━━━━━━━━━━━━━<span class="close-paren">)</span>
+source ts: <span class="ts">00:00</span>  <span class="ts">00:01</span>  <span class="ts">00:02</span>  <span class="ts">00:03</span>  <span class="ts">00:04</span>  <span class="ts">00:05</span>  <span class="ts">00:06</span>
+in window? <span style="color:var(--green); font-weight:700;">YES</span>   <span style="color:var(--green); font-weight:700;">YES</span>   <span style="color:var(--green); font-weight:700;">YES</span>   <span style="color:var(--green); font-weight:700;">YES</span>   <span style="color:var(--green); font-weight:700;">YES</span>   <span style="color:var(--red); font-weight:700;">NO</span>    <span style="color:var(--red); font-weight:700;">NO</span>
+           <span style="color:var(--muted);">↑ left edge,</span>                  <span style="color:var(--muted);">↑ right edge,</span>
+           <span style="color:var(--muted);">  INCLUDED</span>                    <span style="color:var(--muted);">  EXCLUDED (opens next window),</span>
+                                              <span style="color:var(--muted);">  bar is LABELLED 00:05</span></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>5-min bar's ts_event (label = close)</th>
+          <th>Covers 1-min source ts_events…</th>
+          <th class="center">count</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:05</td>
+          <td class="mono">[00:00, 00:05) = {00:00, 00:01, 00:02, 00:03, 00:04}</td>
+          <td class="center num">5</td>
+        </tr>
+        <tr>
+          <td class="mono">00:10</td>
+          <td class="mono">[00:05, 00:10) = {00:05, 00:06, 00:07, 00:08, 00:09}</td>
+          <td class="center num">5</td>
+        </tr>
+        <tr>
+          <td class="mono">00:15</td>
+          <td class="mono">[00:10, 00:15) = {00:10, 00:11, 00:12, 00:13, 00:14}</td>
+          <td class="center num">5</td>
+        </tr>
+        <tr>
+          <td class="mono">00:20</td>
+          <td class="mono">[00:15, 00:20) = {00:15, 00:16, 00:17, 00:18, 00:19}</td>
+          <td class="center num">5</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>Contrast with the FX 15-min guide.</strong> That guide documents Nautilus' native
+      <code>(left, right]</code> bracket, where the bar labelled 00:15 covers <code>{00:01 … 00:15}</code> and the very
+      first window is a lone partial bar. Our buffer uses <code>[left, right)</code> floor-bucketing instead: the bar
+      labelled 00:05 covers <code>{00:00 … 00:04}</code>, the aligned 00:00 bar is <em>not</em> isolated, and the only
+      partial window is the trailing one. Same OHLCV reduction, opposite end-points.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-4">4. The buffer system internals</h2>
+
+    <p>The whole mechanism is one small class, <code>BarAggregator</code> (<code>core/aggregator.py:355&ndash;421</code>).
+      It holds two pieces of state: <code>_window_start</code> (the floor key of the window currently filling) and
+      <code>_buffer</code> (the 1-min bars collected so far).</p>
+
+    <div class="filebox">core/aggregator.py — BarAggregator.on_bar (the boundary check)</div>
+    <pre><code>def on_bar(self, base_bar: Bar) -> Bar | None:
+    ts  = pd.Timestamp(base_bar.ts_event, unit="ns", tz="UTC")
+    key = _floor_to_interval(ts, self._interval)   # which 5-min window?
+    emitted: Bar | None = None
+    if self._window_start is None:
+        self._window_start = key                   # first bar ever
+    elif key != self._window_start:
+        emitted = self._build_window()             # boundary crossed -> seal prior window
+        self._window_start = key
+    self._buffer.append(base_bar)                  # append AFTER emit:
+    return emitted                                 #   the boundary bar opens the next window</code></pre>
+
+    <div class="callout-tech">
+      <strong>Technically — the append-after-emit invariant.</strong> The arriving bar is appended to
+      <code>_buffer</code> <em>after</em> the boundary check. So when the 00:05 bar arrives, the 00:00 window is sealed
+      from the bars already buffered (00:00&ndash;00:04) and the 00:05 bar becomes the first member of the
+      <em>next</em> buffer. This is exactly why the right edge is exclusive.
+    </div>
+
+    <div class="filebox">core/aggregator.py — BarAggregator._build_window (the OHLCV reduction)</div>
+    <pre><code>def _build_window(self) -> Bar:
+    bars = self._buffer
+    o   = float(bars[0].open)                       # open  = FIRST bar's open
+    h   = max(float(b.high) for b in bars)          # high  = MAX high
+    l   = min(float(b.low)  for b in bars)          # low   = MIN low
+    c   = float(bars[-1].close)                     # close = LAST bar's close
+    vol = min(sum(float(b.volume) for b in bars), float(QUANTITY_MAX))   # volume = SUM (clipped)
+    # Stamp at the window CLOSE (right-edge label): 00:00..00:04 -> labelled & delivered at 00:05.
+    close_ts = int((self._window_start + self._interval).value)
+    agg = Bar(bar_type=self._target_bar_type,
+              open=self._instrument.make_price(o),  high=self._instrument.make_price(h),
+              low=self._instrument.make_price(l),   close=self._instrument.make_price(c),
+              volume=self._instrument.make_qty(vol),
+              ts_event=close_ts, ts_init=close_ts)
+    self._buffer = []                               # reset for the next window
+    return agg</code></pre>
+
+    <h3>Step-by-step trace</h3>
+    <table>
+      <thead>
+        <tr>
+          <th class="center">#</th>
+          <th>Event</th>
+          <th>What the buffer does</th>
+          <th>Returned to strategy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="center">1</td>
+          <td class="mono">on_bar(00:00)</td>
+          <td>floor=00:00; first bar ⇒ <code>_window_start=00:00</code>; buffer=[00:00]</td>
+          <td><code>None</code></td>
+        </tr>
+        <tr>
+          <td class="center">2&ndash;5</td>
+          <td class="mono">on_bar(00:01..00:04)</td>
+          <td>each floors to 00:00 ⇒ same window; buffer grows to 5 bars</td>
+          <td><code>None</code></td>
+        </tr>
+        <tr>
+          <td class="center">6</td>
+          <td class="mono">on_bar(00:05)</td>
+          <td>floor=00:05 ≠ 00:00 ⇒ seal [00:00..00:04] → 5-min bar @ 00:05; reset; buffer=[00:05]</td>
+          <td><span class="badge badge-purple">5-MIN bar @ 00:05</span></td>
+        </tr>
+        <tr>
+          <td class="center">…</td>
+          <td class="mono">on_stop()</td>
+          <td><code>_flush_aggregator()</code> → <code>flush()</code> seals whatever remains in the buffer</td>
+          <td>trailing partial bar (discarded by the mixin)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-tech">
+      <strong>Technically:</strong> the strategy never touches <code>BarAggregator</code> directly. The
+      <code>AggregatingStrategyMixin</code> wraps it: <code>_setup_aggregation(...)</code> builds the aggregator in
+      <code>on_start</code>; <code>_route_bar(bar)</code> in <code>on_bar</code> returns <code>None</code> while a
+      window is filling and the finished 5-min <code>Bar</code> when it closes (also feeding the strategy's indicators
+      via <code>ind.handle_bar(agg)</code>); <code>_flush_aggregator()</code> drains the tail in <code>on_stop</code>.
+      If no target is configured the mixin is a transparent pass-through and single-timeframe behaviour is byte-identical.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-5">5. Files involved &amp; knowledge graph</h2>
+
+    <p>Every file that participates in the aggregation pipeline, from the configured target timeframe down to the
+      emitted 5-minute bar:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Role in aggregation</th>
+          <th>Key symbols</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">core/aggregator.py</td>
+          <td>The buffer engine + offline batch aggregation</td>
+          <td class="mono">BarAggregator, external_from_composite, timeframe_of_bar_type, interval_for_timeframe,
+            _floor_to_interval, aggregate_ohlcv</td>
+        </tr>
+        <tr>
+          <td class="mono">core/aggregating_strategy.py</td>
+          <td>Mixin that wires the buffer into any strategy</td>
+          <td class="mono">AggregatingStrategyMixin: _setup_aggregation, _route_bar, _indicators_ready,
+            _flush_aggregator</td>
+        </tr>
+        <tr>
+          <td class="mono">core/backtest_runner.py</td>
+          <td>L3 — resolves the target &amp; injects it into the strategy config</td>
+          <td class="mono">_config_supports_aggregate_to, _aggregate_target_for_slot</td>
+        </tr>
+        <tr>
+          <td class="mono">core/managed_strategy.py</td>
+          <td>L2 — exit-managed strategy that also aggregates</td>
+          <td class="mono">ManagedExitConfig.aggregate_to_bar_type, config_from_exit</td>
+        </tr>
+        <tr>
+          <td class="mono">core/models.py</td>
+          <td>Schema — carries the composite target string</td>
+          <td class="mono">StrategySlotConfig.strategy_bar_types, build_composite_bar_type,
+            normalize_strategy_bar_types</td>
+        </tr>
+        <tr>
+          <td class="mono">strategies/*.py</td>
+          <td>L1 — consume aggregated bars (all inherit the mixin)</td>
+          <td class="mono">ema_cross, rsi_mean_reversion, bollinger_bands, four_ma, range_breakout</td>
+        </tr>
+        <tr>
+          <td class="mono">core/csv_loader.py</td>
+          <td>L0 — scans LIGHTCMDUSD daily CSVs (ASK/BID), synthesises MID</td>
+          <td class="mono">_scan_commodity_daily_layout, QUANTITY_MAX</td>
+        </tr>
+        <tr>
+          <td class="mono">core/nautilus_loader.py</td>
+          <td>L0 — DataFrame → Nautilus Bars → ParquetDataCatalog</td>
+          <td class="mono">wrangle_bars, save_to_catalog</td>
+        </tr>
+        <tr>
+          <td class="mono">core/instrument_factory.py</td>
+          <td>L0 — builds the LIGHTCMDUSD instrument (precision, lot size)</td>
+          <td class="mono">create_instrument</td>
+        </tr>
+        <tr>
+          <td class="mono">tests/test_bar_aggregator.py</td>
+          <td>Verifies the streaming buffer (floor bucketing, flush)</td>
+          <td class="mono">test_floor_window_emits_at_next_boundary, test_flush_drains_trailing_window</td>
+        </tr>
+        <tr>
+          <td class="mono">tests/test_aggregator.py</td>
+          <td>Verifies the offline/batch pandas path</td>
+          <td class="mono">test_resample_5min_ohlcv, test_bucketing_right_closed_at_boundary</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Knowledge graph</h3>
+
+    <div class="kg">  CONFIG (build time)                        RUNTIME (per 1-min bar)
+  ───────────────────                        ───────────────────────
+
+  StrategySlotConfig.strategy_bar_types
+   "…-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL"
+            │  core/models.py
+            ▼
+  backtest_runner._aggregate_target_for_slot
+            │  calls
+            ▼
+  aggregator.external_from_composite()
+   "…-5-MINUTE-BID-EXTERNAL"   (target)
+            │  injected as
+            ▼
+  config.aggregate_to_bar_type ──────────────► AggregatingStrategyMixin._setup_aggregation
+   (ManagedExitStrategy / ema_cross / …)            │  builds
+                                                    ▼
+                                            BarAggregator(instrument, target, "5-MINUTE")
+                                                    ▲
+  ParquetDataCatalog                                │  fed by
+   …-1-MINUTE-BID-EXTERNAL  ──► engine on_bar ──► mixin._route_bar(bar)
+   (csv_loader → nautilus_loader)                   │
+                                                    │  on window close
+                                                    ▼
+                                            5-MINUTE-BID-EXTERNAL Bar
+                                                    │
+                                                    ├─► indicators.handle_bar(agg)
+                                                    └─► strategy signal / SL-TP logic</div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-6">6. LIGHTCMDUSD instrument &amp; bar types</h2>
+
+    <p>LIGHTCMDUSD is WTI light crude oil, modelled as a USD-quoted instrument on the <code>COMMODITIES_MS</code> venue.
+      Commodities carry three price streams (BID, ASK, and a MID synthesised from both at CSV-load time), unlike most FX
+      slots that run on a single MID stream.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Value</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Symbol</td>
+          <td class="mono">LIGHTCMDUSD</td>
+          <td>base <code>LIGHTCMD</code> / quote <code>USD</code></td>
+        </tr>
+        <tr>
+          <td>Venue</td>
+          <td class="mono">COMMODITIES_MS</td>
+          <td>adapter_admin/adapters_config/commodities_ms.json</td>
+        </tr>
+        <tr>
+          <td>Price precision</td>
+          <td class="mono">3 &nbsp;(tick 0.001)</td>
+          <td>adapter_admin/data_formats/commodity.json</td>
+        </tr>
+        <tr>
+          <td>Size precision</td>
+          <td class="mono">0 &nbsp;(whole units)</td>
+          <td>commodity.json</td>
+        </tr>
+        <tr>
+          <td>Lot size</td>
+          <td class="mono">1000</td>
+          <td>commodities_ms.json</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>BarType string</th>
+          <th>Origin</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-info">Source</span></td>
+          <td class="mono">LIGHTCMDUSD.COMMODITIES_MS-1-MINUTE-BID-EXTERNAL</td>
+          <td>CSV → catalog → <code>engine.add_data(...)</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">UI carrier</span></td>
+          <td class="mono">LIGHTCMDUSD.COMMODITIES_MS-5-MINUTE-BID-INTERNAL@1-MINUTE-EXTERNAL</td>
+          <td>serialised in <code>strategy_bar_types</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">Target</span></td>
+          <td class="mono">LIGHTCMDUSD.COMMODITIES_MS-5-MINUTE-BID-EXTERNAL</td>
+          <td>Built by <code>BarAggregator</code> at runtime</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-7">7. Sample CSV — 1-min source</h2>
+
+    <p>The first six 1-minute BID bars for LIGHTCMDUSD on <strong>2020-04-01</strong> (April 2020, WTI ~$20/barrel).
+      The ASK and MID streams behave identically per side; only the BID side is shown here. These are the bars the
+      engine dispatches to <code>_route_bar</code>.</p>
+
+    <div class="filebox">D:\ForexDataValidator\…\LIGHTCMDUSD\2020\04\01.04.2020_BID_OHLCV.csv (1-MINUTE BID)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>ts_event (UTC)</th>
+          <th>side</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">2020-04-01 00:00:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.335</td>
+          <td class="num">20.355</td>
+          <td class="num">20.305</td>
+          <td class="num">20.325</td>
+          <td class="num">144</td>
+        </tr>
+        <tr>
+          <td class="mono">2020-04-01 00:01:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.335</td>
+          <td class="num">20.335</td>
+          <td class="num">20.305</td>
+          <td class="num">20.315</td>
+          <td class="num">88</td>
+        </tr>
+        <tr>
+          <td class="mono">2020-04-01 00:02:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.325</td>
+          <td class="num">20.435</td>
+          <td class="num">20.325</td>
+          <td class="num">20.425</td>
+          <td class="num">121</td>
+        </tr>
+        <tr>
+          <td class="mono">2020-04-01 00:03:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.430</td>
+          <td class="num">20.490</td>
+          <td class="num">20.405</td>
+          <td class="num">20.465</td>
+          <td class="num">97</td>
+        </tr>
+        <tr>
+          <td class="mono">2020-04-01 00:04:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.470</td>
+          <td class="num">20.516</td>
+          <td class="num">20.445</td>
+          <td class="num">20.515</td>
+          <td class="num">63</td>
+        </tr>
+        <tr>
+          <td class="mono">2020-04-01 00:05:00</td>
+          <td><span class="badge badge-info">BID</span></td>
+          <td class="num">20.515</td>
+          <td class="num">20.540</td>
+          <td class="num">20.500</td>
+          <td class="num">20.525</td>
+          <td class="num">110</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="small">OHLC values are the real April-2020 LIGHTCMDUSD figures (3-decimal, tick 0.001). Volumes are
+      <strong>illustrative</strong> small integers — the genuine overnight rows in this dataset record
+      <code>volume=0.0</code>, which would make the volume-sum demonstration in §8 trivial.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-8">8. Worked window — first 5-min bar (T = 00:05)</h2>
+
+    <div class="simple">
+      Take the 5-min bar labelled <code>T = 2020-04-01 00:05:00</code>. By the floor-bucket <code>[00:00, 00:05)</code>
+      rule it consumes exactly the five 1-min bars <code>{00:00, 00:01, 00:02, 00:03, 00:04}</code> — the 00:05 bar is
+      <em>excluded</em> because it opens the next window. The aggregate's OHLCV must equal: <em>first</em> open,
+      <em>max</em> high, <em>min</em> low, <em>last</em> close, <em>sum</em> volume.
+    </div>
+
+    <div class="filebox">5 source rows from 01.04.2020_BID_OHLCV.csv → 1 aggregated 5-MINUTE-BID-EXTERNAL bar</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="mono">ts_event</th>
+          <th class="num">open</th>
+          <th class="num">high</th>
+          <th class="num">low</th>
+          <th class="num">close</th>
+          <th class="num">volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">00:00:00</td>
+          <td class="num">20.335</td>
+          <td class="num">20.355</td>
+          <td class="num">20.305</td>
+          <td class="num">20.325</td>
+          <td class="num">144</td>
+        </tr>
+        <tr>
+          <td class="mono">00:01:00</td>
+          <td class="num">20.335</td>
+          <td class="num">20.335</td>
+          <td class="num">20.305</td>
+          <td class="num">20.315</td>
+          <td class="num">88</td>
+        </tr>
+        <tr>
+          <td class="mono">00:02:00</td>
+          <td class="num">20.325</td>
+          <td class="num">20.435</td>
+          <td class="num">20.325</td>
+          <td class="num">20.425</td>
+          <td class="num">121</td>
+        </tr>
+        <tr>
+          <td class="mono">00:03:00</td>
+          <td class="num">20.430</td>
+          <td class="num">20.490</td>
+          <td class="num">20.405</td>
+          <td class="num">20.465</td>
+          <td class="num">97</td>
+        </tr>
+        <tr>
+          <td class="mono">00:04:00</td>
+          <td class="num">20.470</td>
+          <td class="num"><strong>20.516</strong></td>
+          <td class="num">20.445</td>
+          <td class="num">20.515</td>
+          <td class="num">63</td>
+        </tr>
+        <tr class="agg-row">
+          <td class="mono">00:05:00 <span class="badge badge-purple">5-min BID</span></td>
+          <td class="num"><strong>20.335</strong></td>
+          <td class="num"><strong>20.516</strong></td>
+          <td class="num"><strong>20.305</strong></td>
+          <td class="num"><strong>20.515</strong></td>
+          <td class="num"><strong>513</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout-ok">
+      <strong>Check.</strong>
+      open = first row's open = <code>20.335</code> ✓ &nbsp;·&nbsp;
+      close = last row's close (00:04) = <code>20.515</code> ✓ &nbsp;·&nbsp;
+      high = max of column = <code>20.516</code> (at 00:04) ✓ &nbsp;·&nbsp;
+      low = min of column = <code>20.305</code> (at 00:00 &amp; 00:01) ✓ &nbsp;·&nbsp;
+      volume = 144+88+121+97+63 = <code>513</code> ✓ &nbsp;·&nbsp;
+      stamped at the close <code>00:05</code> ✓
+    </div>
+
+    <div class="callout-warn">
+      <strong>The 00:05 bar is not in this window.</strong> Under our floor-bucket rule the close of the window is
+      <em>exclusive</em>: the 00:05 source bar opens the next window (labelled 00:10) and becomes the first member of the
+      fresh buffer. This is the single behavioural difference from Nautilus' native <code>(left, right]</code>
+      aggregator, which would instead pull 00:05 in and drop 00:00.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-9">9. Edge cases — partial window &amp; the aligned open</h2>
+
+    <h3>9.1 No lone first bar</h3>
+    <div class="simple">
+      Because the aligned opening bar (00:00) floors to the same key as 00:01&ndash;00:04, it is grouped <em>with</em>
+      them into the first full window. There is no partial single-bar window at the start — the problem the FX 15-min
+      guide warns about does not arise here.
+    </div>
+    <p class="small">Verified by <code>tests/test_bar_aggregator.py::test_no_lone_first_bar_at_aligned_open</code>
+      (lines 102&ndash;109): five bars 00:00..00:04 emit nothing; the 00:05 bar triggers the first emission.</p>
+
+    <h3>9.2 The trailing partial window</h3>
+    <div class="callout-warn">
+      <strong>Where the partial window lands.</strong> If the data ends mid-window (say the last bars are 00:05..00:07),
+      no later bar ever arrives to seal it via <code>on_bar</code>. At strategy stop,
+      <code>AggregatingStrategyMixin._flush_aggregator()</code> calls <code>BarAggregator.flush()</code>, which builds the
+      aggregate from whatever remains in the buffer and clears it. The mixin discards this final bar (no order action) so
+      no spurious signal fires on a truncated window.
+    </div>
+    <p class="small">Verified by <code>tests/test_bar_aggregator.py::test_flush_drains_trailing_window</code>
+      (lines 120&ndash;128): three buffered bars emit nothing until <code>flush()</code> seals them; a second
+      <code>flush()</code> returns <code>None</code>.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="sec-10">10. How to verify</h2>
+
+    <p>Run the streaming-buffer unit tests (floor bucketing, window-close timing, volume sum, flush):</p>
+    <pre><code>venv\Scripts\python.exe -m pytest tests\test_bar_aggregator.py -v</code></pre>
+
+    <p>And the offline/batch pandas path used by <code>scripts\aggregate_catalog.py</code> to pre-aggregate the
+      catalog (same OHLCV math, <code>closed='right', label='right'</code> resample):</p>
+    <pre><code>venv\Scripts\python.exe -m pytest tests\test_aggregator.py -v</code></pre>
+
+    <div class="callout-ok">
+      <strong>Bottom line.</strong> m-cube aggregates LIGHTCMDUSD
+      <code>1-MINUTE-{BID,ASK}-EXTERNAL → 5-MINUTE-{BID,ASK}-EXTERNAL</code> with an in-strategy
+      <code>BarAggregator</code> buffer that <em>replaces</em> Nautilus' native <code>TimeBarAggregator</code>: five
+      source bars in, one aggregate out (open=first, high=max, low=min, close=last, volume=sum), under a floor-bucket
+      <code>[T&minus;5, T)</code> bracket labelled at the close. It sees the exact stream the strategy sees, so stream
+      filters never produce phantom synthetic bars.
+    </div>
+
+  </div>
+</body>
+
+</html>

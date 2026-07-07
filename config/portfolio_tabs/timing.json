@@ -46,6 +46,15 @@
           "backend_enabled": true,
           "html_id": "pf-m-sqofftz",
           "description": "Timezone for the squareoff time."
+        },
+        {
+          "key": "entry_window_overnight",
+          "label": "Window spans to next day (overnight)",
+          "type": "checkbox",
+          "default": false,
+          "backend_enabled": true,
+          "html_id": "pf-m-overnight",
+          "description": "Allow the entry window / square-off to cross midnight (NRML / 24h sessions). When off, a window whose End or SqOff decreases past midnight is rejected on save. Disabled for MIS."
         }
       ]
     }

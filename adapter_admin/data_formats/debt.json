@@ -13,8 +13,7 @@
     "quote_currency": null,
     "price_precision": null,
     "size_precision": null,
-    "currency_type": null,
-    "timeframe": null
+    "currency_type": null
   },
   "trading": {
     "maker_fee": null,

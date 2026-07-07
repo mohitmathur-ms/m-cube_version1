@@ -1,0 +1,133 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Why a Take-Profit Hit Can Show Negative PnL — Conservative VWAP Exit Fill</title>
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#0f1420;color:#dbe3ef;line-height:1.55}
+ .wrap{max-width:1080px;margin:0 auto;padding:26px 30px}
+ h1{font-size:23px;margin:0 0 4px}
+ h2{margin:30px 0 10px;border-bottom:2px solid #2a3550;padding-bottom:6px;color:#fff}
+ h3{margin:20px 0 6px;color:#cfe0ff}
+ code{background:#1b2538;padding:1px 5px;border-radius:4px;color:#a8d5ff;font-size:13px}
+ pre{background:#11192b;border:1px solid #26324d;border-radius:6px;padding:12px 14px;overflow:auto;color:#cfe0ff;font-size:13px}
+ .sub{color:#9fb3d8}
+ .muted{color:#7d8aa3;font-size:12px}
+ table{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 14px}
+ th,td{border:1px solid #26324d;padding:5px 8px;text-align:left;vertical-align:top}
+ th{background:#1b2740;color:#cdd9ef}
+ td.buy{color:#5fd38d;font-weight:600} td.neg{color:#ff8f8f;font-weight:700}
+ .callout{background:#16203a;border-left:3px solid #4a86ff;padding:10px 14px;border-radius:5px;margin:10px 0}
+ .key{background:#1d2a16;border-left:3px solid #6fd36f;padding:10px 14px;border-radius:5px;margin:10px 0}
+ .warn{background:#241c33;border-left:3px solid #a06bff;padding:10px 14px;border-radius:5px;margin:10px 0}
+ .spec{background:#1a1320;border-left:3px solid #c08bff;padding:8px 14px;border-radius:5px;margin:8px 0;font-size:13px}
+ .big{font-size:15px;font-weight:700;color:#ffd27a}
+ .step{margin:6px 0}
+ .tag{display:inline-block;background:#2a3550;border-radius:4px;padding:1px 7px;font-size:12px;color:#bcd}
+</style></head><body><div class="wrap">
+
+<h1>Why a Take-Profit hit can show <span style="color:#ff8f8f">negative PnL</span></h1>
+<p class="sub">m-cube &middot; leg-level Target action <code>close</code> (SqOff) &middot; portfolio <code>LEG_TGT_01_close</code>
+(ETHUSD COINBASE_MS 1-minute) &middot; backend UTC, orderbook display IST (+5:30)</p>
+
+<h2>1. The observation</h2>
+<p>A leg with an <b>On-Target = close (SqOff)</b> action hit its Take Profit, but the trade's realized PnL is
+<b>negative</b>. The orderbook row:</p>
+<table>
+<thead><tr><th>TXN</th><th>ENTRY TIME</th><th>ENTRY PRICE</th><th>ENTRY REASON</th><th>EXIT TIME</th>
+<th>AVG EXIT PRICE</th><th>EXIT REASON</th><th>EXIT DETAILED REASON</th><th>PNL</th></tr></thead>
+<tbody><tr>
+<td class="buy">BUY</td><td>01-01-2026 11:15:00</td><td>2978.14</td>
+<td>EMA Cross BUY: fast(9)=2975.62 &ge; slow(21)=2974.32</td>
+<td>01-01-2026 23:00:00</td><td>2978.180519</td><td>Take Profit</td>
+<td>Take Profit: price=2999.8100 &ge; TP=2993.0307 (entry 2978.1400, +0.73%) -&gt; SqOff</td>
+<td class="neg">&minus;5.9395</td>
+</tr></tbody></table>
+
+<div class="callout"><b>The puzzle:</b> the reason says <b>Take Profit … +0.73%</b>, yet PnL is
+<b>&minus;5.94</b>. How can a profit target produce a loss?</div>
+
+<h2>2. The answer in one line</h2>
+<div class="big">The TP <u>trigger</u> and the exit <u>fill price</u> are two different things.</div>
+<p class="step">The TP <b>triggered</b> off the bar's <b>high (2999.81)</b>, but the leg <b>filled</b> at the
+<b>conservative session VWAP (2978.18)</b> — which sat right at the entry — so the realized result is ≈ 0%,
+and after commission it's negative.</p>
+
+<h2>3. Step-by-step, with the actual bar data</h2>
+<p>Entry was <code>BUY @ 2978.14</code>; the target is +0.5% → TP level <code>2993.0307</code>. The price stayed
+below the TP for the whole session and only spiked at the very end. The exit bar (23:00 IST = 17:30 UTC) from the
+catalog:</p>
+<table>
+<thead><tr><th>Exit bar (17:30 UTC)</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead>
+<tbody><tr><td>1-minute ETHUSD</td><td>2987.90</td><td class="buy">2999.81</td><td>2987.90</td><td>2999.71</td><td>451</td></tr></tbody>
+</table>
+<ol>
+<li class="step"><b>Trigger (detection):</b> Format B (OHLCV) checks the bar's <b>high</b>. <code>high 2999.81 &ge; TP 2993.03</code>
+→ the target fires. The reason's <b>+0.73%</b> is computed from this trigger price (2999.81) vs entry — it is the
+<i>detection</i> metric, not the realized result.</li>
+<li class="step"><b>Fill (execution):</b> the close fills at the <b>conservative session VWAP ≈ 2978.18</b>, <u>not</u>
+the trigger (2999.81) and <u>not</u> the bar close (2999.71). Note the fill <code>2978.180519…</code> is below the
+<i>entire</i> exit bar's range (2987.90–2999.81), confirming it is an average price, not a bar price.</li>
+<li class="step"><b>Why the VWAP ≈ entry:</b> the price hovered around ~2978 for almost the whole session and only
+jumped to ~2999 on the final bar, so the volume-weighted average over the session is ≈ the entry (2978).</li>
+</ol>
+
+<h2>4. What "conservative session VWAP" is</h2>
+<p>A <b>running, volume-weighted average price</b> accumulated bar-by-bar over the session (reset at the session
+boundary). <b>Conservative</b> = at exit, the engine compares the VWAP to the trigger price and takes the side that
+is <b>worse for the position</b> — it never credits you the favourable intra-bar extreme.</p>
+<div class="spec"><b>Spec — VWAP definition (execution_logic.html, Formats A &amp; B):</b>
+<pre>VWAP = (H + L + C) / 3 × candle_weight     (accumulated over the session)</pre></div>
+
+<h3>Why it exists</h3>
+<p>To avoid <b>look-ahead / over-optimistic fills</b>. A Format-B target fires on the bar's <b>high</b> (an intra-bar
+spike). You can't realistically <i>fill</i> at that exact spike, so instead of crediting it, the engine fills at the
+(worse of) VWAP vs trigger. This keeps backtest PnL honest rather than inflated by assuming you sold the top tick.</p>
+
+<h2>5. Where it's written in the spec</h2>
+<div class="spec"><b>execution_logic.html &middot; §4.2 Fill-Price Formula</b><br>
+<i>"SELL exits use MAX(vwap, hit) — conservative (pay more). BUY exits use MIN(vwap, hit) — conservative (receive less)."</i>
+<pre>Format B:
+  SL — SELL:  exit = vwap if vwap &gt; high  else high     (= MAX(vwap, trigger))
+  SL — BUY:   exit = vwap if vwap &lt; low   else low      (= MIN(vwap, trigger))</pre></div>
+<div class="spec"><b>execution_logic.html &middot; §8.1 "VWAP enhancement on Portfolio SqOff"</b> (close-based variant)
+<pre>SELL exit:  fill = vwap if vwap &gt; close else close
+BUY  exit:  fill = vwap if vwap &lt; close else close</pre></div>
+<p class="muted">The target side mirrors this in <code>execution_logic_target.html</code>. "SELL/BUY exit" refers to the
+<b>position</b> side: <b>BUY&nbsp;exit = exiting a LONG</b> → conservative = receive <b>less</b> → <code>MIN(vwap, trigger)</code>.</p>
+
+<div class="callout"><b>Applying it to this trade (a LONG → "BUY exit"):</b>
+<pre>fill = MIN(vwap, trigger) = MIN(2978.18, 2999.81) = 2978.18</pre>
+The VWAP (2978.18) is below the trigger (2999.81), so the conservative rule takes the VWAP.</div>
+
+<h2>6. How realized PnL is computed, and at which price</h2>
+<div class="key"><b>We exit at the conservative VWAP — NOT the bar close.</b> The bar close (2999.71) is ignored
+because the VWAP is lower and the conservative rule for a long takes the lower (receive-less) price.</div>
+<p>Realized PnL uses the <b>fill price</b> (the VWAP), not the trigger:</p>
+<pre>realized_pnl = (exit_fill − entry) × quantity − commissions          (long)
+             = (2978.18 − 2978.14) × qty − commission
+             ≈  tiny gross gain − commission
+             =  −5.94</pre>
+<table>
+<thead><tr><th>Price</th><th>Value</th><th>Used for…</th></tr></thead>
+<tbody>
+<tr><td>Entry</td><td>2978.14</td><td>cost basis</td></tr>
+<tr><td>TP level</td><td>2993.03</td><td>the threshold to beat</td></tr>
+<tr><td>Trigger (bar high)</td><td>2999.81</td><td><b>detection</b> only → the "+0.73%" in the reason</td></tr>
+<tr><td>Bar close</td><td>2999.71</td><td><b>not used</b> (VWAP is lower &amp; more conservative)</td></tr>
+<tr><td class="buy">Conservative VWAP (fill)</td><td class="buy">2978.18</td><td><b>realized PnL</b> ← actual exit price</td></tr>
+</tbody></table>
+
+<h2>7. Conclusion</h2>
+<div class="key"><b>This is not a bug.</b> The Target logic fired correctly (<code>high ≥ TP</code>); the negative PnL
+comes from the <b>conservative VWAP exit-fill</b> working exactly as designed — it prices the exit at the session
+average instead of the intra-bar spike. When the price spikes through the TP late in the session but the session
+VWAP is far below it, a TP-labelled exit can realize ≈ 0 or negative.</div>
+<div class="warn"><b>The lever:</b> it's the per-portfolio <code>vwap_exit_fill</code> (with
+<code>directional_close_fill</code>) setting.
+<ul>
+<li><b>ON</b> (this run) → conservative VWAP fills; pessimistic, avoids look-ahead — what you saw.</li>
+<li><b>OFF</b> → exits fill nearer the trigger / bar price, so a TP hit realizes close to the +0.5% target.</li>
+</ul>
+Nothing in the Target <i>logic</i> changes either way — only the <b>fill-pricing</b> choice.</div>
+
+<p class="muted">Generated from the live investigation: orderbook row + catalog bar at the exit timestamp +
+the execution_logic.html spec (§4.2 fill price, VWAP definition, §8.1 VWAP enhancement).</p>
+</div></body></html>

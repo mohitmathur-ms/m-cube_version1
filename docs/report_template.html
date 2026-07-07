@@ -947,6 +947,16 @@
             return s;
         }
 
+        // Helper to convert YYYY-MM-DD (HTML date input / config storage) to DD-MM-YYYY for display
+        function fromISODate(s) {
+            if (!s) return "";
+            const parts = s.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+            }
+            return s;
+        }
+
         function sortDates(dateArray, reverse = false) {
             return dateArray.sort((a, b) => {
                 const da = parseDate(a);
@@ -960,6 +970,7 @@
         const SUMMARY_DATA = {{ SUMMARY_JSON }};
         const LOGS_DATA = {{ LOGS_JSON }};
         const BACKTEST_NAME = "{{BACKTEST_NAME}}";
+        const CONFIGURED_DATE_RANGE = {{ DATE_RANGE_JSON }};
 
         // State management
         let allPortfolios = [];
@@ -1426,15 +1437,24 @@
             selectedPortfolios = [...allPortfolios]; // Select all by default
             renderTagsAndDropdown();
 
-            // Dates
-            const rawDates = [...new Set(ORDERBOOK_DATA.map(r => r['ENTRY TIME']?.split(' ')[0]).filter(d => d))];
-            if (rawDates.length > 0) {
-                const sorted = sortDates(rawDates);
-                const min = sorted[0];
-                const max = sorted[sorted.length - 1];
-                document.getElementById('date-from').value = toISODate(min);
-                document.getElementById('date-to').value = toISODate(max);
-                document.getElementById('date-range').textContent = `Date range: ${min} to ${max}`;
+            // Dates — prefer the configured engine range injected from the runner;
+            // fall back to min/max ENTRY TIME for older reports without that data.
+            const cfgStart = CONFIGURED_DATE_RANGE && CONFIGURED_DATE_RANGE.start;
+            const cfgEnd = CONFIGURED_DATE_RANGE && CONFIGURED_DATE_RANGE.end;
+            if (cfgStart && cfgEnd) {
+                document.getElementById('date-from').value = cfgStart;
+                document.getElementById('date-to').value = cfgEnd;
+                document.getElementById('date-range').textContent = `Date range: ${fromISODate(cfgStart)} to ${fromISODate(cfgEnd)}`;
+            } else {
+                const rawDates = [...new Set(ORDERBOOK_DATA.map(r => r['ENTRY TIME']?.split(' ')[0]).filter(d => d))];
+                if (rawDates.length > 0) {
+                    const sorted = sortDates(rawDates);
+                    const min = sorted[0];
+                    const max = sorted[sorted.length - 1];
+                    document.getElementById('date-from').value = toISODate(min);
+                    document.getElementById('date-to').value = toISODate(max);
+                    document.getElementById('date-range').textContent = `Date range: ${min} to ${max}`;
+                }
             }
 
             // Buttons

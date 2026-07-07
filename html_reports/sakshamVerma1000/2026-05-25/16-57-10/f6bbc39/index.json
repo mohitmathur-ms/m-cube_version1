@@ -1,0 +1,11 @@
+{
+  "headline": "Remove legacy csv_loader monolith, add CI and MARKET-vs-LIMIT reference docs, clean stale reports",
+  "branch": "Path_A_LowAPI",
+  "sha": "f6bbc39f45233aaa35b11c37c20b3b5d60e501bf",
+  "short_sha": "f6bbc39",
+  "author": "Saksham Verma",
+  "commit_url": "https://github.com/mohitmathur-ms/m-cube_version1/commit/f6bbc39f45233aaa35b11c37c20b3b5d60e501bf",
+  "html_file": "index.html",
+  "generated_utc": "2026-05-25T11:28:45+00:00",
+  "ai": true
+}

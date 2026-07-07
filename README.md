@@ -1,5 +1,7 @@
 # m-cube
 
+[![Push Change Report](https://github.com/mohitmathur-ms/m-cube_version1/actions/workflows/push-report.yml/badge.svg)](https://github.com/mohitmathur-ms/m-cube_version1/actions/workflows/push-report.yml)
+
 Backtesting and research platform built on Nautilus Trader.
 
 ## Docs

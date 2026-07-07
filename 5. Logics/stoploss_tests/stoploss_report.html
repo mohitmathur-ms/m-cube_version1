@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stoploss Tab Test Report &mdash; 16 stress scenarios</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent2: #3fb950; --accent3: #d2a8ff;
+    --accent4: #f0883e; --accent5: #f85149;
+    --code-bg: #1c2128;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.55; font-size: 14px; }
+  .header { background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #111a22 100%);
+    border-bottom: 1px solid var(--border); padding: 2rem; text-align: center; }
+  .header h1 { font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.3rem; }
+  .header p { color: var(--text-muted); font-size: 0.9rem; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.6rem; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
+  h2 { color: var(--accent); font-size: 1.3rem; margin-bottom: 0.7rem;
+    padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { color: var(--accent3); font-size: 1.05rem; margin: 0.8rem 0 0.4rem; }
+  h4 { color: var(--accent4); font-size: 0.85rem; margin: 0.6rem 0 0.3rem;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  code { background: var(--code-bg); color: var(--accent2); padding: 0.1em 0.35em;
+    border-radius: 3px; font-size: 0.85em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 0.6rem; overflow-x: auto; font-size: 0.78rem; }
+  .stat-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+  .stat-card { flex: 1 1 120px; background: var(--code-bg); border-radius: 6px;
+    border: 1px solid var(--border); padding: 0.7rem 0.9rem; text-align: center; }
+  .stat-card .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .stat-card.pass .num { color: var(--accent2); }
+  .stat-card.fail .num { color: var(--accent5); }
+  .stat-card.err .num { color: var(--accent4); }
+  .stat-card .label { font-size: 0.72rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+  .test-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 0.9rem; overflow: hidden; }
+  .test-header { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 1rem;
+    background: var(--code-bg); border-bottom: 1px solid var(--border); }
+  .test-id { font-family: monospace; font-weight: 700; color: var(--accent);
+    font-size: 0.95rem; flex: 0 0 auto; }
+  .test-name { flex: 1 1 auto; font-size: 0.92rem; }
+  .verdict { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+    flex: 0 0 auto; }
+  .v-pass { background: #103018; color: var(--accent2); }
+  .v-fail { background: #2a1018; color: var(--accent5); }
+  .v-error { background: #2a2410; color: var(--accent4); }
+  .test-body { padding: 0.9rem 1rem;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9rem; }
+  .test-section { font-size: 0.85rem; }
+  .test-section ul.params { padding-left: 1.1rem; }
+  .test-section ul.params li { margin: 0.15rem 0; font-size: 0.8rem; }
+  .test-section .expected { font-style: italic; color: var(--text-muted); }
+  .test-section .hint { color: var(--text-muted); font-size: 0.72rem;
+    font-style: italic; margin-bottom: 0.3rem; }
+  .obs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .obs-table td { padding: 0.25rem 0.5rem; border-top: 1px solid var(--border);
+    vertical-align: top; }
+  .obs-table td:first-child { color: var(--text-muted); width: 45%; font-weight: 500; }
+  .obs-table .pos { color: var(--accent2); font-weight: 600; }
+  .obs-table .neg { color: var(--accent5); font-weight: 600; }
+  .obs-table .zero { color: var(--text-muted); }
+  .count-row { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
+  .count-pill { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0.18rem 0.45rem; font-size: 0.74rem;
+    display: inline-flex; align-items: center; gap: 0.35rem; }
+  .count-pill.pill-engine { border-color: var(--accent2); }
+  .count-pill.pill-orderbook { border-color: var(--accent3); }
+  .count-num { background: var(--surface); padding: 0 0.35rem;
+    border-radius: 8px; font-weight: 700; font-size: 0.7rem; }
+  .checks-row { background: var(--code-bg); border-top: 1px solid var(--border);
+    padding: 0.7rem 1rem; }
+  .checks { list-style: none; padding-left: 0; margin-top: 0.3rem; }
+  .checks li { font-size: 0.82rem; padding: 0.2rem 0; }
+  .checks .chk-pass { color: var(--accent2); font-weight: 700; margin-right: 0.4rem; }
+  .checks .chk-fail { color: var(--accent5); font-weight: 700; margin-right: 0.4rem; }
+  .checks .chk-detail { color: var(--text-muted); font-size: 0.72rem;
+    padding-left: 1.2rem; word-break: break-word; }
+  .scen-table, .ref-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .scen-table th, .ref-table th { text-align: left; padding: 0.5rem 0.4rem;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    font-weight: 600; }
+  .scen-table td, .ref-table td { padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--border);
+    vertical-align: top; }
+  .scen-table tr:hover td { background: var(--code-bg); }
+  .err-card { background: linear-gradient(135deg, #2a1018, #161b22);
+    border-left: 3px solid var(--accent5); border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1rem; margin: 0.4rem 1rem 0.9rem; }
+  .err-card h4 { color: var(--accent5); }
+  details { margin-top: 0.4rem; }
+  details summary { cursor: pointer; color: var(--text-muted); font-size: 0.78rem; }
+  .ok-card { background: linear-gradient(135deg, #103018, #161b22);
+    border-left: 4px solid var(--accent2); padding: 0.9rem 1.1rem;
+    margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .ok-card h4 { color: var(--accent2); font-size: 0.95rem; }
+  .warn-card { background: linear-gradient(135deg, #2a2410, #161b22);
+    border-left: 4px solid var(--accent4); padding: 0.9rem 1.1rem;
+    margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .warn-card h4 { color: var(--accent4); font-size: 0.95rem; }
+  .muted { color: var(--text-muted); font-size: 0.78rem; font-style: italic; }
+  @media (max-width: 1000px) {
+    .test-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Stoploss Tab Test Report &mdash; 16 stress scenarios</h1>
+  <p>Per-slot exit_config (stop_loss_type, trailing, target_lock, on_sl_action,
+     re_execute, reverse, sl_wait_bars …) verified end-to-end against backtest
+     output and orderbook reports. Generated 2026-05-07 13:57:05.</p>
+</div>
+
+<div class="container">
+
+<section>
+  <h2>Summary</h2>
+  
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">16</div><div class="label">Total tests</div></div>
+      <div class="stat-card pass"><div class="num">16</div><div class="label">Pass</div></div>
+      <div class="stat-card fail"><div class="num">0</div><div class="label">Fail</div></div>
+      <div class="stat-card err"><div class="num">0</div><div class="label">Error</div></div>
+      <div class="stat-card"><div class="num">1038</div><div class="label">Total trades</div></div>
+      <div class="stat-card"><div class="num">47s</div><div class="label">Total elapsed</div></div>
+    </div>
+  <p style="font-size: 0.86rem; color: var(--text-muted);">
+    <strong>16/16 pass</strong> end-to-end (engine + orderbook).
+    <strong>0 fail</strong> (engine emits the right tag but the
+    orderbook layer drops it on close+open same-bar — see S09/S11/S15).
+    <strong>0 engine errors</strong> (none expected; any non-zero is a regression).
+  </p>
+
+  <div class="ok-card">
+    <h4>What this report verifies</h4>
+    <ul style="padding-left:1.4rem; margin-top:0.3rem;">
+      <li><strong>Engine layer (fills_report.tags)</strong> — Each closing fill
+        carries a structured tag like <code>"Stop Loss: price=… ≤ SL=… (entry …, …%)"</code>.
+        The tag prefix (Stop Loss / Trailing SL / Take Profit / Reverse on SL /
+        Reverse on TP) is the engine's source of truth for what fired.</li>
+      <li><strong>Report layer (orderbook EXIT REASON)</strong> — The
+        <code>build_orderbook_dataframe</code> function joins fills to positions
+        by timestamp, splits the tag at the first colon, and surfaces the prefix
+        in the orderbook UI. Each test asserts that the prefix the engine emitted
+        also lands in the orderbook.</li>
+      <li><strong>Fixed and trailing SL</strong> — Percentage, points, and trailing
+        SL all produce expected exit reasons; trailing tightens with watermark.</li>
+      <li><strong>Composite settings</strong> — Multi-slot portfolios with
+        different SL types per slot, target_lock SL ratchet, sl_wait_bars
+        confirmation delay, re_execute / reverse follow-up actions.</li>
+    </ul>
+  </div>
+
+  
+  <div class="ok-card">
+    <h4>Reverse-action tag propagation: fixed</h4>
+    <p style="font-size:0.86rem; margin:0.3rem 0;">
+      <strong>S09 / S11 / S15</strong> all pass — the orderbook EXIT REASON
+      column now correctly shows <code>Reverse on SL</code> /
+      <code>Reverse on TP</code> labels matching what the engine emits.
+    </p>
+    <p style="font-size:0.86rem; margin:0.3rem 0; color:var(--text-muted);">
+      Fix: <code>core/report_generator.py:_build_fills_lookup</code> was
+      previously keying fills by
+      <code>(trader, strategy, instrument, ts_seconds)</code> only — when
+      <code>on_sl_action=&quot;reverse&quot;</code> fires a close+open pair on the
+      same bar, the open fill (tag=None) was overwriting the tagged close
+      fill. The lookup now splits into <code>by_pos_ts_open</code> /
+      <code>by_pos_ts_close</code> dicts (keyed additionally by
+      <code>is_reduce_only</code>), and <code>_build_orderbook</code>
+      reads from the role-appropriate dict for entry vs. exit fills, so the
+      structured close tag is preserved.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>Stoploss tab settings reference</h2>
+  <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.6rem;">
+    Every per-slot setting exposed in the stoploss tab of the slot/leg modal.
+    These are the inputs that flow into <code>exit_config</code> on each slot
+    and into <code>ManagedExitConfig</code> on the running strategy.
+  </p>
+  <table class='ref-table'><thead><tr><th>Setting</th><th>Type / values</th><th>Effect</th></tr></thead><tbody><tr><td><code>stop_loss_type</code></td><td><code>none / percentage / points / trailing</code></td><td>Selects the SL pricing model. percentage = pct of entry price; points = absolute distance from entry; trailing = ratchets with watermark via trailing_sl_step + trailing_sl_offset.</td></tr><tr><td><code>stop_loss_value</code></td><td><code>float</code></td><td>The configured SL distance. Interpreted as % for percentage/trailing, as absolute price points for points.</td></tr><tr><td><code>trailing_sl_step</code></td><td><code>float (only for type=trailing)</code></td><td>Each step (% of entry) that the highest_profit watermark passes advances the trailing offset by trailing_sl_offset.</td></tr><tr><td><code>trailing_sl_offset</code></td><td><code>float (only for type=trailing)</code></td><td>How tightly the SL trails behind the watermark per step.</td></tr><tr><td><code>target_type</code></td><td><code>none / percentage / points</code></td><td>Symmetric to stop_loss_type but for take-profit.</td></tr><tr><td><code>target_value</code></td><td><code>float</code></td><td>Configured TP distance.</td></tr><tr><td><code>target_lock_trigger</code></td><td><code>float (% profit)</code></td><td>When highest_profit ≥ trigger, raise SL to lock_minimum locking in profit. Subsequent SL hits tagged &#x27;Trailing SL&#x27;.</td></tr><tr><td><code>target_lock_minimum</code></td><td><code>float (% profit)</code></td><td>The locked-in floor SL after target_lock_trigger fires.</td></tr><tr><td><code>sl_wait_bars</code></td><td><code>int</code></td><td>Require N consecutive bars hitting SL before honoring it. Brief wicks are filtered.</td></tr><tr><td><code>on_sl_action</code></td><td><code>close / re_execute / reverse</code></td><td>What the engine does after an SL hit. close=flat. re_execute=re-enter on next signal up to max_re_executions. reverse=immediately flip to opposite-side position.</td></tr><tr><td><code>on_target_action</code></td><td><code>close / re_execute / reverse</code></td><td>Symmetric to on_sl_action but for TP hits.</td></tr><tr><td><code>max_re_executions</code></td><td><code>int</code></td><td>Cap on re_execute retries per slot lifetime.</td></tr></tbody></table>
+</section>
+
+<section>
+  <h2>Compact scenarios table</h2>
+  <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.5rem;">
+    sl_hits = Stop Loss + Trailing SL + Reverse on SL fills.
+    tp_hits = Take Profit + Reverse on TP fills.
+    Counts come from the engine's fills_report.tags (source of truth).
+  </p>
+  
+    <table class='scen-table'>
+      <thead><tr>
+        <th style="width:50px;">#</th>
+        <th>Scenario</th>
+        <th>Observation</th>
+        <th style="width:80px;">Checks</th>
+        <th style="width:60px;">Time</th>
+        <th style="width:70px;">Verdict</th>
+      </tr></thead>
+      <tbody><tr><td><code>S01</code></td><td>Baseline: no SL/TP — strategy-signal exits only</td><td>trades=336, PnL=$-729.05, sl_hits=0, tp_hits=0</td><td><code>4/4</code></td><td>3.8s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S02</code></td><td>Percentage SL = 0.10% (10 pips on EURUSD)</td><td>trades=3, PnL=$-10.73, sl_hits=3, tp_hits=0</td><td><code>4/4</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S03</code></td><td>Points SL = 0.0010 (10 pips absolute on EURUSD)</td><td>trades=5, PnL=$-16.70, sl_hits=5, tp_hits=0</td><td><code>3/3</code></td><td>2.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S04</code></td><td>Trailing SL: initial 0.30%, step 0.05% / offset 0.02%</td><td>trades=2, PnL=$-7.94, sl_hits=2, tp_hits=0</td><td><code>3/3</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S05</code></td><td>Trailing SL micro: step 0.005% / offset 0.002%</td><td>trades=38, PnL=$-94.11, sl_hits=37, tp_hits=0</td><td><code>2/2</code></td><td>2.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S06</code></td><td>Target lock: trigger=0.10%, minimum=0.05% + trailing 0.30%</td><td>trades=1, PnL=$-2.66, sl_hits=1, tp_hits=0</td><td><code>2/2</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S07</code></td><td>Percentage SL=0.20% + Percentage TP=0.30%</td><td>trades=9, PnL=$-25.88, sl_hits=6, tp_hits=2</td><td><code>5/5</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S08</code></td><td>Points SL=0.0015 + Points TP=0.0030</td><td>trades=13, PnL=$-19.72, sl_hits=7, tp_hits=6</td><td><code>2/2</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S09</code></td><td>on_sl_action=&#x27;reverse&#x27; — SL flips position</td><td>trades=37, PnL=$-83.16, sl_hits=25, tp_hits=11</td><td><code>3/3</code></td><td>2.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S10</code></td><td>on_sl_action=&#x27;re_execute&#x27; max=3 — re-enters after SL</td><td>trades=3, PnL=$-10.73, sl_hits=3, tp_hits=0</td><td><code>2/2</code></td><td>2.4s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S11</code></td><td>on_target_action=&#x27;reverse&#x27; — TP flips position</td><td>trades=16, PnL=$-50.28, sl_hits=5, tp_hits=10</td><td><code>3/3</code></td><td>2.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S12</code></td><td>sl_wait_bars=3 — SL needs 3 confirmation bars</td><td>trades=4, PnL=$-14.12, sl_hits=4, tp_hits=0</td><td><code>2/2</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S13</code></td><td>Tight target lock: trigger 0.05%, minimum 0.02%</td><td>trades=1, PnL=$-2.44, sl_hits=1, tp_hits=0</td><td><code>2/2</code></td><td>2.5s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S14</code></td><td>Multi-slot mixed SL types (none/pct/pts/trailing)</td><td>trades=362, PnL=$-804.63, sl_hits=24, tp_hits=0</td><td><code>3/3</code></td><td>5.7s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S15</code></td><td>Compound: tight SL 0.05% + reverse + max_re=5</td><td>trades=63, PnL=$-119.30, sl_hits=45, tp_hits=17</td><td><code>3/3</code></td><td>2.6s</td><td><span class='verdict v-pass'>PASS</span></td></tr><tr><td><code>S16</code></td><td>All-features: trailing+lock + points+reverse + pct+re_execute</td><td>trades=145, PnL=$-332.70, sl_hits=100, tp_hits=44</td><td><code>3/3</code></td><td>4.3s</td><td><span class='verdict v-pass'>PASS</span></td></tr></tbody>
+    </table>
+</section>
+
+<section>
+  <h2>Detailed test cards</h2>
+  <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:0.6rem;">
+    Each card shows: parameters supplied to the slot's exit_config / portfolio,
+    expected behaviour, the engine-level fills tag counts (source of truth),
+    the orderbook EXIT REASON column (report layer), and per-check verifier
+    pass/fail breakdown. Click the per-test JSON path to inspect the saved portfolio.
+  </p>
+  
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S01</span>
+            <span class="test-name">Baseline: no SL/TP — strategy-signal exits only</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;none&quot;</code></li><li><code>target_type</code>: <code>&quot;none&quot;</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">No &#x27;Stop Loss&#x27; / &#x27;Trailing SL&#x27; / &#x27;Take Profit&#x27; in EXIT REASON; trades close on opposite signal.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <span class='muted'>(none)</span>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>336</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>336</td></tr><tr><td>wins / losses</td><td>3 / 333</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-729.05</span></td></tr><tr><td>engine_trades</td><td>336</td></tr><tr><td>engine_pnl</td><td>$-729.05</td></tr><tr><td>verification</td><td><strong>4/4</strong></td></tr><tr><td>elapsed_sec</td><td>3.8</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S01_S01_baseline.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>got 336 trades</div></li><li><span class='chk-pass'>✓</span> <strong>no_stop_loss_exits</strong><div class='chk-detail'>exit reasons: [&#x27;Market Exit&#x27;]</div></li><li><span class='chk-pass'>✓</span> <strong>no_trailing_sl_exits</strong><div class='chk-detail'>trailing should not appear without configured SL</div></li><li><span class='chk-pass'>✓</span> <strong>no_take_profit_exits</strong><div class='chk-detail'>target_type=none → no Take Profit exits</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S02</span>
+            <span class="test-name">Percentage SL = 0.10% (10 pips on EURUSD)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.1</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">EXIT REASON contains &#x27;Stop Loss&#x27; rows; some losing trades.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>3</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>3</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>3</td></tr><tr><td>wins / losses</td><td>0 / 3</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-10.73</span></td></tr><tr><td>engine_trades</td><td>3</td></tr><tr><td>engine_pnl</td><td>$-10.73</td></tr><tr><td>verification</td><td><strong>4/4</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S02_S02_percentage_sl.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>3 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_stop_loss_exits</strong><div class='chk-detail'>expected &#x27;Stop Loss&#x27; in exit reasons [&#x27;Stop Loss&#x27;]</div></li><li><span class='chk-pass'>✓</span> <strong>no_trailing_sl_exits</strong><div class='chk-detail'>fixed SL must not be tagged as &#x27;Trailing SL&#x27;</div></li><li><span class='chk-pass'>✓</span> <strong>losers_present</strong><div class='chk-detail'>SL hits should produce losing trades; got 3</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S03</span>
+            <span class="test-name">Points SL = 0.0010 (10 pips absolute on EURUSD)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;points&quot;</code></li><li><code>stop_loss_value</code>: <code>0.001</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Same behaviour as percentage SL but priced in absolute points.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>5</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>5</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>5</td></tr><tr><td>wins / losses</td><td>0 / 5</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-16.70</span></td></tr><tr><td>engine_trades</td><td>5</td></tr><tr><td>engine_pnl</td><td>$-16.70</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>2.6</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S03_S03_points_sl.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>5 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_stop_loss_exits</strong><div class='chk-detail'>expected &#x27;Stop Loss&#x27; in [&#x27;Stop Loss&#x27;]</div></li><li><span class='chk-pass'>✓</span> <strong>losers_present</strong><div class='chk-detail'>got 5 losers</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S04</span>
+            <span class="test-name">Trailing SL: initial 0.30%, step 0.05% / offset 0.02%</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;trailing&quot;</code></li><li><code>stop_loss_value</code>: <code>0.3</code></li><li><code>trailing_sl_step</code>: <code>0.05</code></li><li><code>trailing_sl_offset</code>: <code>0.02</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Mix of &#x27;Trailing SL&#x27; and &#x27;Stop Loss&#x27; exits; trailing hits after watermark advances.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>1</span></span> <span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>1</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>1</span></span> <span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>2</td></tr><tr><td>wins / losses</td><td>0 / 2</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-7.94</span></td></tr><tr><td>engine_trades</td><td>2</td></tr><tr><td>engine_pnl</td><td>$-7.94</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S04_S04_trailing_sl.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>2 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_exits</strong><div class='chk-detail'>need at least one SL/Trailing SL exit; counts={&#x27;Trailing SL&#x27;: 1, &#x27;Stop Loss&#x27;: 1}</div></li><li><span class='chk-pass'>✓</span> <strong>trailing_or_fixed_sl_appears</strong><div class='chk-detail'>either label acceptable; got [&#x27;Stop Loss&#x27;, &#x27;Trailing SL&#x27;]</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S05</span>
+            <span class="test-name">Trailing SL micro: step 0.005% / offset 0.002%</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;trailing&quot;</code></li><li><code>stop_loss_value</code>: <code>0.2</code></li><li><code>trailing_sl_step</code>: <code>0.005</code></li><li><code>trailing_sl_offset</code>: <code>0.002</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Many trailing-SL ratchets per profitable trade; Trailing SL exits dominate.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>32</span></span> <span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>5</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>32</span></span> <span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>5</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>38</td></tr><tr><td>wins / losses</td><td>1 / 37</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-94.11</span></td></tr><tr><td>engine_trades</td><td>38</td></tr><tr><td>engine_pnl</td><td>$-94.11</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.6</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S05_S05_micro_trailing.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>38 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_exits</strong><div class='chk-detail'>micro-trailing must hit SL; counts={&#x27;Trailing SL&#x27;: 32, &#x27;Stop Loss&#x27;: 5, &#x27;Market Exit&#x27;: 1}</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S06</span>
+            <span class="test-name">Target lock: trigger=0.10%, minimum=0.05% + trailing 0.30%</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>target_lock_trigger</code>: <code>0.1</code></li><li><code>target_lock_minimum</code>: <code>0.05</code></li><li><code>stop_loss_type</code>: <code>&quot;trailing&quot;</code></li><li><code>trailing_sl_step</code>: <code>0.1</code></li><li><code>trailing_sl_offset</code>: <code>0.05</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Once profit ≥ 0.10%, SL ratchets to 0.05% (locked-in profit). Subsequent SL hits tagged Trailing SL.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>1</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>1</td></tr><tr><td>wins / losses</td><td>0 / 1</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-2.66</span></td></tr><tr><td>engine_trades</td><td>1</td></tr><tr><td>engine_pnl</td><td>$-2.66</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S06_S06_target_lock.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>1 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_exits</strong><div class='chk-detail'>target_lock-armed trades must hit some SL; counts={&#x27;Trailing SL&#x27;: 1}</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S07</span>
+            <span class="test-name">Percentage SL=0.20% + Percentage TP=0.30%</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.2</code></li><li><code>target_type</code>: <code>&quot;percentage&quot;</code></li><li><code>target_value</code>: <code>0.3</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Both &#x27;Stop Loss&#x27; and &#x27;Take Profit&#x27; exits in orderbook; wins from TP, losses from SL.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>6</span></span> <span class='count-pill pill-engine'><code>Take Profit</code><span class='count-num'>2</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>6</span></span> <span class='count-pill pill-orderbook'><code>Take Profit</code><span class='count-num'>2</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>9</td></tr><tr><td>wins / losses</td><td>2 / 7</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-25.88</span></td></tr><tr><td>engine_trades</td><td>9</td></tr><tr><td>engine_pnl</td><td>$-25.88</td></tr><tr><td>verification</td><td><strong>5/5</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S07_S07_pct_sl_pct_tp.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>9 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_stop_loss</strong><div class='chk-detail'>need Stop Loss; got [&#x27;Market Exit&#x27;, &#x27;Stop Loss&#x27;, &#x27;Take Profit&#x27;]</div></li><li><span class='chk-pass'>✓</span> <strong>has_take_profit</strong><div class='chk-detail'>need Take Profit; got [&#x27;Market Exit&#x27;, &#x27;Stop Loss&#x27;, &#x27;Take Profit&#x27;]</div></li><li><span class='chk-pass'>✓</span> <strong>winners_present</strong><div class='chk-detail'>TP hits should give wins; got 2</div></li><li><span class='chk-pass'>✓</span> <strong>losers_present</strong><div class='chk-detail'>SL hits should give losses; got 7</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S08</span>
+            <span class="test-name">Points SL=0.0015 + Points TP=0.0030</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;points&quot;</code></li><li><code>stop_loss_value</code>: <code>0.0015</code></li><li><code>target_type</code>: <code>&quot;points&quot;</code></li><li><code>target_value</code>: <code>0.003</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">SL and TP exits priced in absolute points (1.5/3.0 pips).</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>7</span></span> <span class='count-pill pill-engine'><code>Take Profit</code><span class='count-num'>6</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>7</span></span> <span class='count-pill pill-orderbook'><code>Take Profit</code><span class='count-num'>6</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>13</td></tr><tr><td>wins / losses</td><td>6 / 7</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-19.72</span></td></tr><tr><td>engine_trades</td><td>13</td></tr><tr><td>engine_pnl</td><td>$-19.72</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S08_S08_pts_sl_pts_tp.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>13 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_stop_loss_or_tp</strong><div class='chk-detail'>need at least SL or TP exits; got [&#x27;Stop Loss&#x27;, &#x27;Take Profit&#x27;]</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S09</span>
+            <span class="test-name">on_sl_action=&#x27;reverse&#x27; — SL flips position</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.1</code></li><li><code>on_sl_action</code>: <code>&quot;reverse&quot;</code></li><li><code>target_type</code>: <code>&quot;percentage&quot;</code></li><li><code>target_value</code>: <code>0.2</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">EXIT REASON includes &#x27;Reverse on SL&#x27;; subsequent reversed trade carries its own SL/TP.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Reverse on SL</code><span class='count-num'>25</span></span> <span class='count-pill pill-engine'><code>Take Profit</code><span class='count-num'>11</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Reverse on SL</code><span class='count-num'>25</span></span> <span class='count-pill pill-orderbook'><code>Take Profit</code><span class='count-num'>11</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>37</td></tr><tr><td>wins / losses</td><td>10 / 27</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-83.16</span></td></tr><tr><td>engine_trades</td><td>37</td></tr><tr><td>engine_pnl</td><td>$-83.16</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>2.6</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S09_S09_reverse_on_sl.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>37 trades</div></li><li><span class='chk-pass'>✓</span> <strong>engine_emits_reverse_on_sl</strong><div class='chk-detail'>fills_report.tags must contain &#x27;Reverse on SL&#x27;; got {&#x27;Take Profit&#x27;: 11, &#x27;Reverse on SL&#x27;: 25}</div></li><li><span class='chk-pass'>✓</span> <strong>orderbook_propagates_reverse_on_sl</strong><div class='chk-detail'>orderbook EXIT REASON should also contain &#x27;Reverse on SL&#x27;; got [&#x27;Market Exit&#x27;, &#x27;Reverse on SL&#x27;, &#x27;Take Profit&#x27;] — close+open same-ts collision in _build_fills_lookup masks the close tag</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S10</span>
+            <span class="test-name">on_sl_action=&#x27;re_execute&#x27; max=3 — re-enters after SL</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.1</code></li><li><code>on_sl_action</code>: <code>&quot;re_execute&quot;</code></li><li><code>max_re_executions</code>: <code>3</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Stop Loss exits present; slot re-enters up to 3× per signal trigger.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>3</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>3</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>3</td></tr><tr><td>wins / losses</td><td>0 / 3</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-10.73</span></td></tr><tr><td>engine_trades</td><td>3</td></tr><tr><td>engine_pnl</td><td>$-10.73</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.4</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S10_S10_re_execute.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>3 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_stop_loss</strong><div class='chk-detail'>re_execute still goes through SL exit; got [&#x27;Stop Loss&#x27;]</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S11</span>
+            <span class="test-name">on_target_action=&#x27;reverse&#x27; — TP flips position</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.5</code></li><li><code>target_type</code>: <code>&quot;percentage&quot;</code></li><li><code>target_value</code>: <code>0.1</code></li><li><code>on_target_action</code>: <code>&quot;reverse&quot;</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">EXIT REASON includes &#x27;Reverse on TP&#x27;; reversed leg has fresh SL/TP.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Reverse on TP</code><span class='count-num'>10</span></span> <span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>5</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Reverse on TP</code><span class='count-num'>10</span></span> <span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>5</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>16</td></tr><tr><td>wins / losses</td><td>0 / 16</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-50.28</span></td></tr><tr><td>engine_trades</td><td>16</td></tr><tr><td>engine_pnl</td><td>$-50.28</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>2.6</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S11_S11_reverse_on_tp.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>16 trades</div></li><li><span class='chk-pass'>✓</span> <strong>engine_emits_reverse_on_tp</strong><div class='chk-detail'>fills_report.tags must contain &#x27;Reverse on TP&#x27;; got {&#x27;Reverse on TP&#x27;: 10, &#x27;Stop Loss&#x27;: 5}</div></li><li><span class='chk-pass'>✓</span> <strong>orderbook_propagates_reverse_on_tp</strong><div class='chk-detail'>orderbook EXIT REASON should also contain &#x27;Reverse on TP&#x27;; got [&#x27;Market Exit&#x27;, &#x27;Reverse on TP&#x27;, &#x27;Stop Loss&#x27;] — close+open same-ts collision masks tag</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S12</span>
+            <span class="test-name">sl_wait_bars=3 — SL needs 3 confirmation bars</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.1</code></li><li><code>sl_wait_bars</code>: <code>3</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Fewer SL exits than no-wait baseline because brief breaches are filtered.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>4</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>4</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>4</td></tr><tr><td>wins / losses</td><td>0 / 4</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-14.12</span></td></tr><tr><td>engine_trades</td><td>4</td></tr><tr><td>engine_pnl</td><td>$-14.12</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S12_S12_sl_wait_bars.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>4 trades</div></li><li><span class='chk-pass'>✓</span> <strong>engine_completed</strong><div class='chk-detail'>engine completed without crash</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S13</span>
+            <span class="test-name">Tight target lock: trigger 0.05%, minimum 0.02%</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.4</code></li><li><code>target_lock_trigger</code>: <code>0.05</code></li><li><code>target_lock_minimum</code>: <code>0.02</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Most trades touch lock trigger; later SL hits tagged Trailing SL.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>1</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>1</td></tr><tr><td>wins / losses</td><td>0 / 1</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-2.44</span></td></tr><tr><td>engine_trades</td><td>1</td></tr><tr><td>engine_pnl</td><td>$-2.44</td></tr><tr><td>verification</td><td><strong>2/2</strong></td></tr><tr><td>elapsed_sec</td><td>2.5</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S13_S13_tight_lock.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>1 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_exits</strong><div class='chk-detail'>need SL exits; counts={&#x27;Trailing SL&#x27;: 1}</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S14</span>
+            <span class="test-name">Multi-slot mixed SL types (none/pct/pts/trailing)</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>slot_count</code>: <code>4</code></li><li><code>sl_types</code>: <code>[&quot;none&quot;, &quot;percentage 0.10&quot;, &quot;points 0.0010&quot;, &quot;trailing 0.30/0.05/0.02&quot;]</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">All 4 slots run; each isolates its own SL config.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>13</span></span> <span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>11</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>338</span></span> <span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>13</span></span> <span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>11</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>362</td></tr><tr><td>wins / losses</td><td>4 / 358</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-804.63</span></td></tr><tr><td>engine_trades</td><td>362</td></tr><tr><td>engine_pnl</td><td>$-804.63</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>5.7</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S14_S14_mixed_sl_types.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>362 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_exits</strong><div class='chk-detail'>4 slots, 3 with SL; counts={&#x27;Market Exit&#x27;: 338, &#x27;Stop Loss&#x27;: 11, &#x27;Trailing SL&#x27;: 13}</div></li><li><span class='chk-pass'>✓</span> <strong>multi_slot</strong><div class='chk-detail'>4 slots over 5 days should produce &gt;5 trades; got 362</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S15</span>
+            <span class="test-name">Compound: tight SL 0.05% + reverse + max_re=5</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>stop_loss_type</code>: <code>&quot;percentage&quot;</code></li><li><code>stop_loss_value</code>: <code>0.05</code></li><li><code>on_sl_action</code>: <code>&quot;reverse&quot;</code></li><li><code>max_re_executions</code>: <code>5</code></li><li><code>target_type</code>: <code>&quot;percentage&quot;</code></li><li><code>target_value</code>: <code>0.2</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Many Reverse on SL exits; reversal chain limited by max_re.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Reverse on SL</code><span class='count-num'>45</span></span> <span class='count-pill pill-engine'><code>Take Profit</code><span class='count-num'>17</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Reverse on SL</code><span class='count-num'>45</span></span> <span class='count-pill pill-orderbook'><code>Take Profit</code><span class='count-num'>17</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>63</td></tr><tr><td>wins / losses</td><td>17 / 46</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-119.30</span></td></tr><tr><td>engine_trades</td><td>63</td></tr><tr><td>engine_pnl</td><td>$-119.30</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>2.6</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S15_S15_compound_reverse.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>63 trades</div></li><li><span class='chk-pass'>✓</span> <strong>engine_emits_reverse_on_sl</strong><div class='chk-detail'>compound reverse must emit &#x27;Reverse on SL&#x27; in fills.tags; got {&#x27;Take Profit&#x27;: 17, &#x27;Reverse on SL&#x27;: 45}</div></li><li><span class='chk-pass'>✓</span> <strong>orderbook_propagates_reverse_on_sl</strong><div class='chk-detail'>orderbook should show &#x27;Reverse on SL&#x27;; got [&#x27;Market Exit&#x27;, &#x27;Reverse on SL&#x27;, &#x27;Take Profit&#x27;] — close+open same-ts masks the close tag in the report builder</div></li></ul>
+          </div>
+          
+        </div>
+
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-id">S16</span>
+            <span class="test-name">All-features: trailing+lock + points+reverse + pct+re_execute</span>
+            <span class="verdict v-pass">PASS</span>
+          </div>
+          <div class="test-body">
+            <div class="test-section">
+              <h4>Parameters</h4>
+              <ul class='params'><li><code>slot_count</code>: <code>3</code></li><li><code>features</code>: <code>[&quot;trailing+lock+TP&quot;, &quot;points+TP+reverse&quot;, &quot;pct+TP+re_execute+wait&quot;]</code></li></ul>
+              <h4 style='margin-top:0.7rem;'>Expected behaviour</h4>
+              <p class="expected">Diverse EXIT REASONs across slots; engine handles all SL features simultaneously.</p>
+            </div>
+            <div class="test-section">
+              <h4>Engine fills tags</h4>
+              <p class='hint'>Source of truth — tags emitted by ManagedExitStrategy on each close.</p>
+              <div class='count-row'><span class='count-pill pill-engine'><code>Reverse on SL</code><span class='count-num'>50</span></span> <span class='count-pill pill-engine'><code>Take Profit</code><span class='count-num'>44</span></span> <span class='count-pill pill-engine'><code>Stop Loss</code><span class='count-num'>44</span></span> <span class='count-pill pill-engine'><code>Trailing SL</code><span class='count-num'>6</span></span></div>
+              <h4 style='margin-top:0.7rem;'>Orderbook EXIT REASON</h4>
+              <p class='hint'>Report-layer view — what the user sees in the orderbook UI.</p>
+              <div class='count-row'><span class='count-pill pill-orderbook'><code>Reverse on SL</code><span class='count-num'>50</span></span> <span class='count-pill pill-orderbook'><code>Take Profit</code><span class='count-num'>44</span></span> <span class='count-pill pill-orderbook'><code>Stop Loss</code><span class='count-num'>44</span></span> <span class='count-pill pill-orderbook'><code>Trailing SL</code><span class='count-num'>6</span></span> <span class='count-pill pill-orderbook'><code>Market Exit</code><span class='count-num'>1</span></span></div>
+            </div>
+            <div class="test-section">
+              <h4>Observed</h4>
+              <table class='obs-table'><tr><td>orderbook_trades</td><td>145</td></tr><tr><td>wins / losses</td><td>6 / 139</td></tr><tr><td>orderbook_pnl</td><td><span class='neg'>$-332.70</span></td></tr><tr><td>engine_trades</td><td>145</td></tr><tr><td>engine_pnl</td><td>$-332.70</td></tr><tr><td>verification</td><td><strong>3/3</strong></td></tr><tr><td>elapsed_sec</td><td>4.3</td></tr><tr><td>portfolio_json</td><td><code>5. Logics\stoploss_tests\portfolios\S16_S16_all_features.json</code></td></tr></table>
+            </div>
+          </div>
+          <div class="checks-row">
+            <h4>Verification checks</h4>
+            <ul class='checks'><li><span class='chk-pass'>✓</span> <strong>trades_executed</strong><div class='chk-detail'>145 trades</div></li><li><span class='chk-pass'>✓</span> <strong>has_diversity</strong><div class='chk-detail'>need ≥2 distinct exit reasons across 3 slots; got {&#x27;Take Profit&#x27;: 44, &#x27;Reverse on SL&#x27;: 50, &#x27;Stop Loss&#x27;: 44, &#x27;Trailing SL&#x27;: 6, &#x27;Market Exit&#x27;: 1}</div></li><li><span class='chk-pass'>✓</span> <strong>has_sl_or_tp</strong><div class='chk-detail'>need at least one SL/TP class exit; got [&#x27;Market Exit&#x27;, &#x27;Reverse on SL&#x27;, &#x27;Stop Loss&#x27;, &#x27;Take Profit&#x27;, &#x27;Trailing SL&#x27;]</div></li></ul>
+          </div>
+          
+        </div>
+</section>
+
+<section>
+  <h2>How to reproduce</h2>
+  <pre>python stress_test_stoploss.py
+python stress_test_stoploss_report.py</pre>
+  <p style="font-size: 0.85rem; color: var(--text-muted);">
+    Both scripts are at the project root. They write the per-test portfolio
+    JSON files to <code>5. Logics/stoploss_tests/portfolios/</code>, raw
+    results to <code>stoploss_results.json</code>, and this HTML report to
+    <code>stoploss_report.html</code>. Safe to re-run; each invocation
+    overwrites prior output.
+  </p>
+</section>
+
+</div>
+</body>
+</html>

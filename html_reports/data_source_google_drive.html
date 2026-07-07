@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Source &mdash; Google Drive</title>
+<style>
+  :root{
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;
+    --text-muted:#8b949e;--accent:#58a6ff;--accent2:#3fb950;--accent3:#d2a8ff;
+    --accent4:#f0883e;--code-bg:#1c2128;--table-alt:#1c2128;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;font-size:16px;}
+  .header{background:linear-gradient(135deg,#2e1e2a 0%,#0d1117 50%,#111a22 100%);
+    border-bottom:1px solid var(--border);padding:2.6rem 2rem;text-align:center;}
+  .header .badge{display:inline-block;font-size:.8rem;color:var(--accent3);
+    border:1px solid var(--accent3);border-radius:20px;padding:.15rem .8rem;margin-bottom:.8rem;}
+  .header h1{font-size:2rem;font-weight:700;
+    background:linear-gradient(90deg,var(--accent3),var(--accent));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.4rem;}
+  .header p{color:var(--text-muted);font-size:1.05rem;max-width:720px;margin:0 auto;}
+  .container{max-width:900px;margin:0 auto;padding:2rem;}
+  section{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1.6rem 2rem;margin-bottom:1.4rem;}
+  h2{font-size:1.4rem;color:var(--accent3);margin-bottom:1rem;padding-bottom:.4rem;
+    border-bottom:1px solid var(--border);}
+  h3{font-size:1.1rem;color:var(--accent);margin:1.2rem 0 .5rem;}
+  p{margin:.5rem 0;}
+  ul,ol{padding-left:1.4rem;margin:.5rem 0;}
+  li{margin:.35rem 0;}
+  code{background:var(--code-bg);border:1px solid var(--border);border-radius:4px;
+    padding:.1rem .4rem;font-family:'SFMono-Regular',Consolas,monospace;font-size:.88em;color:var(--accent3);}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+    padding:1rem;overflow-x:auto;margin:.7rem 0;}
+  pre code{background:none;border:none;padding:0;color:var(--text);}
+  table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.95rem;}
+  th,td{border:1px solid var(--border);padding:.55rem .7rem;text-align:left;vertical-align:top;}
+  th{background:var(--code-bg);color:var(--accent);}
+  tr:nth-child(even){background:var(--table-alt);}
+  .note{border-left:3px solid var(--accent4);background:rgba(240,136,62,.08);
+    padding:.7rem 1rem;border-radius:0 6px 6px 0;margin:.8rem 0;}
+  .ok{color:var(--accent2);}.muted{color:var(--text-muted);}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.8rem 0;}
+  .flow span{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+    padding:.4rem .7rem;font-size:.85rem;}
+  .flow .arrow{border:none;background:none;color:var(--accent3);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge">Data Source Option 2 of 3</div>
+  <h1>Google Drive</h1>
+  <p>What it takes to load CSV market data from a Google Drive folder instead of a local path.</p>
+</div>
+<div class="container">
+
+  <section>
+    <h2>1. How it fits the current flow</h2>
+    <p>The scanner (<code>scan_csv_folder</code>) only understands <strong>local files</strong>.
+       Google Drive is an object store keyed by opaque <em>file IDs</em>, not real folder paths,
+       so again the model is <strong>sync-then-scan</strong>: download the Drive folder's CSVs
+       into a local staging directory, rebuilding the same sub-folder structure, then scan it.</p>
+    <div class="flow">
+      <span>Drive folder</span><span class="arrow">&rarr;</span>
+      <span>download by file ID</span><span class="arrow">&rarr;</span>
+      <span>rebuild local tree</span><span class="arrow">&rarr;</span>
+      <span>scan_csv_folder()</span>
+    </div>
+    <div class="note">Drive has <strong>no native folder paths</strong> &mdash; we must walk
+      the tree via the API (list children of a folder ID) and recreate the directory names
+      ourselves so the FX/crypto/commodity layout scanners still recognise it.</div>
+  </section>
+
+  <section>
+    <h2>2. Requirements</h2>
+    <table>
+      <tr><th>Item</th><th>Detail</th></tr>
+      <tr><td>GCP project</td><td>Project with the <strong>Google Drive API enabled</strong>.</td></tr>
+      <tr><td>Credentials</td><td>Either a <strong>service account</strong> (best for a shared "data" Drive &mdash; share the folder with the service account's email) <em>or</em> OAuth client + user consent.</td></tr>
+      <tr><td>Scope</td><td><code>drive.readonly</code> &mdash; read-only access is enough.</td></tr>
+      <tr><td>Python libs</td><td><code>google-api-python-client</code>, <code>google-auth</code> (add to <code>requirements.txt</code>).</td></tr>
+      <tr><td>Folder ID</td><td>The Drive folder ID the user selects (from the share URL).</td></tr>
+      <tr><td>Network</td><td>Outbound HTTPS to <code>www.googleapis.com</code>.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Process (step by step)</h2>
+    <ol>
+      <li><strong>Authenticate</strong> with the service-account key and build the Drive client:
+        <pre><code>from googleapiclient.discovery import build
+from google.oauth2 import service_account
+creds = service_account.Credentials.from_service_account_file(
+    key_file, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+drive = build("drive", "v3", credentials=creds)</code></pre></li>
+      <li><strong>Share the folder</strong> with the service account's email (one-time, in Drive UI).</li>
+      <li><strong>List children</strong> of the folder ID, recursing into sub-folders:
+        <pre><code>q = f"'{folder_id}' in parents and trashed=false"
+files = drive.files().list(q=q,
+        fields="files(id,name,mimeType)").execute()["files"]</code></pre></li>
+      <li><strong>Download</strong> each CSV by ID, writing to the rebuilt local path:
+        <pre><code>data = drive.files().get_media(fileId=fid).execute()
+(staging/relpath).write_bytes(data)</code></pre></li>
+      <li><strong>Scan + load</strong> the staging folder exactly as a local path.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>4. Where it touches our code</h2>
+    <ul>
+      <li><strong>UI:</strong> "Source: Google Drive" choice; input = folder ID (or share link we parse).</li>
+      <li><strong>Server:</strong> a downloader that mirrors the Drive tree into a per-user staging
+          folder, then calls <code>scan_csv_folder</code> on it.</li>
+      <li><strong>Scanners:</strong> <span class="ok">no change</span>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. Gotchas</h2>
+    <ul>
+      <li>Drive API has <strong>per-user rate limits / quotas</strong> &mdash; throttle and page large folders.</li>
+      <li>Recursion is required: Drive returns only direct children, so the daily-layout
+          trees (<code>&lt;PAIR&gt;/YYYY/MM/DD</code>) must be walked level by level.</li>
+      <li>Watch for duplicate file names in one folder (Drive allows them); de-dupe by ID.</li>
+      <li>OAuth (vs service account) needs an interactive consent step &mdash; awkward for a server; prefer the service account.</li>
+    </ul>
+  </section>
+
+  <p class="muted" style="text-align:center;margin-top:1.5rem;">m-cube &bull; data-loading source options &bull; 2/3</p>
+</div>
+</body>
+</html>

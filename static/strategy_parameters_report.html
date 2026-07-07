@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M-Cube Strategy &amp; Portfolio Parameters Report</title>
+    <script>
+        // Apply persisted theme before the stylesheet evaluates so the first
+        // paint already matches the user's choice (no flash of wrong theme).
+        (function () {
+            try {
+                var t = localStorage.getItem("theme");
+                if (!t) {
+                    t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+                }
+                document.documentElement.setAttribute("data-theme", t);
+            } catch (_) {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        })();
+    </script>
     <style>
         :root {
             --bg: #0f1117;
@@ -20,7 +35,59 @@
             --yellow: #d4c455;
             --purple: #a06cd5;
             --cyan: #50c8d0;
+            color-scheme: dark;
         }
+
+        :root[data-theme="light"] {
+            --bg: #f5f5f5;
+            --surface: #ffffff;
+            --surface2: #eef1f7;
+            --border: #d0d5dd;
+            --text: #1a1a1a;
+            --text-muted: #555555;
+            --accent: #3366cc;
+            --accent-dim: #2851a3;
+            --green: #00b894;
+            --red: #d63031;
+            --orange: #e17055;
+            --yellow: #c19a00;
+            --purple: #7b3fbf;
+            --cyan: #0eaab3;
+            color-scheme: light;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            width: 38px;
+            height: 38px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 1.05rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .theme-toggle:hover {
+            background: var(--surface2);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .theme-toggle .theme-icon-dark { display: none; }
+        .theme-toggle .theme-icon-light { display: inline; }
+        :root[data-theme="dark"] .theme-toggle .theme-icon-dark { display: inline; }
+        :root[data-theme="dark"] .theme-toggle .theme-icon-light { display: none; }
+        /* No explicit data-theme attribute = the default :root (dark). Show
+         * the moon glyph so the button reads "currently dark, click for light". */
+        html:not([data-theme]) .theme-toggle .theme-icon-light { display: none; }
+        html:not([data-theme]) .theme-toggle .theme-icon-dark { display: inline; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -307,6 +374,12 @@
     </style>
 </head>
 <body>
+<button type="button" class="theme-toggle" title="Toggle dark / light mode"
+        aria-label="Toggle theme"
+        onclick="(function(){var d=document.documentElement;var n=d.getAttribute('data-theme')==='dark'?'light':'dark';d.setAttribute('data-theme',n);try{localStorage.setItem('theme',n);}catch(e){}})()">
+    <span class="theme-icon-light" aria-hidden="true">&#9788;</span>
+    <span class="theme-icon-dark" aria-hidden="true">&#9790;</span>
+</button>
 <div class="container">
 
     <!-- Header -->

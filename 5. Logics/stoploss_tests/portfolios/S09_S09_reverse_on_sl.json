@@ -1,0 +1,37 @@
+{
+  "name": "S09_reverse_on_sl",
+  "description": "stoploss tab stress portfolio",
+  "starting_capital": 100000.0,
+  "allocation_mode": "equal",
+  "start_date": "2024-12-02",
+  "end_date": "2024-12-06",
+  "slots": [
+    {
+      "slot_id": "a",
+      "strategy_name": "EMA Cross",
+      "strategy_params": {},
+      "bar_type_str": "EURUSD.FOREX_MS-1-MINUTE-MID-EXTERNAL",
+      "lots": 0.01,
+      "allocation_pct": 0.0,
+      "exit_config": {
+        "stop_loss_type": "percentage",
+        "stop_loss_value": 0.1,
+        "trailing_sl_step": 0.0,
+        "trailing_sl_offset": 0.0,
+        "target_type": "percentage",
+        "target_value": 0.2,
+        "target_lock_trigger": null,
+        "target_lock_minimum": null,
+        "sl_wait_bars": 0,
+        "on_sl_action": "reverse",
+        "on_target_action": "close",
+        "max_re_executions": 0,
+        "squareoff_time": null,
+        "squareoff_tz": null
+      },
+      "enabled": true,
+      "start_date": "2024-12-02",
+      "end_date": "2024-12-06"
+    }
+  ]
+}

@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M_Cube Crypto Dashboard</title>
+    <!-- Apply persisted theme before the stylesheet evaluates so the first
+         paint already matches the user's choice (no flash of wrong theme). -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem("theme");
+                if (!t) {
+                    t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+                }
+                document.documentElement.setAttribute("data-theme", t);
+            } catch (_) {
+                document.documentElement.setAttribute("data-theme", "light");
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
     <!-- Plotly.js for charts — deferred so it doesn't block first paint. -->
@@ -14,8 +29,15 @@
     <header class="top-header">
         <div class="header-brand">M_Cube</div>
         <div class="header-settings">
+            <span class="tz-badge" title="All times are displayed in IST (Asia/Kolkata, UTC+5:30). The catalog stores UTC.">&#128336; IST</span>
             <label for="catalog-path">Catalog Path:</label>
             <input type="text" id="catalog-path" value="./catalog" placeholder="Catalog path">
+            <button type="button" id="theme-toggle-btn" class="theme-toggle"
+                    onclick="App.toggleTheme()"
+                    title="Toggle dark / light mode" aria-label="Toggle theme">
+                <span class="theme-icon-light" aria-hidden="true">&#9788;</span>
+                <span class="theme-icon-dark" aria-hidden="true">&#9790;</span>
+            </button>
         </div>
     </header>
 
@@ -27,6 +49,7 @@
         <a href="#" class="nav-item" data-page="backtest">Run Backtest</a>
         <a href="#" class="nav-item" data-page="tearsheet">Tearsheet</a>
         <a href="#" class="nav-item" data-page="orderbook">Orderbook</a>
+        <a href="#" class="nav-item" data-page="visual_verification">Visual Verification</a>
         <a href="#" class="nav-item" data-page="portfolio">Multileg</a>
         <a href="#" class="nav-item" data-page="portfolio_tearsheet">Portfolio Tearsheet</a>
     </nav>
@@ -83,6 +106,7 @@
     <script src="/js/backtest.js" defer></script>
     <script src="/js/tearsheet.js" defer></script>
     <script src="/js/orderbook.js" defer></script>
+    <script src="/js/visual_verification.js" defer></script>
     <script src="/js/portfolio.js" defer></script>
     <script src="/js/portfolio_tearsheet.js" defer></script>
 </body>

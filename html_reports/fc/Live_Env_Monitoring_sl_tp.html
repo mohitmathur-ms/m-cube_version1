@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who Monitors SL/TP in Live Trading — m-cube</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:"neutral"});</script>
+<style>
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       max-width:1040px;margin:0 auto;padding:32px 24px;color:#1c2430;line-height:1.55;}
+  h1{font-size:26px;margin-bottom:4px} h2{margin-top:36px;border-bottom:2px solid #eaecef;padding-bottom:6px}
+  h3{margin-top:22px}
+  .sub{color:#6b7480;margin-top:0}
+  code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:90%}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}
+  th,td{border:1px solid #dfe3e8;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f6f8fa}
+  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+  .muted{color:#6b7480;font-size:12px;font-weight:normal}
+  .good{color:#1b7f4b;font-weight:600} .bad{color:#b42318;font-weight:600}
+  td.nat,th.nat{background:#eafaf0} td.py,th.py{background:#fdeeee} td.eng,th.eng{background:#eef3ff}
+  .mermaid{background:#fbfcfe;border:1px solid #e6e9ee;border-radius:8px;padding:16px;margin:14px 0}
+  .legend span{display:inline-block;margin-right:14px;font-size:13px}
+  .box{background:#f6f8fa;border-left:4px solid #1d4ed8;padding:10px 14px;border-radius:4px;margin:12px 0}
+  .pill{background:#1b7f4b;color:#fff;border-radius:12px;padding:2px 10px;font-size:12px}
+  .src{font-size:12px;color:#6b7480}
+</style></head>
+<body>
+<h1>Who Monitors SL/TP Prices in a Live Trading Environment?</h1>
+<p class="sub">m-cube · NautilusTrader 1.224.0 · generated 2026-05-27 · question: <i>the venue or our Python code?</i></p>
+
+<div class="box"><b>Short answer.</b> In NautilusTrader the answer is decided by <b>one field</b> on the
+order — <code>emulation_trigger</code>. With a native <code>order_factory.bracket()</code> (default
+<code>NO_TRIGGER</code>), the SL (STOP_MARKET) and TP (LIMIT) orders <b>rest on the real
+venue/exchange</b> and the <b>venue's matching engine</b> triggers them — your Python code is not in
+the loop. Only when emulation is enabled (<code>DEFAULT</code>/<code>BID_ASK</code>/<code>LAST_PRICE</code>)
+does Nautilus's local <code>OrderEmulator</code> watch price in Python and release a market order on
+trigger. <b>m-cube's current default does neither</b> — it monitors SL/TP itself in
+<code>on_bar</code> and fires a market close, which is conceptually the same as the emulated path but
+hand-rolled, and the one Nautilus treats as the least-preferred fallback.</p>
+
+<h2>1 · Knowledge Graph — the routing decision</h2>
+<div class="mermaid">graph TD
+  SUB["Strategy submits order<br/>order_factory.bracket()"] --> Q{"emulation_trigger ?"}
+  Q -->|"NO_TRIGGER (default)<br/>send_risk_command()"| VENUE_PATH["RiskEngine → ExecEngine<br/>→ ExecutionClient"]
+  Q -->|"DEFAULT / BID_ASK / LAST_PRICE<br/>send_emulator_command()"| EMU["OrderEmulator (LOCAL Python)<br/>in-memory MatchingCore"]
+
+  VENUE_PATH --> VENUE["REAL VENUE / EXCHANGE<br/>order rests on its book"]
+  VENUE --> VMON["Venue matching engine<br/>watches price tick-by-tick"]
+  VMON -->|"price crosses stop → fill"| VFILL["SL / TP filled at venue"]
+
+  EMU --> EFEED["Nautilus subscribes to feed<br/>quotes/book or trades"]
+  EFEED -->|"Python detects trigger"| ETRANS["transform STOP_MARKET → MARKET<br/>release to venue"]
+  ETRANS --> VENUE
+
+  SUB -.->|"backtest only"| SIMX["SimulatedExchange<br/>OrderMatchingEngine"]
+  SIMX -->|"sweeps bar O→H→L→C / ticks"| SFILL["SL / TP simulated fill"]
+
+  MCUBE["m-cube DEFAULT<br/>ManagedExitStrategy.on_bar()"] -->|"_run_exit_phase checks SL/TP floats"| MFIRE["submit MARKET close"]
+
+  classDef venue fill:#d8f5e3,stroke:#1b7f4b,color:#08311c;
+  classDef py fill:#fde2e2,stroke:#b42318,color:#3b0a06;
+  classDef eng fill:#e0ecff,stroke:#1d4ed8,color:#0a1f52;
+  class VENUE,VMON,VFILL,VENUE_PATH venue;
+  class EMU,EFEED,ETRANS,MCUBE,MFIRE py;
+  class SUB,Q,SIMX,SFILL eng;
+</div>
+<p class="legend">
+  <span class="pill">venue-managed (Nautilus default, live)</span>
+  <span style="color:#b42318">■ Python-monitored (emulator / m-cube)</span>
+  <span style="color:#1d4ed8">■ engine / backtest simulator</span>
+</p>
+<ul>
+  <li><b>Venue path</b> (<code>NO_TRIGGER</code>): the SL/TP orders physically rest on the exchange.
+      The <b>venue</b> observes price and triggers — survives a crash/disconnect of your client,
+      lowest latency. This is what <code>order_factory.bracket()</code> does by default.</li>
+  <li><b>Emulated path</b>: the order is held in Nautilus's local <code>OrderEmulator</code>
+      (<code>MatchingCore</code>), invisible to the venue. <b>Nautilus Python</b> watches the data
+      feed and, on trigger, transforms the STOP_MARKET into a plain MARKET order and releases it.
+      Exists as a portability layer for venues lacking a given order type.</li>
+  <li><b>Backtest path</b>: the <code>SimulatedExchange</code> matching engine inside
+      <code>BacktestEngine</code> plays the venue — this is where m-cube actually runs today.</li>
+  <li><b>m-cube default</b>: no resting order at all — SL/TP are floats checked every
+      <code>on_bar</code>; on breach it submits a market close. Same model as the emulator, but
+      hand-rolled at the strategy layer.</li>
+</ul>
+
+<h2>2 · The core concept — <code>emulation_trigger</code> routes everything</h2>
+<p>At submit time the strategy routes the order on a single field
+(<span class="src">trading/strategy.pyx:891-897</span>):</p>
+<pre class="mono" style="background:#f6f8fa;border:1px solid #e6e9ee;border-radius:6px;padding:12px;overflow:auto">if order.emulation_trigger != TriggerType.NO_TRIGGER:
+    self._manager.send_emulator_command(command)   # → OrderEmulator (LOCAL Python)
+else:
+    self._manager.send_risk_command(command)        # → RiskEngine → ExecEngine → VENUE</pre>
+<p>The <code>bracket()</code> factory defaults to <code>emulation_trigger=NO_TRIGGER</code>, whose
+docstring states plainly: <i>"Disables local emulation; orders are sent directly to the venue."</i>
+(<span class="src">common/factories.pyx:1259-1263</span>). So the SL/TP of a default native bracket
+live <b>on the exchange</b>, and the exchange monitors them.</p>
+
+<h2>3 · Detailed comparison — m-cube today vs Nautilus convention (LIVE)</h2>
+<table>
+  <thead><tr>
+    <th>Aspect</th>
+    <th class="py">m-cube currently<div class="muted">Python state machine (default)</div></th>
+    <th class="eng">m-cube <code>_USE_NATIVE_BRACKET=1</code><div class="muted">experiment, backtest</div></th>
+    <th class="nat">Nautilus convention — LIVE<div class="muted"><code>NO_TRIGGER</code> native bracket</div></th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Who monitors SL/TP price</b></td>
+      <td class="py">m-cube's own Python <code>_run_exit_phase</code> in <code>on_bar</code></td>
+      <td class="eng">Matching engine (in backtest, the <i>simulated</i> one)</td>
+      <td class="nat"><b>The real venue/exchange matching engine</b></td>
+    </tr>
+    <tr>
+      <td><b>Where the SL/TP order lives</b></td>
+      <td class="py">Nowhere — SL/TP are just floats (<code>self.current_sl</code>, <code>self.current_tp</code>) checked in code</td>
+      <td class="eng">Resting STOP_MARKET + LIMIT on the (simulated) exchange book</td>
+      <td class="nat"><b>Resting on the real exchange's order book</b></td>
+    </tr>
+    <tr>
+      <td><b>How an SL exit executes</b></td>
+      <td class="py">Python detects breach → submits a <b>MARKET</b> close</td>
+      <td class="eng">Venue triggers the resting STOP_MARKET → market fill</td>
+      <td class="nat"><b>Venue triggers the resting STOP_MARKET → market fill</b></td>
+    </tr>
+    <tr>
+      <td><b>Trigger granularity</b></td>
+      <td class="py">Per-bar (checks at bar close / configured cadence); intra-bar wicks modeled via <code>resolve_trigger_hl</code> but still bar-driven</td>
+      <td class="eng">Every tick/bar the matching engine sees</td>
+      <td class="nat"><b>Real-time, tick-by-tick at the exchange</b></td>
+    </tr>
+    <tr>
+      <td><b>Survives client/network disconnect?</b></td>
+      <td class="py"><span class="bad">✗ No</span> — if the Python process dies, the position is unprotected</td>
+      <td class="eng">N/A in backtest; would inherit venue behavior if wired live</td>
+      <td class="nat"><span class="good">✓ Yes</span> — order rests at the venue independent of your client</td>
+    </tr>
+    <tr>
+      <td><b>Latency</b></td>
+      <td class="py">Bound by data cadence + Python loop</td>
+      <td class="eng">Engine-internal</td>
+      <td class="nat"><b>Lowest — exchange-side, no round-trip</b></td>
+    </tr>
+    <tr>
+      <td><b>OCO/OUO (cancel sibling on fill)</b></td>
+      <td class="py">Hand-managed: flat the position, no real linked orders</td>
+      <td class="eng"><code>ContingencyType.OUO</code>, enforced by simulated venue (<code>support_contingent_orders=True</code>)</td>
+      <td class="nat"><b>Venue-enforced</b> (if supported); else Nautilus <code>OrderManager</code> locally</td>
+    </tr>
+    <tr>
+      <td><b>Order type used</b></td>
+      <td class="py">MARKET (entry and exit)</td>
+      <td class="eng">bracket: MARKET entry + STOP_MARKET + LIMIT</td>
+      <td class="nat">bracket: MARKET/LIMIT entry + STOP_MARKET + LIMIT</td>
+    </tr>
+    <tr>
+      <td><b>Nautilus's own classification</b></td>
+      <td class="py">Equivalent to the "monitor in Python, fire market order" model — the <i>least preferred</i> path that <code>OrderEmulator</code> was built to automate</td>
+      <td class="eng">Native venue-managed (default <code>NO_TRIGGER</code>)</td>
+      <td class="nat"><b>The recommended default</b></td>
+    </tr>
+    <tr>
+      <td><b>Trailing SL / target-lock / SL-wait / RBO / re-execute?</b></td>
+      <td class="py"><span class="good">✓ Yes</span> — the whole reason this path exists</td>
+      <td class="eng"><span class="bad">✗ No</span> — falls back to <code>python</code> mode if any are configured</td>
+      <td class="nat">Partial; trailing needs <code>TRAILING_STOP_MARKET</code> or emulation, dynamic logic still needs strategy code</td>
+    </tr>
+    <tr>
+      <td><b>Live-trading readiness</b></td>
+      <td class="py">Needs an L4 execution layer; Python-monitor model is fragile live</td>
+      <td class="eng">Closer to live-grade, but still routes through m-cube</td>
+      <td class="nat"><b>This is the production convention</b></td>
+    </tr>
+  </tbody>
+</table>
+<p class="muted">m-cube has <b>no live-execution layer</b> today (CLAUDE.md: "L4 = Execution layer does
+<b>not</b> exist yet"), so it only runs in the backtest column. The right-hand column is the model
+m-cube would adopt <i>if</i> native brackets were carried into a future live engine.</p>
+
+<h2>4 · The three execution models, in plain English</h2>
+<table>
+  <thead><tr><th>Model</th><th>Who watches the price</th><th>What rests at the venue</th><th>When used</th></tr></thead>
+  <tbody>
+    <tr><td class="nat"><b>Native bracket (live, <code>NO_TRIGGER</code>)</b></td><td class="nat">The <b>venue</b></td><td class="nat">STOP_MARKET + LIMIT, on the real book</td><td class="nat">Default for live brackets; the recommended convention</td></tr>
+    <tr><td class="py"><b>Emulated (<code>DEFAULT</code>/<code>BID_ASK</code>/<code>LAST_PRICE</code>)</b></td><td class="py">Nautilus <b>Python</b> (<code>OrderEmulator</code>)</td><td class="py">Nothing until trigger; then a MARKET order is released</td><td class="py">Venues lacking native conditional-order support</td></tr>
+    <tr><td class="eng"><b>Backtest (<code>SimulatedExchange</code>)</b></td><td class="eng">The <b>simulated</b> matching engine</td><td class="eng">Resting children inside <code>BacktestEngine</code></td><td class="eng">All m-cube runs today</td></tr>
+    <tr><td class="py"><b>m-cube default state machine</b></td><td class="py">m-cube's <b>own</b> <code>on_bar</code> code</td><td class="py">Nothing — SL/TP are floats</td><td class="py">Needed for trailing / target-lock / RBO / re-execute</td></tr>
+  </tbody>
+</table>
+
+<h2>5 · Bottom line</h2>
+<p>If m-cube always used <code>order_factory.bracket()</code>:</p>
+<ul>
+  <li><b>In backtest</b> (where m-cube lives today): the <code>SimulatedExchange</code> matching
+      engine monitors and fires SL/TP — more realistic fills than the current "close at bar close"
+      Python model. This is exactly why the native-bracket experiment exists.</li>
+  <li><b>In live trading</b> (with a future L4 execution layer): under the default
+      <code>NO_TRIGGER</code>, <b>the real venue monitors SL/TP</b> — orders rest on the exchange,
+      trigger tick-by-tick, and survive a crash of the Python process. This is the
+      Nautilus-recommended convention.</li>
+  <li>m-cube's <b>current default Python state machine is the opposite model</b>: your code observes
+      the SL hit and reacts. Nautilus treats this as the fallback (what <code>OrderEmulator</code>
+      automates), acceptable mainly because m-cube needs it for the dynamic exits a static resting
+      bracket cannot express.</li>
+</ul>
+<p class="muted src">Sources: NautilusTrader 1.224.0 package source — <code>execution/emulator.pyx</code>,
+<code>execution/manager.pyx</code>, <code>backtest/engine.pyx</code>, <code>common/factories.pyx</code>,
+<code>trading/strategy.pyx</code>; m-cube <code>core/managed_strategy.py</code> (<code>_classify_exit_mode</code>,
+<code>_run_exit_phase</code>).</p>
+
+</body></html>

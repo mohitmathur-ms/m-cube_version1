@@ -229,21 +229,25 @@ class TestBuildFillsLookup:
     """Tier 1 #2: report_generator._build_fills_lookup."""
 
     def test_matches_iterrows_reference(self, fills_report_fixture):
+        # _build_fills_lookup now returns a multi-view dict; the "by_oid" view is
+        # the original flat mapping the reference snapshot captures.
         ref = _ref_build_fills_lookup(fills_report_fixture)
         new = report_generator._build_fills_lookup(fills_report_fixture)
-        assert new == ref
+        assert new["by_oid"] == ref
 
     def test_skips_empty_order_ids(self, fills_report_fixture):
         new = report_generator._build_fills_lookup(fills_report_fixture)
-        assert "" not in new
-        assert len(new) == 3  # row 3 has empty venue_order_id
+        assert "" not in new["by_oid"]
+        assert len(new["by_oid"]) == 3  # row 3 has empty venue_order_id
 
     def test_handles_empty_dataframe(self):
         empty = pd.DataFrame({"venue_order_id": [], "type": []})
-        assert report_generator._build_fills_lookup(empty) == {}
+        result = report_generator._build_fills_lookup(empty)
+        assert all(v == {} for v in result.values())
 
     def test_handles_none(self):
-        assert report_generator._build_fills_lookup(None) == {}
+        result = report_generator._build_fills_lookup(None)
+        assert all(v == {} for v in result.values())
 
 
 class TestExtractTradePnls:

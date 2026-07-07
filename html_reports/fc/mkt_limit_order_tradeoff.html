@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKET vs LIMIT Orders — Tradeoff Analysis for m-cube Backtests</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1c2230;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --green-bg: #102a18;
+    --orange: #f0883e;
+    --orange-bg: #2a1d10;
+    --red: #f85149;
+    --red-bg: #2a1314;
+    --purple: #bc8cff;
+    --blue-bg: #0e2233;
+    --code-bg: #1c2128;
+    --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  header.cover {
+    border-radius: 16px;
+    padding: 40px 36px;
+    background: linear-gradient(135deg, #16304d 0%, #0d1117 55%, #2a1d4a 100%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+  }
+  header.cover h1 {
+    margin: 0 0 8px;
+    font-size: 2em;
+    line-height: 1.2;
+    background: linear-gradient(90deg, #58a6ff, #bc8cff, #f0883e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header.cover .subtitle { color: var(--muted); font-size: 1.05em; margin: 0; max-width: 80ch; }
+  header.cover .meta { margin-top: 16px; font-size: .82em; color: var(--muted); }
+  header.cover .meta code { background: rgba(255,255,255,.06); padding: 2px 7px; border-radius: 6px; }
+
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+  nav.toc h2 { margin: 0 0 10px; font-size: 1.05em; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 36px; }
+  nav.toc li { margin: 5px 0; break-inside: avoid; }
+  nav.toc a { color: var(--blue); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  section.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin: 0 0 22px;
+    box-shadow: var(--shadow);
+  }
+  section.panel h2 { margin-top: 0; font-size: 1.4em; }
+  section.panel h3 { font-size: 1.1em; color: var(--text); margin: 22px 0 8px; }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: 8px; }
+
+  p { margin: 12px 0; }
+  strong { color: #fff; }
+  em { color: var(--purple); font-style: normal; }
+  a { color: var(--blue); }
+
+  code, .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: .88em;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-left: 4px solid var(--blue);
+    background: var(--blue-bg);
+  }
+  .callout.ok { border-left-color: var(--green); background: var(--green-bg); }
+  .callout.warn { border-left-color: var(--orange); background: var(--orange-bg); }
+  .callout.bad { border-left-color: var(--red); background: var(--red-bg); }
+  .callout .tag { display: inline-block; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .72em; margin-bottom: 4px; }
+  .callout.ok .tag { color: var(--green); }
+  .callout.warn .tag { color: var(--orange); }
+  .callout.bad .tag { color: var(--red); }
+  .callout .tag.info { color: var(--blue); }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: .94em; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th {
+    text-transform: uppercase;
+    font-size: .76em;
+    letter-spacing: .05em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+    background: var(--surface-2);
+  }
+  tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+  td.mkt { color: var(--green); }
+  td.lim { color: var(--orange); }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .78em; font-weight: 600; border: 1px solid var(--border); }
+  .pill.win { color: var(--green); border-color: #1f5e33; background: var(--green-bg); }
+  .pill.lose { color: var(--red); border-color: #5e2326; background: var(--red-bg); }
+  .pill.tie { color: var(--muted); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .card h4 { margin: 0 0 8px; font-size: 1em; }
+  .card.mkt { border-top: 3px solid var(--green); }
+  .card.lim { border-top: 3px solid var(--orange); }
+  .card ul { margin: 6px 0; padding-left: 18px; }
+  .card li { margin: 5px 0; }
+
+  ul.tight li { margin: 6px 0; }
+  .verdict-word { font-weight: 700; }
+  .verdict-word.mkt { color: var(--green); }
+  .verdict-word.lim { color: var(--orange); }
+  .verdict-word.dep { color: var(--purple); }
+
+  footer { margin-top: 36px; color: var(--muted); font-size: .85em; text-align: center; border-top: 1px solid var(--border); padding-top: 20px; }
+
+  @media (max-width: 820px) {
+    nav.toc ol { columns: 1; }
+    .two-col { grid-template-columns: 1fr; }
+    header.cover { padding: 28px 22px; }
+    .wrap { padding: 20px 14px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="cover">
+    <h1>MARKET vs LIMIT Orders</h1>
+    <p class="subtitle">An exploratory analysis for m-cube: is firing a LIMIT order on signal safer, more conventional, or faster than the MARKET order the engine submits today? Weighted toward <strong>backtest fidelity</strong> first, live trading second.</p>
+    <div class="meta">m-cube · NautilusTrader bar-based backtesting · entries today via <code>order_factory.market(... GTC)</code> · research only, no code changed</div>
+  </header>
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#tldr">TL;DR verdict</a></li>
+      <li><a href="#today">How m-cube fills orders today</a></li>
+      <li><a href="#ambiguity">The core problem: bar data makes LIMIT fills ambiguous</a></li>
+      <li><a href="#proscons">Side-by-side pros &amp; cons</a></li>
+      <li><a href="#speed">"Faster" means two different things</a></li>
+      <li><a href="#fit">Which order fits which strategy</a></li>
+      <li><a href="#threewords">Safer? Conventional? Faster?</a></li>
+      <li><a href="#middle">Middle-ground options</a></li>
+      <li><a href="#impl">If you did want LIMIT support: where it plugs in</a></li>
+      <li><a href="#bottom">Bottom line</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 -->
+  <section class="panel" id="tldr">
+    <h2><span class="num">1</span>TL;DR verdict</h2>
+    <div class="callout ok">
+      <span class="tag">Recommendation</span>
+      <p style="margin:4px 0 0">For your <strong>bar-based</strong> backtests and your <strong>momentum entries</strong> (EMA cross, four-MA, range breakout), <span class="verdict-word mkt">MARKET</span> is the safer, more conventional, and more <em>honest</em> default. Keep it.</p>
+    </div>
+    <p>The reason isn't that LIMIT orders are bad — in live trading they're a legitimate cost-saving tool. The reason is specific to <strong>how you backtest</strong>: m-cube feeds the engine OHLCV <strong>bars</strong>, not ticks. A MARKET order has one obvious, deterministic fill. A LIMIT order's fill is a <em>guess</em> — the simulator has to decide whether your limit "would have" filled inside a bar it can only see as four numbers. That guess is almost always optimistic, and optimistic fills quietly inflate backtest results.</p>
+    <p>LIMIT is worth it only for <strong>mean-reversion entries</strong> (RSI, Bollinger — buying a dip at a better price) <em>and</em> only if you model the fill assumption honestly. Otherwise you're trading a real, measurable cost (the spread, which you already model) for a fake, invisible one (overstated fill rates).</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="panel" id="today">
+    <h2><span class="num">2</span>How m-cube fills orders today</h2>
+    <p>Every entry in the platform is a <strong>MARKET order, time-in-force GTC</strong>. That is true in the exit-management engine and in every bundled strategy:</p>
+    <ul class="tight">
+      <li><code>core/managed_strategy.py:1765</code> — <code>order = self.order_factory.market(...)</code>, with <code>TimeInForce.GTC</code> set at <code>:1761</code>.</li>
+      <li>Same pattern in <code>strategies/ema_cross.py:105</code>, <code>bollinger_bands.py:97</code>, <code>four_ma.py:101</code>, <code>rsi_mean_reversion.py:95</code>, <code>range_breakout.py:458</code>, and the custom-strategy template at <code>core/custom_strategy_loader.py:459</code>.</li>
+      <li>Exits (SL / TP / squareoff / reverse) don't even go through the order factory — they call <code>close_all_positions()</code> via <code>_close_with_reason()</code> at <code>core/managed_strategy.py:1480</code>. That's also a market-style flatten.</li>
+      <li>Only <strong>GTC</strong> is used anywhere. No IOC, FOK, or GTD appears in the codebase.</li>
+    </ul>
+
+    <h3>You already pay for realism — without LIMIT orders</h3>
+    <p>A common reason people reach for LIMIT orders is "to avoid paying the spread." But m-cube already models execution cost on the <em>fill side</em>, independent of order type:</p>
+    <ul class="tight">
+      <li><strong>BID/ASK auto-pairing</strong> (<code>core/backtest_runner.py:2209</code>): each user bar type is paired with its ASK/BID series so the matching engine fills at real spread prices. If that data is missing you get an explicit warning that "fills will use MID prices — spread cost is not reflected" (<code>:2323</code>).</li>
+      <li><strong>VWAP fill model</strong> (<code>_USE_VWAP_FILL</code>, <code>:2819</code>) — SL/Target leg exits fill against a session-cumulative volume-weighted price.</li>
+      <li><strong>Directional close fill</strong> (<code>_USE_DIRECTIONAL_FILL</code>, <code>:2829</code>) — models the half-spread <em>paid on exit</em> (long exits fill on BID, short exits on ASK).</li>
+      <li><strong>Three-format exit-trigger engine</strong> (<code>exit_price_format</code>: <code>ohlcv</code> / <code>ltp</code> / <code>bidask</code>) at <code>core/models/exit_config/__init__.py:29</code> and <code>core/managed_strategy.py:186</code>.</li>
+    </ul>
+    <div class="callout">
+      <span class="tag info">Key point</span>
+      <p style="margin:4px 0 0">The spread cost you'd hope to "save" with a LIMIT order is <em>already represented</em> in your fills. So the LIMIT question isn't "do I want to model the spread?" — you do that already. It's "do I want to gamble on uncertain fills to <em>not</em> pay it?"</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="panel" id="ambiguity" style="border-left-color: var(--orange);">
+    <h2><span class="num">3</span>The core problem: bar data makes LIMIT fills ambiguous</h2>
+    <p>This is the single most important section. A MARKET order and a LIMIT order behave completely differently inside a <strong>bar-driven</strong> simulator.</p>
+
+    <div class="two-col">
+      <div class="card mkt">
+        <h4 style="color:var(--green)">MARKET order on a bar</h4>
+        <p style="margin:6px 0">Submitted on bar <em>N</em> → fills <strong>deterministically</strong> (at that bar's close, or next bar's open, per the engine's rule). One price. No ambiguity. The simulation and a real broker would agree on "yes, you got in."</p>
+      </div>
+      <div class="card lim">
+        <h4 style="color:var(--orange)">LIMIT order on a bar</h4>
+        <p style="margin:6px 0">Rests on the book. The simulator fills it if the bar's range touches the price — typically <code>low &le; limit &le; high</code>. But OHLC tells you the bar <em>reached</em> that price; it does <strong>not</strong> tell you the intrabar path, the time spent there, or whether you'd have been at the front of the queue.</p>
+      </div>
+    </div>
+
+    <h3>Why "touched the price" ≠ "would have filled"</h3>
+    <ul class="tight">
+      <li><strong>Queue position is unknowable.</strong> Price may have ticked your level for a fraction of a second with thin volume — real fills depend on who was ahead of you. Bar data has none of this.</li>
+      <li><strong>Adverse selection.</strong> In live markets a resting limit tends to fill precisely when the market is about to move <em>against</em> you (you bought right before it kept falling). A naive bar simulator fills you and ignores that the move continued.</li>
+      <li><strong>It's an optimistic bias, and it's invisible.</strong> Every "touched-the-price" fill the simulator grants you that you wouldn't really have gotten makes the backtest look better than reality. Unlike the spread (a known, modeled cost), this error has no line item — it just silently inflates the equity curve.</li>
+    </ul>
+
+    <div class="callout bad">
+      <span class="tag">The trap</span>
+      <p style="margin:4px 0 0">Switching entries to LIMIT and seeing the backtest improve is <strong>exactly the symptom to distrust</strong>. Part of that gain is real spread savings; part is fills you'd never have received. Bar data can't separate the two, so you can't trust the number.</p>
+    </div>
+    <p>MARKET orders sidestep all of this: their fill is determined, not assumed, so the backtest stays honest by construction.</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="panel" id="proscons">
+    <h2><span class="num">4</span>Side-by-side pros &amp; cons</h2>
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>MARKET (today)</th><th>LIMIT</th><th>Winner for m-cube</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Fill certainty</strong></td>
+          <td class="mkt">Guaranteed; deterministic in backtest</td>
+          <td class="lim">Conditional; may never fill</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+        <tr>
+          <td><strong>Backtest fidelity</strong></td>
+          <td class="mkt">High — one true fill price</td>
+          <td class="lim">Low on bar data — optimistic-fill bias</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+        <tr>
+          <td><strong>Transaction cost</strong></td>
+          <td class="mkt">Pays the spread (already modeled)</td>
+          <td class="lim">Can save / earn the spread (maker)</td>
+          <td><span class="pill lose">LIMIT</span></td>
+        </tr>
+        <tr>
+          <td><strong>Slippage risk</strong></td>
+          <td class="mkt">Exposed in fast markets (live)</td>
+          <td class="lim">Bounded — you set the worst price</td>
+          <td><span class="pill lose">LIMIT</span></td>
+        </tr>
+        <tr>
+          <td><strong>Missed-trade risk</strong></td>
+          <td class="mkt">None — you always get in</td>
+          <td class="lim">High — price can run away from you</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+        <tr>
+          <td><strong>Signal alignment (momentum)</strong></td>
+          <td class="mkt">"Get in now" = exactly market semantics</td>
+          <td class="lim">Fights the signal; misses the move</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+        <tr>
+          <td><strong>Signal alignment (mean-reversion)</strong></td>
+          <td class="mkt">Buys the dip at the worse price</td>
+          <td class="lim">Buys the dip at a better price — natural fit</td>
+          <td><span class="pill lose">LIMIT</span></td>
+        </tr>
+        <tr>
+          <td><strong>Implementation complexity</strong></td>
+          <td class="mkt">Already wired; one line per strategy</td>
+          <td class="lim">Needs price, TIF, fill modeling, schema fields</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+        <tr>
+          <td><strong>Order management</strong></td>
+          <td class="mkt">Fire and forget</td>
+          <td class="lim">Cancel/replace stale resting orders, TIF expiry</td>
+          <td><span class="pill win">MARKET</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>The pattern is clear: LIMIT wins on <strong>cost and slippage control</strong> (live-trading concerns), MARKET wins on <strong>certainty, fidelity, and simplicity</strong> (backtest concerns). Since you're optimizing a backtest first, the table tilts toward MARKET.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="panel" id="speed">
+    <h2><span class="num">5</span>"Faster" means two different things</h2>
+    <p>You asked whether LIMIT would be <em>faster</em>. There are two completely separate notions of speed here, and they point opposite ways.</p>
+
+    <h3>(a) Backtest simulation speed</h3>
+    <ul class="tight">
+      <li><strong>MARKET:</strong> fills immediately on the bar; nothing rests on the book; the matching engine has fewer open orders to re-evaluate each bar.</li>
+      <li><strong>LIMIT:</strong> creates a resting order the matching engine must re-check against every subsequent bar until it fills, expires, or is cancelled — plus the cancel/replace traffic you'd add to avoid stale orders.</li>
+    </ul>
+    <p>So in the simulator, MARKET is marginally <em>faster</em>, not slower. But the difference is small and almost never the bottleneck — your real costs are bar loading and the engine run (you already profile these with <code>_PROFILE_PHASES=1</code>). <strong>Speed is not a good reason to choose either way for backtesting.</strong></p>
+
+    <h3>(b) Live execution latency</h3>
+    <ul class="tight">
+      <li><strong>MARKET:</strong> executes essentially immediately — you are <em>in</em> the moment the order hits the venue.</li>
+      <li><strong>LIMIT:</strong> "faster" is the wrong word — it executes <em>whenever the market comes to your price, if ever.</em> It can be instant (marketable limit) or never.</li>
+    </ul>
+    <div class="callout warn">
+      <span class="tag">Don't conflate them</span>
+      <p style="margin:4px 0 0">If "faster" means "the backtest runs quicker," MARKET already wins. If it means "I'm in the trade sooner," MARKET wins decisively for momentum. LIMIT is never the faster choice for <em>getting filled</em> — that's the price you pay for a better fill price.</p>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="panel" id="fit">
+    <h2><span class="num">6</span>Which order fits which strategy</h2>
+    <p>Your bundled strategies split into two camps, and the right answer differs between them.</p>
+    <div class="two-col">
+      <div class="card mkt">
+        <h4 style="color:var(--green)">Momentum / breakout → MARKET</h4>
+        <p style="margin:6px 0">EMA Cross, Four MA, Range Breakout. These fire <em>because</em> price is moving in your direction. A LIMIT placed below the market (for a long) sits there while price runs away — you systematically <strong>miss your best trades</strong> and keep only the ones where the move stalled. That's a selection bias that hurts both the backtest and live.</p>
+      </div>
+      <div class="card lim">
+        <h4 style="color:var(--orange)">Mean-reversion → LIMIT is defensible</h4>
+        <p style="margin:6px 0">RSI Mean Reversion, Bollinger Bands. These bet price snaps back from an extreme. Resting a LIMIT at a better price is <em>congruent</em> with the thesis — you wanted to buy lower anyway. Here LIMIT can genuinely cut cost. <strong>But</strong> the bar-data fill ambiguity from §3 still applies; you must model fills conservatively or you'll overstate it.</p>
+      </div>
+    </div>
+    <p>Breakout strategies are a special case: the conventional tool there is a <strong>STOP / stop-limit</strong> order placed <em>above</em> the range (triggers as price breaks out), not a passive limit below the market. See §8.</p>
+  </section>
+
+  <!-- 7 -->
+  <section class="panel" id="threewords">
+    <h2><span class="num">7</span>Your three words, answered directly</h2>
+    <table>
+      <thead><tr><th>You asked</th><th>Answer</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Safer?</strong></td>
+          <td><span class="verdict-word mkt">MARKET, in backtest</span></td>
+          <td>Deterministic fills can't be gamed; no hidden optimistic-fill bias. "Safe" for a backtest means "trustworthy," and MARKET is more trustworthy. (In <em>live</em> trading, LIMIT is "safer" against slippage — a different kind of safe.)</td>
+        </tr>
+        <tr>
+          <td><strong>More conventional?</strong></td>
+          <td><span class="verdict-word dep">Depends on style</span></td>
+          <td>Market-on-signal is the convention for momentum/systematic entries and for backtests generally. Passive limit entries are the convention for market-making and mean-reversion. There's no single "more conventional" — it tracks the strategy.</td>
+        </tr>
+        <tr>
+          <td><strong>Faster?</strong></td>
+          <td><span class="verdict-word mkt">MARKET</span></td>
+          <td>Faster to fill (instant vs maybe-never) and marginally faster to simulate (no resting orders). LIMIT is never the faster choice for execution.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8 -->
+  <section class="panel" id="middle" style="border-left-color: var(--purple);">
+    <h2><span class="num">8</span>Middle-ground options (if you want some of LIMIT's benefits)</h2>
+    <ul class="tight">
+      <li><strong>Keep MARKET, trust your fill models.</strong> The cheapest, most honest path: you already model spread via BID/ASK pairing, VWAP, and directional-close fills. This gives you realistic cost <em>without</em> the fill-ambiguity gamble. This is the default recommendation.</li>
+      <li><strong>Marketable limit (limit with a worst-price cap).</strong> Place a LIMIT a few pips <em>through</em> the market so it fills like a market order but caps catastrophic slippage. Fills are still near-deterministic in backtest, so fidelity stays high. Good live-trading hardening with low backtest risk.</li>
+      <li><strong>STOP / stop-limit for breakouts.</strong> For Range Breakout specifically, a stop entry above the range is the conventional, signal-aligned tool — and the strategy already approximates this by modeling the fill at <code>max(trigger, bar.open)</code> (<code>strategies/range_breakout.py</code>).</li>
+      <li><strong>Time-in-force discipline.</strong> If you do use resting limits, don't leave them GTC forever. <code>GTD</code> (expire end of bar/session) or <code>IOC</code> (fill now or cancel) make the backtest assumption explicit and prevent stale fills days later. None of these TIFs are wired today.</li>
+      <li><strong>Passive limit only for mean-reversion, with conservative fills.</strong> If you add LIMIT entries for RSI/Bollinger, model the fill pessimistically (e.g. require the bar to trade <em>through</em> the limit, not just touch it) so you don't bank fills you wouldn't get.</li>
+    </ul>
+  </section>
+
+  <!-- 9 -->
+  <section class="panel" id="impl">
+    <h2><span class="num">9</span>If you did want LIMIT support: where it plugs in</h2>
+    <p>This is a sketch for orientation only — <strong>no code is changed by this report.</strong> Adding an opt-in LIMIT entry would touch three layers:</p>
+
+    <h3>1. Schema — add the knobs (<code>core/models/exit_config/__init__.py</code>)</h3>
+    <p>Add fields to <code>ExitConfig</code> (or <code>StrategySlotConfig</code>) so it's per-slot and opt-in, defaulting to today's behaviour:</p>
+<pre><code>entry_order_type: str = "market"   # "market" | "limit" | "marketable_limit"
+entry_limit_offset: float = 0.0    # ticks/points from signal price (sign by side)
+entry_tif: str = "gtc"             # "gtc" | "gtd" | "ioc"</code></pre>
+    <p>Defaults preserve current results exactly — anything not set stays MARKET/GTC.</p>
+
+    <h3>2. Serialization — carry them through (<code>core/models/serialization/__init__.py</code>)</h3>
+    <p>Nothing to do beyond adding the fields: <code>_filter_known_fields(exit_data, ExitConfig)</code> already tolerates new keys in both directions, so old portfolio JSON loads with the defaults and new JSON round-trips automatically.</p>
+
+    <h3>3. Submission — branch in <code>_submit_order</code> (<code>core/managed_strategy.py:1752</code>)</h3>
+    <p>Where it builds the market order today, branch on the new field:</p>
+<pre><code># today (core/managed_strategy.py:1765)
+order = self.order_factory.market(**kwargs)
+
+# sketch
+if cfg.entry_order_type == "market":
+    order = self.order_factory.market(**kwargs)
+else:
+    px = self.instrument.make_price(signal_price + offset_by_side)
+    order = self.order_factory.limit(price=px, time_in_force=tif, **kwargs)
+self.submit_order(order)</code></pre>
+
+    <h3>4. The part that matters most — honest fills</h3>
+    <div class="callout bad">
+      <span class="tag">Don't skip this</span>
+      <p style="margin:4px 0 0">A resting limit will be filled by the matching engine on the optimistic <code>low &le; limit &le; high</code> rule (§3). To keep the backtest trustworthy you must either (a) restrict LIMIT entries to mean-reversion slots, (b) require a trade-through rather than a touch, and/or (c) attach a fill-probability/queue model. Wiring the order type without addressing the fill assumption is how a backtest quietly starts lying.</p>
+    </div>
+    <p>Per repo convention, this should also be gated/flagged like the other execution-realism features (<code>_USE_VWAP_FILL</code>, <code>_USE_DIRECTIONAL_FILL</code>) and reflected in <code>LOGICS_BACKEND_STATUS.md</code> with the appropriate <code>pf-ui-only</code> handling until fully wired.</p>
+  </section>
+
+  <!-- 10 -->
+  <section class="panel" id="bottom" style="border-left-color: var(--green);">
+    <h2><span class="num">10</span>Bottom line</h2>
+    <div class="callout ok">
+      <span class="tag">Verdict</span>
+      <ul class="tight" style="margin:6px 0 0">
+        <li><strong>Keep MARKET as the default.</strong> For your bar-based backtests it's safer (no fill gaming), more honest, simpler, and faster to both fill and simulate.</li>
+        <li><strong>You're not "missing out" on spread savings.</strong> Your fill models already represent spread cost — LIMIT wouldn't add realism, it would add an optimistic-fill <em>risk</em>.</li>
+        <li><strong>Consider LIMIT only for mean-reversion slots (RSI, Bollinger),</strong> and only with a conservative fill assumption. For momentum/breakout, a passive limit actively hurts by missing the move.</li>
+        <li><strong>If you want live-trading slippage protection, a <em>marketable</em> limit is the low-risk upgrade</strong> — it caps the worst price while staying near-deterministic in backtest.</li>
+      </ul>
+    </div>
+    <p>The headline: LIMIT vs MARKET is not really a "which is better" question — it's a tradeoff between <strong>fill certainty</strong> and <strong>fill price</strong>. A backtest, especially a bar-based one, prizes certainty. Live trading prizes price. You're tuning a backtest, so certainty wins — keep MARKET, and revisit LIMIT (carefully) only if and when you take a specific mean-reversion strategy toward live execution.</p>
+  </section>
+
+  <footer>
+    m-cube research report · MARKET vs LIMIT order tradeoff · exploratory analysis, no source code modified.<br>
+    Code references point to the repository state at the time of writing.
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,350 @@
+,total,locked,free,currency,account_id,account_type,base_currency,margins,reported,info
+2020-04-01 00:00:00+00:00,1000000.00,0.00,1000000.00,USD,Commodities_MS-001,MARGIN,USD,[],True,{}
+2020-04-01 04:45:00+00:00,999999.98,7.19,999992.79,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.19', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 04:45:00+00:00,997946.50,718725.35,279221.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '718725.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 05:45:00+00:00,997946.21,718718.16,279228.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '718718.16', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 05:45:00+00:00,968918.00,0.00,968918.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 05:45:00+00:00,968917.98,7.09,968910.89,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.09', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 05:45:00+00:00,966891.50,709274.65,257616.85,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '709274.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 10:30:00+00:00,966891.18,709267.56,257623.62,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '709267.56', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 10:30:00+00:00,934833.00,0.00,934833.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 10:30:00+00:00,934832.98,7.20,934825.78,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.20', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 10:30:00+00:00,932776.50,719775.35,213001.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '719775.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:00:00+00:00,932776.17,719768.15,213008.02,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '719768.15', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:00:00+00:00,899749.00,0.00,899749.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 13:00:00+00:00,899748.98,7.09,899741.89,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.09', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:00:00+00:00,897723.50,708924.65,188798.85,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '708924.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:15:00+00:00,897723.22,708917.56,188805.66,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '708917.56', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:15:00+00:00,869670.00,0.00,869670.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 13:15:00+00:00,869669.98,7.18,869662.80,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.18', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:15:00+00:00,867618.50,718025.35,149593.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '718025.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:45:00+00:00,867618.29,718018.17,149600.12,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '718018.17', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:45:00+00:00,846584.00,0.00,846584.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 13:45:00+00:00,846583.98,7.11,846576.87,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.11', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 13:45:00+00:00,844551.50,711374.65,133176.85,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '711374.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 15:45:00+00:00,844551.09,711367.54,133183.55,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '711367.54', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 15:45:00+00:00,803478.00,0.00,803478.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 15:45:00+00:00,803477.98,7.25,803470.73,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.25', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 15:45:00+00:00,801406.50,725025.35,76381.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '725025.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 16:45:00+00:00,801405.94,725018.10,76387.84,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '725018.10', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 16:45:00+00:00,745886.50,0.00,745886.50,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 16:45:00+00:00,745886.48,7.06,745879.42,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.06', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 16:45:00+00:00,743868.50,706299.65,37568.85,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '706299.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 18:15:00+00:00,743867.73,706292.59,37575.14,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '706292.59', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 18:15:00+00:00,666273.00,0.00,666273.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-01 18:15:00+00:00,666272.98,7.33,666265.65,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.33', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-01 18:15:00+00:00,664179.50,664179.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '732725.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 13:45:00+00:00,664180.32,664180.32,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '732718.02', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 13:45:00+00:00,746000.00,0.00,746000.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-02 13:45:00+00:00,745999.98,7.62,745992.36,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.62', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 13:45:00+00:00,743822.50,743822.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '762124.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 14:30:00+00:00,743821.43,743821.43,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '762117.03', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 14:30:00+00:00,636437.90,0.00,636437.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-02 14:30:00+00:00,636437.88,7.99,636429.89,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.99', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-02 14:30:00+00:00,634155.30,634155.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '798910.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 00:15:00+00:00,634156.41,634156.41,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '798902.36', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 00:15:00+00:00,745656.80,0.00,745656.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-03 00:15:00+00:00,745656.78,8.39,745648.39,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.39', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 00:15:00+00:00,743260.30,743260.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '838774.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 07:00:00+00:00,743259.46,743259.46,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '838766.26', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 07:00:00+00:00,658779.80,0.00,658779.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-03 07:00:00+00:00,658779.78,8.67,658771.11,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.67', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-03 07:00:00+00:00,656301.30,656301.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '867475.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-05 22:00:00+00:00,656302.01,656302.01,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '867466.68', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-05 22:00:00+00:00,727746.80,0.00,727746.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-05 22:00:00+00:00,727746.77,8.93,727737.84,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.93', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-05 22:00:00+00:00,725194.30,725194.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '893374.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 04:00:00+00:00,725192.40,725192.40,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '893365.72', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 04:00:00+00:00,535452.80,0.00,535452.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-06 04:00:00+00:00,535452.77,9.59,535443.18,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.59', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 04:00:00+00:00,532713.30,532713.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '958825.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 10:15:00+00:00,532713.05,532713.05,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '958815.76', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 10:15:00+00:00,507993.80,0.00,507993.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-06 10:15:00+00:00,507993.77,9.51,507984.26,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.51', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 10:15:00+00:00,505276.30,505276.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '951124.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 23:00:00+00:00,505276.69,505276.69,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '951115.14', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 23:00:00+00:00,544598.80,0.00,544598.80,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-06 23:00:00+00:00,544598.77,9.36,544589.41,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.36', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-06 23:00:00+00:00,541923.30,541923.30,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '936425.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 06:45:00+00:00,541923.31,541923.31,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '936415.99', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 06:45:00+00:00,543441.60,0.00,543441.60,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-07 06:45:00+00:00,543441.57,9.38,543432.19,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.38', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 06:45:00+00:00,540761.90,540761.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '937894.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 07:00:00+00:00,540761.69,540761.69,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '937885.27', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 07:00:00+00:00,519261.40,0.00,519261.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-07 07:00:00+00:00,519261.37,9.44,519251.93,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.44', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 07:00:00+00:00,516562.90,516562.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '944475.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 11:15:00+00:00,516562.75,516562.75,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '944465.91', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 11:15:00+00:00,502074.20,0.00,502074.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-07 11:15:00+00:00,502074.17,9.40,502064.77,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.40', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-07 11:15:00+00:00,499387.50,499387.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '940344.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 00:15:00+00:00,499389.25,499389.25,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '940335.25', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 00:15:00+00:00,674076.00,0.00,674076.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-08 00:15:00+00:00,674075.98,8.78,674067.20,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.78', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 00:15:00+00:00,671566.50,671566.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '878325.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 06:45:00+00:00,671565.96,671565.96,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '878316.57', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 06:45:00+00:00,618106.00,0.00,618106.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-08 06:45:00+00:00,618105.98,8.60,618097.38,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.60', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 06:45:00+00:00,615647.50,615647.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '860474.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 14:00:00+00:00,615647.12,615647.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '860466.05', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 14:00:00+00:00,577151.00,0.00,577151.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-08 14:00:00+00:00,577150.98,8.73,577142.25,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.73', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 14:00:00+00:00,574656.50,574656.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '873075.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 16:30:00+00:00,574655.88,574655.88,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '873066.62', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 16:30:00+00:00,513219.00,0.00,513219.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-08 16:30:00+00:00,513218.98,8.52,513210.46,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.52', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 16:30:00+00:00,510783.50,510783.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '852424.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 18:30:00+00:00,510782.62,510782.62,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '852416.13', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 18:30:00+00:00,422260.00,0.00,422260.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-08 18:30:00+00:00,422259.98,8.83,422251.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.83', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-08 18:30:00+00:00,419738.50,419738.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '882525.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 03:00:00+00:00,419738.99,419738.99,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '882516.52', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 03:00:00+00:00,469163.00,0.00,469163.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-09 03:00:00+00:00,469162.97,9.01,469153.96,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.01', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 03:00:00+00:00,466589.50,466589.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '900724.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 06:30:00+00:00,466589.07,466589.07,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '900715.64', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 06:30:00+00:00,422973.00,0.00,422973.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-09 06:30:00+00:00,422972.97,9.15,422963.82,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.15', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 06:30:00+00:00,420358.50,420358.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '915075.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 12:00:00+00:00,420358.26,420358.26,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '915066.20', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 12:00:00+00:00,396763.00,0.00,396763.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-09 12:00:00+00:00,396762.97,9.08,396753.89,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.08', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 12:00:00+00:00,394169.50,394169.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '907724.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 13:45:00+00:00,394168.61,394168.61,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '907715.57', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 13:45:00+00:00,305488.00,0.00,305488.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-09 13:45:00+00:00,305487.97,9.38,305478.59,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '9.38', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 13:45:00+00:00,302808.50,302808.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '937825.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 15:45:00+00:00,302807.05,302807.05,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '937815.97', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 15:45:00+00:00,158269.00,0.00,158269.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-09 15:45:00+00:00,158268.98,8.88,158260.10,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.88', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-09 15:45:00+00:00,155731.50,155731.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '888124.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:00:00+00:00,155733.02,155733.02,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '888115.77', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:00:00+00:00,307846.50,0.00,307846.50,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-12 22:00:00+00:00,307846.48,8.34,307838.14,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.34', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:00:00+00:00,305463.50,305463.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '834050.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:15:00+00:00,305461.96,305461.96,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '834042.01', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:15:00+00:00,151730.00,0.00,151730.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-12 22:15:00+00:00,151729.98,7.81,151722.17,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.81', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-12 22:15:00+00:00,149498.50,149498.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '781024.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 00:15:00+00:00,149497.12,149497.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '781016.84', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 00:15:00+00:00,11129.00,0.00,11129.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-13 00:15:00+00:00,11128.98,8.29,11120.69,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.29', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 00:15:00+00:00,8761.50,8761.50,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '828625.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 06:00:00+00:00,8761.37,8761.37,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '828617.06', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 06:00:00+00:00,-4497.10,-4497.10,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-13 06:00:00+00:00,-4497.12,-4497.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.25', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 06:00:00+00:00,-6853.70,-6853.70,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '824809.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 13:45:00+00:00,-6853.58,-6853.58,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '824801.40', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 13:45:00+00:00,4801.70,0.00,4801.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-13 13:45:00+00:00,4801.68,8.20,4793.48,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.20', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 13:45:00+00:00,2459.10,2459.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '819910.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 16:15:00+00:00,2458.64,2458.64,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '819902.15', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 16:15:00+00:00,-43941.40,-43941.40,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-13 16:15:00+00:00,-43941.42,-43941.42,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.04', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 16:15:00+00:00,-46239.90,-46239.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '804474.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 23:15:00+00:00,-46239.85,-46239.85,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '804466.61', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 23:15:00+00:00,-41533.40,-41533.40,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-13 23:15:00+00:00,-41533.42,-41533.42,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.02', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-13 23:15:00+00:00,-43824.90,-43824.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '802025.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-14 02:30:00+00:00,-43825.29,-43825.29,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '802017.33', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-14 02:30:00+00:00,-83081.40,-83081.40,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-14 02:30:00+00:00,-83081.42,-83081.42,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.89', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-14 02:30:00+00:00,-85335.90,-85335.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '789074.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 13:45:00+00:00,-85333.51,-85333.51,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '789066.76', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 13:45:00+00:00,153648.60,0.00,153648.60,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-15 13:45:00+00:00,153648.58,7.05,153641.53,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.05', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 13:45:00+00:00,151635.10,151635.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '704725.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 15:00:00+00:00,151634.35,151634.35,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '704718.30', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 15:00:00+00:00,76692.60,0.00,76692.60,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-15 15:00:00+00:00,76692.58,6.79,76685.79,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.79', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 15:00:00+00:00,74752.10,74752.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '679174.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 17:00:00+00:00,74751.51,74751.51,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '679167.86', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 17:00:00+00:00,15752.60,0.00,15752.60,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-15 17:00:00+00:00,15752.58,6.99,15745.59,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.99', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-15 17:00:00+00:00,13755.10,13755.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '699125.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 03:30:00+00:00,13755.18,13755.18,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '699118.36', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 03:30:00+00:00,22245.10,0.00,22245.10,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 03:30:00+00:00,22245.08,7.03,22238.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.03', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 03:30:00+00:00,20237.10,20237.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '702799.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 08:45:00+00:00,20236.94,20236.94,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '702792.62', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 08:45:00+00:00,3612.50,0.00,3612.50,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 08:45:00+00:00,3612.48,7.08,3605.40,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.08', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 08:45:00+00:00,1589.90,1589.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '707910.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 14:15:00+00:00,1589.55,1589.55,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '707903.27', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 14:15:00+00:00,-33501.60,-33501.60,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 14:15:00+00:00,-33501.62,-33501.62,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.96', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 14:15:00+00:00,-35491.10,-35491.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '696324.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:30:00+00:00,-35491.46,-35491.46,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '696317.69', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:30:00+00:00,-71516.60,-71516.60,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 15:30:00+00:00,-71516.62,-71516.62,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.08', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:30:00+00:00,-73540.10,-73540.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '708225.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:45:00+00:00,-73540.38,-73540.38,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '708218.27', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:45:00+00:00,-101539.60,-101539.60,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 15:45:00+00:00,-101539.62,-101539.62,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.99', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 15:45:00+00:00,-103537.10,-103537.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '699124.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 22:30:00+00:00,-103537.19,-103537.19,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '699117.66', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 22:30:00+00:00,-113044.10,-113044.10,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-16 22:30:00+00:00,-113044.12,-113044.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.02', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-16 22:30:00+00:00,-115049.10,-115049.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '701750.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 02:45:00+00:00,-115049.51,-115049.51,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '701743.33', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 02:45:00+00:00,-155517.60,-155517.60,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-17 02:45:00+00:00,-155517.62,-155517.62,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.88', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 02:45:00+00:00,-157484.10,-157484.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '688274.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 20:45:00+00:00,-157482.81,-157482.81,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '688267.77', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 20:45:00+00:00,-28822.10,-28822.10,0.00,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-17 20:45:00+00:00,-28822.12,-28822.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.43', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-17 20:45:00+00:00,-30658.10,-30658.10,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '642600.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 08:45:00+00:00,-30653.17,-30653.17,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '642593.92', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 08:45:00+00:00,462508.40,0.00,462508.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-20 08:45:00+00:00,462508.38,8.16,462500.22,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '8.16', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 08:45:00+00:00,460176.90,460176.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '816024.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:15:00+00:00,460177.37,460177.37,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '816016.49', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:15:00+00:00,507392.90,0.00,507392.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-20 16:15:00+00:00,507392.88,7.99,507384.89,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.99', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:15:00+00:00,505110.90,505110.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '798700.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:30:00+00:00,505110.67,505110.67,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '798692.36', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:30:00+00:00,482347.40,0.00,482347.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-20 16:30:00+00:00,482347.38,7.92,482339.46,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.92', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:30:00+00:00,480085.90,480085.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '791524.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:45:00+00:00,480085.71,480085.71,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '791516.73', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:45:00+00:00,461305.90,0.00,461305.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-20 16:45:00+00:00,461305.88,7.97,461297.91,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.97', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 16:45:00+00:00,459027.90,459027.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '797300.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 17:00:00+00:00,459027.34,459027.34,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '797292.38', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 17:00:00+00:00,403301.40,0.00,403301.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-20 17:00:00+00:00,403301.38,7.79,403293.59,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.79', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-20 17:00:00+00:00,401076.90,401076.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '778574.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 00:45:00+00:00,401077.24,401077.24,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '778566.86', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 00:45:00+00:00,435386.90,0.00,435386.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-21 00:45:00+00:00,435386.88,7.66,435379.22,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.66', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 00:45:00+00:00,433198.90,433198.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '765800.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 03:00:00+00:00,433198.12,433198.12,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '765792.69', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 03:00:00+00:00,355584.40,0.00,355584.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-21 03:00:00+00:00,355584.38,7.39,355576.99,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '7.39', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 03:00:00+00:00,353471.90,353471.90,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '739374.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 21:15:00+00:00,353479.88,353479.88,0.00,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '739367.26', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 21:15:00+00:00,1151656.90,0.00,1151656.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-21 21:15:00+00:00,1151656.89,4.60,1151652.29,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.60', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-21 21:15:00+00:00,1150343.90,459550.35,690793.55,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '459550.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 02:00:00+00:00,1150343.70,459545.75,690797.95,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '459545.75', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 02:00:00+00:00,1130047.90,0.00,1130047.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-22 02:00:00+00:00,1130047.89,4.53,1130043.36,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.53', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 02:00:00+00:00,1128753.90,452899.65,675854.25,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '452899.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 10:45:00+00:00,1128755.19,452895.12,675860.07,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '452895.12', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 10:45:00+00:00,1257587.90,0.00,1257587.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-22 10:45:00+00:00,1257587.89,4.07,1257583.82,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.07', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 10:45:00+00:00,1256423.90,407400.35,849023.55,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '407400.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:00:00+00:00,1256423.51,407396.28,849027.23,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '407396.28', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:00:00+00:00,1217295.90,0.00,1217295.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-22 12:00:00+00:00,1217295.89,3.94,1217291.95,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '3.94', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:00:00+00:00,1216169.90,394099.65,822070.25,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '394099.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:15:00+00:00,1216169.30,394095.71,822073.59,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '394095.71', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:15:00+00:00,1156483.40,0.00,1156483.40,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-22 12:15:00+00:00,1156483.39,4.15,1156479.24,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.15', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-22 12:15:00+00:00,1155298.90,414575.35,740723.55,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '414575.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 01:00:00+00:00,1155300.61,414571.20,740729.41,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '414571.20', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 01:00:00+00:00,1326439.90,0.00,1326439.90,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 01:00:00+00:00,1326439.89,4.75,1326435.14,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.75', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 01:00:00+00:00,1325082.90,474949.65,850133.25,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '474949.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 03:30:00+00:00,1325082.12,474944.90,850137.22,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '474944.90', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 03:30:00+00:00,1247047.30,0.00,1247047.30,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 03:30:00+00:00,1247047.29,5.02,1247042.27,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.02', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 03:30:00+00:00,1245613.70,501760.35,743853.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '501760.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 18:15:00+00:00,1245615.75,501755.33,743860.42,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '501755.33', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 18:15:00+00:00,1450371.70,0.00,1450371.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 18:15:00+00:00,1450371.68,5.74,1450365.94,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.74', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 18:15:00+00:00,1448731.70,573999.65,874732.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '573999.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 20:45:00+00:00,1448731.00,573993.91,874737.09,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '573993.91', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 20:45:00+00:00,1379021.70,0.00,1379021.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 20:45:00+00:00,1379021.68,5.98,1379015.70,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.98', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 20:45:00+00:00,1377313.70,597800.35,779513.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '597800.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 21:00:00+00:00,1377313.44,597794.37,779519.07,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '597794.37', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 21:00:00+00:00,1351128.20,0.00,1351128.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 21:00:00+00:00,1351128.18,5.89,1351122.29,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.89', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 21:00:00+00:00,1349444.70,589224.65,760220.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '589224.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 23:15:00+00:00,1349444.29,589218.76,760225.53,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '589218.76', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 23:15:00+00:00,1308720.20,0.00,1308720.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-23 23:15:00+00:00,1308720.18,6.03,1308714.15,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.03', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-23 23:15:00+00:00,1306997.70,602875.35,704122.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '602875.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 06:00:00+00:00,1306997.38,602869.32,704128.06,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '602869.32', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 06:00:00+00:00,1275303.20,0.00,1275303.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-24 06:00:00+00:00,1275303.18,5.92,1275297.26,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.92', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 06:00:00+00:00,1273610.70,592374.65,681236.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '592374.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 11:30:00+00:00,1273610.57,592368.73,681241.84,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '592368.73', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 11:30:00+00:00,1260404.70,0.00,1260404.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-24 11:30:00+00:00,1260404.68,5.96,1260398.72,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.96', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 11:30:00+00:00,1258700.70,596400.35,662300.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '596400.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 16:15:00+00:00,1258700.31,596394.39,662305.92,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '596394.39', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 16:15:00+00:00,1220031.70,0.00,1220031.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-24 16:15:00+00:00,1220031.68,5.83,1220025.85,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.83', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 16:15:00+00:00,1218364.70,583449.65,634915.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '583449.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 17:45:00+00:00,1218364.06,583443.82,634920.24,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '583443.82', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 17:45:00+00:00,1154633.70,0.00,1154633.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-24 17:45:00+00:00,1154633.68,6.05,1154627.63,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.05', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-24 17:45:00+00:00,1152904.70,605150.35,547754.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '605150.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-26 22:00:00+00:00,1152904.07,605144.30,547759.77,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '605144.30', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-26 22:00:00+00:00,1090234.70,0.00,1090234.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-26 22:00:00+00:00,1090234.68,5.84,1090228.84,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.84', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-26 22:00:00+00:00,1088566.70,583799.65,504767.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '583799.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 18:45:00+00:00,1088570.28,583793.81,504776.47,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '583793.81', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 18:45:00+00:00,1446255.70,0.00,1446255.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 18:45:00+00:00,1446255.69,4.58,1446251.11,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.58', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 18:45:00+00:00,1444946.70,458150.35,986796.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '458150.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 21:45:00+00:00,1444946.48,458145.77,986800.71,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '458145.77', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 21:45:00+00:00,1423156.20,0.00,1423156.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 21:45:00+00:00,1423156.19,4.51,1423151.68,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.51', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 21:45:00+00:00,1421867.70,450974.65,970893.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '450974.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:00:00+00:00,1421867.54,450970.14,970897.40,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '450970.14', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:00:00+00:00,1406062.70,0.00,1406062.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 22:00:00+00:00,1406062.69,4.56,1406058.13,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.56', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:00:00+00:00,1404759.70,456050.35,948709.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '456050.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:15:00+00:00,1404759.53,456045.79,948713.74,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '456045.79', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:15:00+00:00,1387970.20,0.00,1387970.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 22:15:00+00:00,1387970.19,4.51,1387965.68,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.51', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:15:00+00:00,1386682.70,450624.65,936058.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '450624.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:30:00+00:00,1386682.46,450620.14,936062.32,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '450620.14', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:30:00+00:00,1362370.20,0.00,1362370.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 22:30:00+00:00,1362370.19,4.59,1362365.60,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.59', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 22:30:00+00:00,1361059.70,458675.35,902384.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '458675.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 23:00:00+00:00,1361059.39,458670.76,902388.63,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '458670.76', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 23:00:00+00:00,1330276.70,0.00,1330276.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-27 23:00:00+00:00,1330276.69,4.48,1330272.21,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.48', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-27 23:00:00+00:00,1328995.70,448349.65,880646.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '448349.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-28 09:45:00+00:00,1328996.41,448345.17,880651.24,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '448345.17', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-28 09:45:00+00:00,1399784.70,0.00,1399784.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-28 09:45:00+00:00,1399784.69,4.23,1399780.46,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.23', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-28 09:45:00+00:00,1398575.70,423150.35,975425.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '423150.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:15:00+00:00,1398576.96,423146.12,975430.84,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '423146.12', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:15:00+00:00,1524237.70,0.00,1524237.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-29 06:15:00+00:00,1524237.69,4.68,1524233.01,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.68', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:15:00+00:00,1522901.70,467599.65,1055302.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '467599.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:45:00+00:00,1522901.10,467594.97,1055306.13,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '467594.97', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:45:00+00:00,1463005.20,0.00,1463005.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-29 06:45:00+00:00,1463005.19,4.88,1463000.31,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '4.88', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 06:45:00+00:00,1461610.70,488075.35,973535.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '488075.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 18:45:00+00:00,1461611.92,488070.47,973541.45,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '488070.47', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 18:45:00+00:00,1583590.70,0.00,1583590.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-29 18:45:00+00:00,1583590.69,5.31,1583585.38,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.31', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 18:45:00+00:00,1582072.70,531299.65,1050773.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '531299.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 22:00:00+00:00,1582072.28,531294.34,1050777.94,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '531294.34', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 22:00:00+00:00,1540012.20,0.00,1540012.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-29 22:00:00+00:00,1540012.19,5.45,1540006.74,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.45', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-29 22:00:00+00:00,1538453.70,545475.35,992978.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '545475.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 13:15:00+00:00,1538454.94,545469.90,992985.04,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '545469.90', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 13:15:00+00:00,1662267.70,0.00,1662267.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-30 13:15:00+00:00,1662267.68,5.89,1662261.79,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '5.89', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 13:15:00+00:00,1660583.70,589399.65,1071184.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '589399.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 14:00:00+00:00,1660582.54,589393.76,1071188.78,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '589393.76', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 14:00:00+00:00,1544783.70,0.00,1544783.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-30 14:00:00+00:00,1544783.68,6.29,1544777.39,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.29', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 14:00:00+00:00,1542985.70,629300.35,913685.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '629300.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 17:45:00+00:00,1542984.94,629294.06,913690.88,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '629294.06', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 17:45:00+00:00,1467259.70,0.00,1467259.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-30 17:45:00+00:00,1467259.68,6.03,1467253.65,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.03', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 17:45:00+00:00,1465535.70,603399.65,862136.05,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '603399.65', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 18:30:00+00:00,1465534.44,603393.62,862140.82,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '603393.62', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 18:30:00+00:00,1339685.70,0.00,1339685.70,USD,Commodities_MS-001,MARGIN,USD,[],False,{}
+2020-04-30 18:30:00+00:00,1339685.68,6.47,1339679.21,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '6.47', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 18:30:00+00:00,1337837.70,646800.35,691037.35,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '646800.35', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 23:59:00+00:00,1337838.74,646793.88,691044.86,USD,Commodities_MS-001,MARGIN,USD,"[{'type': 'MarginBalance', 'initial': '0.00', 'maintenance': '646793.88', 'currency': 'USD', 'instrument_id': 'EURUSD.Commodities_MS'}]",False,{}
+2020-04-30 23:59:00+00:00,1441382.20,0.00,1441382.20,USD,Commodities_MS-001,MARGIN,USD,[],False,{}

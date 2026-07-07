@@ -137,6 +137,126 @@ def get_multiplier(user_id: Optional[str]) -> float:
     return m if m > 0 else 1.0
 
 
+def get_user_max_loss(user_id: Optional[str]) -> Optional[float]:
+    """User-level Max Loss cap (spec §3 Level 3). Absolute amount in base ccy.
+
+    None = no cap. Used by the portfolio runner to short-circuit further
+    trading when cumulative PnL across all of this user's portfolios reaches
+    the limit. Stored as ``max_loss`` on the user record.
+    """
+    user = get_user(user_id)
+    if not user:
+        return None
+    raw = user.get("max_loss")
+    if raw is None:
+        return None
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return abs(v) if v else None
+
+
+def get_user_trailing_sl(user_id: Optional[str]) -> Optional[dict]:
+    """User-level Trailing SL config (spec execution_logic.html §6.1).
+
+    Returns ``{"every": float, "by": float}`` when the user has enabled a
+    trailing SL with positive ratchet parameters, else None. The runner
+    walks the user's combined equity curve, ratcheting the Max-Loss cap
+    tighter by ``by`` for every ``every`` of combined profit gained.
+    """
+    user = get_user(user_id)
+    if not user:
+        return None
+    if not user.get("trailing_sl_enabled"):
+        return None
+    try:
+        every = float(user.get("trailing_sl_every") or 0.0)
+        by = float(user.get("trailing_sl_by") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if every <= 0 or by <= 0:
+        return None
+    return {"every": every, "by": by}
+
+
+def get_user_trailing_target(user_id: Optional[str]) -> Optional[dict]:
+    """User-level Trailing Target / Profit-Lock config (spec §6.1, target doc).
+
+    Returns ``{"when_reach": float, "lock": float, "every": float, "by": float}``
+    when the user has enabled a trailing target with a positive activation
+    threshold, else None. The runner walks the user's combined equity curve:
+    once combined profit reaches ``when_reach`` a floor is locked at ``lock``
+    and ratcheted up by ``by`` for every ``every`` of further combined profit;
+    a fall back to the floor force-sqoffs all the user's portfolios.
+    """
+    user = get_user(user_id)
+    if not user:
+        return None
+    if not user.get("trailing_tgt_enabled"):
+        return None
+    try:
+        when_reach = float(user.get("trailing_tgt_when_reach") or 0.0)
+        lock = float(user.get("trailing_tgt_lock") or 0.0)
+        every = float(user.get("trailing_tgt_every") or 0.0)
+        by = float(user.get("trailing_tgt_by") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if when_reach <= 0:
+        return None
+    return {"when_reach": when_reach, "lock": lock, "every": every, "by": by}
+
+
+def get_user_max_profit(user_id: Optional[str]) -> Optional[float]:
+    """User-level Max Profit cap (spec §3 Level 3). Mirrors Max Loss."""
+    user = get_user(user_id)
+    if not user:
+        return None
+    raw = user.get("max_profit")
+    if raw is None:
+        return None
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return abs(v) if v else None
+
+
+# Cumulative PnL aggregator across all portfolios for a given user, used by
+# the user-level Max Loss / Max Profit caps (spec §3). The orchestrator
+# updates this after each portfolio finishes; the runner reads it at the
+# start of the next run to decide whether to skip / clip early.
+_USER_PNL_AGGREGATOR: dict[str, float] = {}
+
+
+def get_user_cumulative_pnl(user_id: Optional[str]) -> float:
+    """Return the cumulative PnL across all portfolios for this user, 0.0 if unknown."""
+    if not user_id:
+        return 0.0
+    return _USER_PNL_AGGREGATOR.get(user_id, 0.0)
+
+
+def add_user_pnl(user_id: Optional[str], pnl_delta: float) -> float:
+    """Add a portfolio's final PnL to the user's cumulative aggregate.
+
+    Returns the new total. Idempotent on (user_id, None) — no-op if user_id is empty.
+    """
+    if not user_id:
+        return 0.0
+    cur = _USER_PNL_AGGREGATOR.get(user_id, 0.0)
+    new = cur + float(pnl_delta or 0.0)
+    _USER_PNL_AGGREGATOR[user_id] = new
+    return new
+
+
+def reset_user_pnl(user_id: Optional[str] = None) -> None:
+    """Reset the per-user PnL aggregator. None clears all users."""
+    if user_id is None:
+        _USER_PNL_AGGREGATOR.clear()
+    else:
+        _USER_PNL_AGGREGATOR.pop(user_id, None)
+
+
 def get_allowed_instruments(user_id: Optional[str]) -> Optional[list[str]]:
     """Return the user's allowed-instruments whitelist, uppercased.
 
@@ -212,4 +332,45 @@ def validate_registry_payload(payload: dict) -> tuple[bool, str]:
             return False, f"users[{i}].allowed_instruments must be a list or null"
         if isinstance(ai, list) and not all(isinstance(s, str) for s in ai):
             return False, f"users[{i}].allowed_instruments must be a list of strings"
+        # User-level Max Loss / Max Profit (spec §3 Level 3). Both optional;
+        # null/missing → no cap. Numeric & finite when present.
+        for cap_field in ("max_loss", "max_profit"):
+            cap_val = u.get(cap_field)
+            if cap_val is None:
+                continue
+            try:
+                cf = float(cap_val)
+            except (TypeError, ValueError):
+                return False, f"users[{i}].{cap_field} must be numeric or null"
+            if cf != cf:  # NaN check
+                return False, f"users[{i}].{cap_field} must be a finite number"
+        # User-level Trailing SL (spec execution_logic.html §6.1). All optional.
+        tsl_enabled = u.get("trailing_sl_enabled")
+        if tsl_enabled is not None and not isinstance(tsl_enabled, bool):
+            return False, f"users[{i}].trailing_sl_enabled must be a boolean or omitted"
+        for tsl_field in ("trailing_sl_every", "trailing_sl_by"):
+            tsl_val = u.get(tsl_field)
+            if tsl_val is None:
+                continue
+            try:
+                tv = float(tsl_val)
+            except (TypeError, ValueError):
+                return False, f"users[{i}].{tsl_field} must be numeric or null"
+            if tv != tv or tv < 0:
+                return False, f"users[{i}].{tsl_field} must be a non-negative number"
+        # User-level Trailing Target / Profit-Lock (spec §6.1 target doc).
+        ttg_enabled = u.get("trailing_tgt_enabled")
+        if ttg_enabled is not None and not isinstance(ttg_enabled, bool):
+            return False, f"users[{i}].trailing_tgt_enabled must be a boolean or omitted"
+        for ttg_field in ("trailing_tgt_when_reach", "trailing_tgt_lock",
+                          "trailing_tgt_every", "trailing_tgt_by"):
+            ttg_val = u.get(ttg_field)
+            if ttg_val is None:
+                continue
+            try:
+                gv = float(ttg_val)
+            except (TypeError, ValueError):
+                return False, f"users[{i}].{ttg_field} must be numeric or null"
+            if gv != gv or gv < 0:
+                return False, f"users[{i}].{ttg_field} must be a non-negative number"
     return True, ""

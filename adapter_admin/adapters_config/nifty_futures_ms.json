@@ -1,0 +1,30 @@
+{
+  "id": "nifty_futures_ms",
+  "name": "NIFTY_FUTURES_MS",
+  "venue": "NIFTY_FUTURES_MS",
+  "exchange_type": "NIFY_FUTURES_MS",
+  "asset_class": "index",
+  "is_custom": true,
+  "custom_adapter_file": null,
+  "testnet": true,
+  "data_config": {
+    "api_key": "",
+    "api_secret": "",
+    "base_url": "https://api.myexchange.com",
+    "testnet": true,
+    "ws_url": "wss://ws.myexchange.com/stream"
+  },
+  "exec_config": {
+    "api_key": "",
+    "api_secret": "",
+    "base_url": "https://api.myexchange.com",
+    "testnet": true,
+    "ws_url": "wss://ws.myexchange.com/stream"
+  },
+  "account_base_currency": "INR",
+  "fx_conversion": {},
+  "created_at": "2026-05-19T16:46:15.439516",
+  "updated_at": "2026-06-20T11:30:15.603721",
+  "session_start_time": "03:45:00",
+  "session_end_time": "13:44:00"
+}
