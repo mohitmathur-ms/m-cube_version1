@@ -147,7 +147,12 @@
       "Bash(sleep 5)",
       "Bash(echo READY)",
       "PowerShell(\"---CONTAINERIZATION---\")",
-      "PowerShell(\"---STATIC TOP---\")"
+      "PowerShell(\"---STATIC TOP---\")",
+      "Bash(rm -rf d:/m-cube_version1/.claude/agents/dckr_docs/docs)",
+      "Bash([ -d \"$BASE/docs\" ])",
+      "Bash(chmod -R u+w d:/m-cube_version1/.claude/agents/dckr_docs/docs)",
+      "Bash(git check-ignore *)",
+      "Bash(xargs echo \"code blocks:\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADMIN\\.claude\\plans",

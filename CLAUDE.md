@@ -41,6 +41,16 @@ prefer the **`ntm3`** subagent — it answers from the 28 concept PDFs under
 [.claude/agents/ntm3_docs/](.claude/agents/) for `nautilus_trader==1.224.0` and
 cites them. See [.claude/agents/ntm3.md](.claude/agents/ntm3.md).
 
+### Docker / containerization subagent (`dckr`)
+
+When a task touches running, building, deploying, or debugging m-cube (or an
+m-cube-like NautilusTrader system) **inside a container** — Dockerfiles,
+docker-compose, images, volumes, networking, env vars, resource limits, catalog
+persistence, process-pool workers in containers, CI image builds — prefer the
+**`dckr`** subagent. It answers from the knowledge base under
+[.claude/agents/dckr_docs/](.claude/agents/) and cites it. See
+[.claude/agents/dckr.md](.claude/agents/dckr.md).
+
 ## Commands
 
 This is a Windows-first codebase. The default shell is PowerShell.
